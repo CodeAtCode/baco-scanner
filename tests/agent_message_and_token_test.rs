@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 #[test]
 fn test_agent_message_with_tools_is_specific() {
-    let tools_used = vec!["file_read".to_string(), "pattern_search".to_string()];
+    let tools_used = ["file_read".to_string(), "pattern_search".to_string()];
     let turn_count = 3;
     let tools_list = tools_used.join(", ");
     let message = format!(

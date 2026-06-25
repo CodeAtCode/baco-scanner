@@ -117,10 +117,7 @@ mod tests {
         // .and_then(|v| v.as_array()) on missing "results" → None → unwrap_or(&vec![]) → []
         // .and_then(|v| v.as_u64())  → Some if line present, else None → continue
         // .and_then(|v| v.as_str())  → Some if check_id present, else None → continue
-        assert!(
-            true,
-            "parse_json_output contains continue paths for missing fields"
-        );
+        // parse_json_output contains continue paths for missing fields
     }
 
     #[test]

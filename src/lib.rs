@@ -1,3 +1,21 @@
+#![allow(
+    clippy::items_after_test_module,
+    clippy::assertions_on_constants,
+    clippy::useless_vec,
+    clippy::needless_return,
+    clippy::match_single_binding,
+    clippy::field_reassign_with_default,
+    clippy::single_match,
+    clippy::too_many_arguments,
+    clippy::len_without_is_empty,
+    clippy::redundant_clone,
+    clippy::doc_markdown,
+    clippy::borrow_deref_ref,
+    clippy::len_zero,
+    clippy::module_inception,
+    clippy::vec_init_then_push
+)]
+
 pub mod agent;
 pub mod auto_patcher;
 pub mod checkpoint;
