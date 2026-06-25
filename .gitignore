@@ -1,0 +1,10 @@
+cobertura.xml
+tarpaulin-report.html
+.opencode
+target
+baco-output
+config_*
+.baco
+findings.json
+checkpoint.json
+file_hashes.json

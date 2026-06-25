@@ -1,0 +1,40 @@
+[project]
+name = "test-project"
+path = "./tests/fixtures/sample-project"
+languages = ["c", "python"]
+
+[output]
+dir = "./tests/output"
+format = ["json"]
+
+[scanner]
+commit_lookback_days = 30
+max_file_size_kb = 100
+exclude_paths = []
+
+[llm]
+timeout_secs = 30
+max_retries = 2
+retry_backoff_ms = 1000
+max_concurrent = 2
+
+[llm.phases.discovery]
+base_url = "https://test-api.example.com/v1"
+api_key = "test-key"
+model = "test-model"
+
+[llm.phases.verification]
+base_url = "https://test-api.example.com/v1"
+api_key = "test-key"
+model = "test-model"
+
+[llm.phases.aggregation]
+base_url = "https://test-api.example.com/v1"
+api_key = "test-key"
+model = "test-model"
+
+[tickets]
+[[tickets.systems]]
+system_type = "github"
+url = "https://api.github.com"
+project = "test-repo"

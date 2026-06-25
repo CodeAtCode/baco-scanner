@@ -1,0 +1,13 @@
+{
+  "results": [
+    {
+      "check_id": "python.security.injection",
+      "path": "test.py",
+      "start": {"line": 42, "col": 10},
+      "extra": {
+        "message": "Potential SQL injection",
+        "metadata": {"cwe": ["CWE-89"]}
+      }
+    }
+  ]
+}

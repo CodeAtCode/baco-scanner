@@ -1,0 +1,98 @@
+# BACO Scanner Configuration
+# ===================================
+# This file contains all configuration options for the BACO vulnerability scanner.
+# Copy this file to config.toml and modify values as needed.
+#
+# Environment variables can override LLM API keys:
+# - LLM_DISCOVERY_KEY    -> overrides llm.phases.discovery.api_key
+# - LLM_VERIFICATION_KEY -> overrides llm.phases.verification.api_key
+# - LLM_AGGREGATION_KEY  -> overrides llm.phases.aggregation.api_key
+
+# Project configuration
+[project]
+# Name of the project being scanned
+name = "libxml2"
+# Path to the target directory to scan (must exist)
+path = "./libxml2-test"
+# Languages to scan (file extensions will be detected automatically)
+languages = ["c", "python"]
+
+# Output configuration
+[output]
+# Directory where reports and checkpoints will be written
+dir = "./baco-output"
+# Report formats to generate: ["json", "html", "both"]
+format = ["json", "html"]
+
+# Scanner settings
+[scanner]
+# Number of days to look back in git history for commit analysis
+commit_lookback_days = 90
+# Maximum file size in KB to index (skip larger files)
+max_file_size_kb = 512
+# Paths to exclude from scanning (use glob patterns like "tests/" or "docs/*")
+exclude_paths = ["tests/", "docs/", "target/"]
+
+[scanner.semgrep]
+exclude_rules = ["html.security.plaintext-http-link", "html.security.plaintext-http-link.plaintext-http-link"]
+
+# LLM configuration with per-phase settings
+[llm]
+# Timeout in seconds for LLM API requests
+timeout_secs = 60
+# Maximum number of retries for failed requests (on 429/5xx)
+max_retries = 3
+# Retry backoff in milliseconds (exponential: ms * 2^attempt)
+retry_backoff_ms = 2000
+# Maximum concurrent LLM requests (default: 4)
+max_concurrent = 4
+
+# Per-phase LLM configuration
+# Each phase can use a single model or multiple models (round-robin)
+# Use 'model' for single model (backward compatible)
+# Use 'models' for multiple models (takes precedence over 'model')
+
+[llm.phases]
+# Discovery phase: finds potential vulnerabilities in code
+[llm.phases.discovery]
+base_url = "https://api.mistral.ai/v1"
+api_key = "your-discovery-api-key"  # or set env: LLM_DISCOVERY_KEY
+# Single model (legacy):
+# model = "mistral-small"
+# Multiple models (round-robin selection):
+models = ["mistral-small", "mistral-medium", "codestral-latest"]
+
+# Verification phase: validates and enriches findings
+[llm.phases.verification]
+base_url = "https://api.mistral.ai/v1"
+api_key = "your-verification-api-key"  # or set env: LLM_VERIFICATION_KEY
+model = "qwen35"  # single model
+
+# Aggregation phase: generates executive summary and prioritizes
+[llm.phases.aggregation]
+base_url = "https://api.mistral.ai/v1"
+api_key = "your-aggregation-api-key"  # or set env: LLM_AGGREGATION_KEY
+model = "mistral-medium"  # stronger model for final report
+
+# Ticket system configuration (search for existing reports)
+[tickets]
+# Add multiple ticket systems by adding multiple [[tickets.systems]] blocks
+[[tickets.systems]]
+# Ticket system type: github | gitlab | bugzilla | jira
+system_type = "github"
+# URL to the ticket system (must include protocol: https://...)
+url = "https://github.com/GNOME/libxml2"
+# Optional API key for authentication
+# api_key = "your-github-token"  # optional, or set env: TICKET_GITHUB_KEY
+# Optional project key/ID for filtering
+project = "libxml2"
+
+# Agent configuration (advanced: automatic remediation agent)
+# Uncomment and configure to enable the agent-based remediation system.
+#[agent]
+# enabled = false       # Set to true to enable the agent
+# max_turns = 10        # Maximum agent conversation turns per issue
+# tool_timeout_secs = 30  # Timeout for individual tool executions
+# trusted_paths = ["."] # Filesystem paths the agent is allowed to access
+# keep_artifacts = false  # Keep agent work artifacts (logs, temp files)
+
