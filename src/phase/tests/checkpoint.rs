@@ -10,8 +10,7 @@ use chrono::Utc;
 use std::fs;
 use tempfile::TempDir;
 
-/// Create a minimal test finding
-
+// Create a minimal test finding
 // ========================================================================
 // CHECKPOINT TESTS (10 tests)
 // ========================================================================
@@ -24,10 +23,12 @@ fn test_field_preservation_checkpoint_field_integrity() {
     let temp_path = "/tmp/test_checkpoint_integrity.json";
 
     let mut checkpoint_with_finding = checkpoint;
-    checkpoint_with_finding.findings_so_far.push(finding.clone());
+    checkpoint_with_finding
+        .findings_so_far
+        .push(finding.clone());
     checkpoint_with_finding.file_count = 42;
-    checkpoint_with_finding.analyzed_files
-        = vec!["src/main.rs".to_string(), "src/utils.rs".to_string()];
+    checkpoint_with_finding.analyzed_files =
+        vec!["src/main.rs".to_string(), "src/utils.rs".to_string()];
     checkpoint_with_finding.save(temp_path).unwrap();
 
     let loaded = Checkpoint::load(temp_path).unwrap();
@@ -58,7 +59,10 @@ fn test_integration_checkpoint_resume_all_phases() {
         (ScanPhase::CrossFileAnalysis, ScanPhase::ConfidenceScoring),
         (ScanPhase::ConfidenceScoring, ScanPhase::AiAggregation),
         (ScanPhase::AiAggregation, ScanPhase::Reporting),
-        (ScanPhase::VariantSearch, ScanPhase::SecurityAgentVerification),
+        (
+            ScanPhase::VariantSearch,
+            ScanPhase::SecurityAgentVerification,
+        ),
         (ScanPhase::SecurityAgentVerification, ScanPhase::Complete),
         (ScanPhase::Reporting, ScanPhase::Indexing), // Simplified - real code goes to ThreatModeling
     ];
@@ -73,9 +77,18 @@ fn test_integration_checkpoint_resume_all_phases() {
         let next_phase = Checkpoint::resume_from(&temp_path).unwrap();
         // Note: Reporting resumes to ThreatModeling in real code, not Indexing
         if current == ScanPhase::Reporting {
-            assert_eq!(next_phase, ScanPhase::ThreatModeling, "Resume from {:?} failed", current);
+            assert_eq!(
+                next_phase,
+                ScanPhase::ThreatModeling,
+                "Resume from {:?} failed",
+                current
+            );
         } else {
-            assert_eq!(next_phase, expected_next, "Resume from {:?} failed", current);
+            assert_eq!(
+                next_phase, expected_next,
+                "Resume from {:?} failed",
+                current
+            );
         }
 
         let _ = fs::remove_file(&temp_path);
@@ -88,7 +101,11 @@ fn test_integration_checkpoint_persistence() {
     let temp_dir = TempDir::new().unwrap();
     let checkpoint_path = temp_dir.path().join("checkpoint.json");
 
-    let checkpoint = Checkpoint::new("persist-test", temp_dir.path().to_str().unwrap(), Utc::now());
+    let checkpoint = Checkpoint::new(
+        "persist-test",
+        temp_dir.path().to_str().unwrap(),
+        Utc::now(),
+    );
     checkpoint.save(checkpoint_path.to_str().unwrap()).unwrap();
 
     // Verify file exists
@@ -110,7 +127,9 @@ fn test_field_preservation_llm_model_checkpoint() {
 
     // Simulate adding finding to checkpoint
     let mut checkpoint_with_finding = checkpoint.clone();
-    checkpoint_with_finding.findings_so_far.push(finding.clone());
+    checkpoint_with_finding
+        .findings_so_far
+        .push(finding.clone());
     checkpoint_with_finding.save(temp_path).unwrap();
 
     let loaded = Checkpoint::load(temp_path).unwrap();

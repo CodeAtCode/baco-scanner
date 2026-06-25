@@ -3,8 +3,8 @@
 //! Generates and validates unified diff patches for vulnerability fixes.
 //! Uses StagingArea for safe validation in isolated git worktrees.
 
-use crate::staging::{PatchValidationResult, StagingArea};
 use crate::scanner_types::PatchCandidate;
+use crate::staging::{PatchValidationResult, StagingArea};
 use std::path::PathBuf;
 use thiserror::Error;
 
@@ -193,7 +193,10 @@ impl AutoPatcher {
 
         for finding in findings {
             if patch_count >= config.max_auto_patches {
-                tracing::info!("Reached max auto-patches ({}), stopping", config.max_auto_patches);
+                tracing::info!(
+                    "Reached max auto-patches ({}), stopping",
+                    config.max_auto_patches
+                );
                 break;
             }
 
@@ -203,11 +206,7 @@ impl AutoPatcher {
             };
 
             // Generate patch
-            let patch = self.generate_patch(
-                &finding.title,
-                code_snippet,
-                &finding.file_path,
-            )?;
+            let patch = self.generate_patch(&finding.title, code_snippet, &finding.file_path)?;
 
             // Validate patch
             let validation = self.validate_patch(&patch)?;
@@ -215,7 +214,8 @@ impl AutoPatcher {
             if validation.compiles && validation.tests_pass {
                 tracing::info!(
                     "Auto-patch validated for finding {} (file: {})",
-                    finding.id, finding.file_path
+                    finding.id,
+                    finding.file_path
                 );
                 patched_findings.push(finding.clone());
                 patch_count += 1;
@@ -223,7 +223,10 @@ impl AutoPatcher {
                 tracing::warn!(
                     "Auto-patch validation failed for finding {}: {}",
                     finding.id,
-                    validation.error_message.as_deref().unwrap_or("unknown error")
+                    validation
+                        .error_message
+                        .as_deref()
+                        .unwrap_or("unknown error")
                 );
                 // Keep the finding even if patch failed - manual review needed
                 patched_findings.push(finding.clone());

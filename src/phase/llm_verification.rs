@@ -27,7 +27,8 @@ impl ScanPhase for LlmVerificationPhase {
             reader.findings.clone()
         };
 
-        let Some(client) = crate::llm::create_llm_client_with_metrics(&ctx.scanner, "verification") else {
+        let Some(client) = crate::llm::create_llm_client_with_metrics(ctx.scanner, "verification")
+        else {
             tracing::debug!("No API key for verification, skipping LLM verification");
             return Ok(findings);
         };

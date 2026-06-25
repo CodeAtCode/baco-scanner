@@ -17,9 +17,8 @@ async fn test_empty_description_still_runs_agent_loop() {
     fs::write(&test_file, "void test() {}").unwrap();
 
     // Mock that returns empty description initially
-    let responses = vec![
-        make_chat_response(
-            r#"{
+    let responses = vec![make_chat_response(
+        r#"{
                 "title": "Empty Finding",
                 "description": "",
                 "severity": "Medium",
@@ -27,10 +26,9 @@ async fn test_empty_description_still_runs_agent_loop() {
                 "line_number": 0,
                 "code_snippet": ""
             }"#,
-            "test-model",
-            vec![],
-        ),
-    ];
+        "test-model",
+        vec![],
+    )];
 
     let mock_client = create_agent_mock_client(responses);
     let config = AgentConfig {
@@ -41,19 +39,14 @@ async fn test_empty_description_still_runs_agent_loop() {
         keep_artifacts: false,
     };
 
-    let session = AgentSession::new(
-        mock_client,
-        &config,
-        temp_dir.path(),
-        Arc::new(|_| {}),
-    );
+    let session = AgentSession::new(mock_client, &config, temp_dir.path(), Arc::new(|_| {}));
 
     let result = session.analyze_file(test_file.to_str().unwrap()).await;
-    
+
     // Agent loop should complete even with empty description
     assert!(result.is_ok());
     let finding = result.unwrap();
-    
+
     // Finding should still be created (may have empty fields)
     assert_eq!(finding.finding.title, "Empty Finding");
     assert_eq!(finding.finding.description, "");
@@ -66,9 +59,8 @@ async fn test_finding_with_no_code_snippet() {
     let test_file = temp_dir.path().join("test.c");
     fs::write(&test_file, "void test() {}").unwrap();
 
-    let responses = vec![
-        make_chat_response(
-            r#"{
+    let responses = vec![make_chat_response(
+        r#"{
                 "title": "Configuration Issue",
                 "description": "Insecure default configuration detected",
                 "severity": "Medium",
@@ -76,10 +68,9 @@ async fn test_finding_with_no_code_snippet() {
                 "line_number": null,
                 "code_snippet": null
             }"#,
-            "test-model",
-            vec![],
-        ),
-    ];
+        "test-model",
+        vec![],
+    )];
 
     let mock_client = create_agent_mock_client(responses);
     let config = AgentConfig {
@@ -90,19 +81,16 @@ async fn test_finding_with_no_code_snippet() {
         keep_artifacts: false,
     };
 
-    let session = AgentSession::new(
-        mock_client,
-        &config,
-        temp_dir.path(),
-        Arc::new(|_| {}),
-    );
+    let session = AgentSession::new(mock_client, &config, temp_dir.path(), Arc::new(|_| {}));
 
     let result = session.analyze_file(test_file.to_str().unwrap()).await;
-    
+
     assert!(result.is_ok());
     let finding = result.unwrap();
-    
+
     // Code snippet can be None for configuration issues
     assert_eq!(finding.finding.title, "Configuration Issue");
-    assert!(finding.finding.code_snippet.is_none() || finding.finding.code_snippet.unwrap().is_empty());
+    assert!(
+        finding.finding.code_snippet.is_none() || finding.finding.code_snippet.unwrap().is_empty()
+    );
 }

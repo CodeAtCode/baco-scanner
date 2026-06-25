@@ -16,7 +16,7 @@ use tempfile::TempDir;
 async fn test_file_read_tool_on_test_files() {
     let temp_dir = TempDir::new().unwrap();
     let test_file = temp_dir.path().join("test_source.c");
-    
+
     let expected_content = r#"
 #include <stdio.h>
 int main() {
@@ -25,13 +25,12 @@ int main() {
     return 0;
 }
 "#;
-    
+
     fs::write(&test_file, expected_content).unwrap();
 
     // Mock client that simulates file_read being called and returning content
-    let responses = vec![
-        make_chat_response(
-            r#"{
+    let responses = vec![make_chat_response(
+        r#"{
                 "title": "Buffer Overflow with scanf",
                 "description": "scanf without width limit causes buffer overflow",
                 "severity": "High",
@@ -39,10 +38,9 @@ int main() {
                 "line_number": 5,
                 "code_snippet": "scanf(\"%s\", buf);"
             }"#,
-            "test-model",
-            vec![],
-        ),
-    ];
+        "test-model",
+        vec![],
+    )];
 
     let mock_client = create_agent_mock_client(responses);
     let config = AgentConfig {
@@ -53,15 +51,10 @@ int main() {
         keep_artifacts: false,
     };
 
-    let session = AgentSession::new(
-        mock_client,
-        &config,
-        temp_dir.path(),
-        Arc::new(|_| {}),
-    );
+    let session = AgentSession::new(mock_client, &config, temp_dir.path(), Arc::new(|_| {}));
 
     let result = session.analyze_file(test_file.to_str().unwrap()).await;
-    
+
     assert!(result.is_ok());
     let finding = result.unwrap();
     assert_eq!(finding.finding.title, "Buffer Overflow with scanf");
@@ -73,13 +66,15 @@ int main() {
 #[tokio::test]
 async fn test_pattern_search_finds_vulnerabilities() {
     let temp_dir = TempDir::new().unwrap();
-    
+
     // Create a multi-file project with vulnerability
     let src_dir = temp_dir.path().join("src");
     fs::create_dir(&src_dir).unwrap();
-    
+
     let main_file = src_dir.join("main.c");
-    fs::write(&main_file, r#"
+    fs::write(
+        &main_file,
+        r#"
 #include <stdio.h>
 #include "utils.h"
 
@@ -89,10 +84,14 @@ int main(int argc, char *argv[]) {
     }
     return 0;
 }
-"#).unwrap();
+"#,
+    )
+    .unwrap();
 
     let utils_file = src_dir.join("utils.c");
-    fs::write(&utils_file, r#"
+    fs::write(
+        &utils_file,
+        r#"
 #include <string.h>
 
 void process_input(char *input) {
@@ -100,7 +99,9 @@ void process_input(char *input) {
     strcpy(buffer, input);  // Vulnerable: no bounds checking
     printf("Processed: %s\n", buffer);
 }
-"#).unwrap();
+"#,
+    )
+    .unwrap();
 
     let responses = vec![
         make_chat_response(
@@ -113,7 +114,10 @@ void process_input(char *input) {
                 "code_snippet": "strcpy(buffer, input);"
             }"#,
             "test-model",
-            vec![make_pattern_search_tool("strcpy", src_dir.to_str().unwrap())],
+            vec![make_pattern_search_tool(
+                "strcpy",
+                src_dir.to_str().unwrap(),
+            )],
         ),
         make_chat_response(
             r#"{
@@ -138,15 +142,10 @@ void process_input(char *input) {
         keep_artifacts: false,
     };
 
-    let session = AgentSession::new(
-        mock_client,
-        &config,
-        temp_dir.path(),
-        Arc::new(|_| {}),
-    );
+    let session = AgentSession::new(mock_client, &config, temp_dir.path(), Arc::new(|_| {}));
 
     let result = session.analyze_file(main_file.to_str().unwrap()).await;
-    
+
     assert!(result.is_ok());
     let finding = result.unwrap();
     assert!(finding.tools_used.contains(&"pattern_search".to_string()));
@@ -158,13 +157,17 @@ void process_input(char *input) {
 async fn test_file_write_generates_test_code() {
     let temp_dir = TempDir::new().unwrap();
     let vulnerable_file = temp_dir.path().join("vuln.c");
-    
-    fs::write(&vulnerable_file, r#"
+
+    fs::write(
+        &vulnerable_file,
+        r#"
 #include <string.h>
 void copy(char *dst, char *src) {
     strcpy(dst, src);
 }
-"#).unwrap();
+"#,
+    )
+    .unwrap();
 
     // Mock that simulates writing a PoC test
     let responses = vec![
@@ -206,21 +209,18 @@ void copy(char *dst, char *src) {
         keep_artifacts: false,
     };
 
-    let session = AgentSession::new(
-        mock_client,
-        &config,
-        temp_dir.path(),
-        Arc::new(|_| {}),
-    );
+    let session = AgentSession::new(mock_client, &config, temp_dir.path(), Arc::new(|_| {}));
 
-    let result = session.analyze_file(vulnerable_file.to_str().unwrap()).await;
-    
+    let result = session
+        .analyze_file(vulnerable_file.to_str().unwrap())
+        .await;
+
     assert!(result.is_ok());
     let finding = result.unwrap();
-    
+
     // Verify file_write was used
     assert!(finding.tools_used.contains(&"file_write".to_string()));
-    
+
     // Verify test_source_path was captured
     assert!(finding.test_source_path.is_some());
 }
@@ -229,13 +229,15 @@ void copy(char *dst, char *src) {
 #[tokio::test]
 async fn test_full_agent_verification_flow() {
     let temp_dir = TempDir::new().unwrap();
-    
+
     // Create a realistic vulnerable C project
     let src_dir = temp_dir.path().join("src");
     fs::create_dir(&src_dir).unwrap();
-    
+
     let auth_file = src_dir.join("auth.c");
-    fs::write(&auth_file, r#"
+    fs::write(
+        &auth_file,
+        r#"
 #include <string.h>
 #include <stdio.h>
 
@@ -254,7 +256,9 @@ int authenticate(char *username, char *password) {
     }
     return 0;  // Auth fail
 }
-"#).unwrap();
+"#,
+    )
+    .unwrap();
 
     // Mock responses simulating realistic agent behavior
     let responses = vec![
@@ -311,26 +315,26 @@ int authenticate(char *username, char *password) {
     );
 
     let result = session.analyze_file(auth_file.to_str().unwrap()).await;
-    
+
     assert!(result.is_ok(), "Agent verification should succeed");
     let finding = result.unwrap();
-    
+
     // Verify complete flow
     assert!(!finding.finding.title.is_empty());
     assert!(!finding.finding.description.is_empty());
     assert_eq!(finding.finding.severity, Severity::High);
     assert!(finding.finding.cwe_id.is_some());
     assert_eq!(finding.finding.cwe_id.unwrap(), "CWE-120");
-    
+
     // Verify all tools were used
     assert!(finding.tools_used.contains(&"file_read".to_string()));
     assert!(finding.tools_used.contains(&"pattern_search".to_string()));
     assert!(finding.tools_used.contains(&"file_write".to_string()));
     assert_eq!(finding.tools_used.len(), 3);
-    
+
     // Verify turns
     assert_eq!(finding.agent_turns, 4);
-    
+
     // Verify evidence path was captured
     assert!(finding.test_source_path.is_some());
 }

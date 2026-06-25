@@ -177,7 +177,10 @@ impl HistoricalData {
 
     /// Record a verification result.
     pub fn record_verification(&mut self, cwe_id: &str, is_false_positive: bool) {
-        let stats = self.verification_stats.entry(cwe_id.to_string()).or_default();
+        let stats = self
+            .verification_stats
+            .entry(cwe_id.to_string())
+            .or_default();
         stats.total += 1;
         if is_false_positive {
             stats.false_positives += 1;
@@ -225,7 +228,11 @@ impl ConfidenceRefinementPhase {
     }
 
     /// Refine confidence score for a single finding.
-    fn refine_confidence(&self, finding: &VulnerabilityFinding, _context: &AnalysisContext) -> RefinedConfidence {
+    fn refine_confidence(
+        &self,
+        finding: &VulnerabilityFinding,
+        _context: &AnalysisContext,
+    ) -> RefinedConfidence {
         let original_score = finding.confidence_score;
         let mut refined_score = original_score;
         let mut factors = Vec::new();
@@ -250,7 +257,8 @@ impl ConfidenceRefinementPhase {
                 }
                 VerificationStatus::Failed => {
                     refined_score = (refined_score - 0.1).max(0.0);
-                    explanations.push("Verification failed - slight confidence reduction".to_string());
+                    explanations
+                        .push("Verification failed - slight confidence reduction".to_string());
                 }
             }
         }
@@ -259,7 +267,10 @@ impl ConfidenceRefinementPhase {
         if finding.sources.len() > 1 {
             refined_score = (refined_score + 0.1).min(1.0);
             factors.push(ConfidenceFactor::MultiSourceConfirmation);
-            explanations.push(format!("Confirmed by {} independent sources", finding.sources.len()));
+            explanations.push(format!(
+                "Confirmed by {} independent sources",
+                finding.sources.len()
+            ));
         }
 
         // Factor 3: Cross-file reachability
@@ -272,14 +283,21 @@ impl ConfidenceRefinementPhase {
         // Factor 4: Historical data patterns (false positive detection)
         if let Some(code_snippet) = &finding.code_snippet {
             if let Some(cwe_id) = &finding.cwe_id {
-                if self.historical_data.matches_false_positive_pattern(cwe_id, code_snippet) {
+                if self
+                    .historical_data
+                    .matches_false_positive_pattern(cwe_id, code_snippet)
+                {
                     refined_score = (refined_score - 0.2).max(0.0);
                     factors.push(ConfidenceFactor::FalsePositiveDetected);
                     explanations.push("Matches known false positive pattern".to_string());
-                } else if self.historical_data.matches_high_confidence_pattern(cwe_id, code_snippet) {
+                } else if self
+                    .historical_data
+                    .matches_high_confidence_pattern(cwe_id, code_snippet)
+                {
                     refined_score = (refined_score + 0.1).min(1.0);
                     factors.push(ConfidenceFactor::HistoricalPatternMatch);
-                    explanations.push("Matches known high-confidence vulnerability pattern".to_string());
+                    explanations
+                        .push("Matches known high-confidence vulnerability pattern".to_string());
                 }
             }
         }
@@ -331,7 +349,10 @@ impl ConfidenceRefinementPhase {
             if low_confidence_sources.contains(&source.as_str()) {
                 refined_score = (refined_score - 0.05).max(0.0);
                 factors.push(ConfidenceFactor::LowConfidenceSource);
-                explanations.push(format!("Source '{}' typically has lower confidence", source));
+                explanations.push(format!(
+                    "Source '{}' typically has lower confidence",
+                    source
+                ));
                 break;
             }
         }
@@ -353,16 +374,36 @@ impl ConfidenceRefinementPhase {
 
         // Patterns that support the vulnerability
         let support_patterns = [
-            ("user_input", vec!["request", "param", "query", "input", "body"]),
-            ("unsafe_sinks", vec![".exec(" , "eval", "system", "shell"]),
-            ("direct_access", vec!["readFile", "read_file", "open(", ".read()"]),
+            (
+                "user_input",
+                vec!["request", "param", "query", "input", "body"],
+            ),
+            ("unsafe_sinks", vec![".exec(", "eval", "system", "shell"]),
+            (
+                "direct_access",
+                vec!["readFile", "read_file", "open(", ".read()"],
+            ),
         ];
 
         // Patterns that contradict the vulnerability
         let contradict_patterns = [
-            ("validation", vec!["validate", "sanitize", "escape", "check", "verify"]),
-            ("safe_api", vec!["preparedStatement", "parameterized", "bindParam", "placeholder"]),
-            ("auth_check", vec!["requireAuth", "isAuthenticated", "checkAuth", "authorized"]),
+            (
+                "validation",
+                vec!["validate", "sanitize", "escape", "check", "verify"],
+            ),
+            (
+                "safe_api",
+                vec![
+                    "preparedStatement",
+                    "parameterized",
+                    "bindParam",
+                    "placeholder",
+                ],
+            ),
+            (
+                "auth_check",
+                vec!["requireAuth", "isAuthenticated", "checkAuth", "authorized"],
+            ),
         ];
 
         let mut support_count = 0;
@@ -434,7 +475,8 @@ impl ConfidenceRefinementPhase {
 
     /// Update historical data with new verification results.
     pub fn record_verification_result(&mut self, cwe_id: &str, is_false_positive: bool) {
-        self.historical_data.record_verification(cwe_id, is_false_positive);
+        self.historical_data
+            .record_verification(cwe_id, is_false_positive);
     }
 }
 
@@ -468,7 +510,8 @@ mod tests {
             "src/main.rs",
             Some(42),
             Some("CWE-79"),
-            vec!["semgrep"], Some(VerificationStatus::Confirmed),
+            vec!["semgrep"],
+            Some(VerificationStatus::Confirmed),
         );
 
         let refinements = phase.run(vec![finding], &context);
@@ -490,14 +533,17 @@ mod tests {
             "src/main.rs",
             Some(42),
             Some("CWE-79"),
-            vec!["semgrep"], Some(VerificationStatus::FalsePositive),
+            vec!["semgrep"],
+            Some(VerificationStatus::FalsePositive),
         );
 
         let refinements = phase.run(vec![finding], &context);
         let refined = refinements.get("f1").unwrap();
 
         assert!(refined.refined_score < refined.original_score);
-        assert!(refined.factors.contains(&ConfidenceFactor::FalsePositiveDetected));
+        assert!(refined
+            .factors
+            .contains(&ConfidenceFactor::FalsePositiveDetected));
     }
 
     #[test]
@@ -512,13 +558,16 @@ mod tests {
             "src/main.rs",
             Some(42),
             Some("CWE-89"),
-            vec!["semgrep", "bandit"], None,
+            vec!["semgrep", "bandit"],
+            None,
         );
 
         let refinements = phase.run(vec![finding], &context);
         let refined = refinements.get("f1").unwrap();
 
-        assert!(refined.factors.contains(&ConfidenceFactor::MultiSourceConfirmation));
+        assert!(refined
+            .factors
+            .contains(&ConfidenceFactor::MultiSourceConfirmation));
     }
 
     #[test]
@@ -533,7 +582,8 @@ mod tests {
             "src/main_test.rs",
             Some(42),
             Some("CWE-79"),
-            vec!["semgrep"], None,
+            vec!["semgrep"],
+            None,
         );
 
         let refinements = phase.run(vec![finding], &context);
@@ -554,7 +604,8 @@ mod tests {
             "vendor/some_lib.rs",
             Some(42),
             Some("CWE-79"),
-            vec!["semgrep"], None,
+            vec!["semgrep"],
+            None,
         );
 
         let refinements = phase.run(vec![finding], &context);
@@ -575,14 +626,17 @@ mod tests {
             "src/main.rs",
             Some(42),
             Some("CWE-79"),
-            vec!["semgrep"], None,
+            vec!["semgrep"],
+            None,
         );
         finding.cross_file_references = Some(vec!["src/util.rs".to_string()]);
 
         let refinements = phase.run(vec![finding], &context);
         let refined = refinements.get("f1").unwrap();
 
-        assert!(refined.factors.contains(&ConfidenceFactor::CrossFileReachability));
+        assert!(refined
+            .factors
+            .contains(&ConfidenceFactor::CrossFileReachability));
     }
 
     #[test]
@@ -615,7 +669,8 @@ mod tests {
             "src/main.rs",
             Some(42),
             Some("CWE-79"),
-            vec!["semgrep", "llm"], None,
+            vec!["semgrep", "llm"],
+            None,
         );
 
         let refinements = phase.run(vec![finding], &context);
@@ -631,7 +686,8 @@ mod tests {
             "vendor/lib.rs",
             Some(1),
             Some("CWE-79"),
-            vec!["bandit"], None,
+            vec!["bandit"],
+            None,
         );
 
         let refinements2 = phase.run(vec![finding2], &context);
@@ -652,7 +708,8 @@ mod tests {
             "src/main.rs",
             Some(42),
             Some("CWE-79"),
-            vec!["semgrep"], None,
+            vec!["semgrep"],
+            None,
         );
 
         let mut findings = vec![finding];
@@ -660,7 +717,10 @@ mod tests {
 
         phase.apply_refinements(&mut findings, &refinements);
 
-        assert_eq!(findings[0].confidence_score, refinements["f1"].refined_score);
+        assert_eq!(
+            findings[0].confidence_score,
+            refinements["f1"].refined_score
+        );
     }
 
     #[test]
@@ -705,9 +765,36 @@ mod tests {
         let context = AnalysisContext::default();
 
         let findings = vec![
-            create_finding_with_params("f1", Severity::High, 0.7, "src/a.rs", Some(1), Some("CWE-79"), vec!["semgrep"], None),
-            create_finding_with_params("f2", Severity::Medium, 0.5, "src/b.rs", Some(2), Some("CWE-89"), vec!["bandit"], None),
-            create_finding_with_params("f3", Severity::Critical, 0.9, "src/c.rs", Some(3), Some("CWE-22"), vec!["semgrep", "llm"], None),
+            create_finding_with_params(
+                "f1",
+                Severity::High,
+                0.7,
+                "src/a.rs",
+                Some(1),
+                Some("CWE-79"),
+                vec!["semgrep"],
+                None,
+            ),
+            create_finding_with_params(
+                "f2",
+                Severity::Medium,
+                0.5,
+                "src/b.rs",
+                Some(2),
+                Some("CWE-89"),
+                vec!["bandit"],
+                None,
+            ),
+            create_finding_with_params(
+                "f3",
+                Severity::Critical,
+                0.9,
+                "src/c.rs",
+                Some(3),
+                Some("CWE-22"),
+                vec!["semgrep", "llm"],
+                None,
+            ),
         ];
 
         let refinements = phase.run(findings, &context);

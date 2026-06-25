@@ -1,7 +1,7 @@
 //! Pattern detection logic for vulnerability and risky commit detection.
 
-use regex::Regex;
 pub use crate::git_analysis::models::{RiskyPatternType, VulnerabilityPatternType};
+use regex::Regex;
 
 /// Compiled vulnerability patterns for detection
 pub fn compile_vulnerability_patterns() -> Vec<(Regex, VulnerabilityPatternType, &'static str)> {
@@ -86,10 +86,8 @@ pub fn compile_risky_patterns() -> Vec<(Regex, RiskyPatternType, f32)> {
         ),
         // Security bypass
         (
-            Regex::new(
-                r"(?i)(?:bypass|skip|disable|ignore).*(?:security|auth|check|validation)",
-            )
-            .unwrap(),
+            Regex::new(r"(?i)(?:bypass|skip|disable|ignore).*(?:security|auth|check|validation)")
+                .unwrap(),
             RiskyPatternType::SecurityBypass,
             0.5,
         ),

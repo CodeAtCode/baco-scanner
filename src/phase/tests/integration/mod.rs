@@ -35,6 +35,6 @@
 pub mod fixtures;
 pub mod helpers;
 
+pub mod cross_phase;
 pub mod full_pipeline;
 pub mod report_validation;
-pub mod cross_phase;

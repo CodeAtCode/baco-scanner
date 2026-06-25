@@ -3,8 +3,8 @@
 use crate::agent::session::AgentSession;
 use crate::config::AgentConfig;
 use crate::phase::tests::agent_verification::test_helpers::{
-    create_agent_mock_client, make_chat_response, make_file_read_tool,
-    make_file_write_tool, make_pattern_search_tool,
+    create_agent_mock_client, make_chat_response, make_file_read_tool, make_file_write_tool,
+    make_pattern_search_tool,
 };
 use std::fs;
 use std::sync::Arc;
@@ -15,9 +15,11 @@ use tempfile::TempDir;
 async fn test_agent_loop_executes_with_real_tool_calls() {
     let temp_dir = TempDir::new().unwrap();
     let test_file = temp_dir.path().join("vulnerable.c");
-    
+
     // Create a file with a real vulnerability
-    fs::write(&test_file, r#"
+    fs::write(
+        &test_file,
+        r#"
 #include <string.h>
 #include <stdio.h>
 
@@ -25,7 +27,9 @@ void copy_input(char *buf, char *input) {
     strcpy(buf, input);  // Buffer overflow vulnerability
     printf("Copied: %s\n", buf);
 }
-"#).unwrap();
+"#,
+    )
+    .unwrap();
 
     // Create mock responses that trigger tool usage
     let responses = vec![
@@ -70,23 +74,27 @@ void copy_input(char *buf, char *input) {
         tracing::debug!("Progress: {}", msg);
     });
 
-    let session = AgentSession::new(
-        mock_client,
-        &config,
-        temp_dir.path(),
-        progress_cb,
-    );
+    let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
 
     let result = session.analyze_file(test_file.to_str().unwrap()).await;
-    
+
     assert!(result.is_ok(), "Agent analysis should succeed");
     let finding = result.unwrap();
-    
+
     // Verify finding was created
-    assert!(!finding.finding.title.is_empty(), "Title should be populated");
-    assert!(!finding.finding.description.is_empty(), "Description should be populated");
+    assert!(
+        !finding.finding.title.is_empty(),
+        "Title should be populated"
+    );
+    assert!(
+        !finding.finding.description.is_empty(),
+        "Description should be populated"
+    );
     assert_eq!(finding.agent_turns, 2, "Should have completed 2 turns");
-    assert!(finding.tools_used.contains(&"file_read".to_string()), "file_read tool should be tracked");
+    assert!(
+        finding.tools_used.contains(&"file_read".to_string()),
+        "file_read tool should be tracked"
+    );
 }
 
 /// Test 10: Tool usage tracking - verify tools are actually called
@@ -131,22 +139,21 @@ async fn test_tool_usage_tracking() {
         keep_artifacts: false,
     };
 
-    let session = AgentSession::new(
-        mock_client,
-        &config,
-        temp_dir.path(),
-        Arc::new(|_| {}),
-    );
+    let session = AgentSession::new(mock_client, &config, temp_dir.path(), Arc::new(|_| {}));
 
     let result = session.analyze_file(test_file.to_str().unwrap()).await;
-    
+
     assert!(result.is_ok());
     let finding = result.unwrap();
-    
+
     // Verify all tools were tracked
     assert!(finding.tools_used.contains(&"file_read".to_string()));
     assert!(finding.tools_used.contains(&"pattern_search".to_string()));
-    assert_eq!(finding.tools_used.len(), 2, "Should have tracked exactly 2 tools");
+    assert_eq!(
+        finding.tools_used.len(),
+        2,
+        "Should have tracked exactly 2 tools"
+    );
     assert_eq!(finding.agent_turns, 3, "Should have completed 3 turns");
 }
 
@@ -190,18 +197,13 @@ async fn test_multiple_tool_calls_per_turn_tracked() {
         keep_artifacts: false,
     };
 
-    let session = AgentSession::new(
-        mock_client,
-        &config,
-        temp_dir.path(),
-        Arc::new(|_| {}),
-    );
+    let session = AgentSession::new(mock_client, &config, temp_dir.path(), Arc::new(|_| {}));
 
     let result = session.analyze_file(test_file.to_str().unwrap()).await;
-    
+
     assert!(result.is_ok());
     let finding = result.unwrap();
-    
+
     // All three tools should be tracked even though called in same turn
     assert!(finding.tools_used.contains(&"file_read".to_string()));
     assert!(finding.tools_used.contains(&"pattern_search".to_string()));

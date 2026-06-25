@@ -22,7 +22,10 @@ impl DeduplicationService {
     }
 
     /// Semantic deduplication: uses LLM to identify and merge duplicate findings
-    pub async fn deduplicate(&self, findings: &[VulnerabilityFinding]) -> Vec<VulnerabilityFinding> {
+    pub async fn deduplicate(
+        &self,
+        findings: &[VulnerabilityFinding],
+    ) -> Vec<VulnerabilityFinding> {
         if findings.is_empty() {
             return Vec::new();
         }
@@ -36,7 +39,7 @@ impl DeduplicationService {
             }
 
             let mut duplicates = Vec::new();
-            
+
             for (j, other) in findings.iter().enumerate().skip(i + 1) {
                 if skipped_indices.contains(&j) {
                     continue;
@@ -78,8 +81,13 @@ impl DeduplicationService {
                     }];
 
                     if let Ok(response) = client.chat(&messages).await {
-                        if let Some(same) = EnrichmentService::extract_json_field(&response.content, "same_issue") {
-                            if same.to_lowercase() == "true" || same.to_lowercase() == "yes" || same == "1" {
+                        if let Some(same) =
+                            EnrichmentService::extract_json_field(&response.content, "same_issue")
+                        {
+                            if same.to_lowercase() == "true"
+                                || same.to_lowercase() == "yes"
+                                || same == "1"
+                            {
                                 duplicates.push(j);
                             }
                         }
@@ -98,19 +106,27 @@ impl DeduplicationService {
                     (Severity::Critical, _) => std::cmp::Ordering::Greater,
                     (_, Severity::Critical) => std::cmp::Ordering::Less,
                     (Severity::High, Severity::High) => std::cmp::Ordering::Equal,
-                    (Severity::High, Severity::Medium | Severity::Low | Severity::Info) => std::cmp::Ordering::Greater,
-                    (Severity::Medium | Severity::Low | Severity::Info, Severity::High) => std::cmp::Ordering::Less,
+                    (Severity::High, Severity::Medium | Severity::Low | Severity::Info) => {
+                        std::cmp::Ordering::Greater
+                    }
+                    (Severity::Medium | Severity::Low | Severity::Info, Severity::High) => {
+                        std::cmp::Ordering::Less
+                    }
                     (Severity::Medium, Severity::Medium) => std::cmp::Ordering::Equal,
-                    (Severity::Medium, Severity::Low | Severity::Info) => std::cmp::Ordering::Greater,
+                    (Severity::Medium, Severity::Low | Severity::Info) => {
+                        std::cmp::Ordering::Greater
+                    }
                     (Severity::Low | Severity::Info, Severity::Medium) => std::cmp::Ordering::Less,
                     (Severity::Low, Severity::Low) => std::cmp::Ordering::Equal,
                     (Severity::Low, Severity::Info) => std::cmp::Ordering::Greater,
                     (Severity::Info, Severity::Low) => std::cmp::Ordering::Less,
                     (Severity::Info, Severity::Info) => std::cmp::Ordering::Equal,
                 };
-                
+
                 severity_cmp.then_with(|| {
-                    b.confidence_score.partial_cmp(&a.confidence_score).unwrap_or(std::cmp::Ordering::Equal)
+                    b.confidence_score
+                        .partial_cmp(&a.confidence_score)
+                        .unwrap_or(std::cmp::Ordering::Equal)
                 })
             });
 
@@ -123,7 +139,11 @@ impl DeduplicationService {
             }
         }
 
-        tracing::info!("Semantic deduplication: {} findings reduced to {} unique findings", findings.len(), deduplicated.len());
+        tracing::info!(
+            "Semantic deduplication: {} findings reduced to {} unique findings",
+            findings.len(),
+            deduplicated.len()
+        );
         deduplicated
     }
 }

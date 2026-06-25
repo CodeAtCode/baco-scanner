@@ -33,7 +33,12 @@ fn file_paths_set(index: &FileIndex) -> HashSet<String> {
 }
 
 fn index_project(path: &std::path::Path) -> Result<FileIndex, std::io::Error> {
-    FileIndex::index_project(path.to_str().unwrap(), &["rust".to_string(), "python".to_string()], 512 * 1024, &[])
+    FileIndex::index_project(
+        path.to_str().unwrap(),
+        &["rust".to_string(), "python".to_string()],
+        512 * 1024,
+        &[],
+    )
 }
 
 async fn run_parallel_phases(scanner: &mut Scanner) -> Vec<VulnerabilityFinding> {

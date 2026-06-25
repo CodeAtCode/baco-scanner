@@ -83,7 +83,10 @@ impl AiAggregationPhase {
     }
 
     /// Enrich findings with LLM-generated description and recommendation
-    pub async fn enrich_findings_with_llm(&self, findings: &[VulnerabilityFinding]) -> (Vec<VulnerabilityFinding>, bool) {
+    pub async fn enrich_findings_with_llm(
+        &self,
+        findings: &[VulnerabilityFinding],
+    ) -> (Vec<VulnerabilityFinding>, bool) {
         self.enrichment.enrich_findings(findings).await
     }
 
@@ -95,9 +98,12 @@ impl AiAggregationPhase {
 
     /// Semantic deduplication: uses LLM to identify and merge duplicate findings
     #[allow(dead_code)]
-    async fn semantic_deduplication(&self, findings: &[VulnerabilityFinding]) -> Vec<VulnerabilityFinding> {
+    async fn semantic_deduplication(
+        &self,
+        findings: &[VulnerabilityFinding],
+    ) -> Vec<VulnerabilityFinding> {
         use super::ai_aggregation::deduplication::DeduplicationService;
-        
+
         let dedup_service = DeduplicationService::new(&self.config);
         dedup_service.deduplicate(findings).await
     }
@@ -109,18 +115,20 @@ impl AiAggregationPhase {
         context: &AnalysisContext,
     ) -> AiAggregationResult {
         // Step 0: Perform semantic deduplication FIRST to avoid enriching duplicates
-        let deduplicated_findings = if !self.config.api_key.is_empty() && !self.config.base_url.is_empty() {
-            self.semantic_deduplication(&findings).await
-        } else {
-            findings.clone()
-        };
+        let deduplicated_findings =
+            if !self.config.api_key.is_empty() && !self.config.base_url.is_empty() {
+                self.semantic_deduplication(&findings).await
+            } else {
+                findings.clone()
+            };
 
         // Step 0.5: Enrich only the unique findings with LLM
-        let (enriched_findings, _llm_failed) = if !self.config.api_key.is_empty() && !self.config.base_url.is_empty() {
-            self.enrich_findings_with_llm(&deduplicated_findings).await
-        } else {
-            (deduplicated_findings.clone(), false)
-        };
+        let (enriched_findings, _llm_failed) =
+            if !self.config.api_key.is_empty() && !self.config.base_url.is_empty() {
+                self.enrich_findings_with_llm(&deduplicated_findings).await
+            } else {
+                (deduplicated_findings.clone(), false)
+            };
 
         // Step 1: Group findings by location
         let grouped = self.group_findings_by_location(&enriched_findings);
@@ -204,7 +212,9 @@ impl AiAggregationPhase {
                 .len()
                 > 1
             {
-                let conflict = conflict_resolver::ConflictResolver::resolve_severity_conflict(location, findings);
+                let conflict = conflict_resolver::ConflictResolver::resolve_severity_conflict(
+                    location, findings,
+                );
                 conflicts.push(conflict);
                 continue;
             }
@@ -212,7 +222,8 @@ impl AiAggregationPhase {
             // Check for CWE mismatches
             let cwes: Vec<_> = findings.iter().filter_map(|f| f.cwe_id.as_ref()).collect();
             if cwes.iter().collect::<std::collections::HashSet<_>>().len() > 1 {
-                let conflict = conflict_resolver::ConflictResolver::resolve_cwe_conflict(location, findings);
+                let conflict =
+                    conflict_resolver::ConflictResolver::resolve_cwe_conflict(location, findings);
                 conflicts.push(conflict);
                 continue;
             }
@@ -226,7 +237,9 @@ impl AiAggregationPhase {
                 .any(|f| f.verification_status == Some(VerificationStatus::FalsePositive));
 
             if has_verified && has_fp {
-                let conflict = conflict_resolver::ConflictResolver::resolve_verification_conflict(location, findings);
+                let conflict = conflict_resolver::ConflictResolver::resolve_verification_conflict(
+                    location, findings,
+                );
                 conflicts.push(conflict);
                 continue;
             }
@@ -240,14 +253,15 @@ impl AiAggregationPhase {
                 .fold(f32::NEG_INFINITY, f32::max);
 
             if max_conf - min_conf > 0.3 {
-                let conflict = conflict_resolver::ConflictResolver::resolve_confidence_conflict(location, findings);
+                let conflict = conflict_resolver::ConflictResolver::resolve_confidence_conflict(
+                    location, findings,
+                );
                 conflicts.push(conflict);
             }
         }
 
         conflicts
     }
-
 
     /// Apply consensus algorithms to detect false positives
     fn apply_consensus_algorithms(
@@ -520,8 +534,8 @@ impl AiAggregationPhase {
 
 #[cfg(test)]
 mod tests {
-    use crate::findings::Severity;
     use super::*;
+    use crate::findings::Severity;
     use crate::llm::LlmConfig;
 
     fn make_config() -> LlmConfig {
@@ -926,7 +940,7 @@ mod tests {
 
         // Assert: LLM should have failed
         assert!(llm_failed, "LLM should have failed with invalid endpoint");
-        
+
         // Assert: description should still be populated via fallback
         assert!(!enriched.is_empty(), "Should have findings");
         assert!(
@@ -934,8 +948,8 @@ mod tests {
             "Fallback description must be populated even when LLM fails. Got empty string"
         );
         assert!(
-            enriched[0].description.contains("Buffer Overflow") || 
-            enriched[0].description.contains("vulnerability"),
+            enriched[0].description.contains("Buffer Overflow")
+                || enriched[0].description.contains("vulnerability"),
             "Fallback description should contain meaningful content"
         );
     }

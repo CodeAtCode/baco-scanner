@@ -4,7 +4,9 @@ use chrono::Utc;
 use std::fs;
 
 use super::finding_renderer::render_finding;
-use super::utilities::{build_empty_state_message, build_filter_buttons, build_summary_cards, calculate_severity_stats};
+use super::utilities::{
+    build_empty_state_message, build_filter_buttons, build_summary_cards, calculate_severity_stats,
+};
 
 pub fn generate_html_report(
     findings: &[VulnerabilityFinding],
@@ -226,7 +228,7 @@ pub fn generate_html_report(
         String::new()
     };
 
-        let mut html = format!(
+    let mut html = format!(
         r#"<!DOCTYPE html>
 <html lang="en">
 <head>

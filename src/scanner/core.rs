@@ -58,7 +58,7 @@ impl Scanner {
         pb: &ProgressBar,
     ) -> Result<bool, String> {
         let threshold = self.config.scanner.performance.early_termination_threshold;
-        
+
         if threshold > 0.0 && findings.len() as f32 > threshold {
             tracing::warn!(
                 "Early termination triggered after phase {:?}: {} findings > threshold {}",
@@ -66,21 +66,21 @@ impl Scanner {
                 findings.len(),
                 threshold
             );
-            
+
             if let Err(e) = self.save_checkpoint(findings, analyzed_files, phase).await {
                 tracing::warn!("Failed to save checkpoint before early termination: {}", e);
             }
-            
+
             pb.set_message(format!(
                 "Early termination: {} findings (threshold: {})",
                 findings.len(),
                 threshold
             ));
             pb.finish();
-            
+
             return Ok(true);
         }
-        
+
         Ok(false)
     }
 
@@ -188,7 +188,9 @@ impl Scanner {
         if enable_parallel {
             tracing::info!("\u{1B}[34m[SCANNER]\u{1B}[0m Starting parallel phases: Indexing, Semgrep, LLM Static Analysis...");
         } else {
-            tracing::info!("\u{1B}[34m[SCANNER]\u{1B}[0m Starting SERIAL phases (parallel disabled)...");
+            tracing::info!(
+                "\u{1B}[34m[SCANNER]\u{1B}[0m Starting SERIAL phases (parallel disabled)..."
+            );
         }
 
         // Calculate total phases: 3 parallel + 12 sequential = 15 total (including v3 features)
@@ -400,18 +402,16 @@ impl Scanner {
                         "Phase {}/{}: LLM static analysis (analyzing files for vulnerabilities)...",
                         phase_num, total_phases
                     ),
-                    ScanPhase::CveBootstrap => format!(
-                        "Phase {}/{}: CVE bootstrap...",
-                        phase_num, total_phases
-                    ),
+                    ScanPhase::CveBootstrap => {
+                        format!("Phase {}/{}: CVE bootstrap...", phase_num, total_phases)
+                    }
                     ScanPhase::PocCompiler => format!(
                         "Phase {}/{}: PoC compilation check...",
                         phase_num, total_phases
                     ),
-                    ScanPhase::VariantSearch => format!(
-                        "Phase {}/{}: Variant search...",
-                        phase_num, total_phases
-                    ),
+                    ScanPhase::VariantSearch => {
+                        format!("Phase {}/{}: Variant search...", phase_num, total_phases)
+                    }
                     _ => format!("Phase {}/{}: {:?}", phase_num, total_phases, phase),
                 };
                 pb.set_message(phase_msg);
@@ -429,9 +429,12 @@ impl Scanner {
                 });
 
                 // Check for early termination
-                match self.check_early_termination(&findings, &analyzed_files, phase, &pb).await {
+                match self
+                    .check_early_termination(&findings, &analyzed_files, phase, &pb)
+                    .await
+                {
                     Ok(true) => return Ok(findings),
-                    Ok(false) => {},
+                    Ok(false) => {}
                     Err(e) => tracing::warn!("Early termination check failed: {}", e),
                 }
 
@@ -510,18 +513,16 @@ impl Scanner {
                     "Phase {}/{}: Auto-patching with staging validation...",
                     phase_num, total_phases
                 ),
-                ScanPhase::CveBootstrap => format!(
-                    "Phase {}/{}: CVE bootstrap...",
-                    phase_num, total_phases
-                ),
+                ScanPhase::CveBootstrap => {
+                    format!("Phase {}/{}: CVE bootstrap...", phase_num, total_phases)
+                }
                 ScanPhase::PocCompiler => format!(
                     "Phase {}/{}: PoC compilation check...",
                     phase_num, total_phases
                 ),
-                ScanPhase::VariantSearch => format!(
-                    "Phase {}/{}: Variant search...",
-                    phase_num, total_phases
-                ),
+                ScanPhase::VariantSearch => {
+                    format!("Phase {}/{}: Variant search...", phase_num, total_phases)
+                }
                 _ => format!("Phase {}/{}: {:?}", phase_num, total_phases, phase),
             };
             pb.set_message(phase_msg);
@@ -540,9 +541,12 @@ impl Scanner {
             });
 
             // Check for early termination
-            match self.check_early_termination(&findings, &analyzed_files, phase, &pb).await {
+            match self
+                .check_early_termination(&findings, &analyzed_files, phase, &pb)
+                .await
+            {
                 Ok(true) => return Ok(findings),
-                Ok(false) => {},
+                Ok(false) => {}
                 Err(e) => tracing::warn!("Early termination check failed: {}", e),
             }
 

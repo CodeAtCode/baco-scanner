@@ -6,15 +6,16 @@
 use crate::config::ScannerConfig;
 use crate::findings::VulnerabilityFinding;
 
-use crate::phase::tests::test_fixtures::create_test_finding;
 use crate::phase::ai_aggregation::AiAggregationPhase;
 use crate::phase::llm_static::LlmStaticAnalysisPhase;
+use crate::phase::tests::test_fixtures::create_test_finding;
 use crate::phase::{PhaseContext, ScanPhase as PhaseTrait};
 use crate::scanner::Scanner;
-use crate::scanner_types::{MajorityVerdict, PatchCandidate, PatchValidationResult, VerifierVerdict};
+use crate::scanner_types::{
+    MajorityVerdict, PatchCandidate, PatchValidationResult, VerifierVerdict,
+};
 use std::fs;
 use tempfile::TempDir;
-
 
 // ========================================================================
 // LLM PHASE TESTS (10 tests)
@@ -135,10 +136,7 @@ fn test_root_cause_dedup_logic() {
     let mut unique_count = 0;
 
     for finding in &findings {
-        let location = (
-            finding.file_path.clone(),
-            finding.line_number.unwrap_or(0),
-        );
+        let location = (finding.file_path.clone(), finding.line_number.unwrap_or(0));
         if seen_locations.insert(location) {
             unique_count += 1;
         }

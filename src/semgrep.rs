@@ -26,7 +26,7 @@ fn extract_code_snippet(file_path: &str, target_line: u32, context_lines: usize)
     if !path.exists() {
         return format!("Line {}: [file not found]", target_line);
     }
-    
+
     match fs::read_to_string(&path) {
         Ok(content) => {
             let lines: Vec<&str> = content.lines().collect();
@@ -36,11 +36,15 @@ fn extract_code_snippet(file_path: &str, target_line: u32, context_lines: usize)
                 0
             };
             let end = std::cmp::min(target_line as usize + context_lines, lines.len());
-            
+
             let mut snippet = String::new();
             for (idx, line) in lines.iter().enumerate().skip(start).take(end - start) {
                 let line_num = (idx + 1) as u32;
-                let marker = if line_num == target_line { " >> " } else { "    " };
+                let marker = if line_num == target_line {
+                    " >> "
+                } else {
+                    "    "
+                };
                 snippet.push_str(&format!("{}{:4} | {}\n", marker, line_num, line));
             }
             snippet
@@ -196,9 +200,11 @@ impl SemgrepRunner {
             if raw_findings.len() == 1 {
                 let rf = &raw_findings[0];
                 // Generate description from Semgrep message or use title as fallback
-                let description = rf.message.clone()
+                let description = rf
+                    .message
+                    .clone()
                     .unwrap_or_else(|| format!("{} detected by Semgrep", check_id));
-                
+
                 findings.push(VulnerabilityFinding {
                     id: VulnerabilityFinding::generate_id(
                         &rf.path,

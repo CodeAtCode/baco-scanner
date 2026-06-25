@@ -4,9 +4,7 @@ use git2::Repository;
 use std::path::Path;
 
 use crate::context::AnalysisContext;
-use crate::git_analysis::helpers::{
-    calculate_overall_confidence, get_remote_url, update_context,
-};
+use crate::git_analysis::helpers::{calculate_overall_confidence, get_remote_url, update_context};
 use crate::git_analysis::models::{
     CommitReference, GitAnalysisResult, GitConfidenceModifier, RiskyCommitPattern,
     RiskyPatternType, VulnerabilityPattern, VulnerabilityPatternType,
@@ -88,7 +86,8 @@ impl GitHistoryAnalyzer {
             .map_err(|e| format!("failed to find commit: {}", e))?;
 
         let message = commit.message().unwrap_or("");
-        let (is_security_fix, cwe_references) = analyze_commit_message(message, &self.security_keywords);
+        let (is_security_fix, cwe_references) =
+            analyze_commit_message(message, &self.security_keywords);
 
         let author_name = commit.author().name().unwrap_or("").to_string();
         let author_email = commit.author().email().unwrap_or("").to_string();
@@ -167,7 +166,8 @@ impl GitHistoryAnalyzer {
             }
 
             let message = commit.message().unwrap_or("");
-            let (is_security_fix, cwe_references) = analyze_commit_message(message, &self.security_keywords);
+            let (is_security_fix, cwe_references) =
+                analyze_commit_message(message, &self.security_keywords);
 
             commits.push(CommitReference {
                 commit_hash: oid.to_string()[..8].to_string(),
@@ -390,7 +390,10 @@ impl GitHistoryAnalyzer {
     }
 
     /// Get commit statistics for a file
-    pub fn get_commit_stats(&self, file_path: &str) -> Result<std::collections::HashMap<String, i32>, String> {
+    pub fn get_commit_stats(
+        &self,
+        file_path: &str,
+    ) -> Result<std::collections::HashMap<String, i32>, String> {
         let commits = self.find_related_commits(file_path, None, 100)?;
         Ok(crate::git_analysis::helpers::get_commit_stats(&commits))
     }

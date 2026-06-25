@@ -393,9 +393,8 @@ pub fn apply_env_overrides(config: &mut ScannerConfig) {
 
 #[cfg(test)]
 mod tests {
-    use serial_test::serial;
     use super::*;
-
+    use serial_test::serial;
 
     #[test]
     fn test_parse() -> Result<(), Box<dyn std::error::Error>> {
@@ -466,9 +465,10 @@ mod tests {
     #[serial]
     fn test_env_override() {
         // Use EnvVarGuard for automatic cleanup and parallel safety
-        let _guard = super::super::phase::parallel_safety_tests::EnvVarGuard::set(&[
-            ("LLM_DISCOVERY_KEY", "env-discovery-key"),
-        ]);
+        let _guard = super::super::phase::parallel_safety_tests::EnvVarGuard::set(&[(
+            "LLM_DISCOVERY_KEY",
+            "env-discovery-key",
+        )]);
 
         let toml_str = r#"
             [project]

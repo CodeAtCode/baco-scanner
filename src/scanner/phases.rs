@@ -1,9 +1,9 @@
 use crate::agent;
 use crate::auto_patcher::{AutoPatcher, PatchingConfig};
 use crate::checkpoint::ScanPhase;
+use crate::confidence_refinement::ConfidenceRefinementPhase;
 use crate::config;
 use crate::context::AnalysisContext;
-use crate::confidence_refinement::ConfidenceRefinementPhase;
 use crate::cve_bootstrap::CveBootstrapper;
 use crate::findings::{VerificationStatus, VulnerabilityFinding};
 use crate::git_analysis::GitAnalyzer;
@@ -19,8 +19,8 @@ use crate::report::html::generate_html_report;
 use crate::report::json::write_findings_json;
 use crate::root_cause_dedup::RootCauseDeduplicator;
 use crate::semgrep::SemgrepRunner;
-use crate::tickets::TicketSearcher;
 use crate::threat_model::ThreatModelingPhase;
+use crate::tickets::TicketSearcher;
 use crate::variant_search::VariantSearcher;
 
 use indicatif::ProgressBar;
@@ -63,20 +63,15 @@ pub async fn run_phase(
             // Try to load previous hash store for incremental scanning
             let hash_store_path = PathBuf::from(&config.output.dir).join("file_hashes.json");
             let _previous_hash_store = if hash_store_path.exists() {
-                match crate::incremental_scan::FileHashStore::load(&hash_store_path.to_string_lossy())
-                {
+                match crate::incremental_scan::FileHashStore::load(
+                    &hash_store_path.to_string_lossy(),
+                ) {
                     Ok(store) => {
-                        tracing::info!(
-                            "Loaded previous hash store with {} entries",
-                            store.len()
-                        );
+                        tracing::info!("Loaded previous hash store with {} entries", store.len());
                         Some(store)
                     }
                     Err(e) => {
-                        tracing::warn!(
-                            "Failed to load previous hash store: {}, starting fresh",
-                            e
-                        );
+                        tracing::warn!("Failed to load previous hash store: {}, starting fresh", e);
                         None
                     }
                 }
@@ -126,18 +121,14 @@ pub async fn run_phase(
         }
         ScanPhase::Semgrep => {
             tracing::info!("Running Semgrep phase on {:?}", target_path);
-            let runner =
-                SemgrepRunner::new(None, config.scanner.semgrep.exclude_rules.clone());
+            let runner = SemgrepRunner::new(None, config.scanner.semgrep.exclude_rules.clone());
             pb.set_message("Phase 2/11: Running Semgrep static analysis (scanning for known vulnerability patterns)...");
 
             // Enable steady tick for progress bar timer
             pb.enable_steady_tick(std::time::Duration::from_millis(100));
 
             match runner
-                .run(
-                    target_path.to_str().unwrap_or("."),
-                    &config.output.dir,
-                )
+                .run(target_path.to_str().unwrap_or("."), &config.output.dir)
                 .await
             {
                 Ok(semgrep_findings) => {
@@ -188,15 +179,15 @@ pub async fn run_phase(
             // Check for LLM discovery API key (used by LlmStaticAnalysis)
             tracing::info!("[LLM] Phase config check for LlmStaticAnalysis");
             let phase_config = &config.llm.phases.discovery;
-            tracing::info!("[LLM] Phase config: base_url={}, api_key={:?}", 
-                phase_config.base_url, 
+            tracing::info!(
+                "[LLM] Phase config: base_url={}, api_key={:?}",
+                phase_config.base_url,
                 phase_config.api_key
             );
-            
+
             if let Some(api_key) = &phase_config.api_key {
-                let discovery_timeout = phase_config
-                    .timeout_secs
-                    .unwrap_or(config.llm.timeout_secs);
+                let discovery_timeout =
+                    phase_config.timeout_secs.unwrap_or(config.llm.timeout_secs);
 
                 // Enable steady tick for progress bar timer
                 pb.enable_steady_tick(std::time::Duration::from_millis(100));
@@ -321,8 +312,12 @@ pub async fn run_phase(
             // Detect project stack (languages, frameworks, dependencies)
             let stack = match bootstrapper.detect_project_stack() {
                 Ok(s) => {
-                    tracing::info!("Detected project stack: {:?} languages, {:?} frameworks, {} dependencies",
-                        s.languages, s.frameworks, s.dependencies.len());
+                    tracing::info!(
+                        "Detected project stack: {:?} languages, {:?} frameworks, {} dependencies",
+                        s.languages,
+                        s.frameworks,
+                        s.dependencies.len()
+                    );
                     s
                 }
                 Err(e) => {
@@ -438,8 +433,7 @@ pub async fn run_phase(
                                 finding.description = converted.description;
                                 finding.severity = converted.severity;
                                 finding.cwe_id = converted.cwe_id.or(finding.cwe_id.clone());
-                                finding.line_number =
-                                    converted.line_number.or(finding.line_number);
+                                finding.line_number = converted.line_number.or(finding.line_number);
                                 finding.diff_hunk =
                                     converted.diff_hunk.or(finding.diff_hunk.clone());
                                 if finding.agent_evidence_path.is_none() {
@@ -475,17 +469,15 @@ Respond with ONLY JSON:
                             ))
                         ];
                         if let Ok(response_with_model) = client.chat(&messages).await {
-                            if let Ok(parsed) =
-                                serde_json::from_str::<serde_json::Value>(&response_with_model.content)
-                            {
+                            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(
+                                &response_with_model.content,
+                            ) {
                                 if let Some(desc) =
                                     parsed.get("description").and_then(|v| v.as_str())
                                 {
                                     finding.description = desc.to_string();
                                 }
-                                if let Some(fix) =
-                                    parsed.get("fix_code").and_then(|v| v.as_str())
-                                {
+                                if let Some(fix) = parsed.get("fix_code").and_then(|v| v.as_str()) {
                                     finding.diff_hunk = Some(fix.to_string());
                                 }
                             }
@@ -530,12 +522,8 @@ Respond with ONLY JSON:
                     let progress_cb = Arc::new(move |msg: String| {
                         tracing::debug!("Agent verify: {}", msg);
                     });
-                    let agent_session = agent::AgentSession::new(
-                        client,
-                        &config.agent,
-                        target_path,
-                        progress_cb,
-                    );
+                    let agent_session =
+                        agent::AgentSession::new(client, &config.agent, target_path, progress_cb);
 
                     for (i, finding) in findings.iter_mut().enumerate() {
                         let progress_pct = if total_findings > 0 {
@@ -572,10 +560,8 @@ Respond with ONLY JSON:
                                     finding.file_path,
                                     e
                                 );
-                                finding.verification_status =
-                                    Some(VerificationStatus::NeedsReview);
-                                finding.verification_notes =
-                                    Some(format!("Agent error: {}", e));
+                                finding.verification_status = Some(VerificationStatus::NeedsReview);
+                                finding.verification_notes = Some(format!("Agent error: {}", e));
                             }
                         }
 
@@ -614,18 +600,18 @@ Respond with ONLY JSON:
 
                         if let Ok(response_with_model) = result {
                             if response_with_model.content.contains("confirmed") {
-                                finding.verification_status =
-                                    Some(VerificationStatus::Confirmed);
+                                finding.verification_status = Some(VerificationStatus::Confirmed);
                                 finding.verification_notes =
                                     Some("LLM verified as true positive".to_string());
                             } else if response_with_model.content.contains("false_positive") {
                                 finding.verification_status =
                                     Some(VerificationStatus::FalsePositive);
-                                finding.verification_notes = Some(response_with_model.content.clone());
+                                finding.verification_notes =
+                                    Some(response_with_model.content.clone());
                             } else {
-                                finding.verification_status =
-                                    Some(VerificationStatus::NeedsReview);
-                                finding.verification_notes = Some(response_with_model.content.clone());
+                                finding.verification_status = Some(VerificationStatus::NeedsReview);
+                                finding.verification_notes =
+                                    Some(response_with_model.content.clone());
                             }
                         }
                     }
@@ -684,8 +670,7 @@ Respond with ONLY JSON:
                 let poc_count = poc_result.proofs.len();
 
                 for poc in &poc_result.proofs {
-                    if let Some(finding) = findings.iter_mut().find(|f| f.id == poc.finding_id)
-                    {
+                    if let Some(finding) = findings.iter_mut().find(|f| f.id == poc.finding_id) {
                         finding.poc_code = Some(poc.code.clone());
                         finding.poc_format = Some(match poc.format {
                             PoCFormat::Rust => "rust".to_string(),
@@ -705,10 +690,7 @@ Respond with ONLY JSON:
                         let compile_result = PocCompiler::compile_check(&poc.code, lang_str);
 
                         if compile_result.compiles {
-                            tracing::debug!(
-                                "PoC compiled successfully for finding {}",
-                                finding.id
-                            );
+                            tracing::debug!("PoC compiled successfully for finding {}", finding.id);
                         } else {
                             tracing::warn!(
                                 "PoC compilation failed for finding {}: {:?}",
@@ -743,7 +725,7 @@ Respond with ONLY JSON:
         }
         ScanPhase::SecurityAgentVerification => {
             tracing::info!("Running SecurityAgent verification phase...");
-            
+
             if !config.agent.enabled {
                 tracing::debug!("Agent mode disabled, skipping SecurityAgent verification");
                 pb.set_message("Phase 6/11: Agent mode disabled - skipping");
@@ -751,7 +733,7 @@ Respond with ONLY JSON:
                 pb.set_position(100);
                 return Ok((findings, analyzed_files.to_vec()));
             }
-            
+
             let Some(_api_key) = &config.llm.phases.discovery.api_key else {
                 tracing::debug!("No API key for agent, skipping SecurityAgent verification");
                 pb.set_message("Phase 6/11: No API key - skipping");
@@ -759,18 +741,16 @@ Respond with ONLY JSON:
                 pb.set_position(100);
                 return Ok((findings, analyzed_files.to_vec()));
             };
-            
+
             pb.set_length(100);
             pb.set_position(0);
-            pb.set_message(
-                "Phase 6/11: SecurityAgent verification (tool-based analysis)...",
-            );
-            
+            pb.set_message("Phase 6/11: SecurityAgent verification (tool-based analysis)...");
+
             let total_findings = findings.len();
-            
+
             let client = create_llm_client_with_metrics(scanner, "discovery")
                 .expect("Failed to create LLM client for SecurityAgent phase");
-            
+
             for (i, finding) in findings.iter_mut().enumerate() {
                 let progress_pct = if total_findings > 0 {
                     ((i as f64 / total_findings as f64) * 100.0) as u64
@@ -784,14 +764,14 @@ Respond with ONLY JSON:
                     total_findings,
                     finding.title
                 ));
-                
+
                 let agent = agent::AgentSession::new(
                     client.clone(),
                     &config.agent,
                     target_path,
                     Arc::new(|msg| tracing::debug!("[AGENT] {}", msg)),
                 );
-                
+
                 match agent.verify_finding(&finding.file_path, finding).await {
                     Ok(agent_result) => {
                         // Store evidence path
@@ -806,14 +786,14 @@ Respond with ONLY JSON:
                                 agent_result.tools_used.len()
                             ));
                         }
-                        
+
                         // Store test log
                         if let Some(ref log) = agent_result.test_log {
                             if finding.verification_notes.is_none() {
                                 finding.verification_notes = Some(log.clone());
                             }
                         }
-                        
+
                         tracing::debug!(
                             "SecurityAgent verified {}: {:?} - {} turns, {} tools",
                             finding.title,
@@ -823,15 +803,23 @@ Respond with ONLY JSON:
                         );
                     }
                     Err(e) => {
-                        tracing::warn!("SecurityAgent verification failed for {}: {}", finding.title, e);
+                        tracing::warn!(
+                            "SecurityAgent verification failed for {}: {}",
+                            finding.title,
+                            e
+                        );
                         finding.verification_status = Some(VerificationStatus::Failed);
-                        finding.verification_notes = Some(format!("Agent verification failed: {}", e));
+                        finding.verification_notes =
+                            Some(format!("Agent verification failed: {}", e));
                     }
                 }
             }
-            
+
             pb.set_position(100);
-            tracing::info!("SecurityAgent verification complete - {} findings", total_findings);
+            tracing::info!(
+                "SecurityAgent verification complete - {} findings",
+                total_findings
+            );
             Ok((findings, analyzed_files.to_vec()))
         }
         ScanPhase::TicketCrossRef => {
@@ -971,7 +959,13 @@ Respond with ONLY JSON:
             tracing::info!("Running AI aggregation phase...");
             let llm_config = llm::LlmConfig {
                 base_url: config.llm.phases.aggregation.base_url.clone(),
-                api_key: config.llm.phases.aggregation.api_key.clone().unwrap_or_default(),
+                api_key: config
+                    .llm
+                    .phases
+                    .aggregation
+                    .api_key
+                    .clone()
+                    .unwrap_or_default(),
                 model: config.llm.phases.aggregation.model.clone(),
                 models: config.llm.phases.aggregation.get_models(),
                 timeout: config.llm.timeout_secs,
@@ -980,11 +974,10 @@ Respond with ONLY JSON:
             };
 
             let aggregation = AiAggregationPhase::new(llm_config);
-            
+
             // Enrich findings with LLM analysis (populates description and recommendation)
-            let (enriched_findings, _llm_failed) = aggregation
-                .enrich_findings_with_llm(&findings)
-                .await;
+            let (enriched_findings, _llm_failed) =
+                aggregation.enrich_findings_with_llm(&findings).await;
 
             tracing::debug!("AI aggregation complete");
             pb.set_position(pb.position() + 100);
@@ -997,16 +990,12 @@ Respond with ONLY JSON:
             let llm_metrics = metrics_tracker.finalize().await;
 
             let json_path = format!("{}/findings.json", config.output.dir);
-            if let Err(e) =
-                write_findings_json(&findings, json_path.as_str(), Some(llm_metrics))
-            {
+            if let Err(e) = write_findings_json(&findings, json_path.as_str(), Some(llm_metrics)) {
                 tracing::warn!("Failed to write JSON report: {}", e);
             }
 
             let html_path = format!("{}/report.html", config.output.dir);
-            if let Err(e) =
-                generate_html_report(&findings, &html_path, Some(config), None)
-            {
+            if let Err(e) = generate_html_report(&findings, &html_path, Some(config), None) {
                 tracing::warn!("Failed to write HTML report: {}", e);
             }
 
@@ -1042,7 +1031,10 @@ Respond with ONLY JSON:
                     // If threat model generated, add it as a finding
                     if !threat_model.is_empty() {
                         let finding = VulnerabilityFinding {
-                            id: format!("threat-model-{}", chrono::Utc::now().format("%Y%m%d%H%M%S")),
+                            id: format!(
+                                "threat-model-{}",
+                                chrono::Utc::now().format("%Y%m%d%H%M%S")
+                            ),
                             title: "Threat Model Generated".to_string(),
                             severity: crate::findings::Severity::Medium,
                             confidence_score: 0.9,
@@ -1073,7 +1065,7 @@ Respond with ONLY JSON:
                         };
                         findings.push(finding);
                     }
-                    
+
                     Ok((findings, analyzed_files.to_vec()))
                 }
                 Err(e) => {
@@ -1093,7 +1085,7 @@ Respond with ONLY JSON:
 
             let mut dedup = RootCauseDeduplicator::new();
             let deduped_groups = dedup.deduplicate(findings.clone());
-            
+
             // Keep one finding per group (the first one encountered)
             let mut kept_findings = Vec::new();
             for group in deduped_groups {
@@ -1104,8 +1096,12 @@ Respond with ONLY JSON:
                     }
                 }
             }
-            
-            tracing::info!("Deduplicated: {} findings → {} findings", findings.len(), kept_findings.len());
+
+            tracing::info!(
+                "Deduplicated: {} findings → {} findings",
+                findings.len(),
+                kept_findings.len()
+            );
             Ok((kept_findings, analyzed_files.to_vec()))
         }
         ScanPhase::MultiVerifier => {
@@ -1123,8 +1119,12 @@ Respond with ONLY JSON:
             };
             let verifier = MultiVerifier::new(config_verifier);
             let verified_findings = verifier.verify_batch(&findings);
-            
-            tracing::info!("Multi verifier: {} findings → {} findings", findings.len(), verified_findings.len());
+
+            tracing::info!(
+                "Multi verifier: {} findings → {} findings",
+                findings.len(),
+                verified_findings.len()
+            );
             Ok((verified_findings, analyzed_files.to_vec()))
         }
         ScanPhase::AutoPatching => {
@@ -1138,10 +1138,13 @@ Respond with ONLY JSON:
 
             let patcher = AutoPatcher::new(target_path.to_path_buf());
             let patching_config = PatchingConfig::default();
-            
+
             match patcher.execute_batch(&findings, &patching_config) {
                 Ok(patched_findings) => {
-                    tracing::info!("Auto patching: {} findings processed", patched_findings.len());
+                    tracing::info!(
+                        "Auto patching: {} findings processed",
+                        patched_findings.len()
+                    );
                     Ok((patched_findings, analyzed_files.to_vec()))
                 }
                 Err(e) => {
@@ -1160,10 +1163,13 @@ Respond with ONLY JSON:
             tracing::info!("Running CVE bootstrap phase");
 
             let bootstrapper = CveBootstrapper::new(target_path.to_string_lossy().to_string());
-            
+
             match bootstrapper.run_cve_enrichment(&findings).await {
                 Ok(enriched_findings) => {
-                    tracing::info!("CVE bootstrap: {} findings enriched", enriched_findings.len());
+                    tracing::info!(
+                        "CVE bootstrap: {} findings enriched",
+                        enriched_findings.len()
+                    );
                     Ok((enriched_findings, analyzed_files.to_vec()))
                 }
                 Err(e) => {
@@ -1187,11 +1193,13 @@ Respond with ONLY JSON:
                     // Use language from poc_format or default to rust
                     let language = finding.poc_format.as_deref().unwrap_or("rust");
                     let result = PocCompiler::compile_check(poc_code, language);
-                    
+
                     if result.compiles {
-                        finding.verification_status = Some(crate::findings::VerificationStatus::Confirmed);
+                        finding.verification_status =
+                            Some(crate::findings::VerificationStatus::Confirmed);
                     } else {
-                        finding.verification_status = Some(crate::findings::VerificationStatus::Failed);
+                        finding.verification_status =
+                            Some(crate::findings::VerificationStatus::Failed);
                         let notes = finding.verification_notes.clone().unwrap_or_default();
                         finding.verification_notes = Some(format!(
                             "{}PoC compilation failed: {}",
@@ -1201,7 +1209,7 @@ Respond with ONLY JSON:
                     }
                 }
             }
-            
+
             Ok((verified_findings, analyzed_files.to_vec()))
         }
         ScanPhase::VariantSearch => {
@@ -1214,7 +1222,7 @@ Respond with ONLY JSON:
             tracing::info!("Running variant search phase");
 
             let searcher = VariantSearcher::new(target_path.to_string_lossy().to_string());
-            
+
             // For now, return empty variants (full implementation requires more work)
             match searcher.search_variants() {
                 Ok(_hits) => {

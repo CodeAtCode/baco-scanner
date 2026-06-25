@@ -3,10 +3,10 @@
 //! Tests for edge cases, boundary conditions, and error scenarios
 //! in the security scanning pipeline.
 
+use crate::config::ScannerConfig;
 use crate::findings::{Severity, VulnerabilityFinding};
 use crate::phase::tests::test_fixtures::{create_default_metrics_summary, create_test_finding};
 use crate::report::html::generate_html_report;
-use crate::config::ScannerConfig;
 use std::fs;
 use tempfile::TempDir;
 

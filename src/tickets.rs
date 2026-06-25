@@ -3,8 +3,8 @@ use serde::{Deserialize, Serialize};
 /// Helper to extract meaningful words from a string, excluding common stop words
 fn extract_meaningful_words(s: &str, count: usize) -> String {
     let stop_words = [
-        "the", "a", "an", "is", "are", "in", "on", "with", "for", "to", "of", "and", "or",
-        "no", "missing", "lack",
+        "the", "a", "an", "is", "are", "in", "on", "with", "for", "to", "of", "and", "or", "no",
+        "missing", "lack",
     ];
     s.split_whitespace()
         .filter(|w| w.len() > 3 && !stop_words.contains(&w.to_lowercase().as_str()))
@@ -547,8 +547,6 @@ mod tests {
         let results = searcher.search_for_finding("test query").await.unwrap();
         assert_eq!(results.len(), 0);
     }
-
-
 
     #[tokio::test]
     async fn test_search_empty_string() {

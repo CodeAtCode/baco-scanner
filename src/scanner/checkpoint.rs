@@ -1,4 +1,4 @@
-use crate::checkpoint::{ScanPhase, Checkpoint as CheckpointStruct};
+use crate::checkpoint::{Checkpoint as CheckpointStruct, ScanPhase};
 use crate::findings::VulnerabilityFinding;
 use crate::llm_metrics::LlmMetricsTracker;
 use crate::report::json::write_findings_json;
@@ -12,12 +12,12 @@ pub async fn save_checkpoint(
     phase: &ScanPhase,
     metrics_tracker: &LlmMetricsTracker,
 ) -> Result<(), String> {
-
     let scan_id = format!("scan-{}", chrono::Utc::now().format("%Y%m%d-%H%M%S"));
-    let target_path = checkpoint_path.parent().unwrap_or_else(|| std::path::Path::new(""));
-    let mut checkpoint = CheckpointStruct::new(&scan_id, &target_path.to_string_lossy(), chrono::Utc::now());
-
-
+    let target_path = checkpoint_path
+        .parent()
+        .unwrap_or_else(|| std::path::Path::new(""));
+    let mut checkpoint =
+        CheckpointStruct::new(&scan_id, &target_path.to_string_lossy(), chrono::Utc::now());
 
     checkpoint.current_phase = phase.clone();
     checkpoint.findings_so_far = findings.to_vec();
@@ -60,7 +60,6 @@ pub async fn load_checkpoint_findings(
     checkpoint_path: &std::path::Path,
     phase: &ScanPhase,
 ) -> Vec<VulnerabilityFinding> {
-
     match CheckpointStruct::load(&checkpoint_path.to_string_lossy()) {
         Ok(checkpoint) => {
             // Check if the phase is in completed_phases

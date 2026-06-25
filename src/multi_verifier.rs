@@ -179,14 +179,21 @@ impl MultiVerifier {
     }
 
     /// Verify multiple findings in batch
-    pub fn verify_batch(&self, findings: &[crate::findings::VulnerabilityFinding]) -> Vec<crate::findings::VulnerabilityFinding> {
+    pub fn verify_batch(
+        &self,
+        findings: &[crate::findings::VulnerabilityFinding],
+    ) -> Vec<crate::findings::VulnerabilityFinding> {
         let mut verified_findings = Vec::new();
 
         for finding in findings {
             let code_snippet = finding.code_snippet.as_deref().unwrap_or("");
             let verdict = self.verify(&finding.id, code_snippet).unwrap_or_else(|e| {
                 tracing::warn!("MultiVerifier error for finding {}: {}", finding.id, e);
-                MajorityVerdict::new(VerifierVerdict::Inconclusive, 0.0, vec![VerifierVerdict::Inconclusive; 3])
+                MajorityVerdict::new(
+                    VerifierVerdict::Inconclusive,
+                    0.0,
+                    vec![VerifierVerdict::Inconclusive; 3],
+                )
             });
 
             // Keep findings that are confirmed or inconclusive, reject confirmed false positives
@@ -196,7 +203,10 @@ impl MultiVerifier {
                 }
                 VerifierVerdict::Rejected => {
                     // This is a false positive - skip it
-                    tracing::info!("Finding {} rejected by multi-verifier (false positive)", finding.id);
+                    tracing::info!(
+                        "Finding {} rejected by multi-verifier (false positive)",
+                        finding.id
+                    );
                 }
                 VerifierVerdict::Inconclusive => {
                     // Keep inconclusive findings for manual review

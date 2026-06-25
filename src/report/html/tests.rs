@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use crate::report::html::generate_html_report;
     use crate::findings::{Severity, VulnerabilityFinding};
+    use crate::report::html::generate_html_report;
     use std::path::Path;
 
     fn make_finding(severity: Severity, title: &str, file: &str) -> VulnerabilityFinding {
@@ -158,15 +158,16 @@ mod tests {
         use crate::findings::VulnerabilityFinding;
         use std::fs;
         use tempfile::TempDir;
-        
+
         let temp_dir = TempDir::new().unwrap();
         let report_path = temp_dir.path().join("test_report.html");
-        
+
         // Create a finding with llm_model and description set
         let finding = VulnerabilityFinding {
             id: "test-finding-123".to_string(),
             title: "Buffer Overflow".to_string(),
-            description: "Potential buffer overflow detected in vulnerable_copy function".to_string(),
+            description: "Potential buffer overflow detected in vulnerable_copy function"
+                .to_string(),
             severity: Severity::High,
             confidence_score: 0.85,
             cwe_id: Some("CWE-120".to_string()),
@@ -193,27 +194,36 @@ mod tests {
             llm_model: Some("semgrep".to_string()),
             agent_mode: false,
         };
-        
+
         let findings = vec![finding];
-        
+
         // Generate HTML report
         let result = generate_html_report(&findings, &report_path.to_string_lossy(), None, None);
         assert!(result.is_ok(), "HTML report generation should succeed");
-        
+
         // Read and verify the report
         let content = fs::read_to_string(&report_path).unwrap();
-        
+
         // Verify that source is displayed
-        assert!(content.contains("<strong>Source:</strong> semgrep"), 
-                "HTML should display source value, got: {}", content);
-        
+        assert!(
+            content.contains("<strong>Source:</strong> semgrep"),
+            "HTML should display source value, got: {}",
+            content
+        );
+
         // Verify that description is displayed
-        assert!(content.contains("Potential buffer overflow"), 
-                "HTML should display description, got: {}", content);
-        
+        assert!(
+            content.contains("Potential buffer overflow"),
+            "HTML should display description, got: {}",
+            content
+        );
+
         // Verify that file_path is displayed
-        assert!(content.contains("src/vulnerable.c"), 
-                "HTML should display file_path, got: {}", content);
+        assert!(
+            content.contains("src/vulnerable.c"),
+            "HTML should display file_path, got: {}",
+            content
+        );
     }
 
     #[test]
@@ -571,17 +581,23 @@ mod tests {
         let content = std::fs::read_to_string(output_path).unwrap();
 
         // Verify that the source is displayed
-        assert!(content.contains("<strong>Source:</strong> semgrep"), 
-                "HTML should contain the LLM source 'semgrep'");
-        
+        assert!(
+            content.contains("<strong>Source:</strong> semgrep"),
+            "HTML should contain the LLM source 'semgrep'"
+        );
+
         // Verify that the description is displayed
-        assert!(content.contains("User input is directly concatenated into SQL query"),
-                "HTML should contain the finding description");
-        
+        assert!(
+            content.contains("User input is directly concatenated into SQL query"),
+            "HTML should contain the finding description"
+        );
+
         // Verify that the description is rendered as HTML (not empty)
-        assert!(content.contains("<p>User input is directly concatenated into SQL query</p>") ||
-                content.contains("User input is directly concatenated into SQL query"),
-                "HTML should contain rendered description text");
+        assert!(
+            content.contains("<p>User input is directly concatenated into SQL query</p>")
+                || content.contains("User input is directly concatenated into SQL query"),
+            "HTML should contain rendered description text"
+        );
     }
 
     #[test]
@@ -624,7 +640,9 @@ mod tests {
         let content = std::fs::read_to_string(output_path).unwrap();
 
         // Description should still be displayed even without model
-        assert!(content.contains("Potential buffer overflow condition"),
-                "HTML should contain the finding description even without LLM model");
+        assert!(
+            content.contains("Potential buffer overflow condition"),
+            "HTML should contain the finding description even without LLM model"
+        );
     }
 }

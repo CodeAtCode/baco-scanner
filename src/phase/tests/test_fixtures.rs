@@ -58,7 +58,9 @@ pub fn create_complete_finding() -> VulnerabilityFinding {
     VulnerabilityFinding {
         id: "complete-finding-id".to_string(),
         title: "Complete SQL Injection Finding".to_string(),
-        description: "Comprehensive SQL injection vulnerability with all fields populated for testing".to_string(),
+        description:
+            "Comprehensive SQL injection vulnerability with all fields populated for testing"
+                .to_string(),
         file_path: "src/database.rs".to_string(),
         line_number: Some(42),
         severity: Severity::High,

@@ -313,7 +313,11 @@ impl LlmAnalyzer {
         let response = self.client.chat(&messages).await;
 
         match response {
-            Ok(response_with_model) => self.parse_llm_response(&response_with_model.content, &file_path, &response_with_model.model_used),
+            Ok(response_with_model) => self.parse_llm_response(
+                &response_with_model.content,
+                &file_path,
+                &response_with_model.model_used,
+            ),
             Err(e) => {
                 tracing::error!(
                     "LLM analysis failed for {}: Error: {}\n  Model: {}",
@@ -380,14 +384,12 @@ impl LlmAnalyzer {
                 let title = item.get("title").and_then(|v| v.as_str());
                 let description = item.get("description").and_then(|v| v.as_str());
                 let line = item.get("line").and_then(|v| v.as_i64());
-                
+
                 // Skip if essential fields are missing
                 if let (Some(severity_str), Some(title), Some(line)) = (severity_str, title, line) {
                     // Use description from LLM response (may be empty if LLM didn't provide one)
-                    let description = description
-                        .map(|s| s.to_string())
-                        .unwrap_or_default();
-                    
+                    let description = description.map(|s| s.to_string()).unwrap_or_default();
+
                     let severity = match severity_str.to_lowercase().as_str() {
                         "critical" => Severity::Critical,
                         "high" => Severity::High,
@@ -519,7 +521,11 @@ impl LlmAnalyzer {
                         poc_code: poc_code.clone(),
                         mitigation_code: mitigation_code.clone(),
                         poc_format: None,
-                        llm_model: if model_name == "fallback" || model_name.is_empty() { None } else { Some(model_name.to_string()) },
+                        llm_model: if model_name == "fallback" || model_name.is_empty() {
+                            None
+                        } else {
+                            Some(model_name.to_string())
+                        },
                         agent_mode: false,
                     });
                 }

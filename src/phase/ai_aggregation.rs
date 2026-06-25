@@ -42,18 +42,18 @@ impl ScanPhase for AiAggregationPhase {
 
             let aggregation_runner = AiAggregationRunner::new(llm_config);
             let context = AnalysisContext::default();
-            
+
             tracing::info!("Running AI aggregation with LLM enrichment");
             let result = aggregation_runner.run(findings.clone(), &context).await;
-            
+
             let enriched_findings = result.enriched_findings;
-            
+
             // Check if LLM enrichment completely failed (all LLM calls failed)
             let llm_completely_failed = enriched_findings.iter().all(|f| {
-                f.description.contains("LLM enrichment unavailable") || 
-                f.description.contains("client error")
+                f.description.contains("LLM enrichment unavailable")
+                    || f.description.contains("client error")
             }) && !enriched_findings.is_empty();
-            
+
             if llm_completely_failed {
                 tracing::error!(
                     "\n╔══════════════════════════════════════════════════════════════════════════════╗\n\
@@ -79,13 +79,18 @@ impl ScanPhase for AiAggregationPhase {
                     enriched_findings.len()
                 );
             } else if !enriched_findings.is_empty() {
-                tracing::info!("AI aggregation enriched {} findings", enriched_findings.len());
+                tracing::info!(
+                    "AI aggregation enriched {} findings",
+                    enriched_findings.len()
+                );
             }
-            
+
             if !enriched_findings.is_empty() {
-                scanner.state.send_modify(|s| s.findings = enriched_findings.clone());
+                scanner
+                    .state
+                    .send_modify(|s| s.findings = enriched_findings.clone());
             }
-            
+
             Ok(enriched_findings)
         } else {
             tracing::info!("No LLM configured for aggregation phase, skipping AI aggregation");

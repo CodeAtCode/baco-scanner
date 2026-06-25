@@ -393,7 +393,6 @@ impl Default for ReportAggregationPhase {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::findings::VerificationStatus;
     use crate::phase::tests::test_fixtures::create_finding_with_params;
 
     // Wrapper for backward compatibility with existing test code

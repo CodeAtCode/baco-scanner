@@ -68,7 +68,10 @@ pub struct ChatResponseWithModel {
 
 impl ChatResponseWithModel {
     pub fn new(content: String, model_used: String) -> Self {
-        Self { content, model_used }
+        Self {
+            content,
+            model_used,
+        }
     }
 }
 
@@ -249,7 +252,10 @@ impl LlmClient {
                     })
                     .await;
 
-                    return Ok(ChatResponseWithModel::new(content.to_string(), model.clone()));
+                    return Ok(ChatResponseWithModel::new(
+                        content.to_string(),
+                        model.clone(),
+                    ));
                 }
                 Ok(resp) => {
                     let status = resp.status();
@@ -532,7 +538,7 @@ impl LlmClient {
 
         let chat_url = format!("{}/v1/chat/completions", self.config.base_url);
         tracing::info!("Trying LLM API at: {}", chat_url);
-        
+
         match self
             .try_chat_request(&self.config.base_url, payload, tokens_prompt)
             .await
@@ -562,7 +568,7 @@ impl LlmClient {
 
         let chat_url = format!("{}/v1/chat/completions", self.config.base_url);
         tracing::info!("Trying LLM API (with tools) at: {}", chat_url);
-        
+
         match self
             .try_chat_with_tools_request(&self.config.base_url, payload)
             .await
@@ -604,7 +610,6 @@ impl ChatMessage {
         }
     }
 }
-
 
 pub trait LlmProvider {
     fn chat(&self, messages: &[ChatMessage]) -> Result<String, String>;

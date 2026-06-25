@@ -121,18 +121,20 @@ impl AgentSession {
                 Ok(response) => {
                     let _model_used = response.model_used.clone();
                     if !response.tool_calls.is_empty() {
-                        let (new_tools_used, new_test_path, new_compile_path, new_messages) = execute_tool_calls(
-                            &self.tool_registry,
-                            &self.sandbox,
-                            &response,
-                            messages,
-                            &self.progress_cb,
-                            &self.project_root,
-                            turn,
-                            self.max_turns,
-                            "Turn",
-                        ).await;
-                        
+                        let (new_tools_used, new_test_path, new_compile_path, new_messages) =
+                            execute_tool_calls(
+                                &self.tool_registry,
+                                &self.sandbox,
+                                &response,
+                                messages,
+                                &self.progress_cb,
+                                &self.project_root,
+                                turn,
+                                self.max_turns,
+                                "Turn",
+                            )
+                            .await;
+
                         // Merge results
                         for tool_name in new_tools_used {
                             if !tools_used.contains(&tool_name) {
@@ -211,7 +213,14 @@ impl AgentSession {
                                 poc_code: None,
                                 mitigation_code: None,
                                 poc_format: None,
-                                  llm_model: { let m = self.client.model_name(); if m.is_empty() { None } else { Some(m) } },
+                                llm_model: {
+                                    let m = self.client.model_name();
+                                    if m.is_empty() {
+                                        None
+                                    } else {
+                                        Some(m)
+                                    }
+                                },
                                 agent_mode: true,
                             },
                             compile_path,
@@ -304,7 +313,7 @@ impl AgentSession {
             "[AGENT] description preview: {}",
             finding.description.chars().take(100).collect::<String>()
         );
-        
+
         // Always run agent verification loop - don't skip even if description exists
         // The agent needs to use tools to actually verify the finding
         let system_prompt = "Write a test proving this vulnerability. Use file_write to create a test, test_compile to verify it compiles, and test_run to execute it. Report in JSON: {compiled: true|false, test_passed: true|false, log: \"reason\"}";
@@ -346,18 +355,20 @@ impl AgentSession {
                 Ok(response) => {
                     let _model_used = response.model_used.clone();
                     if !response.tool_calls.is_empty() {
-                        let (new_tools_used, new_test_path, new_compile_path, new_messages) = execute_tool_calls(
-                            &self.tool_registry,
-                            &self.sandbox,
-                            &response,
-                            messages,
-                            &self.progress_cb,
-                            &self.project_root,
-                            turn,
-                            self.max_turns,
-                            "Verify",
-                        ).await;
-                        
+                        let (new_tools_used, new_test_path, new_compile_path, new_messages) =
+                            execute_tool_calls(
+                                &self.tool_registry,
+                                &self.sandbox,
+                                &response,
+                                messages,
+                                &self.progress_cb,
+                                &self.project_root,
+                                turn,
+                                self.max_turns,
+                                "Verify",
+                            )
+                            .await;
+
                         // Merge results
                         for tool_name in new_tools_used {
                             if !tools_used.contains(&tool_name) {

@@ -14,12 +14,14 @@ use tempfile::TempDir;
 #[tokio::test]
 async fn test_false_positive_detection_tests_pass() {
     let temp_dir = TempDir::new().unwrap();
-    
+
     // Create a SAFE version of the code
     let src_dir = temp_dir.path().join("src");
     fs::create_dir(&src_dir).unwrap();
-    
-    fs::write(src_dir.join("lib.rs"), r#"
+
+    fs::write(
+        src_dir.join("lib.rs"),
+        r#"
 pub fn safe_copy(dst: &mut [u8], src: &[u8]) {
     // Safe: uses min to prevent overflow
     let len = src.len().min(dst.len());
@@ -38,7 +40,9 @@ mod tests {
         assert_eq!(dst, [1, 2, 3, 4, 5]);
     }
 }
-"#).unwrap();
+"#,
+    )
+    .unwrap();
 
     let responses = vec![
         make_chat_response(
@@ -76,32 +80,34 @@ mod tests {
         keep_artifacts: false,
     };
 
-    let session = AgentSession::new(
-        mock_client,
-        &config,
-        temp_dir.path(),
-        Arc::new(|_| {}),
-    );
+    let session = AgentSession::new(mock_client, &config, temp_dir.path(), Arc::new(|_| {}));
 
-    let result = session.analyze_file(src_dir.join("lib.rs").to_str().unwrap()).await;
-    
+    let result = session
+        .analyze_file(src_dir.join("lib.rs").to_str().unwrap())
+        .await;
+
     assert!(result.is_ok());
     let finding = result.unwrap();
-    
+
     // Agent should conclude no vulnerability
-    assert!(finding.finding.title.contains("No Vulnerability") || finding.finding.severity == Severity::Low);
+    assert!(
+        finding.finding.title.contains("No Vulnerability")
+            || finding.finding.severity == Severity::Low
+    );
 }
 
 /// Test 9: True positive detection - agent keeps finding when tests fail
 #[tokio::test]
 async fn test_true_positive_detection_tests_fail() {
     let temp_dir = TempDir::new().unwrap();
-    
+
     // Create vulnerable code with failing test
     let src_dir = temp_dir.path().join("src");
     fs::create_dir(&src_dir).unwrap();
-    
-    fs::write(src_dir.join("lib.rs"), r#"
+
+    fs::write(
+        src_dir.join("lib.rs"),
+        r#"
 pub fn unsafe_copy(dst: &mut [u8], src: &[u8]) {
     // UNSAFE: no bounds checking
     for (i, &byte) in src.iter().enumerate() {
@@ -121,7 +127,9 @@ mod tests {
         unsafe_copy(&mut dst, &src);  // WILL panic
     }
 }
-"#).unwrap();
+"#,
+    )
+    .unwrap();
 
     let responses = vec![
         make_chat_response(
@@ -159,19 +167,19 @@ mod tests {
         keep_artifacts: false,
     };
 
-    let session = AgentSession::new(
-        mock_client,
-        &config,
-        temp_dir.path(),
-        Arc::new(|_| {}),
-    );
+    let session = AgentSession::new(mock_client, &config, temp_dir.path(), Arc::new(|_| {}));
 
-    let result = session.analyze_file(src_dir.join("lib.rs").to_str().unwrap()).await;
-    
+    let result = session
+        .analyze_file(src_dir.join("lib.rs").to_str().unwrap())
+        .await;
+
     assert!(result.is_ok());
     let finding = result.unwrap();
-    
+
     // Agent should confirm the vulnerability
     assert_eq!(finding.finding.severity, Severity::High);
-    assert!(finding.finding.description.contains("true positive") || finding.finding.description.contains("confirmed"));
+    assert!(
+        finding.finding.description.contains("true positive")
+            || finding.finding.description.contains("confirmed")
+    );
 }

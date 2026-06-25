@@ -557,7 +557,6 @@ mod tests {
     use super::*;
     use crate::phase::tests::test_fixtures::create_finding_with_params;
 
-
     #[test]
     fn test_cross_file_analysis_empty() {
         let phase = CrossFileAnalysisPhase::new();
@@ -581,7 +580,8 @@ mod tests {
             "src/main.rs",
             Some(42),
             Some("CWE-79"),
-            vec!["semgrep"], None,
+            vec!["semgrep"],
+            None,
         );
 
         let result = phase.run(vec![finding], &context);
@@ -602,7 +602,8 @@ mod tests {
             "src/main.rs",
             Some(42),
             Some("CWE-79"),
-            vec!["semgrep"], None,
+            vec!["semgrep"],
+            None,
         );
         finding.cross_file_references = Some(vec!["src/utils.rs".to_string()]);
 
@@ -671,7 +672,8 @@ mod tests {
             "src/main.rs",
             Some(42),
             Some("CWE-79"),
-            vec!["semgrep"], None,
+            vec!["semgrep"],
+            None,
         );
 
         let data_flow = vec![
@@ -740,7 +742,8 @@ mod tests {
             "src/main.rs",
             Some(42),
             Some("CWE-79"),
-            vec!["semgrep"], None,
+            vec!["semgrep"],
+            None,
         );
 
         let cross_finding = CrossFileFinding {
@@ -771,7 +774,8 @@ mod tests {
                 "src/a.rs",
                 Some(1),
                 Some("CWE-79"),
-                vec!["semgrep"], None,
+                vec!["semgrep"],
+                None,
             ),
             create_finding_with_params(
                 "f2",
@@ -780,7 +784,8 @@ mod tests {
                 "src/b.rs",
                 Some(2),
                 Some("CWE-89"),
-                vec!["bandit"], None,
+                vec!["bandit"],
+                None,
             ),
         ];
 
@@ -846,7 +851,8 @@ mod tests {
             "src/main.rs",
             Some(42),
             Some("CWE-79"),
-            vec!["semgrep"], None,
+            vec!["semgrep"],
+            None,
         );
 
         let result = phase.run(vec![finding], &context);

@@ -198,7 +198,11 @@ impl CveBootstrapper {
     }
 
     /// Parse a dependency line and add to the dependencies list
-    fn parse_dependency_line(line: &str, deps: &mut Vec<Dependency>, ecosystem: DependencyEcosystem) {
+    fn parse_dependency_line(
+        line: &str,
+        deps: &mut Vec<Dependency>,
+        ecosystem: DependencyEcosystem,
+    ) {
         let parts: Vec<&str> = line.split(' ').collect();
         if let Some(name) = parts.first() {
             let version = parts
@@ -237,7 +241,11 @@ impl CveBootstrapper {
             }
 
             if trimmed.starts_with("require ") {
-                Self::parse_dependency_line(&trimmed[9..], &mut deps, DependencyEcosystem::GoModules);
+                Self::parse_dependency_line(
+                    &trimmed[9..],
+                    &mut deps,
+                    DependencyEcosystem::GoModules,
+                );
                 continue;
             }
 
@@ -406,17 +414,17 @@ impl CveBootstrapper {
     ) -> Result<Vec<crate::findings::VulnerabilityFinding>> {
         // Detect project stack
         let stack = self.detect_project_stack()?;
-        
+
         // Fetch relevant CVEs
         let _cves = self.fetch_relevant_cves(&stack).await?;
-        
+
         if _cves.is_empty() {
             tracing::info!("No CVEs found for project stack");
             return Ok(findings.to_vec());
         }
-        
+
         tracing::info!("Found {} CVEs for project dependencies", _cves.len());
-        
+
         // For now, just return findings (CVE enrichment requires additional fields)
         // Future: add cve_references and threat_intelligence fields to VulnerabilityFinding
         Ok(findings.to_vec())

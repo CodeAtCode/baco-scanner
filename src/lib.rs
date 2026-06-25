@@ -30,13 +30,13 @@ pub mod rate_limiter;
 pub mod report;
 pub mod root_cause_dedup;
 pub mod scanner;
+pub mod scanner_types;
 pub mod semgrep;
 pub mod severity_rubric;
 pub mod staging;
 pub mod threat_model;
 pub mod threat_model_file;
 pub mod tickets;
-pub mod scanner_types;
 pub mod validation;
 pub mod variant_search;
 

@@ -116,7 +116,12 @@ pub async fn execute_tool_calls(
     turn: u32,
     max_turns: u32,
     turn_label: &str,
-) -> (Vec<String>, Option<PathBuf>, Option<PathBuf>, Vec<ChatMessage>) {
+) -> (
+    Vec<String>,
+    Option<PathBuf>,
+    Option<PathBuf>,
+    Vec<ChatMessage>,
+) {
     let mut tools_used = Vec::new();
     let mut test_source_path = None;
     let mut compile_path = None;
@@ -153,7 +158,11 @@ pub async fn execute_tool_calls(
             }
 
             messages.push(ChatMessage::assistant(
-                format!("Calling: {}\nArgs: {:#}", tool_call.name, tool_call.arguments).as_str(),
+                format!(
+                    "Calling: {}\nArgs: {:#}",
+                    tool_call.name, tool_call.arguments
+                )
+                .as_str(),
             ));
             messages.push(ChatMessage::user(result_str.as_str()));
         }

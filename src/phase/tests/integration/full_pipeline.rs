@@ -5,7 +5,6 @@
 use crate::checkpoint::{Checkpoint, ScanPhase};
 use crate::config::ScannerConfig;
 use crate::findings::{Severity, VulnerabilityFinding};
-use crate::phase::ScanPhase as PhaseTrait;
 use crate::scanner::Scanner;
 use std::fs;
 use tempfile::TempDir;
@@ -42,7 +41,10 @@ async fn test_full_pipeline_resume_from_checkpoint() {
         id: "pre-existing-finding".to_string(),
         title: "Pre-existing vulnerability".to_string(),
         description: "Found in previous phase".to_string(),
-        file_path: project_path.join("vulnerable.rs").to_string_lossy().to_string(),
+        file_path: project_path
+            .join("vulnerable.rs")
+            .to_string_lossy()
+            .to_string(),
         line_number: Some(5),
         severity: Severity::High,
         confidence_score: 0.7,
@@ -121,7 +123,10 @@ async fn test_full_pipeline_interrupt_and_resume() {
             id: format!("interrupted-finding-{}", i),
             title: format!("Finding {} from interrupted scan", i),
             description: "Found before interrupt".to_string(),
-            file_path: project_path.join("vulnerable.rs").to_string_lossy().to_string(),
+            file_path: project_path
+                .join("vulnerable.rs")
+                .to_string_lossy()
+                .to_string(),
             line_number: Some(i + 1),
             severity: Severity::Medium,
             confidence_score: 0.6,

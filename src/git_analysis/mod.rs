@@ -16,8 +16,8 @@ mod patterns;
 mod tests;
 
 // Re-export public API
-pub use analyzer::{GitHistoryAnalyzer, GitAnalyzer};
+pub use analyzer::{GitAnalyzer, GitHistoryAnalyzer};
 pub use models::{
-    CommitReference, VulnerabilityPattern, VulnerabilityPatternType,
-    RiskyCommitPattern, RiskyPatternType, GitConfidenceModifier, GitAnalysisResult,
+    CommitReference, GitAnalysisResult, GitConfidenceModifier, RiskyCommitPattern,
+    RiskyPatternType, VulnerabilityPattern, VulnerabilityPatternType,
 };

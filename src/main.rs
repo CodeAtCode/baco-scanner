@@ -148,11 +148,11 @@ async fn run_scan(
     let checkpoint_path_clone = checkpoint_path.clone();
     tokio::spawn(async move {
         if tokio::signal::ctrl_c().await.is_ok() {
-        tracing::error!("\nScan interrupted. Progress saved to checkpoint.");
-        tracing::error!(
-            "Resume with: baco resume --checkpoint {}",
-            checkpoint_path_clone.display()
-        );
+            tracing::error!("\nScan interrupted. Progress saved to checkpoint.");
+            tracing::error!(
+                "Resume with: baco resume --checkpoint {}",
+                checkpoint_path_clone.display()
+            );
             std::process::exit(130);
         }
     });
@@ -275,9 +275,7 @@ async fn run_resume(checkpoint_path: &Path, quiet: bool) -> Result<(), Box<dyn s
             for entry in entries.filter_map(|e| e.ok()) {
                 let path = entry.path();
                 if path.is_file() {
-                    let filename = path
-                        .file_name()
-                        .map(|n| n.to_string_lossy().to_string());
+                    let filename = path.file_name().map(|n| n.to_string_lossy().to_string());
                     if filename.map(|n| n.ends_with(".json")).unwrap_or(false)
                         && path != checkpoint_path
                     {
@@ -397,7 +395,9 @@ fn format_phase(phase: &baco::checkpoint::ScanPhase) -> String {
         baco::checkpoint::ScanPhase::CveBootstrap => ("CVE Bootstrap 📋", 17),
         baco::checkpoint::ScanPhase::PocCompiler => ("PoC Compiler 🛠️", 18),
         baco::checkpoint::ScanPhase::VariantSearch => ("Variant Search 🔎", 19),
-        baco::checkpoint::ScanPhase::SecurityAgentVerification => ("SecurityAgent Verification 🤖", 20),
+        baco::checkpoint::ScanPhase::SecurityAgentVerification => {
+            ("SecurityAgent Verification 🤖", 20)
+        }
         baco::checkpoint::ScanPhase::Complete => ("Complete ✨", 15),
         baco::checkpoint::ScanPhase::Error => ("Error ❌", 16),
     };

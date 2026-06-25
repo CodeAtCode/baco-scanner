@@ -108,19 +108,19 @@ async fn test_tempdir_isolation_parallel() {
             tokio::spawn(async move {
                 let temp_dir = TempDir::new().unwrap();
                 let file_path = temp_dir.path().join(format!("test_{}.txt", i));
-                
+
                 // Write unique content
                 std::fs::write(&file_path, format!("content_{}", i)).unwrap();
-                
+
                 // Read and verify
                 let content = std::fs::read_to_string(&file_path).unwrap();
                 assert_eq!(content, format!("content_{}", i));
-                
+
                 // TempDir auto-cleans on drop
                 assert!(file_path.exists());
                 drop(temp_dir);
                 assert!(!file_path.exists());
-                
+
                 i
             })
         })
@@ -160,9 +160,9 @@ async fn test_shared_state_synchronization() {
 /// Test that phase contexts don't share mutable state
 #[tokio::test]
 async fn test_phase_context_isolation() {
+    use crate::config::ScannerConfig;
     use crate::findings::{Severity, VulnerabilityFinding};
     use crate::scanner::Scanner;
-    use crate::config::ScannerConfig;
 
     let handles: Vec<_> = (0..5)
         .map(|i| {
@@ -171,16 +171,19 @@ async fn test_phase_context_isolation() {
                 let config = ScannerConfig::default();
                 let temp_dir = TempDir::new().unwrap();
                 let target_path = temp_dir.path().to_path_buf();
-                
+
                 let scanner = Scanner::new(config, target_path.clone(), false);
                 let _analyzed_files: Vec<String> = Vec::new();
-                
+
                 // Create a finding unique to this task
                 let finding = VulnerabilityFinding {
                     id: format!("task-{}-finding", i),
                     title: format!("Test finding from task {}", i),
                     description: format!("Description for task {}", i),
-                    file_path: target_path.join(format!("file_{}.rs", i)).to_string_lossy().to_string(),
+                    file_path: target_path
+                        .join(format!("file_{}.rs", i))
+                        .to_string_lossy()
+                        .to_string(),
                     line_number: Some(i + 1),
                     severity: Severity::High,
                     confidence_score: 0.8,
@@ -206,12 +209,12 @@ async fn test_phase_context_isolation() {
                     llm_model: None,
                     agent_mode: false,
                 };
-                
+
                 scanner.add_finding(finding.clone());
-                
+
                 assert_eq!(scanner.findings().len(), 1);
                 assert_eq!(scanner.findings()[0].id, format!("task-{}-finding", i));
-                
+
                 i
             })
         })
@@ -235,20 +238,20 @@ async fn test_checkpoint_file_isolation() {
             tokio::spawn(async move {
                 let temp_dir = TempDir::new().unwrap();
                 let checkpoint_path = temp_dir.path().join(format!("checkpoint_{}.json", i));
-                
+
                 let checkpoint = Checkpoint::new(
                     &format!("scan-{}", i),
                     temp_dir.path().to_string_lossy().as_ref(),
                     Utc::now(),
                 );
-                
+
                 checkpoint.save(checkpoint_path.to_str().unwrap()).unwrap();
-                
+
                 // Verify checkpoint can be loaded
                 let loaded = Checkpoint::load(checkpoint_path.to_str().unwrap()).unwrap();
                 assert_eq!(loaded.scan_id, format!("scan-{}", i));
                 assert_eq!(loaded.current_phase, ScanPhase::Indexing);
-                
+
                 i
             })
         })
@@ -264,9 +267,9 @@ async fn test_checkpoint_file_isolation() {
 /// Test that report generation doesn't have file conflicts
 #[tokio::test]
 async fn test_report_generation_isolation() {
+    use crate::config::ScannerConfig;
     use crate::findings::{Severity, VulnerabilityFinding};
     use crate::scanner::Scanner;
-    use crate::config::ScannerConfig;
 
     let handles: Vec<_> = (0..5)
         .map(|i| {
@@ -275,17 +278,20 @@ async fn test_report_generation_isolation() {
                 let temp_dir = TempDir::new().unwrap();
                 let output_dir = temp_dir.path().join("output");
                 std::fs::create_dir_all(&output_dir).unwrap();
-                
+
                 let target_path = temp_dir.path().to_path_buf();
                 let scanner = Scanner::new(config, target_path.clone(), false);
-                
+
                 // Add unique findings per task
                 for j in 0..3 {
                     let finding = VulnerabilityFinding {
                         id: format!("task-{}-finding-{}", i, j),
                         title: format!("Finding {} from task {}", j, i),
                         description: format!("Description for finding {} in task {}", j, i),
-                        file_path: target_path.join(format!("file_{}.rs", j)).to_string_lossy().to_string(),
+                        file_path: target_path
+                            .join(format!("file_{}.rs", j))
+                            .to_string_lossy()
+                            .to_string(),
                         line_number: Some(j + 1),
                         severity: Severity::High,
                         confidence_score: 0.8,
@@ -313,13 +319,13 @@ async fn test_report_generation_isolation() {
                     };
                     scanner.add_finding(finding);
                 }
-                
+
                 // Verify findings are isolated
                 assert_eq!(scanner.findings().len(), 3);
                 for finding in &scanner.findings() {
                     assert!(finding.id.starts_with(&format!("task-{}-", i)));
                 }
-                
+
                 i
             })
         })
@@ -341,7 +347,7 @@ async fn test_config_loading_parallel() {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    
+
     // Create all config files first
     let mut config_paths = Vec::new();
     for i in 0..10 {
@@ -373,7 +379,7 @@ timeout_secs = 120
         std::fs::write(&config_path, &config_content).unwrap();
         config_paths.push(config_path);
     }
-    
+
     // Now load them in parallel using direct TOML parsing (no validation)
     let handles: Vec<_> = config_paths
         .into_iter()
@@ -381,14 +387,14 @@ timeout_secs = 120
         .map(|(i, config_path)| {
             tokio::spawn(async move {
                 let content = std::fs::read_to_string(&config_path).unwrap();
-                let success = toml::from_str::<String>(&content).is_ok() || 
-                              toml::from_str::<serde_json::Value>(&content).is_ok();
+                let success = toml::from_str::<String>(&content).is_ok()
+                    || toml::from_str::<serde_json::Value>(&content).is_ok();
                 let _ = std::fs::remove_file(&config_path);
                 (i, success)
             })
         })
         .collect();
-    
+
     // Wait for all tasks and collect results
     let mut all_passed = true;
     for handle in handles {
@@ -401,7 +407,7 @@ timeout_secs = 120
             all_passed = false;
         }
     }
-    
+
     assert!(all_passed, "All parallel config parsing tasks must succeed");
     assert!(all_passed, "All parallel config parsing tasks must succeed");
 }
@@ -427,17 +433,17 @@ async fn test_parallel_stress_50_concurrent_tasks() {
             tokio::spawn(async move {
                 // Each task does multiple operations
                 let _guard = EnvVarGuard::set_var("BACO_STRESS_TEST", &format!("task_{}", i));
-                
+
                 let temp_dir = TempDir::new().unwrap();
                 let file_path = temp_dir.path().join("test.txt");
                 std::fs::write(&file_path, &format!("content_{}", i)).unwrap();
-                
+
                 let content = std::fs::read_to_string(&file_path).unwrap();
                 assert_eq!(content, format!("content_{}", i));
-                
+
                 // Verify env var
                 assert_eq!(env::var("BACO_STRESS_TEST").unwrap(), format!("task_{}", i));
-                
+
                 i
             })
         })
@@ -445,7 +451,7 @@ async fn test_parallel_stress_50_concurrent_tasks() {
 
     let results = futures::future::join_all(handles).await;
     assert_eq!(results.len(), 50);
-    
+
     for (i, result) in results.into_iter().enumerate() {
         assert_eq!(result.unwrap(), i);
     }
@@ -462,16 +468,16 @@ async fn migration_example_env_var_pattern() {
     //     let config = ScannerConfig::from_env();
     //     assert_eq!(config.llm.phases.discovery.api_key, Some("test_key".to_string()));
     // }
-    
+
     // AFTER (parallel-safe):
     let _guard = EnvVarGuard::set(&[
         ("BACO_MIGRATION_EXAMPLE", "example_value"),
         ("ANOTHER_VAR", "another_value"),
     ]);
-    
+
     assert_eq!(env::var("BACO_MIGRATION_EXAMPLE").unwrap(), "example_value");
     assert_eq!(env::var("ANOTHER_VAR").unwrap(), "another_value");
-    
+
     // When _guard drops, vars are restored automatically
     // This test can run in parallel with any other test
 }

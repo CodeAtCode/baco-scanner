@@ -109,7 +109,11 @@ async fn test_semgrep_phase_success_simulation() {
 #[tokio::test]
 async fn test_semgrep_phase_no_findings() {
     let temp_dir = TempDir::new().unwrap();
-    fs::write(temp_dir.path().join("safe.rs"), "fn main() { println!(\"hello\"); }").unwrap();
+    fs::write(
+        temp_dir.path().join("safe.rs"),
+        "fn main() { println!(\"hello\"); }",
+    )
+    .unwrap();
 
     let config = ScannerConfig::default();
     let mut scanner = Scanner::new(config, temp_dir.path().to_path_buf(), false);
@@ -152,7 +156,11 @@ async fn test_indexing_phase_nested_directories() {
     // Create nested structure
     fs::create_dir_all(temp_dir.path().join("src").join("utils")).unwrap();
     fs::write(temp_dir.path().join("src/main.rs"), "fn main() {}").unwrap();
-    fs::write(temp_dir.path().join("src/utils/helper.rs"), "pub fn helper() {}").unwrap();
+    fs::write(
+        temp_dir.path().join("src/utils/helper.rs"),
+        "pub fn helper() {}",
+    )
+    .unwrap();
 
     let config = ScannerConfig::default();
     let mut scanner = Scanner::new(config, temp_dir.path().to_path_buf(), false);
@@ -197,7 +205,11 @@ async fn test_indexing_phase_file_count_accuracy() {
 
     // Create exactly 5 Rust files
     for i in 0..5 {
-        fs::write(temp_dir.path().join(format!("file{}.rs", i)), "fn test() {}").unwrap();
+        fs::write(
+            temp_dir.path().join(format!("file{}.rs", i)),
+            "fn test() {}",
+        )
+        .unwrap();
     }
 
     let config = ScannerConfig::default();

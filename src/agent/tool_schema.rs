@@ -107,6 +107,25 @@ pub fn tool_definitions() -> Vec<serde_json::Value> {
     ]
 }
 
+#[allow(dead_code)]
+struct MockTool;
+impl Tool for MockTool {
+    fn name(&self) -> &str {
+        "mock_tool"
+    }
+    fn execute(
+        &self,
+        _args: serde_json::Value,
+        _sandbox: &dyn SandboxLike,
+    ) -> Result<ToolResult, String> {
+        Ok(ToolResult {
+            tool_call_id: "mock".to_string(),
+            success: true,
+            output: "Mock tool executed".to_string(),
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -161,24 +180,5 @@ mod tests {
         let required = params["required"].as_array().unwrap();
 
         assert!(required.contains(&serde_json::json!("path")));
-    }
-}
-
-#[allow(dead_code)]
-struct MockTool;
-impl Tool for MockTool {
-    fn name(&self) -> &str {
-        "mock_tool"
-    }
-    fn execute(
-        &self,
-        _args: serde_json::Value,
-        _sandbox: &dyn SandboxLike,
-    ) -> Result<ToolResult, String> {
-        Ok(ToolResult {
-            tool_call_id: "mock".to_string(),
-            success: true,
-            output: "".to_string(),
-        })
     }
 }

@@ -15,25 +15,22 @@ fn update_finding_with_agent_evidence(
     test_log: Option<&String>,
 ) -> VulnerabilityFinding {
     // Store evidence path
-    if let Some(ref path) = compile_path {
+    if let Some(path) = compile_path {
         finding.agent_evidence_path = Some(path.to_string_lossy().to_string());
-    } else if let Some(ref path) = test_source_path {
+    } else if let Some(path) = test_source_path {
         finding.agent_evidence_path = Some(path.to_string_lossy().to_string());
     } else if agent_turns > 0 {
-        finding.agent_evidence_path = Some(format!(
-            "{} turns, {} tools",
-            agent_turns,
-            tools_used.len()
-        ));
+        finding.agent_evidence_path =
+            Some(format!("{} turns, {} tools", agent_turns, tools_used.len()));
     }
-    
+
     // Store test log
     if let Some(log) = test_log {
         if finding.verification_notes.is_none() {
             finding.verification_notes = Some(log.clone().to_string());
         }
     }
-    
+
     finding
 }
 
@@ -71,7 +68,8 @@ impl ScanPhase for SecurityAgentVerificationPhase {
         let total_findings = findings.len();
         let mut verified_findings = Vec::with_capacity(findings.len());
 
-        let Some(client) = crate::llm::create_llm_client_with_metrics(&ctx.scanner, "discovery") else {
+        let Some(client) = crate::llm::create_llm_client_with_metrics(ctx.scanner, "discovery")
+        else {
             tracing::debug!("No API key for agent, skipping SecurityAgent verification");
             return Ok(findings);
         };
@@ -103,7 +101,7 @@ impl ScanPhase for SecurityAgentVerificationPhase {
                         &agent_result.tools_used,
                         agent_result.test_log.as_ref(),
                     );
-                    
+
                     tracing::debug!(
                         "SecurityAgent verified {}: {:?} - {} turns, {} tools",
                         updated_finding.title,
@@ -122,7 +120,8 @@ impl ScanPhase for SecurityAgentVerificationPhase {
                     );
                     let mut failed_finding = finding;
                     failed_finding.verification_status = Some(VerificationStatus::Failed);
-                    failed_finding.verification_notes = Some(format!("Agent verification failed: {}", e));
+                    failed_finding.verification_notes =
+                        Some(format!("Agent verification failed: {}", e));
                     verified_findings.push(failed_finding);
                 }
             }

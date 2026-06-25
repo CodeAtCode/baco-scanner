@@ -71,9 +71,7 @@ mod tests {
                 let pb = progress.add(ProgressBar::new(100));
                 let findings = vec![];
 
-                let result = scanner
-                    .run_phase(&$phase, findings, &pb, &[])
-                    .await;
+                let result = scanner.run_phase(&$phase, findings, &pb, &[]).await;
                 assert!(result.is_ok());
             }
         };

@@ -28,7 +28,8 @@ impl ScanPhase for LlmDiscoveryPhase {
             reader.findings.clone()
         };
 
-        let Some(client) = crate::llm::create_llm_client_with_metrics(&ctx.scanner, "discovery") else {
+        let Some(client) = crate::llm::create_llm_client_with_metrics(ctx.scanner, "discovery")
+        else {
             tracing::debug!("No API key for discovery, skipping LLM enrichment");
             return Ok(findings);
         };
@@ -49,18 +50,22 @@ impl ScanPhase for LlmDiscoveryPhase {
 
             if use_agent_mode {
                 let models = client.get_all_models();
-                tracing::debug!("Agent mode: analyzing with {} models: {:?}", models.len(), models);
-                
+                tracing::debug!(
+                    "Agent mode: analyzing with {} models: {:?}",
+                    models.len(),
+                    models
+                );
+
                 let source_path = target_path.join(&finding.file_path);
                 let source_code = std::fs::read_to_string(&source_path)
                     .unwrap_or_else(|_| "Unable to read source file".to_string());
-                
+
                 let mut all_descriptions: Vec<String> = Vec::new();
                 let mut all_fixes: Vec<String> = Vec::new();
-                
+
                 for model in &models {
                     tracing::debug!("  Agent mode with model: {}", model);
-                    
+
                     let prompt = format!(
                         r#"Analyze this vulnerability and provide enriched details.
 
@@ -95,31 +100,40 @@ Respond with ONLY a JSON object (no other text):
                     ];
 
                     if let Ok(response_with_model) = client.chat(&messages).await {
-                        parse_llm_response(&response_with_model.content, &mut all_descriptions, &mut all_fixes, &model);
+                        parse_llm_response(
+                            &response_with_model.content,
+                            &mut all_descriptions,
+                            &mut all_fixes,
+                            model,
+                        );
                     } else {
                         tracing::warn!("  Agent mode model {} failed", model);
                     }
                 }
-                
+
                 // Aggregate: use the longest/most detailed description
                 if let Some(best_desc) = all_descriptions.into_iter().max_by_key(|d| d.len()) {
                     finding.description = best_desc;
                 }
-                
+
                 if let Some(best_fix) = all_fixes.into_iter().next() {
                     finding.diff_hunk = Some(best_fix);
                 }
             } else {
                 // Multi-model mode: analyze with ALL configured models and aggregate results
                 let models = client.get_all_models();
-                tracing::debug!("Analyzing finding with {} models: {:?}", models.len(), models);
-                
+                tracing::debug!(
+                    "Analyzing finding with {} models: {:?}",
+                    models.len(),
+                    models
+                );
+
                 let mut all_descriptions: Vec<String> = Vec::new();
                 let mut all_fixes: Vec<String> = Vec::new();
-                
+
                 for model in &models {
                     tracing::debug!("  Analyzing with model: {}", model);
-                    
+
                     let messages = vec![
                         ChatMessage::system(
                             "You are a security vulnerability analyzer. Output valid JSON only.",
@@ -144,17 +158,22 @@ Respond with ONLY JSON:
                     ];
 
                     if let Ok(response_with_model) = client.chat(&messages).await {
-                        parse_llm_response(&response_with_model.content, &mut all_descriptions, &mut all_fixes, &model);
+                        parse_llm_response(
+                            &response_with_model.content,
+                            &mut all_descriptions,
+                            &mut all_fixes,
+                            model,
+                        );
                     } else {
                         tracing::warn!("  Model {} failed to analyze this finding", model);
                     }
                 }
-                
+
                 // Aggregate: use the longest/most detailed description
                 if let Some(best_desc) = all_descriptions.into_iter().max_by_key(|d| d.len()) {
                     finding.description = best_desc;
                 }
-                
+
                 // Use the first fix available
                 if let Some(best_fix) = all_fixes.into_iter().next() {
                     finding.diff_hunk = Some(best_fix);

@@ -3,16 +3,17 @@
 //! Tests verifying HTML, JSON, and SARIF report generation,
 //! including field display, XSS safety, and format compliance.
 
-use crate::report::json::LlmMetricsSummary;
 use crate::config::ScannerConfig;
 use crate::findings::{Severity, VerificationStatus, VulnerabilityFinding};
-use crate::phase::tests::test_fixtures::{create_complete_finding, create_default_metrics_summary, create_test_finding};
+use crate::phase::tests::test_fixtures::{
+    create_complete_finding, create_default_metrics_summary, create_test_finding,
+};
 use crate::report::html::generate_html_report;
 use crate::report::json::write_findings_json;
+use crate::report::json::LlmMetricsSummary;
 use crate::report::sarif::generate_sarif_report;
 use std::fs;
 use tempfile::TempDir;
-
 
 fn create_severity_finding(severity: Severity) -> VulnerabilityFinding {
     let mut finding = create_test_finding();
@@ -160,7 +161,12 @@ fn test_report_llm_metrics_display() {
         operations: vec![],
     };
 
-    let result = generate_html_report(&findings, html_path.to_str().unwrap(), Some(&config), Some(metrics));
+    let result = generate_html_report(
+        &findings,
+        html_path.to_str().unwrap(),
+        Some(&config),
+        Some(metrics),
+    );
     assert!(result.is_ok());
 }
 

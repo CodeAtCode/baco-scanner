@@ -30,7 +30,9 @@ mod tests {
 
         // Semgrep may not be installed in test environment - either success or clear error is expected
         match result {
-            Ok(findings) => { let _ = findings.len(); } // Test runs semgrep
+            Ok(findings) => {
+                let _ = findings.len();
+            } // Test runs semgrep
             Err(_) => {} // Expected if semgrep not installed
         }
     }

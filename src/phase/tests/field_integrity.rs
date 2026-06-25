@@ -4,10 +4,11 @@
 //! are correctly preserved through serialization, deserialization,
 //! and phase processing.
 
-
 use crate::config::ScannerConfig;
 use crate::findings::{Severity, VerificationStatus, VulnerabilityFinding};
-use crate::phase::tests::test_fixtures::{create_complete_finding, create_default_metrics_summary, create_test_finding};
+use crate::phase::tests::test_fixtures::{
+    create_complete_finding, create_default_metrics_summary, create_test_finding,
+};
 use crate::report::html::generate_html_report;
 use std::fs;
 use tempfile::TempDir;
@@ -41,7 +42,10 @@ fn test_field_preservation_json_serialization() {
         finding.cross_file_references,
         deserialized.cross_file_references
     );
-    assert_eq!(finding.verification_status, deserialized.verification_status);
+    assert_eq!(
+        finding.verification_status,
+        deserialized.verification_status
+    );
     assert_eq!(finding.verification_notes, deserialized.verification_notes);
     assert_eq!(finding.poc_code, deserialized.poc_code);
     assert_eq!(finding.mitigation_code, deserialized.mitigation_code);
@@ -196,7 +200,10 @@ fn test_field_preservation_verification_status() {
         let json = serde_json::to_string(&finding).unwrap();
         let deserialized: VulnerabilityFinding = serde_json::from_str(&json).unwrap();
 
-        assert_eq!(finding.verification_status, deserialized.verification_status);
+        assert_eq!(
+            finding.verification_status,
+            deserialized.verification_status
+        );
     }
 }
 
@@ -251,5 +258,8 @@ fn test_field_preservation_agent_mode_flag() {
     let deserialized: VulnerabilityFinding = serde_json::from_str(&json).unwrap();
 
     assert!(deserialized.agent_mode);
-    assert_eq!(deserialized.llm_model, Some("claude-3.5-sonnet".to_string()));
+    assert_eq!(
+        deserialized.llm_model,
+        Some("claude-3.5-sonnet".to_string())
+    );
 }

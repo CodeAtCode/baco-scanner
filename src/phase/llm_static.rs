@@ -31,15 +31,16 @@ impl ScanPhase for LlmStaticAnalysisPhase {
 
         // Quick connectivity check: test LLM endpoint before processing files
         let phase_config = &ctx.scanner.config.llm.phases.discovery;
-        tracing::info!("[LLM] Phase config: base_url={}, api_key={:?}", 
-            phase_config.base_url, 
+        tracing::info!(
+            "[LLM] Phase config: base_url={}, api_key={:?}",
+            phase_config.base_url,
             phase_config.api_key
         );
-        
+
         if phase_config.api_key.is_none() {
             tracing::warn!("[LLM] No API key found - skipping connectivity check");
         }
-        
+
         if let Some(api_key) = &phase_config.api_key {
             tracing::info!("[LLM] API key found, starting connectivity check...");
             let llm_config = LlmConfig {

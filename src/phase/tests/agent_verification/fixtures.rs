@@ -3,11 +3,7 @@
 use crate::findings::{Severity, VulnerabilityFinding};
 
 /// Create a test finding with minimal required fields
-pub fn make_finding(
-    title: &str,
-    description: &str,
-    file_path: &str,
-) -> VulnerabilityFinding {
+pub fn make_finding(title: &str, description: &str, file_path: &str) -> VulnerabilityFinding {
     VulnerabilityFinding {
         id: format!("test-{}", title.to_lowercase().replace(" ", "-")),
         title: title.to_string(),

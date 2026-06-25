@@ -5,10 +5,8 @@ use std::collections::HashMap;
 
 use crate::context::AnalysisContext;
 use crate::git_analysis::models::{
-    CommitReference, GitAnalysisResult,
-    RiskyCommitPattern, VulnerabilityPattern,
+    CommitReference, GitAnalysisResult, RiskyCommitPattern, VulnerabilityPattern,
 };
-
 
 /// Get the remote URL for a repository
 pub fn get_remote_url(repo: &Repository) -> Option<String> {
@@ -78,9 +76,8 @@ pub fn update_context(ctx: &mut AnalysisContext, result: &GitAnalysisResult) {
         .iter()
         .any(|m| m.source == "security_commits")
     {
-        ctx.invariants.push(
-            "Code has security fixes in git history - review related patterns".to_string(),
-        );
+        ctx.invariants
+            .push("Code has security fixes in git history - review related patterns".to_string());
     }
 }
 

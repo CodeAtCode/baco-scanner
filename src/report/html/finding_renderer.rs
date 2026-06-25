@@ -64,8 +64,15 @@ pub fn render_finding(finding: &VulnerabilityFinding, finding_id: usize) -> Stri
         finding.confidence_score * 100.0,
         // Source and agent mode info (treat empty strings as missing)
         if finding.agent_mode {
-            let source = finding.llm_model.as_deref().filter(|m| !m.is_empty()).unwrap_or("unknown");
-            format!(r#"<br><strong>Source:</strong> {}<br><strong>Mode:</strong> <span class="agent-badge">Agent</span>"#, source)
+            let source = finding
+                .llm_model
+                .as_deref()
+                .filter(|m| !m.is_empty())
+                .unwrap_or("unknown");
+            format!(
+                r#"<br><strong>Source:</strong> {}<br><strong>Mode:</strong> <span class="agent-badge">Agent</span>"#,
+                source
+            )
         } else if let Some(model) = &finding.llm_model {
             if model.is_empty() {
                 String::new() // Don't show source if empty
@@ -84,9 +91,7 @@ pub fn render_finding(finding: &VulnerabilityFinding, finding_id: usize) -> Stri
         let diff_trimmed = diff.trim();
         if !diff_trimmed.is_empty() {
             html.push_str(r#"<div class="diff-hunk">"#);
-            html.push_str(
-                r#"<div class="diff-header">🔧 Recommended Fix (Unified Diff)</div>"#,
-            );
+            html.push_str(r#"<div class="diff-header">🔧 Recommended Fix (Unified Diff)</div>"#);
             html.push_str(r#"<pre class="diff-code"><code class="language-diff">"#);
             html.push_str(&encode_text(diff_trimmed));
             html.push_str(r#"</code></pre></div>"#);

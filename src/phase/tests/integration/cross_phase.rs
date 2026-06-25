@@ -32,12 +32,19 @@ async fn test_cross_phase_findings_preserved() {
         id: "data-flow-test".to_string(),
         title: "Data Flow Test Finding".to_string(),
         description: "Testing data preservation through phases".to_string(),
-        file_path: project_path_clone.join("test.rs").to_string_lossy().to_string(),
+        file_path: project_path_clone
+            .join("test.rs")
+            .to_string_lossy()
+            .to_string(),
         line_number: Some(50),
         severity: Severity::Critical,
         confidence_score: 0.95,
         cwe_id: Some("CWE-89".to_string()),
-        sources: vec!["semgrep".to_string(), "llm".to_string(), "agent".to_string()],
+        sources: vec![
+            "semgrep".to_string(),
+            "llm".to_string(),
+            "agent".to_string(),
+        ],
         verification_status: Some(VerificationStatus::Confirmed),
         verification_notes: Some("Verified through multiple sources".to_string()),
         code_snippet: Some("sql_query = \"SELECT * FROM users\".to_string();".to_string()),
@@ -74,7 +81,10 @@ async fn test_cross_phase_findings_preserved() {
     assert_eq!(preserved_finding.file_path, original_finding.file_path);
     assert_eq!(preserved_finding.line_number, original_finding.line_number);
     assert_eq!(preserved_finding.severity, original_finding.severity);
-    assert_eq!(preserved_finding.confidence_score, original_finding.confidence_score);
+    assert_eq!(
+        preserved_finding.confidence_score,
+        original_finding.confidence_score
+    );
     assert_eq!(preserved_finding.cwe_id, original_finding.cwe_id);
     assert_eq!(preserved_finding.sources, original_finding.sources);
 
@@ -98,7 +108,11 @@ async fn test_cross_phase_confidence_calculation() {
         severity: Severity::High,
         confidence_score: 0.7,
         cwe_id: None,
-        sources: vec!["semgrep".to_string(), "llm".to_string(), "agent".to_string()],
+        sources: vec![
+            "semgrep".to_string(),
+            "llm".to_string(),
+            "agent".to_string(),
+        ],
         verification_status: None,
         verification_notes: None,
         code_snippet: None,
@@ -123,7 +137,11 @@ async fn test_cross_phase_confidence_calculation() {
     let composite = ConfidenceCalculator::calculate_composite(&mut finding);
 
     // Composite should be higher than base (0.7) with multiple sources (+0.15)
-    assert!(composite >= 0.85, "Composite should be >= 0.85 with multiple sources, got {}", composite);
+    assert!(
+        composite >= 0.85,
+        "Composite should be >= 0.85 with multiple sources, got {}",
+        composite
+    );
     assert!(composite <= 1.0, "Composite should be <= 1.0");
 
     // Test with single source - no bonus
@@ -143,7 +161,10 @@ async fn test_cross_phase_confidence_calculation() {
         "poc".to_string(),
     ];
     let many_composite = ConfidenceCalculator::calculate_composite(&mut many_sources_finding);
-    assert!(many_composite >= composite, "More sources should increase confidence");
+    assert!(
+        many_composite >= composite,
+        "More sources should increase confidence"
+    );
 
     // Test priority recalculation
     let mut priority_finding = VulnerabilityFinding {
@@ -178,8 +199,14 @@ async fn test_cross_phase_confidence_calculation() {
     };
 
     ConfidenceCalculator::recalculate_priority(&mut priority_finding);
-    assert!(priority_finding.priority_score.unwrap_or(0.0) > 0.0, "Priority should be positive");
-    assert!(priority_finding.priority_score.unwrap_or(0.0) <= 1.0, "Priority should be <= 1.0");
+    assert!(
+        priority_finding.priority_score.unwrap_or(0.0) > 0.0,
+        "Priority should be positive"
+    );
+    assert!(
+        priority_finding.priority_score.unwrap_or(0.0) <= 1.0,
+        "Priority should be <= 1.0"
+    );
 
     // High severity + high confidence = high priority
     let mut high_sev_finding = priority_finding.clone();
@@ -187,7 +214,8 @@ async fn test_cross_phase_confidence_calculation() {
     high_sev_finding.confidence_score = 0.95;
     ConfidenceCalculator::recalculate_priority(&mut high_sev_finding);
     assert!(
-        high_sev_finding.priority_score.unwrap_or(0.0) > priority_finding.priority_score.unwrap_or(0.0),
+        high_sev_finding.priority_score.unwrap_or(0.0)
+            > priority_finding.priority_score.unwrap_or(0.0),
         "Critical + high confidence should have higher priority"
     );
 }

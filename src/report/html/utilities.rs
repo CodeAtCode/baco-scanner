@@ -2,7 +2,7 @@
 pub fn markdown_to_html(md: &str) -> String {
     // First convert literal \n to real newlines (LLM sometimes sends escaped)
     let normalized = md.replace("\\n", "\n");
-    
+
     // First escape any HTML entities to prevent XSS
     let escaped = html_escape::encode_text(&normalized);
 
@@ -28,7 +28,9 @@ pub struct SeverityStats {
 }
 
 /// Calculate severity counts from findings
-pub fn calculate_severity_stats(findings: &[crate::findings::VulnerabilityFinding]) -> SeverityStats {
+pub fn calculate_severity_stats(
+    findings: &[crate::findings::VulnerabilityFinding],
+) -> SeverityStats {
     let mut stats = SeverityStats::default();
 
     for finding in findings {
