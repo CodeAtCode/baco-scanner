@@ -288,7 +288,7 @@ impl ReportAggregationPhase {
         }
 
         let mut priority_files: Vec<_> = file_severity.into_iter().collect();
-        priority_files.sort_by(|a, b| b.1.cmp(&a.1));
+        priority_files.sort_by_key(|b| std::cmp::Reverse(b.1));
         let priority_files: Vec<String> = priority_files
             .into_iter()
             .take(5)
