@@ -4,6 +4,7 @@
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::string::String;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -303,9 +304,30 @@ edition = "2021"
             .output()
             .unwrap();
 
-        Command::new("git")
+        let commit_output = Command::new("git")
             .current_dir(&temp_dir)
             .args(["commit", "-m", "Initial commit"])
+            .output()
+            .unwrap();
+
+        if !commit_output.status.success() {
+            panic!("Failed to create initial commit: {:?}", String::from_utf8_lossy(&commit_output.stderr));
+        }
+
+        // Ensure HEAD is valid by creating/rename to a default branch
+        // First try to detect current branch, fallback to 'master'
+        let branch_output = Command::new("git")
+            .current_dir(&temp_dir)
+            .args(["branch", "--show-current"])
+            .output()
+            .unwrap();
+        
+        let current_branch = String::from_utf8_lossy(&branch_output.stdout).trim().to_string();
+        let default_branch = if current_branch.is_empty() { "master" } else { &current_branch };
+        
+        Command::new("git")
+            .current_dir(&temp_dir)
+            .args(["branch", "-M", default_branch])
             .output()
             .unwrap();
 
