@@ -327,7 +327,7 @@ impl CveBootstrapper {
             });
         }
 
-        clusters.sort_by(|a, b| b.cve_count.cmp(&a.cve_count));
+        clusters.sort_by_key(|b| std::cmp::Reverse(b.cve_count));
 
         clusters
     }
