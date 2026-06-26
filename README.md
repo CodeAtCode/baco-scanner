@@ -1,7 +1,7 @@
 # BACO - Bug Analysis & Cross-reference Orchestrator
 [![License](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](http://www.gnu.org/licenses/gpl-3.0)   
 
-A CLI-based security vulnerability scanner that combines static analysis, LLM-powered discovery, and ticket system cross-referencing.  
+A CLI-based security vulnerability scanner that combines static analysis, LLM-powered discovery, and ticket system cross-referencing (generated with Regolo.AI).  
 [Example Report](report.html) generated with [Regolo.AI](https://regolo.ai/) models on [ins1gn1a/VulnServer-Linux](https://github.com/ins1gn1a/VulnServer-Linux).
 
 ## Features

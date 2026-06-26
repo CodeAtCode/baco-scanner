@@ -13,7 +13,10 @@
     clippy::borrow_deref_ref,
     clippy::len_zero,
     clippy::module_inception,
-    clippy::vec_init_then_push
+    clippy::vec_init_then_push,
+    clippy::cloned_ref_to_slice_refs,
+    clippy::needless_borrows_for_generic_args,
+    clippy::test_attr_in_doctest
 )]
 
 pub mod agent;

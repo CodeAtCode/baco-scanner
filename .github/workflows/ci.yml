@@ -30,7 +30,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
-      - run: cargo test
+      - name: Install cargo-tarpaulin
+        run: cargo install cargo-tarpaulin
+      - name: Run tests with coverage
+        run: cargo tarpaulin --all-targets --out Xml --output-dir cobertura
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./cobertura/cobertura.xml
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   # Build and package only on release tags
   release-build:
