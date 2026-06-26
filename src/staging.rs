@@ -256,6 +256,7 @@ impl Drop for StagingArea {
 mod tests {
     use super::*;
     use std::fs;
+    use std::path::PathBuf;
 
     /// Create a simple temp directory with basic Rust project structure (no git)
     fn create_temp_dir_with_project() -> PathBuf {
@@ -360,5 +361,229 @@ edition = "2021"
 
         // Cleanup
         let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_patch_validation_result_default() {
+        let result = PatchValidationResult::default();
+
+        assert!(result.compiles);
+        assert!(result.tests_pass);
+        assert_eq!(result.warnings, 0);
+        assert!(result.error_message.is_none());
+    }
+
+    #[test]
+    fn test_patch_validation_result_success() {
+        let result = PatchValidationResult::success();
+
+        assert!(result.compiles);
+        assert!(result.tests_pass);
+        assert_eq!(result.warnings, 0);
+        assert!(result.error_message.is_none());
+    }
+
+    #[test]
+    fn test_patch_validation_result_failure() {
+        let result = PatchValidationResult::failure("Compilation error");
+
+        assert!(!result.compiles);
+        assert!(!result.tests_pass);
+        assert_eq!(result.warnings, 0);
+        assert_eq!(result.error_message, Some("Compilation error".to_string()));
+    }
+
+    #[test]
+    fn test_patch_validation_result_clone() {
+        let original = PatchValidationResult {
+            compiles: true,
+            tests_pass: false,
+            warnings: 3,
+            error_message: Some("test failed".to_string()),
+        };
+
+        let cloned = original.clone();
+
+        assert_eq!(original.compiles, cloned.compiles);
+        assert_eq!(original.tests_pass, cloned.tests_pass);
+        assert_eq!(original.warnings, cloned.warnings);
+        assert_eq!(original.error_message, cloned.error_message);
+    }
+
+    #[test]
+    fn test_patch_validation_result_equality() {
+        let result1 = PatchValidationResult {
+            compiles: true,
+            tests_pass: true,
+            warnings: 0,
+            error_message: None,
+        };
+
+        let result2 = PatchValidationResult {
+            compiles: true,
+            tests_pass: true,
+            warnings: 0,
+            error_message: None,
+        };
+
+        let result3 = PatchValidationResult {
+            compiles: false,
+            tests_pass: true,
+            warnings: 0,
+            error_message: None,
+        };
+
+        assert_eq!(result1, result2);
+        assert_ne!(result1, result3);
+    }
+
+    #[test]
+    fn test_staging_error_display() {
+        let worktree_err = StagingError::WorktreeCreate("Permission denied".to_string());
+        assert!(worktree_err.to_string().contains("Failed to create worktree"));
+
+        let patch_err = StagingError::PatchApply("Hunk failed".to_string());
+        assert!(patch_err.to_string().contains("Failed to apply patch"));
+
+        let val_err = StagingError::Validation("Cargo check failed".to_string());
+        assert!(val_err.to_string().contains("Validation failed"));
+
+        let cleanup_err = StagingError::Cleanup("Git worktree busy".to_string());
+        assert!(cleanup_err.to_string().contains("Cleanup failed"));
+
+        let rollback_err = StagingError::Rollback("Reset failed".to_string());
+        assert!(rollback_err.to_string().contains("Rollback failed"));
+
+        let git_err = StagingError::GitError("Git not found".to_string());
+        assert!(git_err.to_string().contains("Git command failed"));
+    }
+
+    #[test]
+    fn test_staging_area_not_created_error() {
+        // Create a StagingArea without actually creating it (simulating error state)
+        let temp_dir = create_temp_dir_with_project();
+        let staging = StagingArea {
+            worktree_path: temp_dir.clone(),
+            original_repo_path: temp_dir.clone(),
+            is_created: false,
+        };
+
+        // Test apply_patch with not created
+        let result = staging.apply_patch("some diff");
+        assert!(result.is_err());
+        assert!(matches!(result, Err(StagingError::PatchApply(_))));
+
+        // Test validate with not created
+        let result = staging.validate();
+        assert!(result.is_err());
+        assert!(matches!(result, Err(StagingError::Validation(_))));
+
+        // Cleanup
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_staging_area_rollback_not_created() {
+        let temp_dir = create_temp_dir_with_project();
+        let mut staging = StagingArea {
+            worktree_path: temp_dir.clone(),
+            original_repo_path: temp_dir.clone(),
+            is_created: false,
+        };
+
+        // Rollback should succeed even when not created
+        let result = staging.rollback();
+        assert!(result.is_ok());
+
+        // Cleanup
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_staging_area_cleanup_not_created() {
+        let temp_dir = create_temp_dir_with_project();
+        let mut staging = StagingArea {
+            worktree_path: temp_dir.clone(),
+            original_repo_path: temp_dir.clone(),
+            is_created: false,
+        };
+
+        // Cleanup should succeed even when not created
+        let result = staging.cleanup();
+        assert!(result.is_ok());
+
+        // Cleanup
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_staging_area_drop() {
+        let temp_dir = create_temp_dir_with_project();
+
+        // Create a staging area that will be dropped
+        {
+            let mut staging = StagingArea {
+                worktree_path: temp_dir.clone(),
+                original_repo_path: temp_dir.clone(),
+                is_created: true,
+            };
+
+            // Manually set is_created to false to simulate cleanup
+            staging.is_created = false;
+        } // Drop happens here
+
+        // Cleanup
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_staging_area_is_created_flag() {
+        let temp_dir = create_temp_dir_with_project();
+
+        // Test with is_created = true
+        let staging = StagingArea {
+            worktree_path: temp_dir.clone(),
+            original_repo_path: temp_dir.clone(),
+            is_created: true,
+        };
+
+        // The flag should be set
+        assert!(staging.is_created);
+
+        // Cleanup
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_patch_validation_result_from() {
+        let local_result = PatchValidationResult {
+            compiles: true,
+            tests_pass: false,
+            warnings: 2,
+            error_message: Some("test error".to_string()),
+        };
+
+        let converted: crate::scanner_types::PatchValidationResult = local_result.into();
+
+        assert!(converted.compiles);
+        assert!(!converted.tests_pass);
+        assert_eq!(converted.warnings, 2);
+        assert_eq!(converted.error_message, Some("test error".to_string()));
+    }
+
+    #[test]
+    fn test_staging_path_generation() {
+        let _repo_path = PathBuf::from("/tmp/test-repo");
+        let worktree_path = std::env::temp_dir().join(format!(
+            "baco-staging-{:x}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+
+        // Verify path is in temp directory
+        assert!(worktree_path.starts_with(std::env::temp_dir()));
+        assert!(worktree_path.to_string_lossy().contains("baco-staging-"));
     }
 }

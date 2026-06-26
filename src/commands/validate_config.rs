@@ -849,4 +849,338 @@ model = "test-model"
             errs.errors.iter().map(|e| &e.field).collect::<Vec<_>>()
         );
     }
+
+    #[test]
+    fn test_validation_error_display() {
+        let error = ValidationError {
+            field: "test.field".to_string(),
+            detail: "test detail".to_string(),
+        };
+        assert_eq!(error.field, "test.field");
+        assert_eq!(error.detail, "test detail");
+    }
+
+    #[test]
+    fn test_validation_errors_default() {
+        let errors = ValidationErrors::default();
+        assert!(errors.is_empty());
+        assert!(errors.errors.is_empty());
+    }
+
+    #[test]
+    fn test_validation_errors_push() {
+        let mut errors = ValidationErrors::default();
+        errors.push("field1", "detail1");
+        assert!(!errors.is_empty());
+        assert_eq!(errors.errors.len(), 1);
+        assert_eq!(errors.errors[0].field, "field1");
+        assert_eq!(errors.errors[0].detail, "detail1");
+    }
+
+    #[test]
+    fn test_is_valid_hostname_edge_cases() {
+        // Valid hostnames
+        assert!(is_valid_hostname("localhost"));
+        assert!(is_valid_hostname("example.com"));
+        assert!(is_valid_hostname("sub.example.com"));
+        assert!(is_valid_hostname("192.168.1.1"));
+        assert!(is_valid_hostname("my-server_1"));
+
+        // Invalid hostnames
+        assert!(!is_valid_hostname(""));
+        assert!(!is_valid_hostname("   "));
+        assert!(!is_valid_hostname("a".repeat(64))); // Too long part
+    }
+
+    #[test]
+    fn test_is_valid_http_url_with_ports() {
+        assert!(is_valid_http_url("http://localhost:8080"));
+        assert!(is_valid_http_url("https://api.example.com:443/v1"));
+        assert!(is_valid_http_url("http://127.0.0.1:3000"));
+    }
+
+    #[test]
+    fn test_validate_output_dir_nonexistent_parent() {
+        let temp_dir = TempDir::new().unwrap();
+        let nonexistent_parent = temp_dir.path().join("nonexistent").join("output");
+        
+        let mut errors = Vec::new();
+        validate_output_dir(nonexistent_parent.to_str().unwrap(), &mut errors);
+        
+        assert!(!errors.is_empty());
+        assert!(errors[0].field == "output.dir");
+        assert!(errors[0].detail.contains("does not exist"));
+    }
+
+    #[test]
+    fn test_validate_output_dir_not_a_directory() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("not_a_dir");
+        std::fs::write(&file_path, "content").unwrap();
+        
+        let mut errors = Vec::new();
+        validate_output_dir(file_path.to_str().unwrap(), &mut errors);
+        
+        assert!(!errors.is_empty());
+        assert!(errors[0].field == "output.dir");
+        assert!(errors[0].detail.contains("not a directory"));
+    }
+
+    #[test]
+    fn test_validate_project_path_is_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("not_a_dir");
+        std::fs::write(&file_path, "content").unwrap();
+        
+        let mut errors = Vec::new();
+        validate_project_path(file_path.to_str().unwrap(), &mut errors);
+        
+        assert!(!errors.is_empty());
+        assert!(errors[0].field == "project.path");
+        assert!(errors[0].detail.contains("not a directory"));
+    }
+
+    #[test]
+    fn test_empty_base_url_without_api_key_skipped() {
+        // When base_url is empty and no api_key, validation should skip URL check
+        // This is tested implicitly by valid_config_passes which has no base_url for disabled phases
+        let temp_dir = TempDir::new().unwrap();
+        let project_dir = temp_dir.path().join("project");
+        std::fs::create_dir_all(&project_dir).unwrap();
+
+        let content = format!(
+            r#"
+project.path = "{}"
+output.dir = "./baco-output"
+
+[llm]
+timeout_secs = 60
+max_concurrent = 4
+
+[llm.phases.discovery]
+base_url = ""
+model = "test-model"
+
+[llm.phases.verification]
+base_url = "https://api.example.com/v1"
+api_key = "test-key"
+model = "test-model"
+
+[llm.phases.aggregation]
+base_url = "https://api.example.com/v1"
+api_key = "test-key"
+model = "test-model"
+"#,
+            project_dir.display()
+        );
+
+        let config_path = make_config_file(&temp_dir, &content);
+        let result = validate_config(&config_path);
+        
+        // Should pass since empty base_url without api_key is skipped
+        // Note: This may still fail due to missing timeout_secs in discovery phase
+        // The important thing is we don't error on empty base_url
+        match result {
+            Ok(()) => {}, // Perfect
+            Err(errs) => {
+                // Check that empty base_url is NOT in the errors
+                let has_empty_url_error = errs.errors.iter().any(|e| 
+                    e.field.contains("base_url") && e.detail.contains("Invalid HTTP/HTTPS")
+                );
+                assert!(!has_empty_url_error, "Empty base_url without api_key should be skipped");
+            }
+        }
+    }
+
+    #[test]
+    fn test_models_array_with_blank_entry() {
+        let temp_dir = TempDir::new().unwrap();
+        let project_dir = temp_dir.path().join("project");
+        std::fs::create_dir_all(&project_dir).unwrap();
+
+        let content = format!(
+            r#"
+project.path = "{}"
+output.dir = "./baco-output"
+
+[llm]
+timeout_secs = 60
+max_concurrent = 4
+
+[llm.phases.discovery]
+base_url = "https://api.example.com/v1"
+api_key = "test-key"
+models = ["model1", "", "model3"]
+
+[llm.phases.verification]
+base_url = "https://api.example.com/v1"
+api_key = "test-key"
+model = "test-model"
+
+[llm.phases.aggregation]
+base_url = "https://api.example.com/v1"
+api_key = "test-key"
+model = "test-model"
+"#,
+            project_dir.display()
+        );
+
+        let config_path = make_config_file(&temp_dir, &content);
+        let result = validate_config(&config_path);
+
+        assert!(result.is_err());
+        let errs = result.err().unwrap();
+        assert!(
+            errs.errors.iter().any(|e| e.field.contains("models[1]") && e.detail.contains("blank")),
+            "Should report blank model in array: {:?}",
+            errs.errors.iter().map(|e| &e.field).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn test_negative_early_termination_threshold() {
+        let temp_dir = TempDir::new().unwrap();
+        let project_dir = temp_dir.path().join("project");
+        std::fs::create_dir_all(&project_dir).unwrap();
+
+        let content = format!(
+            r#"
+project.path = "{}"
+output.dir = "./baco-output"
+
+[llm]
+timeout_secs = 60
+max_concurrent = 4
+
+[llm.phases.discovery]
+base_url = "https://api.example.com/v1"
+api_key = "test-key"
+model = "test-model"
+
+[llm.phases.verification]
+base_url = "https://api.example.com/v1"
+api_key = "test-key"
+model = "test-model"
+
+[llm.phases.aggregation]
+base_url = "https://api.example.com/v1"
+api_key = "test-key"
+model = "test-model"
+
+[scanner.performance]
+max_parallel_tasks = 4
+batch_size = 10
+early_termination_threshold = -1.5
+"#,
+            project_dir.display()
+        );
+
+        let config_path = make_config_file(&temp_dir, &content);
+        let result = validate_config(&config_path);
+
+        assert!(result.is_err());
+        let errs = result.err().unwrap();
+        assert!(
+            errs.errors.iter().any(|e| e.field == "scanner.performance.early_termination_threshold"),
+            "Should report negative early_termination_threshold error"
+        );
+    }
+
+    #[test]
+    fn test_zero_max_parallel_tasks() {
+        let temp_dir = TempDir::new().unwrap();
+        let project_dir = temp_dir.path().join("project");
+        std::fs::create_dir_all(&project_dir).unwrap();
+
+        let content = format!(
+            r#"
+project.path = "{}"
+output.dir = "./baco-output"
+
+[llm]
+timeout_secs = 60
+max_concurrent = 4
+
+[llm.phases.discovery]
+base_url = "https://api.example.com/v1"
+api_key = "test-key"
+model = "test-model"
+
+[llm.phases.verification]
+base_url = "https://api.example.com/v1"
+api_key = "test-key"
+model = "test-model"
+
+[llm.phases.aggregation]
+base_url = "https://api.example.com/v1"
+api_key = "test-key"
+model = "test-model"
+
+[scanner.performance]
+max_parallel_tasks = 0
+batch_size = 10
+early_termination_threshold = 0.5
+"#,
+            project_dir.display()
+        );
+
+        let config_path = make_config_file(&temp_dir, &content);
+        let result = validate_config(&config_path);
+
+        assert!(result.is_err());
+        let errs = result.err().unwrap();
+        assert!(
+            errs.errors.iter().any(|e| e.field == "scanner.performance.max_parallel_tasks"),
+            "Should report zero max_parallel_tasks error"
+        );
+    }
+
+    #[test]
+    fn test_zero_batch_size() {
+        let temp_dir = TempDir::new().unwrap();
+        let project_dir = temp_dir.path().join("project");
+        std::fs::create_dir_all(&project_dir).unwrap();
+
+        let content = format!(
+            r#"
+project.path = "{}"
+output.dir = "./baco-output"
+
+[llm]
+timeout_secs = 60
+max_concurrent = 4
+
+[llm.phases.discovery]
+base_url = "https://api.example.com/v1"
+api_key = "test-key"
+model = "test-model"
+
+[llm.phases.verification]
+base_url = "https://api.example.com/v1"
+api_key = "test-key"
+model = "test-model"
+
+[llm.phases.aggregation]
+base_url = "https://api.example.com/v1"
+api_key = "test-key"
+model = "test-model"
+
+[scanner.performance]
+max_parallel_tasks = 4
+batch_size = 0
+early_termination_threshold = 0.5
+"#,
+            project_dir.display()
+        );
+
+        let config_path = make_config_file(&temp_dir, &content);
+        let result = validate_config(&config_path);
+
+        assert!(result.is_err());
+        let errs = result.err().unwrap();
+        assert!(
+            errs.errors.iter().any(|e| e.field == "scanner.performance.batch_size"),
+            "Should report zero batch_size error"
+        );
+    }
 }

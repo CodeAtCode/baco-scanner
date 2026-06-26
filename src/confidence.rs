@@ -1,32 +1,53 @@
-use crate::findings::{Severity, VulnerabilityFinding};
+use crate::findings::{Severity, VerificationStatus, VulnerabilityFinding};
 
 pub struct ConfidenceCalculator;
 
 impl ConfidenceCalculator {
     pub fn calculate_composite(finding: &mut VulnerabilityFinding) -> f32 {
-        let mut score = finding.confidence_score;
+        // Base confidence score based on severity (0-100 scale)
+        let base_score: f32 = match finding.severity {
+            Severity::Critical => 80.0,
+            Severity::High => 60.0,
+            Severity::Medium => 40.0,
+            Severity::Low => 20.0,
+            Severity::Info => 10.0,
+        };
+        
+        let mut score = base_score;
+
+        // Add base confidence for having any source
+        if !finding.sources.is_empty() {
+            score += 10.0;
+        }
 
         if finding.commit_reference.is_some() {
-            score += 0.10;
+            score += 10.0;
         }
 
         if finding.ticket_reference.is_some() {
-            score += 0.10;
+            score += 10.0;
         }
 
         if finding.sources.len() > 1 {
-            score += 0.15;
+            score += 15.0;
         }
 
-        if let Severity::High | Severity::Critical = finding.severity {
-            score += 0.05;
+        // Boost for high/critical severity
+        if finding.severity.is_high_or_critical() {
+            score += 5.0;
         }
 
-        score.clamp(0.0, 1.0)
+        // Verification status boost
+        if let Some(VerificationStatus::Confirmed) = finding.verification_status {
+            score += 20.0;
+        }
+
+        score.clamp(0.0, 100.0)
     }
 
     pub fn recalculate_priority(finding: &mut VulnerabilityFinding) {
         let confidence = Self::calculate_composite(finding);
+        finding.confidence_score = confidence;
         let severity_multiplier = match finding.severity {
             Severity::Critical => 1.0,
             Severity::High => 0.8,
@@ -77,8 +98,8 @@ mod tests {
         };
 
         let score = ConfidenceCalculator::calculate_composite(&mut finding);
-        assert!(score >= 0.7);
-        assert!(score <= 1.0);
+        assert!(score >= 70.0);
+        assert!(score <= 100.0);
     }
 
     #[test]

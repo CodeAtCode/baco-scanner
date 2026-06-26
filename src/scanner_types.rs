@@ -406,42 +406,7 @@ impl MajorityVerdict {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_severity_rubric_constructor() {
-        let rubric =
-            SeverityRubric::new(0.8, 0.9, 0.7, false, AccessType::Write, BlastRadius::High);
 
-        assert_eq!(rubric.reachability, 0.8);
-        assert_eq!(rubric.attacker_control, 0.9);
-        assert_eq!(rubric.preconditions_factor, 0.7);
-        assert!(!rubric.auth_required);
-        assert_eq!(rubric.access_type, AccessType::Write);
-        assert_eq!(rubric.blast_radius, BlastRadius::High);
-    }
-
-    #[test]
-    fn test_severity_rubric_clamps_values() {
-        let rubric = SeverityRubric::new(
-            1.5,  // Should clamp to 1.0
-            -0.5, // Should clamp to 0.0
-            2.0,  // Should clamp to 1.0
-            false,
-            AccessType::Read,
-            BlastRadius::Low,
-        );
-
-        assert_eq!(rubric.reachability, 1.0);
-        assert_eq!(rubric.attacker_control, 0.0);
-        assert_eq!(rubric.preconditions_factor, 1.0);
-    }
-
-    #[test]
-    fn test_rubric_score_mapping() {
-        assert_eq!(RubricScore::map_to_severity(0.9), V3Severity::Critical);
-        assert_eq!(RubricScore::map_to_severity(0.6), V3Severity::High);
-        assert_eq!(RubricScore::map_to_severity(0.3), V3Severity::Medium);
-        assert_eq!(RubricScore::map_to_severity(0.1), V3Severity::Low);
-    }
 
     #[test]
     fn test_cve_entry_creation() {

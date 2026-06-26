@@ -366,4 +366,200 @@ edition = "2021"
         // Cleanup
         let _ = fs::remove_dir_all(&temp_dir);
     }
+
+    #[test]
+    fn test_autopatcher_new() {
+        let temp_dir = create_temp_dir_with_project();
+        let autopatcher = AutoPatcher::new(temp_dir.clone());
+
+        assert_eq!(autopatcher.repo_path, temp_dir);
+    }
+
+    #[test]
+    fn test_generate_placeholder_patch() {
+        let temp_dir = create_temp_dir_with_project();
+        let autopatcher = AutoPatcher::new(temp_dir);
+
+        let vulnerability_desc = "SQL injection in user input";
+        let vulnerable_code = "let query = format!(\"SELECT * FROM users WHERE id = {}\", user_id);";
+        let file_path = "src/db.rs";
+
+        let patch = autopatcher
+            .generate_patch(vulnerability_desc, vulnerable_code, file_path)
+            .unwrap();
+
+        assert_eq!(patch.file_path, file_path);
+        assert!(!patch.diff.is_empty());
+        assert!(patch.diff.contains("--- a/src/db.rs"));
+        assert!(patch.diff.contains("+++ b/src/db.rs"));
+        assert!(!patch.applied);
+    }
+
+    #[test]
+    fn test_format_patch_report_validated() {
+        let temp_dir = create_temp_dir_with_project();
+        let autopatcher = AutoPatcher::new(temp_dir);
+
+        let candidate = PatchCandidate::new("diff content", "src/main.rs");
+        let validation = PatchValidationResult {
+            compiles: true,
+            tests_pass: true,
+            warnings: 0,
+            error_message: None,
+        };
+
+        let report = autopatcher.format_patch_report(&candidate, &validation);
+
+        assert!(report.contains("Patch Report"));
+        assert!(report.contains("src/main.rs"));
+        assert!(report.contains("✅ VALIDATED"));
+        assert!(report.contains("diff content"));
+    }
+
+    #[test]
+    fn test_format_patch_report_compiles_but_tests_fail() {
+        let temp_dir = create_temp_dir_with_project();
+        let autopatcher = AutoPatcher::new(temp_dir);
+
+        let candidate = PatchCandidate::new("diff content", "src/main.rs");
+        let validation = PatchValidationResult {
+            compiles: true,
+            tests_pass: false,
+            warnings: 2,
+            error_message: Some("test failed: assertion panicked".to_string()),
+        };
+
+        let report = autopatcher.format_patch_report(&candidate, &validation);
+
+        assert!(report.contains("⚠️ COMPILES BUT TESTS FAILED"));
+        assert!(report.contains("Warnings: 2"));
+        assert!(report.contains("Test Errors:"));
+        assert!(report.contains("test failed: assertion panicked"));
+    }
+
+    #[test]
+    fn test_format_patch_report_failed() {
+        let temp_dir = create_temp_dir_with_project();
+        let autopatcher = AutoPatcher::new(temp_dir);
+
+        let candidate = PatchCandidate::new("diff content", "src/main.rs");
+        let validation = PatchValidationResult {
+            compiles: false,
+            tests_pass: false,
+            warnings: 0,
+            error_message: Some("error[E0308]: mismatched types".to_string()),
+        };
+
+        let report = autopatcher.format_patch_report(&candidate, &validation);
+
+        assert!(report.contains("❌ FAILED"));
+        assert!(report.contains("Build Errors:"));
+        assert!(report.contains("error[E0308]: mismatched types"));
+    }
+
+    #[test]
+    fn test_format_patch_report_with_warnings() {
+        let temp_dir = create_temp_dir_with_project();
+        let autopatcher = AutoPatcher::new(temp_dir);
+
+        let candidate = PatchCandidate::new("diff content", "src/main.rs");
+        let validation = PatchValidationResult {
+            compiles: true,
+            tests_pass: true,
+            warnings: 5,
+            error_message: None,
+        };
+
+        let report = autopatcher.format_patch_report(&candidate, &validation);
+
+        assert!(report.contains("✅ VALIDATED"));
+        assert!(report.contains("Warnings: 5"));
+    }
+
+    #[test]
+    fn test_patch_validation_result_creation() {
+        // Test success case
+        let success = PatchValidationResult::success();
+        assert!(success.compiles);
+        assert!(success.tests_pass);
+        assert_eq!(success.warnings, 0);
+        assert!(success.error_message.is_none());
+
+        // Test failure case
+        let failure = PatchValidationResult::failure("Patch application failed");
+        assert!(!failure.compiles);
+        assert!(!failure.tests_pass);
+        assert_eq!(failure.warnings, 0);
+        assert_eq!(failure.error_message, Some("Patch application failed".to_string()));
+    }
+
+    #[test]
+    fn test_patching_config_default() {
+        let config = PatchingConfig::default();
+
+        assert!(!config.dry_run);
+        assert!(!config.allow_network_access);
+        assert_eq!(config.max_auto_patches, 5);
+        assert_eq!(config.staging_prefix, Some("baco-auto-".to_string()));
+    }
+
+    #[test]
+    fn test_patching_config_custom() {
+        let config = PatchingConfig {
+            dry_run: true,
+            allow_network_access: true,
+            max_auto_patches: 10,
+            staging_prefix: Some("custom-prefix-".to_string()),
+        };
+
+        assert!(config.dry_run);
+        assert!(config.allow_network_access);
+        assert_eq!(config.max_auto_patches, 10);
+        assert_eq!(config.staging_prefix, Some("custom-prefix-".to_string()));
+    }
+
+    #[test]
+    fn test_autopatch_error_enum() {
+        // Test error display
+        let gen_err = AutoPatchError::Generation("IO error".to_string());
+        assert!(gen_err.to_string().contains("Failed to generate patch"));
+
+        let apply_err = AutoPatchError::Apply("Patch rejected".to_string());
+        assert!(apply_err.to_string().contains("Failed to apply patch"));
+
+        let val_err = AutoPatchError::Validation("Type mismatch".to_string());
+        assert!(val_err.to_string().contains("Validation failed"));
+
+        let staging_err = AutoPatchError::Staging("Worktree create failed".to_string());
+        assert!(staging_err.to_string().contains("Staging error"));
+
+        let llm_err = AutoPatchError::NoLlmClient;
+        assert!(llm_err.to_string().contains("No LLM client configured"));
+    }
+
+    #[test]
+    fn test_patch_candidate_default() {
+        let candidate = PatchCandidate::default();
+
+        assert!(candidate.diff.is_empty());
+        assert!(candidate.file_path.is_empty());
+        assert!(!candidate.applied);
+        assert!(candidate.validation_result.is_none());
+    }
+
+    #[test]
+    fn test_patch_candidate_new() {
+        let diff = r#"--- a/test.rs
++++ b/test.rs
+@@ -1 +1 @@
+-old
++new
+"#;
+        let candidate = PatchCandidate::new(diff, "test.rs");
+
+        assert_eq!(candidate.diff, diff);
+        assert_eq!(candidate.file_path, "test.rs");
+        assert!(!candidate.applied);
+        assert!(candidate.validation_result.is_none());
+    }
 }

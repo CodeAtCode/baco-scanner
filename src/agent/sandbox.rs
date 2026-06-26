@@ -15,12 +15,11 @@ impl SandboxLike for ToolSandbox {
         &self.temp_dir
     }
     fn resolve_safe_path(&self, path: &str) -> Result<PathBuf, String> {
-        let full = self.temp_dir.join(path);
-        if let Some(parent) = full.parent() {
-            if !parent.starts_with(&self.temp_dir) {
-                return Err(format!("Path traversal: {}", path));
-            }
+        // Check for path traversal before joining
+        if path.contains("..") {
+            return Err(format!("Path traversal: {}", path));
         }
+        let full = self.temp_dir.join(path);
         if !full.exists() {
             return Err(format!("Path does not exist: {}", path));
         }
@@ -48,10 +47,11 @@ impl SandboxLike for ToolSandbox {
             String::from_utf8_lossy(&dur.stdout),
             String::from_utf8_lossy(&dur.stderr)
         );
+        // Trim whitespace from output for reliable matching
         Ok(ToolResult {
             tool_call_id: "sandbox".to_string(),
             success: ec == 0,
-            output: out,
+            output: out.trim().to_string(),
         })
     }
     fn validate_test_source(&self, content: &str) -> Result<(), String> {
@@ -76,13 +76,11 @@ impl SandboxLike for ToolSandbox {
     fn create_temp_file(&self, path: &str, content: &str) -> Result<PathBuf, String> {
         self.validate_test_source(content)
             .map_err(|e| format!("Validation failed: {}", e))?;
-        let full = self.temp_dir.join(path);
-        // Check path traversal without requiring file to exist
-        if let Some(parent) = full.parent() {
-            if !parent.starts_with(&self.temp_dir) {
-                return Err(format!("Path traversal: {}", path));
-            }
+        // Check path traversal by looking for ".." in the input path
+        if path.contains("..") {
+            return Err(format!("Path traversal: {}", path));
         }
+        let full = self.temp_dir.join(path);
         std::fs::File::create(&full)
             .and_then(|mut f| f.write_all(content.as_bytes()))
             .map_err(|e| format!("Write failed: {}", e))?;
@@ -114,16 +112,12 @@ impl WaitWithTimeout for std::process::Child {
                 std::thread::sleep(Duration::from_millis(100));
             }
         }
-        let status = self.wait().map_err(|e| format!("wait: {}", e))?;
-        if status.code() == Some(-15) {
+        // Use wait_with_output to capture stdout/stderr
+        let output = self.wait_with_output().map_err(|e| format!("wait_with_output: {}", e))?;
+        if output.status.code() == Some(-15) {
             return Err("timeout".to_string());
         }
-        let out = Output {
-            stdout: vec![],
-            stderr: vec![],
-            status,
-        };
-        Ok(out)
+        Ok(output)
     }
 }
 
@@ -188,5 +182,107 @@ mod tests {
         let malicious_code = "import os; os.system(\"rm -rf /\")";
         let result = sandbox.validate_test_source(malicious_code);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_resolve_safe_path_success() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let sandbox = ToolSandbox::new(tmpdir.path().to_path_buf(), 30);
+        
+        // Create a file first
+        let test_file = tmpdir.path().join("test.txt");
+        std::fs::write(&test_file, "content").unwrap();
+        
+        let result = sandbox.resolve_safe_path("test.txt");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), test_file);
+    }
+
+    #[test]
+    fn test_resolve_safe_path_path_traversal() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let sandbox = ToolSandbox::new(tmpdir.path().to_path_buf(), 30);
+        
+        let result = sandbox.resolve_safe_path("../etc/passwd");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Path traversal"));
+    }
+
+    #[test]
+    fn test_resolve_safe_path_nonexistent() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let sandbox = ToolSandbox::new(tmpdir.path().to_path_buf(), 30);
+        
+        let result = sandbox.resolve_safe_path("nonexistent.txt");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Path does not exist"));
+    }
+
+    #[test]
+    fn test_create_temp_file_success() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let sandbox = ToolSandbox::new(tmpdir.path().to_path_buf(), 30);
+        
+        let result = sandbox.create_temp_file("newfile.txt", "hello world");
+        assert!(result.is_ok());
+        
+        let created_path = result.unwrap();
+        assert!(created_path.exists());
+        let content = std::fs::read_to_string(&created_path).unwrap();
+        assert_eq!(content, "hello world");
+    }
+
+    #[test]
+    fn test_create_temp_file_path_traversal() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let sandbox = ToolSandbox::new(tmpdir.path().to_path_buf(), 30);
+        
+        let result = sandbox.create_temp_file("../outside.txt", "content");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Path traversal"));
+    }
+
+    #[test]
+    fn test_create_temp_file_blocks_dangerous_content() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let sandbox = ToolSandbox::new(tmpdir.path().to_path_buf(), 30);
+        
+        let result = sandbox.create_temp_file("bad.py", "import os; os.system('rm -rf /')");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Validation failed"));
+    }
+
+    #[test]
+    fn test_run_with_timeout_success() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let sandbox = ToolSandbox::new(tmpdir.path().to_path_buf(), 30);
+        
+        let result = sandbox.run_with_timeout("/bin/echo", &["hello"], Some(5));
+        assert!(result.is_ok());
+        let tool_result = result.unwrap();
+        assert!(tool_result.success);
+        assert!(tool_result.output.contains("hello"));
+    }
+
+    #[test]
+    fn test_run_with_timeout_failure() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let sandbox = ToolSandbox::new(tmpdir.path().to_path_buf(), 30);
+        
+        let result = sandbox.run_with_timeout("false", &[], Some(5));
+        assert!(result.is_ok());
+        let tool_result = result.unwrap();
+        assert!(!tool_result.success);
+    }
+
+    #[test]
+    fn test_is_path_allowed_nonexistent_path() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let sandbox = ToolSandbox::new(tmpdir.path().to_path_buf(), 30);
+        
+        // Path that doesn't exist but parent is within tempdir
+        let non_existent = tmpdir.path().join("subdir").join("file.txt");
+        let allowed = sandbox.is_path_allowed(&non_existent);
+        assert!(allowed);
     }
 }

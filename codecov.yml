@@ -12,7 +12,7 @@ coverage:
         target: 80%
 
 ignore:
-  - "./tests/*.rs"
+  - "tests/**/*.rs"
 
 comment:
   layout: " diff, flags, files"

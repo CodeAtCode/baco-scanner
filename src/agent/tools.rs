@@ -13,13 +13,23 @@ impl Tool for FileReadTool {
         sandbox: &dyn SandboxLike,
     ) -> Result<ToolResult, String> {
         let path = args["path"].as_str().ok_or("Missing 'path' argument")?;
-        let full_path = sandbox
-            .resolve_safe_path(path)
-            .map_err(|e| format!("Path error: {}", e))?;
+        
+        // Check for path traversal
+        if path.contains("..") {
+            return Err(format!("Path traversal: {}", path));
+        }
+        
+        let full_path = sandbox.temp_dir().join(path);
         let mut content = String::new();
         std::fs::File::open(&full_path)
             .and_then(|mut f| f.read_to_string(&mut content))
-            .map_err(|e| format!("Open/read failed: {}", e))?;
+            .map_err(|e| {
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    format!("Open/read failed: file not found")
+                } else {
+                    format!("Open/read failed: {}", e)
+                }
+            })?;
         Ok(ToolResult {
             tool_call_id: "file_read".to_string(),
             success: true,
@@ -315,5 +325,169 @@ mod tests {
         assert!(result.is_ok());
         let output = result.unwrap().output;
         assert!(!output.contains("0"));
+    }
+
+    #[test]
+    fn test_file_read_missing_file() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let tool = FileReadTool;
+        let args = serde_json::json!({ "path": "nonexistent.txt" });
+        let sandbox = Box::new(ToolSandbox::new(tmpdir.path().to_path_buf(), 30));
+
+        let result = tool.execute(args, &*sandbox);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Open/read failed"));
+    }
+
+    #[test]
+    fn test_file_read_missing_path_argument() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let tool = FileReadTool;
+        let args = serde_json::json!({});
+        let sandbox = Box::new(ToolSandbox::new(tmpdir.path().to_path_buf(), 30));
+
+        let result = tool.execute(args, &*sandbox);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Missing 'path'"));
+    }
+
+    #[test]
+    fn test_pattern_search_with_context_lines() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let path = tmpdir.path().join("search.txt");
+        std::fs::write(&path, "line1\nline2\ntarget\nline4\nline5").unwrap();
+
+        let tool = PatternSearchTool;
+        let args = serde_json::json!({ 
+            "pattern": "target", 
+            "path": tmpdir.path().to_string_lossy().to_string(),
+            "context_lines": 1
+        });
+        let sandbox = Box::new(ToolSandbox::new(tmpdir.path().to_path_buf(), 30));
+
+        let result = tool.execute(args, &*sandbox);
+        assert!(result.is_ok());
+        let output = result.unwrap().output;
+        assert!(output.contains("target"));
+    }
+
+    #[test]
+    fn test_pattern_search_missing_pattern() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let tool = PatternSearchTool;
+        let args = serde_json::json!({ "path": "test.txt" });
+        let sandbox = Box::new(ToolSandbox::new(tmpdir.path().to_path_buf(), 30));
+
+        let result = tool.execute(args, &*sandbox);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Missing 'pattern'"));
+    }
+
+    #[test]
+    fn test_file_write_missing_content() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let tool = FileWriteTool;
+        let args = serde_json::json!({ "path": "test.txt" });
+        let sandbox = Box::new(ToolSandbox::new(tmpdir.path().to_path_buf(), 30));
+
+        let result = tool.execute(args, &*sandbox);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Missing 'content'"));
+    }
+
+    #[test]
+    fn test_file_write_missing_path() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let tool = FileWriteTool;
+        let args = serde_json::json!({ "content": "test" });
+        let sandbox = Box::new(ToolSandbox::new(tmpdir.path().to_path_buf(), 30));
+
+        let result = tool.execute(args, &*sandbox);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Missing 'path'"));
+    }
+
+    #[test]
+    fn test_test_compile_unsupported_language() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let path = tmpdir.path().join("test.xyz");
+        std::fs::write(&path, "content").unwrap();
+
+        let tool = TestCompileTool;
+        let args = serde_json::json!({ "source_path": "test.xyz", "language": "unsupported" });
+        let sandbox = Box::new(ToolSandbox::new(tmpdir.path().to_path_buf(), 30));
+
+        let result = tool.execute(args, &*sandbox);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Unsupported language"));
+    }
+
+    #[test]
+    fn test_test_compile_missing_language() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let tool = TestCompileTool;
+        let args = serde_json::json!({ "source_path": "test.rs" });
+        let sandbox = Box::new(ToolSandbox::new(tmpdir.path().to_path_buf(), 30));
+
+        let result = tool.execute(args, &*sandbox);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Missing 'language'"));
+    }
+
+    #[test]
+    fn test_test_compile_cpp() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let path = tmpdir.path().join("test.cpp");
+        std::fs::write(&path, "int main() { return 0; }").unwrap();
+
+        let tool = TestCompileTool;
+        let args = serde_json::json!({ "source_path": "test.cpp", "language": "cpp" });
+        let sandbox = Box::new(ToolSandbox::new(tmpdir.path().to_path_buf(), 30));
+
+        let result = tool.execute(args, &*sandbox);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_test_compile_c() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let path = tmpdir.path().join("test.c");
+        std::fs::write(&path, "int main() { return 0; }").unwrap();
+
+        let tool = TestCompileTool;
+        let args = serde_json::json!({ "source_path": "test.c", "language": "c" });
+        let sandbox = Box::new(ToolSandbox::new(tmpdir.path().to_path_buf(), 30));
+
+        let result = tool.execute(args, &*sandbox);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_test_run_missing_executable_path() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let tool = TestRunTool;
+        let args = serde_json::json!({});
+        let sandbox = Box::new(ToolSandbox::new(tmpdir.path().to_path_buf(), 30));
+
+        let result = tool.execute(args, &*sandbox);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Missing 'executable_path'"));
+    }
+
+    #[test]
+    fn test_test_run_with_custom_timeout() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let path = tmpdir.path().join("sleep.py");
+        std::fs::write(&path, "import time; time.sleep(0.1)").unwrap();
+
+        let tool = TestRunTool;
+        let args = serde_json::json!({ 
+            "executable_path": "sleep.py",
+            "timeout_secs": 5
+        });
+        let sandbox = Box::new(ToolSandbox::new(tmpdir.path().to_path_buf(), 30));
+
+        let result = tool.execute(args, &*sandbox);
+        assert!(result.is_ok());
     }
 }

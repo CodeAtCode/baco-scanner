@@ -3,8 +3,6 @@
 mod checkpoint;
 mod core;
 mod phases;
-#[cfg(test)]
-mod tests;
 
 // Re-export public API from core
 pub use core::{Scanner, ScannerState};

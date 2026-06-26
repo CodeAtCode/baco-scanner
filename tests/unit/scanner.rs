@@ -4,6 +4,7 @@ mod tests {
 
     use crate::checkpoint::ScanPhase;
     use crate::config;
+    use crate::findings::Severity;
     use indicatif::{MultiProgress, ProgressBar};
     use std::path::PathBuf;
     use tokio::sync::watch;

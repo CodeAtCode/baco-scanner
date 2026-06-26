@@ -12,6 +12,10 @@ pub mod confidence_scoring;
 pub mod cross_file_analysis;
 pub mod git_analysis;
 pub mod indexing;
+
+#[cfg(test)]
+pub mod helpers;
+
 #[cfg(test)]
 pub mod indexing_test;
 pub mod llm_discovery;
@@ -29,10 +33,28 @@ pub mod semgrep_test;
 pub mod ticket_crossref;
 
 #[cfg(test)]
-pub mod tests;
+pub mod parallel_safety_tests;
 
 #[cfg(test)]
-pub mod parallel_safety_tests;
+pub mod confidence_scoring_test;
+
+#[cfg(test)]
+pub mod cross_file_analysis_test;
+
+#[cfg(test)]
+pub mod git_analysis_test;
+
+#[cfg(test)]
+pub mod reporting_test;
+
+#[cfg(test)]
+pub mod ai_aggregation_test;
+
+#[cfg(test)]
+pub mod ticket_crossref_test;
+
+#[cfg(test)]
+pub mod security_agent_verification_test;
 
 /// Error type for phase execution failures.
 #[derive(Debug, Clone)]

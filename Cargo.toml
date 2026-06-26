@@ -67,6 +67,14 @@ serial_test = "3"
 futures = "0.3"
 mockito = "1"
 
+[[test]]
+name = "unit_tests"
+path = "tests/unit/mod.rs"
+
+[[test]]
+name = "integration_tests"
+path = "tests/integration/mod.rs"
+
 [profile.release]
 opt-level = 3
 lto = true

@@ -127,6 +127,12 @@ pub fn write_findings_json(
     let json = serde_json::to_string_pretty(&findings)
         .map_err(|e| format!("Failed to serialize findings: {}", e))?;
 
+    // Create parent directory if it doesn't exist
+    if let Some(parent) = std::path::Path::new(output_path).parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create output directory: {}", e))?;
+    }
+
     fs::write(output_path, json).map_err(|e| format!("Failed to write findings.json: {}", e))?;
 
     Ok(())

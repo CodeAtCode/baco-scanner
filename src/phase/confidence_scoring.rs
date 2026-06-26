@@ -29,6 +29,8 @@ impl ScanPhase for ConfidenceScoringPhase {
         }
 
         for finding in &mut findings {
+            // Calculate composite confidence and set it on the finding
+            finding.confidence_score = ConfidenceCalculator::calculate_composite(finding) * 100.0;
             ConfidenceCalculator::recalculate_priority(finding);
         }
 

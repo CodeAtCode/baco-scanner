@@ -62,6 +62,8 @@ pub fn default_tools() -> ToolRegistry {
     reg.register(Box::new(super::tools::FileWriteTool));
     reg.register(Box::new(super::tools::TestCompileTool));
     reg.register(Box::new(super::tools::TestRunTool));
+    // Also add the tool definitions
+    reg.definitions = tool_definitions();
     reg
 }
 
@@ -180,5 +182,92 @@ mod tests {
         let required = params["required"].as_array().unwrap();
 
         assert!(required.contains(&serde_json::json!("path")));
+    }
+
+    #[test]
+    fn test_tool_registry_get_missing_tool() {
+        let mut registry = ToolRegistry::new();
+        let mock_tool = MockTool {};
+        registry.register(Box::new(mock_tool));
+
+        assert!(registry.get("nonexistent_tool").is_none());
+    }
+
+    #[test]
+    fn test_tool_registry_overwrite_existing_tool() {
+        let mut registry = ToolRegistry::new();
+        let mock_tool1 = MockTool {};
+        let mock_tool2 = MockTool {};
+        
+        registry.register(Box::new(mock_tool1));
+        registry.register(Box::new(mock_tool2));
+
+        // Should still have the tool (just overwritten)
+        assert!(registry.get("mock_tool").is_some());
+    }
+
+    #[test]
+    fn test_default_tools_registry() {
+        let registry = default_tools();
+        let defs = registry.get_definitions();
+        
+        assert_eq!(defs.len(), 5);
+        
+        // Verify all expected tools are registered
+        assert!(registry.get("file_read").is_some());
+        assert!(registry.get("pattern_search").is_some());
+        assert!(registry.get("file_write").is_some());
+        assert!(registry.get("test_compile").is_some());
+        assert!(registry.get("test_run").is_some());
+    }
+
+    #[test]
+    fn test_tool_definitions_schema_structure() {
+        let definitions = tool_definitions();
+        
+        for def in &definitions {
+            // Check top-level structure
+            assert!(def.get("type").is_some());
+            assert_eq!(def["type"], "function");
+            
+            // Check function object
+            let func = def["function"].as_object().unwrap();
+            assert!(func.contains_key("name"));
+            assert!(func.contains_key("description"));
+            assert!(func.contains_key("parameters"));
+            
+            // Check parameters structure
+            let params = func.get("parameters").unwrap().as_object().unwrap();
+            assert_eq!(params["type"], "object");
+            assert!(params.contains_key("properties"));
+            assert!(params.contains_key("required"));
+        }
+    }
+
+    #[test]
+    fn test_tool_definitions_required_fields() {
+        let definitions = tool_definitions();
+        
+        // Check that each tool has required fields defined
+        let file_read = definitions.iter().find(|d| d["function"]["name"].as_str() == Some("file_read")).unwrap();
+        assert!(file_read["function"]["parameters"]["required"].as_array().unwrap().contains(&serde_json::json!("path")));
+        
+        let pattern_search = definitions.iter().find(|d| d["function"]["name"].as_str() == Some("pattern_search")).unwrap();
+        let required = pattern_search["function"]["parameters"]["required"].as_array().unwrap();
+        assert!(required.contains(&serde_json::json!("pattern")));
+        assert!(required.contains(&serde_json::json!("path")));
+        
+        let file_write = definitions.iter().find(|d| d["function"]["name"].as_str() == Some("file_write")).unwrap();
+        let required = file_write["function"]["parameters"]["required"].as_array().unwrap();
+        assert!(required.contains(&serde_json::json!("path")));
+        assert!(required.contains(&serde_json::json!("content")));
+        
+        let test_compile = definitions.iter().find(|d| d["function"]["name"].as_str() == Some("test_compile")).unwrap();
+        let required = test_compile["function"]["parameters"]["required"].as_array().unwrap();
+        assert!(required.contains(&serde_json::json!("source_path")));
+        assert!(required.contains(&serde_json::json!("language")));
+        
+        let test_run = definitions.iter().find(|d| d["function"]["name"].as_str() == Some("test_run")).unwrap();
+        assert!(test_run["function"]["parameters"]["required"].as_array().unwrap().contains(&serde_json::json!("executable_path")));
     }
 }

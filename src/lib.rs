@@ -60,6 +60,3 @@ pub mod threat_model_file;
 pub mod tickets;
 pub mod validation;
 pub mod variant_search;
-
-#[cfg(test)]
-mod llm_analysis_test;

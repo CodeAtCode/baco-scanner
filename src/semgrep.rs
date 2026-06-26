@@ -30,12 +30,24 @@ fn extract_code_snippet(file_path: &str, target_line: u32, context_lines: usize)
     match fs::read_to_string(&path) {
         Ok(content) => {
             let lines: Vec<&str> = content.lines().collect();
-            let start = if target_line > context_lines as u32 {
-                (target_line - context_lines as u32) as usize
+            
+            // Convert to 0-based index (saturating to handle line 0)
+            let target_idx = target_line.saturating_sub(1) as usize;
+            
+            // Calculate start and end indices for context window
+            let (start, end) = if target_idx >= lines.len() {
+                // Target line beyond file - show last available lines
+                if lines.len() > context_lines {
+                    (lines.len() - context_lines, lines.len())
+                } else {
+                    (0, lines.len())
+                }
             } else {
-                0
+                // Target line within file - show context around it
+                let start = target_idx.saturating_sub(context_lines);
+                let end = std::cmp::min(target_idx + context_lines + 1, lines.len());
+                (start, end)
             };
-            let end = std::cmp::min(target_line as usize + context_lines, lines.len());
 
             let mut snippet = String::new();
             for (idx, line) in lines.iter().enumerate().skip(start).take(end - start) {
@@ -485,5 +497,223 @@ mod tests {
         let runner = SemgrepRunner::new(None, vec![]);
         let result = runner.parse_json_output(mock_json);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_should_exclude_rule_exact_match() {
+        let runner = SemgrepRunner::new(None, vec!["python.lang.security".to_string()]); 
+        assert!(runner.should_exclude_rule("python.lang.security"));
+        // Prefix match: "python.lang.security" matches "python.lang.security.audit"
+        assert!(runner.should_exclude_rule("python.lang.security.audit"));
+    }
+
+    #[test]
+    fn test_should_exclude_rule_prefix_match() {
+        let runner = SemgrepRunner::new(None, vec!["python.lang.security".to_string()]);
+        // Prefix match should exclude all sub-rules
+        assert!(runner.should_exclude_rule("python.lang.security.audit"));
+        assert!(runner.should_exclude_rule("python.lang.security.injection"));
+        assert!(runner.should_exclude_rule("python.lang.security.audit.danger"));
+    }
+
+    #[test]
+    fn test_should_exclude_rule_no_match() {
+        let runner = SemgrepRunner::new(None, vec!["python.lang.security".to_string()]);
+        assert!(!runner.should_exclude_rule("javascript.security"));
+        assert!(!runner.should_exclude_rule("python.lang.ast"));
+        assert!(!runner.should_exclude_rule("rust.security"));
+    }
+
+    #[test]
+    fn test_should_exclude_rule_multiple_patterns() {
+        let runner = SemgrepRunner::new(None, vec!["python.lang".to_string(), "javascript.security".to_string()]);
+        assert!(runner.should_exclude_rule("python.lang.security"));
+        assert!(runner.should_exclude_rule("javascript.security.xss"));
+        assert!(!runner.should_exclude_rule("rust.security"));
+    }
+
+    #[test]
+    fn test_should_exclude_rule_empty_patterns() {
+        let runner = SemgrepRunner::new(None, vec![]);
+        assert!(!runner.should_exclude_rule("any.rule"));
+        assert!(!runner.should_exclude_rule("python.lang.security"));
+    }
+
+    #[test]
+    fn test_extract_code_snippet_file_not_found() {
+        let snippet = extract_code_snippet("/nonexistent/file.rs", 42, 2);
+        assert!(snippet.contains("file not found"));
+        assert!(snippet.contains("Line 42"));
+    }
+
+    #[test]
+    fn test_extract_code_snippet_with_context() {
+        // Create a temp file for testing
+        let temp_dir = std::env::temp_dir();
+        let test_file = temp_dir.join("test_extract_snippet.txt");
+        let content = "line 1\nline 2\nline 3\nline 4\nline 5\n";
+        std::fs::write(&test_file, content).unwrap();
+
+        let snippet = extract_code_snippet(
+            test_file.to_str().unwrap(),
+            3,
+            1,
+        );
+
+        // Should include lines 2, 3, 4 with line 3 marked
+        assert!(snippet.contains("line 2"), "snippet should contain line 2: {}", snippet);
+        assert!(snippet.contains("line 3"));
+        assert!(snippet.contains("line 4"));
+        assert!(snippet.contains(">>")); // Marker for target line
+
+        // Clean up
+        std::fs::remove_file(&test_file).ok();
+    }
+
+    #[test]
+    fn test_extract_code_snippet_target_line_at_start() {
+        let temp_dir = std::env::temp_dir();
+        let test_file = temp_dir.join("test_extract_snippet_start.txt");
+        let content = "line 1\nline 2\nline 3\n";
+        std::fs::write(&test_file, content).unwrap();
+
+        let snippet = extract_code_snippet(
+            test_file.to_str().unwrap(),
+            1,
+            2,
+        );
+
+        // Should start from line 1 (can't go negative)
+        assert!(snippet.contains("line 1"));
+        assert!(snippet.contains(">>"));
+
+        std::fs::remove_file(&test_file).ok();
+    }
+
+    #[test]
+    fn test_extract_code_snippet_target_line_beyond_file() {
+        let temp_dir = std::env::temp_dir();
+        let test_file = temp_dir.join("test_extract_snippet_beyond.txt");
+        let content = "line 1\nline 2\nline 3\n";
+        std::fs::write(&test_file, content).unwrap();
+
+        let snippet = extract_code_snippet(
+            test_file.to_str().unwrap(),
+            100,
+            2,
+        );
+
+        // Should show last available lines
+        assert!(snippet.contains("line 3"));
+
+        std::fs::remove_file(&test_file).ok();
+    }
+
+    #[test]
+    fn test_parse_semgrep_output_low_severity() {
+        let mock_json = r#"{
+            "results": [
+                {"check_id": "low.issue", "path": "test.py", "start": {"line": 1}, "extra": {"message": "Low", "metadata": {"cwe": ["CWE-1"]}}}
+            ]
+        }"#;
+        let runner = SemgrepRunner::new(None, vec![]);
+        let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
+        assert_eq!(findings[0].severity, Severity::Low);
+    }
+
+    #[test]
+    fn test_parse_semgrep_output_info_severity() {
+        let mock_json = r#"{
+            "results": [
+                {"check_id": "info.issue", "path": "test.py", "start": {"line": 1}, "extra": {"message": "Info", "metadata": {"cwe": ["CWE-1"]}}}
+            ]
+        }"#;
+        let runner = SemgrepRunner::new(None, vec![]);
+        let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
+        assert_eq!(findings[0].severity, Severity::Info);
+    }
+
+    #[test]
+    fn test_parse_semgrep_output_missing_message() {
+        let mock_json = r#"{
+            "results": [
+                {"check_id": "test.issue", "path": "test.py", "start": {"line": 1}, "extra": {"metadata": {"cwe": ["CWE-1"]}}}
+            ]
+        }"#;
+        let runner = SemgrepRunner::new(None, vec![]);
+        let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
+        // Should use fallback description
+        assert!(findings[0].description.contains("test.issue"));
+    }
+
+    #[test]
+    fn test_parse_semgrep_aggregated_multiple_locations() {
+        let mock_json = r#"{
+            "results": [
+                {"check_id": "multi.issue", "path": "file1.py", "start": {"line": 1}, "extra": {"message": "Issue", "metadata": {"cwe": ["CWE-1"]}}},
+                {"check_id": "multi.issue", "path": "file2.py", "start": {"line": 2}, "extra": {"message": "Issue", "metadata": {"cwe": ["CWE-1"]}}},
+                {"check_id": "multi.issue", "path": "file3.py", "start": {"line": 3}, "extra": {"message": "Issue", "metadata": {"cwe": ["CWE-1"]}}}
+            ]
+        }"#;
+        let runner = SemgrepRunner::new(None, vec![]);
+        let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
+        // Multiple findings with same check_id should be aggregated
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].file_path, "multiple_files");
+        // Code snippet shows "Found in 3 files:" format
+        assert!(findings[0].code_snippet.as_ref().unwrap().contains("3 files"));
+    }
+
+    #[test]
+    fn test_parse_semgrep_aggregated_single_location() {
+        let mock_json = r#"{
+            "results": [
+                {"check_id": "single.issue", "path": "file1.py", "start": {"line": 1}, "extra": {"message": "Single issue", "metadata": {"cwe": ["CWE-1"]}}}
+            ]
+        }"#;
+        let runner = SemgrepRunner::new(None, vec![]);
+        let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].file_path, "file1.py");
+        assert_eq!(findings[0].line_number, Some(1));
+    }
+
+    #[test]
+    fn test_parse_semgrep_missing_extra_field() {
+        let mock_json = r#"{
+            "results": [
+                {"check_id": "test.issue", "path": "test.py", "start": {"line": 1}}
+            ]
+        }"#;
+        let runner = SemgrepRunner::new(None, vec![]);
+        let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].severity, Severity::Info); // Default severity
+        assert_eq!(findings[0].cwe_id, None);
+    }
+
+    #[test]
+    fn test_parse_semgrep_with_empty_check_id() {
+        let mock_json = r#"{
+            "results": [
+                {"check_id": "", "path": "test.py", "start": {"line": 1}, "extra": {"message": "Test"}}
+            ]
+        }"#;
+        let runner = SemgrepRunner::new(None, vec![]);
+        let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].title, "");
+    }
+
+    #[test]
+    fn test_semgrep_runner_new_with_exclude_rules() {
+        let runner = SemgrepRunner::new(
+            Some("/path/to/config.yml".to_string()),
+            vec!["rule1".to_string(), "rule2".to_string()],
+        );
+        assert_eq!(runner.config_path, Some("/path/to/config.yml".to_string()));
+        assert_eq!(runner.exclude_rules.len(), 2);
+        assert!(runner.exclude_rules.contains(&"rule1".to_string()));
+        assert!(runner.exclude_rules.contains(&"rule2".to_string()));
     }
 }

@@ -496,23 +496,17 @@ struct ContextAnalysis {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::phase::tests::test_fixtures::create_finding_with_params;
+    use crate::findings::VerificationStatus;
+    use crate::phase::helpers::create_finding_with_params;
 
     #[test]
     fn test_refine_confidence_verified() {
         let phase = ConfidenceRefinementPhase::new();
         let context = AnalysisContext::default();
-
-        let finding = create_finding_with_params(
-            "f1",
-            Severity::High,
-            0.7,
-            "src/main.rs",
-            Some(42),
-            Some("CWE-79"),
-            vec!["semgrep"],
-            Some(VerificationStatus::Confirmed),
-        );
+        
+        // Create a finding with verified status
+        let mut finding = create_finding_with_params("f1", "Test finding", Severity::High);
+        finding.verification_status = Some(VerificationStatus::Confirmed);
 
         let refinements = phase.run(vec![finding], &context);
         let refined = refinements.get("f1").unwrap();
@@ -526,16 +520,8 @@ mod tests {
         let phase = ConfidenceRefinementPhase::new();
         let context = AnalysisContext::default();
 
-        let finding = create_finding_with_params(
-            "f1",
-            Severity::High,
-            0.8,
-            "src/main.rs",
-            Some(42),
-            Some("CWE-79"),
-            vec!["semgrep"],
-            Some(VerificationStatus::FalsePositive),
-        );
+        let mut finding = create_finding_with_params("f1", "Test finding", Severity::High);
+        finding.verification_status = Some(VerificationStatus::FalsePositive);
 
         let refinements = phase.run(vec![finding], &context);
         let refined = refinements.get("f1").unwrap();
@@ -551,16 +537,8 @@ mod tests {
         let phase = ConfidenceRefinementPhase::new();
         let context = AnalysisContext::default();
 
-        let finding = create_finding_with_params(
-            "f1",
-            Severity::Medium,
-            0.6,
-            "src/main.rs",
-            Some(42),
-            Some("CWE-89"),
-            vec!["semgrep", "bandit"],
-            None,
-        );
+        let mut finding = create_finding_with_params("f1", "Test finding", Severity::Medium);
+        finding.sources = vec!["semgrep".to_string(), "llm".to_string()];
 
         let refinements = phase.run(vec![finding], &context);
         let refined = refinements.get("f1").unwrap();
@@ -575,16 +553,7 @@ mod tests {
         let phase = ConfidenceRefinementPhase::new();
         let context = AnalysisContext::default();
 
-        let finding = create_finding_with_params(
-            "f1",
-            Severity::High,
-            0.8,
-            "src/main_test.rs",
-            Some(42),
-            Some("CWE-79"),
-            vec!["semgrep"],
-            None,
-        );
+        let finding = create_finding_with_params("f1", "Test finding", Severity::High);
 
         let refinements = phase.run(vec![finding], &context);
         let refined = refinements.get("f1").unwrap();
@@ -597,16 +566,8 @@ mod tests {
         let phase = ConfidenceRefinementPhase::new();
         let context = AnalysisContext::default();
 
-        let finding = create_finding_with_params(
-            "f1",
-            Severity::High,
-            0.8,
-            "vendor/some_lib.rs",
-            Some(42),
-            Some("CWE-79"),
-            vec!["semgrep"],
-            None,
-        );
+        let mut finding = create_finding_with_params("f1", "Test finding", Severity::High);
+        finding.file_path = "vendor/some-lib/lib.rs".to_string();
 
         let refinements = phase.run(vec![finding], &context);
         let refined = refinements.get("f1").unwrap();
@@ -619,16 +580,7 @@ mod tests {
         let phase = ConfidenceRefinementPhase::new();
         let context = AnalysisContext::default();
 
-        let mut finding = create_finding_with_params(
-            "f1",
-            Severity::High,
-            0.7,
-            "src/main.rs",
-            Some(42),
-            Some("CWE-79"),
-            vec!["semgrep"],
-            None,
-        );
+        let mut finding = create_finding_with_params("f1", "Test finding", Severity::High);
         finding.cross_file_references = Some(vec!["src/util.rs".to_string()]);
 
         let refinements = phase.run(vec![finding], &context);
@@ -662,16 +614,7 @@ mod tests {
         let context = AnalysisContext::default();
 
         // Test upper bound
-        let finding = create_finding_with_params(
-            "f1",
-            Severity::Critical,
-            0.95,
-            "src/main.rs",
-            Some(42),
-            Some("CWE-79"),
-            vec!["semgrep", "llm"],
-            None,
-        );
+        let finding = create_finding_with_params("f1", "Test finding", Severity::Critical);
 
         let refinements = phase.run(vec![finding], &context);
         let refined = refinements.get("f1").unwrap();
@@ -679,16 +622,7 @@ mod tests {
         assert!(refined.refined_score <= 1.0);
 
         // Test lower bound with false positive
-        let finding2 = create_finding_with_params(
-            "f2",
-            Severity::Low,
-            0.1,
-            "vendor/lib.rs",
-            Some(1),
-            Some("CWE-79"),
-            vec!["bandit"],
-            None,
-        );
+        let finding2 = create_finding_with_params("f2", "Test finding", Severity::Low);
 
         let refinements2 = phase.run(vec![finding2], &context);
         let refined2 = refinements2.get("f2").unwrap();
@@ -701,16 +635,7 @@ mod tests {
         let phase = ConfidenceRefinementPhase::new();
         let context = AnalysisContext::default();
 
-        let finding = create_finding_with_params(
-            "f1",
-            Severity::High,
-            0.7,
-            "src/main.rs",
-            Some(42),
-            Some("CWE-79"),
-            vec!["semgrep"],
-            None,
-        );
+        let finding = create_finding_with_params("f1", "Test finding", Severity::High);
 
         let mut findings = vec![finding];
         let refinements = phase.run(findings.clone(), &context);
@@ -764,37 +689,13 @@ mod tests {
         let phase = ConfidenceRefinementPhase::new();
         let context = AnalysisContext::default();
 
+        let mut f3 = create_finding_with_params("f3", "Test finding", Severity::Critical);
+        f3.file_path = "src/main.rs".to_string();
+
         let findings = vec![
-            create_finding_with_params(
-                "f1",
-                Severity::High,
-                0.7,
-                "src/a.rs",
-                Some(1),
-                Some("CWE-79"),
-                vec!["semgrep"],
-                None,
-            ),
-            create_finding_with_params(
-                "f2",
-                Severity::Medium,
-                0.5,
-                "src/b.rs",
-                Some(2),
-                Some("CWE-89"),
-                vec!["bandit"],
-                None,
-            ),
-            create_finding_with_params(
-                "f3",
-                Severity::Critical,
-                0.9,
-                "src/c.rs",
-                Some(3),
-                Some("CWE-22"),
-                vec!["semgrep", "llm"],
-                None,
-            ),
+            create_finding_with_params("f1", "Test finding", Severity::High),
+            create_finding_with_params("f2", "Test finding", Severity::Medium),
+            f3,
         ];
 
         let refinements = phase.run(findings, &context);

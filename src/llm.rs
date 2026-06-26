@@ -282,7 +282,7 @@ impl LlmClient {
 
                         return Err(format!(
                             "LLM API request failed after {} retries to URL {}\nStatus: {}\nResponse: {}\nModel: {}",
-                            max_attempts - 1,
+                            max_attempts.saturating_sub(1),
                             url,
                             status,
                             error,
@@ -291,27 +291,7 @@ impl LlmClient {
                     }
                 }
                 Err(e) => {
-                    let status = e
-                        .status()
-                        .map(|s| s.to_string())
-                        .unwrap_or_else(|| "N/A".to_string());
-                    let url_e = e
-                        .url()
-                        .map(|u| u.to_string())
-                        .unwrap_or_else(|| "N/A".to_string());
-                    let kind = if e.is_timeout() {
-                        "timeout"
-                    } else if e.is_connect() {
-                        "connection"
-                    } else if e.is_request() {
-                        "request"
-                    } else if e.is_body() {
-                        "body"
-                    } else if e.is_decode() {
-                        "decode"
-                    } else {
-                        "unknown"
-                    };
+                    let (status, url_e, kind) = get_error_details(&e);
                     tracing::warn!(
                         "LLM request error on model '{}': {}\n(status: {}, type: {}, url: {}) (attempt {}/{})",
                         model, e, status, kind, url_e, retries + 1, max_attempts
@@ -331,7 +311,7 @@ impl LlmClient {
 
                         return Err(format!(
                             "LLM HTTP request failed after {} retries\nError: {:?}\nStatus: {}\nType: {}\nURL: {}\nModel: {}",
-                            max_attempts - 1,
+                            max_attempts.saturating_sub(1),
                             e,
                             status,
                             kind,
@@ -473,7 +453,7 @@ impl LlmClient {
                     if retries + 1 >= max_attempts {
                         return Err(format!(
                             "LLM API request failed after {} retries to URL {}\nStatus: {}\nResponse: {}\nModel: {}",
-                            max_attempts - 1,
+                            max_attempts.saturating_sub(1),
                             url,
                             status,
                             error,
@@ -482,27 +462,7 @@ impl LlmClient {
                     }
                 }
                 Err(e) => {
-                    let status = e
-                        .status()
-                        .map(|s| s.to_string())
-                        .unwrap_or_else(|| "N/A".to_string());
-                    let url_e = e
-                        .url()
-                        .map(|u| u.to_string())
-                        .unwrap_or_else(|| "N/A".to_string());
-                    let kind = if e.is_timeout() {
-                        "timeout"
-                    } else if e.is_connect() {
-                        "connection"
-                    } else if e.is_request() {
-                        "request"
-                    } else if e.is_body() {
-                        "body"
-                    } else if e.is_decode() {
-                        "decode"
-                    } else {
-                        "unknown"
-                    };
+                    let (status, url_e, kind) = get_error_details(&e);
                     tracing::warn!(
                         "LLM request error on model '{}': {}\n(status: {}, type: {}, url: {}) (attempt {}/{})",
                         model, e, status, kind, url_e, retries + 1, max_attempts
@@ -510,7 +470,7 @@ impl LlmClient {
                     if retries + 1 >= max_attempts {
                         return Err(format!(
                             "LLM HTTP request failed after {} retries\nError: {:?}\nStatus: {}\nType: {}\nURL: {}\nEndpoint: {}chat/completions\nModel: {}",
-                            max_attempts - 1,
+                            max_attempts.saturating_sub(1),
                             e,
                             status,
                             kind,
@@ -761,6 +721,32 @@ impl From<RecordMetricsParams> for crate::llm_metrics::RecordRequestParams {
             success: p.success,
         }
     }
+}
+
+/// Extract error details from reqwest error
+fn get_error_details(e: &reqwest::Error) -> (String, String, &'static str) {
+    let status = e
+        .status()
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| "N/A".to_string());
+    let url_e = e
+        .url()
+        .map(|u| u.to_string())
+        .unwrap_or_else(|| "N/A".to_string());
+    let kind = if e.is_timeout() {
+        "timeout"
+    } else if e.is_connect() {
+        "connection"
+    } else if e.is_request() {
+        "request"
+    } else if e.is_body() {
+        "body"
+    } else if e.is_decode() {
+        "decode"
+    } else {
+        "unknown"
+    };
+    (status, url_e, kind)
 }
 
 /// Helper to create LLM client with metrics from phase config
