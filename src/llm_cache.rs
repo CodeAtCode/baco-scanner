@@ -226,7 +226,7 @@ impl LlmCache {
 }
 
 /// Calculate SHA256 hash of a string
-fn hash_string(input: &str) -> String {
+pub fn hash_string(input: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(input.as_bytes());
     format!("{:x}", hasher.finalize())

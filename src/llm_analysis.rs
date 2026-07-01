@@ -8,13 +8,13 @@ use std::path::Path;
 use walkdir::WalkDir;
 
 /// Extract CWE ID from description text
-fn extract_cwe_id(description: &str) -> Option<String> {
+pub fn extract_cwe_id(description: &str) -> Option<String> {
     let re = Regex::new(r"CWE-\d+").ok()?;
     re.find(description).map(|m| m.as_str().to_string())
 }
 
 /// Generate a recommendation based on vulnerability title and description
-fn generate_recommendation(title: &str, description: &str) -> String {
+pub fn generate_recommendation(title: &str, description: &str) -> String {
     let title_lower = title.to_lowercase();
 
     if title_lower.contains("sql")
@@ -62,7 +62,7 @@ fn generate_recommendation(title: &str, description: &str) -> String {
 }
 
 /// Generate PoC code demonstrating the vulnerability
-fn generate_poc_code(title: &str, file_path: &str, line_number: u32) -> Option<String> {
+pub fn generate_poc_code(title: &str, file_path: &str, line_number: u32) -> Option<String> {
     let title_lower = title.to_lowercase();
 
     if title_lower.contains("buffer") || title_lower.contains("overflow") {
@@ -118,7 +118,7 @@ void poc_format() {{
 }
 
 /// Generate mitigation code showing the fix
-fn generate_mitigation_code(title: &str, file_path: &str, line_number: u32) -> Option<String> {
+pub fn generate_mitigation_code(title: &str, file_path: &str, line_number: u32) -> Option<String> {
     let title_lower = title.to_lowercase();
 
     if title_lower.contains("buffer") || title_lower.contains("overflow") {
@@ -247,7 +247,7 @@ impl LlmAnalyzer {
     }
 
     /// Check if file should be analyzed based on extension
-    fn should_analyze(&self, path: &Path) -> bool {
+    pub fn should_analyze(&self, path: &Path) -> bool {
         let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
         let extensions = self.get_extensions();
 
@@ -262,7 +262,7 @@ impl LlmAnalyzer {
     }
 
     /// Read file content safely
-    fn read_file_content(&self, path: &Path) -> Option<String> {
+    pub fn read_file_content(&self, path: &Path) -> Option<String> {
         let metadata = fs::metadata(path).ok()?;
         if metadata.len() > self.max_file_size as u64 {
             return None; // File too large
@@ -331,7 +331,7 @@ impl LlmAnalyzer {
     }
 
     /// Truncate code to fit in context window
-    fn truncate_code(&self, code: &str) -> String {
+    pub fn truncate_code(&self, code: &str) -> String {
         let max_chars = 8000; // Keep under context limits
         if code.len() <= max_chars {
             code.to_string()

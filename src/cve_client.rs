@@ -4,7 +4,8 @@
 //! - CISA Known Exploited Vulnerabilities (KEV) catalog
 //! - NVD (National Vulnerability Database) API
 
-use crate::scanner_types::{CveEntry, CveSource, V3Severity};
+use crate::scanner_types::cve::{CveEntry, CveSource};
+use crate::scanner_types::severity::V3Severity;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -254,7 +255,7 @@ fn map_cve_severity(severity: CveSeverity) -> V3Severity {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::scanner_types::V3Severity;
+    use crate::scanner_types::severity::V3Severity;
     use serde_json::json;
 
     #[tokio::test]

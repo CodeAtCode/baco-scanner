@@ -116,6 +116,33 @@ pub fn create_test_scanner() -> (Scanner, TempDir) {
     (scanner, temp_dir)
 }
 
+/// Creates a test scanner with a temporary directory.
+///
+/// # Arguments
+/// * `temp_dir` - Optional temporary directory. If None, a new one is created.
+/// * `config` - Optional configuration. If None, default config is used.
+///
+/// # Returns
+/// A tuple of (Scanner, Option<TempDir>) where TempDir is Some if a new temp dir was created.
+pub fn create_test_scanner_with_options(
+    temp_dir: Option<TempDir>,
+    config: Option<ScannerConfig>,
+) -> (Scanner, Option<TempDir>) {
+    let temp_dir = temp_dir.unwrap_or_else(|| TempDir::new().unwrap());
+    let config = config.unwrap_or_default();
+
+    let scanner = Scanner::new(config, temp_dir.path().to_path_buf(), false);
+    (scanner, Some(temp_dir))
+}
+
+/// Creates a test scanner with default settings.
+pub fn create_default_test_scanner() -> (Scanner, TempDir) {
+    let temp_dir = TempDir::new().unwrap();
+    let config = ScannerConfig::default();
+    let scanner = Scanner::new(config, temp_dir.path().to_path_buf(), false);
+    (scanner, temp_dir)
+}
+
 /// Macro to create a test context with scanner and empty analyzed_files.
 /// This creates local variables and returns a PhaseContext with mutable references to them.
 /// The scanner, temp_dir, and analyzed_files live for the duration of the test function.

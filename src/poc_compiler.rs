@@ -3,7 +3,7 @@
 //! Validates proof-of-concept exploit code without executing it.
 //! Supports Rust, Python, and JavaScript via compile/check only.
 
-use crate::scanner_types::PoCCompileResult;
+use crate::scanner_types::poc::PoCCompileResult;
 use std::process::Command;
 use thiserror::Error;
 

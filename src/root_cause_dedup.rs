@@ -9,7 +9,8 @@
 //! even if they appear at different locations in the codebase.
 
 use crate::findings::{Severity, VulnerabilityFinding};
-use crate::scanner_types::{RootCauseGroup, V3Severity};
+use crate::scanner_types::cve::RootCauseGroup;
+use crate::scanner_types::severity::V3Severity;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 

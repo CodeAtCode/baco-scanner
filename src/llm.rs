@@ -699,7 +699,7 @@ mod tests {
 }
 
 /// Parameters for record_metrics to reduce argument count
-struct RecordMetricsParams {
+pub struct RecordMetricsParams {
     model: String,
     operation: String,
     phase: String,

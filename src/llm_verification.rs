@@ -78,7 +78,7 @@ impl ExtendedVerificationPhase {
     }
 
     /// Get security best practices for project type
-    fn get_security_practices(project_type: DetectProjectType) -> Vec<String> {
+    pub fn get_security_practices(project_type: DetectProjectType) -> Vec<String> {
         match project_type {
             DetectProjectType::Web => vec![
                 "Input validation on all entry points".to_string(),
@@ -157,7 +157,7 @@ impl ExtendedVerificationPhase {
     }
 
     /// Verify a single finding using LLM or heuristics
-    fn verify_finding(&self, finding: &VulnerabilityFinding) -> VerificationResult {
+    pub fn verify_finding(&self, finding: &VulnerabilityFinding) -> VerificationResult {
         // Try LLM-based verification if client is available
         if let Some(ref client) = self.llm_client {
             if let Ok(llm_result) = self.llm_verify_finding(client, finding) {
@@ -282,7 +282,7 @@ impl ExtendedVerificationPhase {
     }
 
     /// Check if code has sanitization
-    fn has_sanitization(&self, code: &str) -> bool {
+    pub fn has_sanitization(&self, code: &str) -> bool {
         let sanitization_patterns = [
             "sanitize",
             "escape",
@@ -304,7 +304,7 @@ impl ExtendedVerificationPhase {
     }
 
     /// Check for known false positive patterns
-    fn is_known_false_positive_pattern(&self, code: &str) -> bool {
+    pub fn is_known_false_positive_pattern(&self, code: &str) -> bool {
         let fp_patterns = [
             "test",
             "mock",
@@ -325,12 +325,12 @@ impl ExtendedVerificationPhase {
     }
 
     /// Check if CWE is known to generate false positives
-    fn is_cwe_known_false_positive(&self, cwe: &str) -> bool {
+    pub fn is_cwe_known_false_positive(&self, cwe: &str) -> bool {
         matches!(cwe, "CWE-190" | "CWE-191" | "CWE-754")
     }
 
     /// Calculate refined confidence score
-    fn calculate_refined_confidence(
+    pub fn calculate_refined_confidence(
         &self,
         finding: &VulnerabilityFinding,
         mitigating_factors: &[String],
@@ -419,7 +419,7 @@ impl ExtendedVerificationPhase {
 }
 
 /// Render template with variable substitution
-fn render_template(template: &str, variables: &HashMap<String, String>) -> String {
+pub fn render_template(template: &str, variables: &HashMap<String, String>) -> String {
     let mut result = template.to_string();
 
     for (key, value) in variables {
@@ -434,7 +434,8 @@ fn render_template(template: &str, variables: &HashMap<String, String>) -> Strin
 mod tests {
     use super::*;
     use crate::findings::{IssueCategory, SecurityIssue, Severity};
-    use tempfile::TempDir;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
 
     fn make_test_finding(
         title: &str,
@@ -481,8 +482,9 @@ mod tests {
 
     #[test]
     fn test_verification_phase_initialization() {
-        let temp_dir = TempDir::new().unwrap();
-        let context = AnalysisContext::load(temp_dir.path()).unwrap();
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(b"{}").unwrap();
+        let context = AnalysisContext::load(temp_file.path().parent().unwrap()).unwrap();
 
         let phase = ExtendedVerificationPhase::new(DetectProjectType::Web, context, None);
 
@@ -492,12 +494,12 @@ mod tests {
 
     #[test]
     fn test_verify_finding_with_sanitization() {
-        let temp_dir = TempDir::new().unwrap();
-        let context = AnalysisContext::load(temp_dir.path()).unwrap();
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(b"{}").unwrap();
+        let context = AnalysisContext::load(temp_file.path().parent().unwrap()).unwrap();
 
         let phase = ExtendedVerificationPhase::new(DetectProjectType::Web, context, None);
 
-        // Finding with sanitization should be marked as needs review or false positive
         let finding = make_test_finding(
             "XSS in user input",
             Severity::High,
@@ -514,12 +516,12 @@ mod tests {
 
     #[test]
     fn test_verify_finding_known_false_positive() {
-        let temp_dir = TempDir::new().unwrap();
-        let context = AnalysisContext::load(temp_dir.path()).unwrap();
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(b"{}").unwrap();
+        let context = AnalysisContext::load(temp_file.path().parent().unwrap()).unwrap();
 
         let phase = ExtendedVerificationPhase::new(DetectProjectType::Web, context, None);
 
-        // Finding with test/mock code should be marked as false positive
         let finding = make_test_finding(
             "Potential SQL Injection",
             Severity::Medium,
@@ -534,12 +536,12 @@ mod tests {
 
     #[test]
     fn test_verify_finding_no_mitigating_factors() {
-        let temp_dir = TempDir::new().unwrap();
-        let context = AnalysisContext::load(temp_dir.path()).unwrap();
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(b"{}").unwrap();
+        let context = AnalysisContext::load(temp_file.path().parent().unwrap()).unwrap();
 
         let phase = ExtendedVerificationPhase::new(DetectProjectType::Web, context, None);
 
-        // Finding without mitigating factors should be confirmed
         let finding = make_test_finding(
             "Command Injection",
             Severity::Critical,
@@ -554,8 +556,9 @@ mod tests {
 
     #[test]
     fn test_execute_verification() {
-        let temp_dir = TempDir::new().unwrap();
-        let context = AnalysisContext::load(temp_dir.path()).unwrap();
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(b"{}").unwrap();
+        let context = AnalysisContext::load(temp_file.path().parent().unwrap()).unwrap();
 
         let mut phase = ExtendedVerificationPhase::new(DetectProjectType::Web, context, None);
 
@@ -577,8 +580,9 @@ mod tests {
 
     #[test]
     fn test_verification_report_generation() {
-        let temp_dir = TempDir::new().unwrap();
-        let context = AnalysisContext::load(temp_dir.path()).unwrap();
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(b"{}").unwrap();
+        let context = AnalysisContext::load(temp_file.path().parent().unwrap()).unwrap();
 
         let mut phase = ExtendedVerificationPhase::new(DetectProjectType::Web, context, None);
 
@@ -597,8 +601,9 @@ mod tests {
 
     #[test]
     fn test_confidence_refinement_high_severity() {
-        let temp_dir = TempDir::new().unwrap();
-        let context = AnalysisContext::load(temp_dir.path()).unwrap();
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(b"{}").unwrap();
+        let context = AnalysisContext::load(temp_file.path().parent().unwrap()).unwrap();
 
         let phase = ExtendedVerificationPhase::new(DetectProjectType::Web, context, None);
 
@@ -612,8 +617,9 @@ mod tests {
 
     #[test]
     fn test_confidence_refinement_already_reported() {
-        let temp_dir = TempDir::new().unwrap();
-        let context = AnalysisContext::load(temp_dir.path()).unwrap();
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(b"{}").unwrap();
+        let context = AnalysisContext::load(temp_file.path().parent().unwrap()).unwrap();
 
         let phase = ExtendedVerificationPhase::new(DetectProjectType::Web, context, None);
 

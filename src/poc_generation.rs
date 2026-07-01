@@ -58,12 +58,12 @@ pub struct PoCGenerationResult {
 #[derive(Debug, Clone, Default)]
 pub struct PoCGenerationEngine {
     /// Templates for different vulnerability types.
-    templates: HashMap<String, PoCTemplate>,
+    pub templates: HashMap<String, PoCTemplate>,
 }
 
 /// A template for generating PoCs.
 #[derive(Debug, Clone)]
-struct PoCTemplate {
+pub struct PoCTemplate {
     /// CWE this template applies to.
     cwe_id: String,
     /// PoC format.

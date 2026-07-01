@@ -20,7 +20,6 @@
 )]
 
 pub mod agent;
-pub mod auto_patcher;
 pub mod checkpoint;
 pub mod confidence;
 pub mod confidence_refinement;

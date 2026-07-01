@@ -490,4 +490,173 @@ mod tests {
         let result = tool.execute(args, &*sandbox);
         assert!(result.is_ok());
     }
+
+    #[test]
+    fn test_file_read_path_traversal() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let tool = FileReadTool;
+        let args = serde_json::json!({ "path": "../etc/passwd" });
+        let sandbox = Box::new(ToolSandbox::new(tmpdir.path().to_path_buf(), 30));
+
+        let result = tool.execute(args, &*sandbox);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Path traversal"));
+    }
+
+    #[test]
+    fn test_pattern_search_missing_path() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let tool = PatternSearchTool;
+        let args = serde_json::json!({ "pattern": "test" });
+        let sandbox = Box::new(ToolSandbox::new(tmpdir.path().to_path_buf(), 30));
+
+        let result = tool.execute(args, &*sandbox);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Missing 'path'"));
+    }
+
+    #[test]
+    fn test_file_write_path_traversal() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let tool = FileWriteTool;
+        let args = serde_json::json!({
+            "path": "../outside.txt",
+            "content": "test"
+        });
+        let sandbox = Box::new(ToolSandbox::new(tmpdir.path().to_path_buf(), 30));
+
+        let result = tool.execute(args, &*sandbox);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err();
+        assert!(err_msg.contains("Path traversal") || err_msg.contains("Validation"));
+    }
+
+    #[test]
+    fn test_test_compile_missing_source_path() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let tool = TestCompileTool;
+        let args = serde_json::json!({ "language": "rust" });
+        let sandbox = Box::new(ToolSandbox::new(tmpdir.path().to_path_buf(), 30));
+
+        let result = tool.execute(args, &*sandbox);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Missing 'source_path'"));
+    }
+
+    #[test]
+    fn test_test_run_with_timeout_secs() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let path = tmpdir.path().join("quick.py");
+        std::fs::write(&path, "print('hello')").unwrap();
+
+        let tool = TestRunTool;
+        let args = serde_json::json!({
+            "executable_path": "quick.py",
+            "timeout_secs": 10
+        });
+        let sandbox = Box::new(ToolSandbox::new(tmpdir.path().to_path_buf(), 30));
+
+        let result = tool.execute(args, &*sandbox);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_file_read_empty_file() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let path = tmpdir.path().join("empty.txt");
+        std::fs::write(&path, "").unwrap();
+
+        let tool = FileReadTool;
+        let args = serde_json::json!({ "path": "empty.txt" });
+        let sandbox = Box::new(ToolSandbox::new(tmpdir.path().to_path_buf(), 30));
+
+        let result = tool.execute(args, &*sandbox);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().output, "");
+    }
+
+    #[test]
+    fn test_pattern_search_empty_result() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let path = tmpdir.path().join("search.txt");
+        std::fs::write(&path, "line1\nline2\nline3").unwrap();
+
+        let tool = PatternSearchTool;
+        let args = serde_json::json!({
+            "pattern": "nonexistent",
+            "path": tmpdir.path().to_string_lossy().to_string()
+        });
+        let sandbox = Box::new(ToolSandbox::new(tmpdir.path().to_path_buf(), 30));
+
+        let result = tool.execute(args, &*sandbox);
+        assert!(result.is_ok());
+        // grep returns non-success when no match found
+        let tool_result = result.unwrap();
+        assert!(!tool_result.success);
+        assert!(tool_result.output.is_empty());
+    }
+
+    #[test]
+    fn test_file_write_empty_content() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let tool = FileWriteTool;
+        let args = serde_json::json!({
+            "path": "empty.txt",
+            "content": ""
+        });
+        let sandbox = Box::new(ToolSandbox::new(tmpdir.path().to_path_buf(), 30));
+
+        let result = tool.execute(args, &*sandbox);
+        assert!(result.is_ok());
+
+        let written_path = tmpdir.path().join("empty.txt");
+        assert!(written_path.exists());
+        let content = std::fs::read_to_string(&written_path).unwrap();
+        assert_eq!(content, "");
+    }
+
+    #[test]
+    fn test_test_compile_with_whitespace_content() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let path = tmpdir.path().join("whitespace.rs");
+        std::fs::write(&path, "   \n\n   ").unwrap();
+
+        let tool = TestCompileTool;
+        let args = serde_json::json!({ "source_path": "whitespace.rs", "language": "rust" });
+        let sandbox = Box::new(ToolSandbox::new(tmpdir.path().to_path_buf(), 30));
+
+        let result = tool.execute(args, &*sandbox);
+        // Should fail to compile but tool execution should succeed
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_file_read_tool_name() {
+        let tool = FileReadTool;
+        assert_eq!(tool.name(), "file_read");
+    }
+
+    #[test]
+    fn test_pattern_search_tool_name() {
+        let tool = PatternSearchTool;
+        assert_eq!(tool.name(), "pattern_search");
+    }
+
+    #[test]
+    fn test_file_write_tool_name() {
+        let tool = FileWriteTool;
+        assert_eq!(tool.name(), "file_write");
+    }
+
+    #[test]
+    fn test_test_compile_tool_name() {
+        let tool = TestCompileTool;
+        assert_eq!(tool.name(), "test_compile");
+    }
+
+    #[test]
+    fn test_test_run_tool_name() {
+        let tool = TestRunTool;
+        assert_eq!(tool.name(), "test_run");
+    }
 }

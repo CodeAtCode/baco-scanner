@@ -278,7 +278,6 @@ mod tests {
     use super::*;
     use std::fs::File;
     use std::io::Write;
-    use tempfile::TempDir;
 
     #[test]
     fn test_file_hash_store_new() {
@@ -330,16 +329,19 @@ mod tests {
 
     #[test]
     fn test_file_hash_store_save_load() {
-        let temp_dir = TempDir::new().unwrap();
-        let store_path = temp_dir.path().join("hash_store.json");
+        use tempfile::NamedTempFile;
+
+        let temp_file = NamedTempFile::new().unwrap();
 
         let mut store = FileHashStore::new();
         store.insert_hash(&PathBuf::from("file1.txt"), "hash1".to_string());
         store.insert_hash(&PathBuf::from("file2.txt"), "hash2".to_string());
 
-        store.save(store_path.to_str().unwrap()).unwrap();
+        // Save to temp file
+        let temp_path = temp_file.path().to_str().unwrap();
+        store.save(temp_path).unwrap();
 
-        let loaded = FileHashStore::load(store_path.to_str().unwrap()).unwrap();
+        let loaded = FileHashStore::load(temp_path).unwrap();
 
         assert_eq!(loaded.len(), 2);
         assert_eq!(
@@ -377,6 +379,7 @@ mod tests {
 
     #[test]
     fn test_incremental_scanner_compare_files() {
+        use tempfile::TempDir;
         let temp_dir = TempDir::new().unwrap();
 
         // Create a file in the previous scan
@@ -419,6 +422,7 @@ mod tests {
 
     #[test]
     fn test_incremental_scanner_unchanged_files() {
+        use tempfile::TempDir;
         let temp_dir = TempDir::new().unwrap();
 
         // Create a file
@@ -445,6 +449,7 @@ mod tests {
 
     #[test]
     fn test_build_hash_store() {
+        use tempfile::TempDir;
         let temp_dir = TempDir::new().unwrap();
 
         let file1 = temp_dir.path().join("file1.txt");

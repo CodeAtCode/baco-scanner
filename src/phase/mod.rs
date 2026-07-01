@@ -13,7 +13,6 @@ pub mod cross_file_analysis;
 pub mod git_analysis;
 pub mod indexing;
 
-#[cfg(test)]
 pub mod helpers;
 
 #[cfg(test)]

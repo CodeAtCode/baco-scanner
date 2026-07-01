@@ -287,4 +287,99 @@ mod tests {
         let allowed = sandbox.is_path_allowed(&non_existent);
         assert!(allowed);
     }
+
+    #[test]
+    fn test_sandbox_new() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let sandbox = ToolSandbox::new(tmpdir.path().to_path_buf(), 60);
+
+        assert_eq!(sandbox.temp_dir(), tmpdir.path());
+        assert_eq!(sandbox.timeout_secs, 60);
+    }
+
+    #[test]
+    fn test_resolve_safe_path_with_subdirectory() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let subdir = tmpdir.path().join("subdir");
+        std::fs::create_dir_all(&subdir).unwrap();
+        let test_file = subdir.join("test.txt");
+        std::fs::write(&test_file, "content").unwrap();
+
+        let sandbox = ToolSandbox::new(tmpdir.path().to_path_buf(), 30);
+
+        let result = sandbox.resolve_safe_path("subdir/test.txt");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), test_file);
+    }
+
+    #[test]
+    fn test_create_temp_file_with_subdirectory() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let sandbox = ToolSandbox::new(tmpdir.path().to_path_buf(), 30);
+
+        // create_temp_file doesn't create subdirectories, so just test flat files
+        let result = sandbox.create_temp_file("newfile.txt", "hello");
+        assert!(result.is_ok());
+
+        let created_path = result.unwrap();
+        assert!(created_path.exists());
+        let content = std::fs::read_to_string(&created_path).unwrap();
+        assert_eq!(content, "hello");
+    }
+
+    #[test]
+    fn test_validate_test_source_blocks_eval() {
+        let sandbox = ToolSandbox::new(PathBuf::new(), 30);
+        let malicious_code = "eval('print(1)')";
+        let result = sandbox.validate_test_source(malicious_code);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Dangerous pattern"));
+    }
+
+    #[test]
+    fn test_validate_test_source_blocks_exec() {
+        let sandbox = ToolSandbox::new(PathBuf::new(), 30);
+        let malicious_code = "exec('code')";
+        let result = sandbox.validate_test_source(malicious_code);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_test_source_blocks_import() {
+        let sandbox = ToolSandbox::new(PathBuf::new(), 30);
+        let malicious_code = "__import__('os')";
+        let result = sandbox.validate_test_source(malicious_code);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_run_with_timeout_nonexistent_command() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let sandbox = ToolSandbox::new(tmpdir.path().to_path_buf(), 30);
+
+        let result = sandbox.run_with_timeout("nonexistent_cmd_xyz", &[], Some(1));
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("spawn"));
+    }
+
+    #[test]
+    fn test_run_with_timeout_default_timeout() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let sandbox = ToolSandbox::new(tmpdir.path().to_path_buf(), 5); // 5 second default
+
+        let result = sandbox.run_with_timeout("/bin/echo", &["hello"], None); // No override
+        assert!(result.is_ok());
+        let tool_result = result.unwrap();
+        assert!(tool_result.success);
+    }
+
+    #[test]
+    fn test_is_path_allowed_root_path() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let sandbox = ToolSandbox::new(tmpdir.path().to_path_buf(), 30);
+
+        // Root path should not be allowed (not within tempdir)
+        let allowed = sandbox.is_path_allowed(&PathBuf::from("/"));
+        assert!(!allowed);
+    }
 }

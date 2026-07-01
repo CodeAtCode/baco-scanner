@@ -312,17 +312,25 @@ os.system(user_input)
 
     #[test]
     fn test_binary_files_skipped() {
-        let temp = TempDir::new().unwrap();
+        use std::io::Write;
+        use tempfile::NamedTempFile;
 
-        fs::write(temp.path().join("test.bin"), vec![0u8; 100]).unwrap();
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(&vec![0u8; 100]).unwrap();
 
-        let searcher = VariantSearcher::new(temp.path().to_str().unwrap().to_string());
+        let searcher = VariantSearcher::new(
+            temp_file
+                .path()
+                .parent()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string(),
+        );
 
         // Should not crash on binary files
         let result = searcher.search_variants();
         assert!(result.is_ok());
-
-        drop(temp);
     }
 
     #[test]
@@ -337,6 +345,8 @@ os.system(user_input)
             .with_patterns(vec![SearchPattern::new("test", ".*", vec![])]);
 
         let hits = searcher.search_variants().unwrap();
+
+        // node_modules should be skipped
 
         // Should not find anything in node_modules
         let from_node_modules = hits.iter().any(|h| h.file_path.contains("node_modules"));
@@ -401,9 +411,18 @@ os.system(user_input)
 
     #[test]
     fn test_similarity_scoring() {
-        let temp = TempDir::new().unwrap();
+        use tempfile::NamedTempFile;
+        let temp_file = NamedTempFile::new().unwrap();
 
-        let searcher = VariantSearcher::new(temp.path().to_str().unwrap().to_string());
+        let searcher = VariantSearcher::new(
+            temp_file
+                .path()
+                .parent()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string(),
+        );
 
         let pattern = SearchPattern::new(
             "command_injection",
@@ -418,7 +437,5 @@ os.system(user_input)
         let score2 = searcher.calculate_similarity(line2, &pattern);
 
         assert!(score1 > score2);
-
-        drop(temp);
     }
 }

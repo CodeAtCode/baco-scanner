@@ -351,4 +351,48 @@ mod tests {
         assert_eq!(response3.content, "");
         assert!(response3.tool_calls.is_empty());
     }
+
+    #[test]
+    fn test_mock_client_model_name_method() {
+        let responses = vec![];
+        let mock = MockLlmClient::new(responses.clone());
+
+        // Test model_name() method
+        assert_eq!(mock.model_name(), "mock-model");
+
+        // Test with custom model name
+        let mock_with_model = MockLlmClient::with_model(responses, "custom-model".to_string());
+        assert_eq!(mock_with_model.model_name(), "custom-model");
+    }
+
+    #[test]
+    fn test_mock_client_response_count() {
+        let responses = vec![
+            ChatResponse {
+                content: "Response 1".to_string(),
+                tool_calls: vec![],
+                raw: json!({}),
+                model_used: "mock".to_string(),
+            },
+            ChatResponse {
+                content: "Response 2".to_string(),
+                tool_calls: vec![],
+                raw: json!({}),
+                model_used: "mock".to_string(),
+            },
+            ChatResponse {
+                content: "Response 3".to_string(),
+                tool_calls: vec![],
+                raw: json!({}),
+                model_used: "mock".to_string(),
+            },
+        ];
+
+        let mock = MockLlmClient::new(responses);
+        assert_eq!(mock.response_count(), 3);
+
+        // Empty responses
+        let empty_mock = MockLlmClient::new(vec![]);
+        assert_eq!(empty_mock.response_count(), 0);
+    }
 }

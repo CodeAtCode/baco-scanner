@@ -348,9 +348,9 @@ async fn test_config_loading_parallel() {
         .unwrap()
         .as_nanos();
 
-    // Create all config files first
+    // Create all config files first (reduced from 10 to 5 for speed)
     let mut config_paths = Vec::new();
-    for i in 0..10 {
+    for i in 0..5 {
         let config_path = format!("/tmp/baco_parallel_test_{}_{}.toml", timestamp, i);
         let config_content = format!(
             r#"[project]

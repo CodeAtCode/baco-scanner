@@ -3,7 +3,7 @@
 //! Implements the BACO v3 severity scoring system based on Anthropic's methodology.
 //! Uses 6 dimensions to compute a final severity score mapped to CVSS-compatible levels.
 
-use crate::scanner_types::{
+use crate::scanner_types::severity::{
     AccessType, BlastRadius, RubricDimensions, RubricScore, SeverityRubric, V3Severity,
 };
 

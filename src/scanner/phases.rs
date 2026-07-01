@@ -1,5 +1,4 @@
 use crate::agent;
-use crate::auto_patcher::{AutoPatcher, PatchingConfig};
 use crate::checkpoint::ScanPhase;
 use crate::confidence_refinement::ConfidenceRefinementPhase;
 use crate::config;
@@ -19,6 +18,7 @@ use crate::report::html::generate_html_report;
 use crate::report::json::write_findings_json;
 use crate::root_cause_dedup::RootCauseDeduplicator;
 use crate::semgrep::SemgrepRunner;
+use crate::staging::{AutoPatcher, PatchingConfig};
 use crate::threat_model::ThreatModelingPhase;
 use crate::tickets::TicketSearcher;
 use crate::variant_search::VariantSearcher;
@@ -37,7 +37,7 @@ pub struct PhaseConfig<'a> {
     pub metrics_tracker: &'a LlmMetricsTracker,
     pub target_path: &'a std::path::Path,
     pub config: &'a config::ScannerConfig,
-    pub project_stack: &'a Option<crate::scanner_types::ProjectStack>,
+    pub project_stack: &'a Option<crate::scanner_types::project::ProjectStack>,
 }
 
 /// Execute a single scan phase and return updated findings and analyzed files
@@ -325,7 +325,7 @@ pub async fn run_phase(
                         "Failed to detect project stack: {}, continuing without CVE enrichment",
                         e
                     );
-                    crate::scanner_types::ProjectStack::default()
+                    crate::scanner_types::project::ProjectStack::default()
                 }
             };
 
@@ -369,12 +369,12 @@ pub async fn run_phase(
             // Deduplicate CVE entries (KEV takes priority)
             let kev_entries: Vec<_> = cve_entries
                 .iter()
-                .filter(|c| c.source == crate::scanner_types::CveSource::KEV)
+                .filter(|c| c.source == crate::scanner_types::cve::CveSource::KEV)
                 .cloned()
                 .collect();
             let nvd_entries: Vec<_> = cve_entries
                 .iter()
-                .filter(|c| c.source != crate::scanner_types::CveSource::KEV)
+                .filter(|c| c.source != crate::scanner_types::cve::CveSource::KEV)
                 .cloned()
                 .collect();
             cve_entries = crate::cve_client::CveClient::dedup_cve_entries(kev_entries, nvd_entries);

@@ -491,4 +491,115 @@ mod tests {
         assert!(tools_used.contains(&"file_write".to_string()));
         assert!(test_path.is_some());
     }
+
+    #[tokio::test]
+    async fn test_execute_tool_calls_duplicate_tool_calls() {
+        let mut registry = ToolRegistry::new();
+        registry.register(Box::new(crate::agent::tools::FileReadTool));
+
+        let tmpdir = tempfile::tempdir().unwrap();
+        let sandbox = ToolSandbox::new(tmpdir.path().to_path_buf(), 30);
+        let progress_cb: ProgressCallback = Arc::new(|_| {});
+
+        // Same tool called twice
+        let response = ChatResponse {
+            content: "".to_string(),
+            tool_calls: vec![
+                ToolCall {
+                    id: Some("call_1".to_string()),
+                    name: "file_read".to_string(),
+                    arguments: serde_json::json!({ "path": "test1.txt" }),
+                },
+                ToolCall {
+                    id: Some("call_2".to_string()),
+                    name: "file_read".to_string(),
+                    arguments: serde_json::json!({ "path": "test2.txt" }),
+                },
+            ],
+            raw: serde_json::json!({}),
+            model_used: "test".to_string(),
+        };
+
+        let messages = vec![ChatMessage::user("test")];
+
+        let (tools_used, _, _, _) = execute_tool_calls(
+            &registry,
+            &sandbox,
+            &response,
+            messages,
+            &progress_cb,
+            tmpdir.path(),
+            1,
+            10,
+            "Turn",
+        )
+        .await;
+
+        // Should only track tool once even if called multiple times
+        assert_eq!(tools_used.len(), 1);
+        assert_eq!(tools_used[0], "file_read");
+    }
+
+    #[tokio::test]
+    async fn test_execute_tool_calls_empty_tool_calls() {
+        let registry = ToolRegistry::new();
+        let tmpdir = tempfile::tempdir().unwrap();
+        let sandbox = ToolSandbox::new(tmpdir.path().to_path_buf(), 30);
+        let progress_cb: ProgressCallback = Arc::new(|_| {});
+
+        let response = ChatResponse {
+            content: "".to_string(),
+            tool_calls: vec![],
+            raw: serde_json::json!({}),
+            model_used: "test".to_string(),
+        };
+
+        let messages = vec![ChatMessage::user("test")];
+
+        let (tools_used, test_path, compile_path, messages) = execute_tool_calls(
+            &registry,
+            &sandbox,
+            &response,
+            messages,
+            &progress_cb,
+            tmpdir.path(),
+            1,
+            10,
+            "Turn",
+        )
+        .await;
+
+        assert!(tools_used.is_empty());
+        assert!(test_path.is_none());
+        assert!(compile_path.is_none());
+        assert_eq!(messages.len(), 1); // No changes
+    }
+
+    #[test]
+    fn test_create_empty_finding_all_defaults() {
+        let finding = create_empty_finding("test.rs", 0, vec![], None);
+
+        assert!(finding.finding.id.is_empty());
+        assert!(finding.finding.title.is_empty());
+        assert!(finding.finding.description.is_empty());
+        assert_eq!(finding.finding.severity, Severity::Low);
+        assert_eq!(finding.finding.confidence_score, 0.0);
+        assert_eq!(finding.agent_turns, 0);
+        assert!(finding.tools_used.is_empty());
+        assert!(finding.finding.llm_model.is_none());
+        assert!(finding.finding.agent_mode);
+    }
+
+    #[test]
+    fn test_create_audit_finding_all_defaults() {
+        let finding = create_audit_finding("test.rs", 0, vec![], "No issues".to_string(), None);
+
+        assert!(finding.finding.id.starts_with("agent-"));
+        assert!(finding.finding.title.contains("Security Audit"));
+        assert_eq!(finding.finding.description, "No issues");
+        assert_eq!(finding.finding.severity, Severity::Medium);
+        assert_eq!(finding.finding.confidence_score, 0.7);
+        assert_eq!(finding.agent_turns, 0);
+        assert!(finding.finding.llm_model.is_none());
+    }
 }

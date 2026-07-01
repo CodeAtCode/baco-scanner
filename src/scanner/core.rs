@@ -2,7 +2,7 @@ use crate::checkpoint::ScanPhase;
 use crate::config;
 use crate::findings::VulnerabilityFinding;
 use crate::llm_metrics::LlmMetricsTracker;
-use crate::scanner_types::{CveEntry, ProjectStack};
+use crate::scanner_types::{cve::CveEntry, project::ProjectStack};
 
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 

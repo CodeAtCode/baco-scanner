@@ -4,9 +4,9 @@
 //! Uses CveClient for fetching CVE data from CISA KEV and NVD.
 
 use crate::cve_client::CveClient;
-use crate::scanner_types::{
-    CveCluster, CveEntry, Dependency, DependencyEcosystem, ProjectStack, V3Severity,
-};
+use crate::scanner_types::cve::{CveCluster, CveEntry};
+use crate::scanner_types::project::{Dependency, DependencyEcosystem, ProjectStack};
+use crate::scanner_types::severity::V3Severity;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
@@ -434,7 +434,8 @@ impl CveBootstrapper {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::scanner_types::{CveSource, V3Severity};
+    use crate::scanner_types::cve::CveSource;
+    use crate::scanner_types::severity::V3Severity;
     use std::fs;
     use tempfile::TempDir;
 

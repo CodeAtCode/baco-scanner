@@ -3,7 +3,7 @@
 //! Implements majority voting for vulnerability verification with N verifiers.
 //! Uses circuit breaker pattern for API failure handling.
 
-use crate::scanner_types::{MajorityVerdict, VerifierVerdict};
+use crate::scanner_types::{poc::VerifierVerdict, MajorityVerdict};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;

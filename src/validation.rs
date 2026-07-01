@@ -66,8 +66,6 @@ pub fn validate_checkpoint(path: &Path) -> Result<Checkpoint, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
-    use tempfile::TempDir;
 
     #[test]
     fn test_validate_file_exists_nonexistent() {
@@ -78,19 +76,17 @@ mod tests {
 
     #[test]
     fn test_validate_file_exists_directory() {
-        let temp_dir = TempDir::new().unwrap();
-        let result = validate_file_exists(temp_dir.path());
+        // Use a real directory path that exists but is not a file
+        let result = validate_file_exists(Path::new("/tmp"));
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("is not a file"));
     }
 
     #[test]
     fn test_validate_file_exists_valid() {
-        let temp_dir = TempDir::new().unwrap();
-        let file_path = temp_dir.path().join("test.txt");
-        fs::write(&file_path, "test").unwrap();
-
-        let result = validate_file_exists(&file_path);
+        use tempfile::NamedTempFile;
+        let temp_file = NamedTempFile::new().unwrap();
+        let result = validate_file_exists(temp_file.path());
         assert!(result.is_ok());
     }
 
@@ -102,11 +98,12 @@ mod tests {
 
     #[test]
     fn test_validate_config_invalid_toml() {
-        let temp_dir = TempDir::new().unwrap();
-        let config_path = temp_dir.path().join("config.toml");
-        fs::write(&config_path, "invalid toml {{{").unwrap();
+        use tempfile::NamedTempFile;
+        let mut temp_file = NamedTempFile::new().unwrap();
+        use std::io::Write;
+        temp_file.write_all(b"invalid toml {{{").unwrap();
 
-        let result = validate_config(&config_path);
+        let result = validate_config(temp_file.path());
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("parse"));
     }
@@ -119,52 +116,55 @@ mod tests {
 
     #[test]
     fn test_validate_findings_invalid_json() {
-        let temp_dir = TempDir::new().unwrap();
-        let findings_path = temp_dir.path().join("findings.json");
-        fs::write(&findings_path, "{bad json").unwrap();
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(b"{bad json").unwrap();
 
-        let result = validate_findings(&findings_path);
+        let result = validate_findings(temp_file.path());
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("parse"));
     }
 
     #[test]
     fn test_validate_findings_empty_array() {
-        let temp_dir = TempDir::new().unwrap();
-        let findings_path = temp_dir.path().join("findings.json");
-        fs::write(&findings_path, "[]").unwrap();
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(b"[]").unwrap();
 
-        let result = validate_findings(&findings_path);
+        let result = validate_findings(temp_file.path());
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("empty"));
     }
 
     #[test]
     fn test_validate_findings_valid() {
-        let findings_path = std::path::Path::new("/tmp/baco_test_findings.json");
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+        let mut temp_file = NamedTempFile::new().unwrap();
         let findings_json = r#"[{"id": "test-1", "title": "Test", "description": "Desc", "severity": "high", "confidence_score": 0.8, "cwe_id": "CWE-79", "file_path": "src/test.rs", "line_number": 10, "code_snippet": "code", "recommendation": "fix", "already_reported": false, "sources": []}]"#;
-        std::fs::write(findings_path, findings_json).unwrap();
+        temp_file.write_all(findings_json.as_bytes()).unwrap();
 
-        let result = validate_findings(findings_path);
+        let result = validate_findings(temp_file.path());
         assert!(result.is_ok(), "Error: {:?}", result.err());
         let findings = result.unwrap();
         assert_eq!(findings.len(), 1);
-        std::fs::remove_file(findings_path).ok();
     }
 
     #[test]
     fn test_validate_findings_missing_id() {
-        let temp_dir = TempDir::new().unwrap();
-        let findings_path = temp_dir.path().join("findings.json");
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+        let mut temp_file = NamedTempFile::new().unwrap();
         let findings_json = r#"[{"id": "", "title": "Test", "description": "Desc", "severity": "high", "confidence_score": 0.8, "file_path": "src/test.rs", "line_number": 10, "code_snippet": "code", "recommendation": "fix", "cwe_id": "CWE-79", "already_reported": false, "sources": []}]"#;
-        fs::write(&findings_path, findings_json).unwrap();
+        temp_file.write_all(findings_json.as_bytes()).unwrap();
 
-        let result = validate_findings(&findings_path);
+        let result = validate_findings(temp_file.path());
         assert!(result.is_ok());
         let findings = result.unwrap();
         assert_eq!(findings.len(), 1);
         assert!(!findings[0].id.is_empty(), "ID should be auto-generated");
-        // ID is a SHA256 hex hash (64 characters)
         assert_eq!(findings[0].id.len(), 64, "ID should be a 64-char hex hash");
         assert!(
             findings[0].id.chars().all(|c| c.is_ascii_hexdigit()),

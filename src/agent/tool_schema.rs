@@ -297,4 +297,75 @@ mod tests {
             .unwrap()
             .contains(&serde_json::json!("executable_path")));
     }
+
+    #[test]
+    fn test_tool_registry_register_same_tool_twice() {
+        let mut registry = ToolRegistry::new();
+        let mock_tool = MockTool {};
+
+        registry.register(Box::new(mock_tool));
+        assert!(registry.get("mock_tool").is_some());
+
+        // Register same tool again - should overwrite
+        let mock_tool2 = MockTool {};
+        registry.register(Box::new(mock_tool2));
+        assert!(registry.get("mock_tool").is_some());
+    }
+
+    #[test]
+    fn test_tool_registry_empty() {
+        let registry = ToolRegistry::new();
+
+        assert!(registry.get("nonexistent").is_none());
+        assert!(registry.get_definitions().is_empty());
+    }
+
+    #[test]
+    fn test_tool_definitions_schema_has_type_function() {
+        let definitions = tool_definitions();
+
+        for def in &definitions {
+            assert_eq!(def["type"], "function");
+            assert!(def.get("function").is_some());
+        }
+    }
+
+    #[test]
+    fn test_tool_definitions_parameter_types() {
+        let definitions = tool_definitions();
+
+        for def in &definitions {
+            let params = def["function"]["parameters"]["properties"]
+                .as_object()
+                .unwrap();
+
+            // All tools should have parameters defined - check they have a type field
+            for (_, value) in params {
+                assert!(
+                    value.get("type").is_some(),
+                    "Parameter should have type field"
+                );
+                // Type can be string or integer depending on the parameter
+                let param_type = value["type"].as_str().unwrap();
+                assert!(
+                    param_type == "string" || param_type == "integer",
+                    "Parameter type should be string or integer"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_default_tools_registry_get_definitions() {
+        let registry = default_tools();
+        let defs = registry.get_definitions();
+
+        assert_eq!(defs.len(), 5);
+
+        // Verify each definition has correct structure
+        for def in defs {
+            assert_eq!(def["type"], "function");
+            assert!(def["function"].is_object());
+        }
+    }
 }
