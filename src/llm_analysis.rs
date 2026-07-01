@@ -345,7 +345,7 @@ impl LlmAnalyzer {
     }
 
     /// Parse LLM response into findings
-    pub(crate) fn parse_llm_response(
+    pub fn parse_llm_response(
         &self,
         text: &str,
         file_path: &str,
