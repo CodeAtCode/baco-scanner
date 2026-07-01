@@ -1,10 +1,12 @@
 #[cfg(test)]
 mod tests {
-    use crate::config::ScannerConfig;
     use crate::confidence::ConfidenceCalculator;
+    use crate::config::ScannerConfig;
+    use crate::create_ctx;
+    use crate::create_ctx_with_finding;
     use crate::findings::{Severity, VerificationStatus};
     use crate::phase::confidence_scoring::ConfidenceScoringPhase;
-    use crate::phase::helpers::{create_ctx, create_ctx_with_finding, create_test_finding};
+    use crate::phase::helpers::create_test_finding;
     use crate::phase::{PhaseContext, ScanPhase};
     use crate::scanner::Scanner;
     use tempfile::TempDir;
@@ -18,7 +20,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_confidence_scoring_phase_with_no_findings() {
-        let (mut scanner, temp_dir, mut ctx, _analyzed_files) = create_ctx!();
+        let (_temp_dir, mut ctx) = create_ctx!();
 
         let phase = ConfidenceScoringPhase;
         let result = phase.execute(&mut ctx).await;
@@ -30,12 +32,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_confidence_scoring_phase_with_findings() {
-        let (mut scanner, temp_dir, mut ctx, _analyzed_files) = create_ctx_with_finding!(
-            "Test vulnerability",
-            "test.rs",
-            42,
-            Severity::High
-        );
+        let (_temp_dir, mut ctx) =
+            create_ctx_with_finding!("Test vulnerability", "test.rs", 42, Severity::High);
 
         let phase = ConfidenceScoringPhase;
         let result = phase.execute(&mut ctx).await;
@@ -90,7 +88,11 @@ mod tests {
         let mut scanner = Scanner::new(config.clone(), temp_dir.path().to_path_buf(), false);
 
         let mut finding = create_test_finding("Multi-source", "multi.rs", 15, Severity::Critical);
-        finding.sources = vec!["semgrep".to_string(), "llm".to_string(), "manual".to_string()];
+        finding.sources = vec![
+            "semgrep".to_string(),
+            "llm".to_string(),
+            "manual".to_string(),
+        ];
 
         scanner.state.send_modify(|s| {
             s.findings.push(finding);

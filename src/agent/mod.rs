@@ -72,8 +72,8 @@ impl AgentFinding {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
     use crate::findings::{Severity, VulnerabilityFinding};
+    use std::path::PathBuf;
 
     #[test]
     fn test_into_finding_with_evidence_path() {
@@ -117,7 +117,10 @@ mod tests {
 
         let result = finding.into_finding();
 
-        assert_eq!(result.agent_evidence_path, Some("/path/to/test".to_string()));
+        assert_eq!(
+            result.agent_evidence_path,
+            Some("/path/to/test".to_string())
+        );
     }
 
     #[test]
@@ -162,7 +165,10 @@ mod tests {
 
         let result = finding.into_finding();
 
-        assert_eq!(result.agent_evidence_path, Some("/path/to/compile".to_string()));
+        assert_eq!(
+            result.agent_evidence_path,
+            Some("/path/to/compile".to_string())
+        );
     }
 
     #[test]
@@ -207,7 +213,10 @@ mod tests {
 
         let result = finding.into_finding();
 
-        assert_eq!(result.agent_evidence_path, Some("5 turns, 2 tools".to_string()));
+        assert_eq!(
+            result.agent_evidence_path,
+            Some("5 turns, 2 tools".to_string())
+        );
     }
 
     #[test]
@@ -252,7 +261,10 @@ mod tests {
 
         let result = finding.into_finding();
 
-        assert_eq!(result.verification_notes, Some("Test execution log".to_string()));
+        assert_eq!(
+            result.verification_notes,
+            Some("Test execution log".to_string())
+        );
     }
 
     #[test]
@@ -298,7 +310,10 @@ mod tests {
         let result = finding.into_finding();
 
         // Should preserve existing notes
-        assert_eq!(result.verification_notes, Some("Existing notes".to_string()));
+        assert_eq!(
+            result.verification_notes,
+            Some("Existing notes".to_string())
+        );
     }
 }
 pub mod mock_llm;

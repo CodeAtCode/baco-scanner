@@ -381,7 +381,8 @@ edition = "2021"
         let autopatcher = AutoPatcher::new(temp_dir);
 
         let vulnerability_desc = "SQL injection in user input";
-        let vulnerable_code = "let query = format!(\"SELECT * FROM users WHERE id = {}\", user_id);";
+        let vulnerable_code =
+            "let query = format!(\"SELECT * FROM users WHERE id = {}\", user_id);";
         let file_path = "src/db.rs";
 
         let patch = autopatcher
@@ -490,7 +491,10 @@ edition = "2021"
         assert!(!failure.compiles);
         assert!(!failure.tests_pass);
         assert_eq!(failure.warnings, 0);
-        assert_eq!(failure.error_message, Some("Patch application failed".to_string()));
+        assert_eq!(
+            failure.error_message,
+            Some("Patch application failed".to_string())
+        );
     }
 
     #[test]

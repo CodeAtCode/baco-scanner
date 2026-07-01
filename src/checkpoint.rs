@@ -304,7 +304,7 @@ mod tests {
     #[test]
     fn test_format_phase_all_variants() {
         let checkpoint = Checkpoint::new("test", "/tmp", Utc::now());
-        
+
         // Test all phase formatting
         let phases = vec![
             (ScanPhase::Indexing, "🔄 Indexing ⚙️"),
@@ -325,7 +325,10 @@ mod tests {
             (ScanPhase::CveBootstrap, "📦 CVE Bootstrap"),
             (ScanPhase::PocCompiler, "💻 PoC Compiler"),
             (ScanPhase::VariantSearch, "🔍 Variant Search"),
-            (ScanPhase::SecurityAgentVerification, "🤖 SecurityAgent Verification"),
+            (
+                ScanPhase::SecurityAgentVerification,
+                "🤖 SecurityAgent Verification",
+            ),
             (ScanPhase::Complete, "✨ Complete"),
             (ScanPhase::Error, "❌ Error"),
         ];
@@ -333,7 +336,12 @@ mod tests {
         for (phase, expected) in phases {
             let mut cp = checkpoint.clone();
             cp.current_phase = phase.clone();
-            assert_eq!(cp.format_phase(), expected, "Phase {:?} formatting mismatch", phase);
+            assert_eq!(
+                cp.format_phase(),
+                expected,
+                "Phase {:?} formatting mismatch",
+                phase
+            );
         }
     }
 
@@ -392,7 +400,10 @@ mod tests {
             (ScanPhase::AutoPatching, ScanPhase::CveBootstrap),
             (ScanPhase::CveBootstrap, ScanPhase::PocCompiler),
             (ScanPhase::PocCompiler, ScanPhase::VariantSearch),
-            (ScanPhase::VariantSearch, ScanPhase::SecurityAgentVerification),
+            (
+                ScanPhase::VariantSearch,
+                ScanPhase::SecurityAgentVerification,
+            ),
             (ScanPhase::SecurityAgentVerification, ScanPhase::Complete),
             (ScanPhase::Complete, ScanPhase::Indexing),
             (ScanPhase::Error, ScanPhase::Indexing),
@@ -405,7 +416,11 @@ mod tests {
             checkpoint.save(&temp_path).unwrap();
 
             let next_phase = Checkpoint::resume_from(&temp_path).unwrap();
-            assert_eq!(next_phase, expected_next, "Transition from {:?} failed", current);
+            assert_eq!(
+                next_phase, expected_next,
+                "Transition from {:?} failed",
+                current
+            );
 
             let _ = fs::remove_file(&temp_path);
         }
@@ -414,16 +429,24 @@ mod tests {
     #[test]
     fn test_checkpoint_with_analyzed_files() {
         let mut checkpoint = Checkpoint::new("test", "/tmp", Utc::now());
-        checkpoint.analyzed_files.push("/path/to/file1.rs".to_string());
-        checkpoint.analyzed_files.push("/path/to/file2.rs".to_string());
+        checkpoint
+            .analyzed_files
+            .push("/path/to/file1.rs".to_string());
+        checkpoint
+            .analyzed_files
+            .push("/path/to/file2.rs".to_string());
 
         let temp_path = "/tmp/test_analyzed.json";
         checkpoint.save(temp_path).unwrap();
 
         let loaded = Checkpoint::load(temp_path).unwrap();
         assert_eq!(loaded.analyzed_files.len(), 2);
-        assert!(loaded.analyzed_files.contains(&"/path/to/file1.rs".to_string()));
-        assert!(loaded.analyzed_files.contains(&"/path/to/file2.rs".to_string()));
+        assert!(loaded
+            .analyzed_files
+            .contains(&"/path/to/file1.rs".to_string()));
+        assert!(loaded
+            .analyzed_files
+            .contains(&"/path/to/file2.rs".to_string()));
 
         let _ = fs::remove_file(temp_path);
     }

@@ -1,10 +1,11 @@
 #[cfg(test)]
 mod tests {
     use crate::config::ScannerConfig;
+    use crate::create_ctx;
     use crate::crossfile::CrossFileAnalyzer;
     use crate::findings::{Severity, VulnerabilityFinding};
     use crate::phase::cross_file_analysis::CrossFileAnalysisPhase;
-    use crate::phase::helpers::{create_ctx, create_test_finding};
+    use crate::phase::helpers::create_test_finding;
     use crate::phase::{PhaseContext, ScanPhase};
     use crate::scanner::Scanner;
     use tempfile::TempDir;
@@ -18,7 +19,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cross_file_analysis_phase_with_no_findings() {
-        let (mut scanner, temp_dir, mut ctx, _analyzed_files) = create_ctx!();
+        let (_temp_dir, mut ctx) = create_ctx!();
 
         let phase = CrossFileAnalysisPhase;
         let result = phase.execute(&mut ctx).await;
@@ -35,7 +36,8 @@ mod tests {
 
         let mut scanner = Scanner::new(config.clone(), temp_dir.path().to_path_buf(), false);
 
-        let finding = create_test_finding("Cross-file vulnerability", "main.rs", 10, Severity::High);
+        let finding =
+            create_test_finding("Cross-file vulnerability", "main.rs", 10, Severity::High);
 
         scanner.state.send_modify(|s| {
             s.findings.push(finding);

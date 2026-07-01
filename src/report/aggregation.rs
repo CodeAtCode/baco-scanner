@@ -395,8 +395,6 @@ mod tests {
     use super::*;
     #[cfg(test)]
     use crate::findings::{Severity, VerificationStatus, VulnerabilityFinding};
-    #[cfg(test)]
-    use std::collections::HashMap;
 
     fn create_finding_with_params(
         id: &str,
@@ -436,11 +434,7 @@ mod tests {
     }
 
     // Wrapper for backward compatibility with existing test code
-    fn make_finding(
-        id: &str,
-        title: &str,
-        severity: Severity,
-    ) -> VulnerabilityFinding {
+    fn make_finding(id: &str, title: &str, severity: Severity) -> VulnerabilityFinding {
         create_finding_with_params(id, title, severity)
     }
 

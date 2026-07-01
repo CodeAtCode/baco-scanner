@@ -45,7 +45,8 @@ mod tests {
 
         let mut scanner = Scanner::new(config.clone(), temp_dir.path().to_path_buf(), false);
 
-        let finding = create_test_finding("Report test vulnerability", "test.rs", 42, Severity::High);
+        let finding =
+            create_test_finding("Report test vulnerability", "test.rs", 42, Severity::High);
 
         scanner.state.send_modify(|s| {
             s.findings.push(finding);
@@ -151,7 +152,10 @@ mod tests {
         let result = phase.execute(&mut ctx).await;
 
         assert!(result.is_ok());
-        assert!(nested_dir.exists(), "Nested output directory should be created");
+        assert!(
+            nested_dir.exists(),
+            "Nested output directory should be created"
+        );
         assert!(nested_dir.join("findings.json").exists());
     }
 

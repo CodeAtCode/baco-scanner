@@ -503,7 +503,7 @@ mod tests {
     fn test_refine_confidence_verified() {
         let phase = ConfidenceRefinementPhase::new();
         let context = AnalysisContext::default();
-        
+
         // Create a finding with verified status
         let mut finding = create_finding_with_params("f1", "Test finding", Severity::High);
         finding.verification_status = Some(VerificationStatus::Confirmed);

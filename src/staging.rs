@@ -440,7 +440,9 @@ edition = "2021"
     #[test]
     fn test_staging_error_display() {
         let worktree_err = StagingError::WorktreeCreate("Permission denied".to_string());
-        assert!(worktree_err.to_string().contains("Failed to create worktree"));
+        assert!(worktree_err
+            .to_string()
+            .contains("Failed to create worktree"));
 
         let patch_err = StagingError::PatchApply("Hunk failed".to_string());
         assert!(patch_err.to_string().contains("Failed to apply patch"));

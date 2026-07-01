@@ -463,16 +463,14 @@ mod tests {
     #[tokio::test]
     async fn test_dedup_only_nvd() {
         let kev = vec![];
-        let nvd = vec![
-            CveEntry {
-                cve_id: "CVE-2024-1111".to_string(),
-                description: "NVD only".to_string(),
-                severity: V3Severity::Medium,
-                source: CveSource::NVD,
-                affected_products: vec![],
-                published_date: None,
-            },
-        ];
+        let nvd = vec![CveEntry {
+            cve_id: "CVE-2024-1111".to_string(),
+            description: "NVD only".to_string(),
+            severity: V3Severity::Medium,
+            source: CveSource::NVD,
+            affected_products: vec![],
+            published_date: None,
+        }];
 
         let result = CveClient::dedup_cve_entries(kev, nvd);
         assert_eq!(result.len(), 1);
@@ -481,16 +479,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_dedup_only_kev() {
-        let kev = vec![
-            CveEntry {
-                cve_id: "CVE-2024-1111".to_string(),
-                description: "KEV only".to_string(),
-                severity: V3Severity::High,
-                source: CveSource::KEV,
-                affected_products: vec![],
-                published_date: None,
-            },
-        ];
+        let kev = vec![CveEntry {
+            cve_id: "CVE-2024-1111".to_string(),
+            description: "KEV only".to_string(),
+            severity: V3Severity::High,
+            source: CveSource::KEV,
+            affected_products: vec![],
+            published_date: None,
+        }];
         let nvd = vec![];
 
         let result = CveClient::dedup_cve_entries(kev, nvd);

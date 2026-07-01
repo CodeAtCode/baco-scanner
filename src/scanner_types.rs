@@ -406,8 +406,6 @@ impl MajorityVerdict {
 mod tests {
     use super::*;
 
-
-
     #[test]
     fn test_cve_entry_creation() {
         let cve = CveEntry::new(

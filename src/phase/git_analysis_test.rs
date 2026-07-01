@@ -1,9 +1,10 @@
 #[cfg(test)]
 mod tests {
     use crate::config::ScannerConfig;
+    use crate::create_ctx;
     use crate::findings::Severity;
-    use crate::phase::helpers::{create_ctx, create_test_finding};
     use crate::phase::git_analysis::GitAnalysisPhase;
+    use crate::phase::helpers::create_test_finding;
     use crate::phase::{PhaseContext, ScanPhase};
     use crate::scanner::Scanner;
     use tempfile::TempDir;
@@ -17,7 +18,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_git_analysis_phase_with_no_findings() {
-        let (mut scanner, temp_dir, mut ctx, _analyzed_files) = create_ctx!();
+        let (_temp_dir, mut ctx) = create_ctx!();
 
         let phase = GitAnalysisPhase;
         let result = phase.execute(&mut ctx).await;

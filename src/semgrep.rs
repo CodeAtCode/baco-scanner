@@ -30,10 +30,10 @@ fn extract_code_snippet(file_path: &str, target_line: u32, context_lines: usize)
     match fs::read_to_string(&path) {
         Ok(content) => {
             let lines: Vec<&str> = content.lines().collect();
-            
+
             // Convert to 0-based index (saturating to handle line 0)
             let target_idx = target_line.saturating_sub(1) as usize;
-            
+
             // Calculate start and end indices for context window
             let (start, end) = if target_idx >= lines.len() {
                 // Target line beyond file - show last available lines
@@ -501,7 +501,7 @@ mod tests {
 
     #[test]
     fn test_should_exclude_rule_exact_match() {
-        let runner = SemgrepRunner::new(None, vec!["python.lang.security".to_string()]); 
+        let runner = SemgrepRunner::new(None, vec!["python.lang.security".to_string()]);
         assert!(runner.should_exclude_rule("python.lang.security"));
         // Prefix match: "python.lang.security" matches "python.lang.security.audit"
         assert!(runner.should_exclude_rule("python.lang.security.audit"));
@@ -526,7 +526,10 @@ mod tests {
 
     #[test]
     fn test_should_exclude_rule_multiple_patterns() {
-        let runner = SemgrepRunner::new(None, vec!["python.lang".to_string(), "javascript.security".to_string()]);
+        let runner = SemgrepRunner::new(
+            None,
+            vec!["python.lang".to_string(), "javascript.security".to_string()],
+        );
         assert!(runner.should_exclude_rule("python.lang.security"));
         assert!(runner.should_exclude_rule("javascript.security.xss"));
         assert!(!runner.should_exclude_rule("rust.security"));
@@ -554,14 +557,14 @@ mod tests {
         let content = "line 1\nline 2\nline 3\nline 4\nline 5\n";
         std::fs::write(&test_file, content).unwrap();
 
-        let snippet = extract_code_snippet(
-            test_file.to_str().unwrap(),
-            3,
-            1,
-        );
+        let snippet = extract_code_snippet(test_file.to_str().unwrap(), 3, 1);
 
         // Should include lines 2, 3, 4 with line 3 marked
-        assert!(snippet.contains("line 2"), "snippet should contain line 2: {}", snippet);
+        assert!(
+            snippet.contains("line 2"),
+            "snippet should contain line 2: {}",
+            snippet
+        );
         assert!(snippet.contains("line 3"));
         assert!(snippet.contains("line 4"));
         assert!(snippet.contains(">>")); // Marker for target line
@@ -577,11 +580,7 @@ mod tests {
         let content = "line 1\nline 2\nline 3\n";
         std::fs::write(&test_file, content).unwrap();
 
-        let snippet = extract_code_snippet(
-            test_file.to_str().unwrap(),
-            1,
-            2,
-        );
+        let snippet = extract_code_snippet(test_file.to_str().unwrap(), 1, 2);
 
         // Should start from line 1 (can't go negative)
         assert!(snippet.contains("line 1"));
@@ -597,11 +596,7 @@ mod tests {
         let content = "line 1\nline 2\nline 3\n";
         std::fs::write(&test_file, content).unwrap();
 
-        let snippet = extract_code_snippet(
-            test_file.to_str().unwrap(),
-            100,
-            2,
-        );
+        let snippet = extract_code_snippet(test_file.to_str().unwrap(), 100, 2);
 
         // Should show last available lines
         assert!(snippet.contains("line 3"));
@@ -661,7 +656,11 @@ mod tests {
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].file_path, "multiple_files");
         // Code snippet shows "Found in 3 files:" format
-        assert!(findings[0].code_snippet.as_ref().unwrap().contains("3 files"));
+        assert!(findings[0]
+            .code_snippet
+            .as_ref()
+            .unwrap()
+            .contains("3 files"));
     }
 
     #[test]

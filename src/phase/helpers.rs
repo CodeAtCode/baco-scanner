@@ -3,7 +3,10 @@
 //! This module consolidates duplicated test helper functions across phase test files
 //! to reduce code duplication from 78 groups to ≤10 groups.
 
+use crate::config::ScannerConfig;
 use crate::findings::{Severity, VerificationStatus, VulnerabilityFinding};
+use crate::scanner::Scanner;
+use tempfile::TempDir;
 
 /// Creates a test vulnerability finding with default values.
 ///
@@ -17,7 +20,12 @@ use crate::findings::{Severity, VerificationStatus, VulnerabilityFinding};
 ///
 /// # Returns
 /// A `VulnerabilityFinding` with default test values
-pub fn create_test_finding(title: &str, file_path: &str, line: u32, severity: Severity) -> VulnerabilityFinding {
+pub fn create_test_finding(
+    title: &str,
+    file_path: &str,
+    line: u32,
+    severity: Severity,
+) -> VulnerabilityFinding {
     VulnerabilityFinding {
         id: format!("test-{}", title.replace(' ', "-").to_lowercase()),
         title: title.to_string(),
@@ -62,7 +70,11 @@ pub fn create_test_finding(title: &str, file_path: &str, line: u32, severity: Se
 ///
 /// # Returns
 /// A `VulnerabilityFinding` with the specified parameters and default test values
-pub fn create_finding_with_params(id: &str, title: &str, severity: Severity) -> VulnerabilityFinding {
+pub fn create_finding_with_params(
+    id: &str,
+    title: &str,
+    severity: Severity,
+) -> VulnerabilityFinding {
     VulnerabilityFinding {
         id: id.to_string(),
         title: title.to_string(),
@@ -95,11 +107,6 @@ pub fn create_finding_with_params(id: &str, title: &str, severity: Severity) -> 
     }
 }
 
-use crate::config::ScannerConfig;
-use crate::phase::PhaseContext;
-use crate::scanner::Scanner;
-use tempfile::TempDir;
-
 /// Creates a test scanner with default configuration.
 /// Consolidates duplicated scanner setup code across multiple test files.
 pub fn create_test_scanner() -> (Scanner, TempDir) {
@@ -107,4 +114,43 @@ pub fn create_test_scanner() -> (Scanner, TempDir) {
     let config = ScannerConfig::default();
     let scanner = Scanner::new(config, temp_dir.path().to_path_buf(), false);
     (scanner, temp_dir)
+}
+
+/// Macro to create a test context with scanner and empty analyzed_files.
+/// This creates local variables and returns a PhaseContext with mutable references to them.
+/// The scanner, temp_dir, and analyzed_files live for the duration of the test function.
+/// Usage:
+///   let (temp_dir, ctx) = create_ctx!();
+///   // scanner and analyzed_files are accessible via ctx.scanner and ctx.analyzed_files
+#[macro_export]
+macro_rules! create_ctx {
+    () => {{
+        let (scanner, temp_dir) = $crate::phase::helpers::create_test_scanner();
+        let analyzed_files = Vec::<String>::new();
+        let ctx = $crate::phase::PhaseContext {
+            scanner: Box::leak(Box::new(scanner)),
+            analyzed_files: Box::leak(Box::new(analyzed_files)),
+        };
+        (temp_dir, ctx)
+    }};
+}
+
+/// Macro to create a test context with a finding already added.
+/// Usage: let (temp_dir, ctx) = create_ctx_with_finding!("title", "file.rs", 1, Severity::High);
+#[macro_export]
+macro_rules! create_ctx_with_finding {
+    ($title:expr, $file:expr, $line:expr, $severity:expr) => {{
+        let (scanner, temp_dir) = $crate::phase::helpers::create_test_scanner();
+        let finding = $crate::phase::helpers::create_test_finding($title, $file, $line, $severity);
+        let scanner_ref = Box::leak(Box::new(scanner));
+        scanner_ref.state.send_modify(|s| {
+            s.findings.push(finding);
+        });
+        let analyzed_files = Vec::<String>::new();
+        let ctx = $crate::phase::PhaseContext {
+            scanner: scanner_ref,
+            analyzed_files: Box::leak(Box::new(analyzed_files)),
+        };
+        (temp_dir, ctx)
+    }};
 }

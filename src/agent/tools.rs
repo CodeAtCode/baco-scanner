@@ -13,19 +13,19 @@ impl Tool for FileReadTool {
         sandbox: &dyn SandboxLike,
     ) -> Result<ToolResult, String> {
         let path = args["path"].as_str().ok_or("Missing 'path' argument")?;
-        
+
         // Check for path traversal
         if path.contains("..") {
             return Err(format!("Path traversal: {}", path));
         }
-        
+
         let full_path = sandbox.temp_dir().join(path);
         let mut content = String::new();
         std::fs::File::open(&full_path)
             .and_then(|mut f| f.read_to_string(&mut content))
             .map_err(|e| {
                 if e.kind() == std::io::ErrorKind::NotFound {
-                    format!("Open/read failed: file not found")
+                    "Open/read failed: file not found".to_string()
                 } else {
                     format!("Open/read failed: {}", e)
                 }
@@ -358,8 +358,8 @@ mod tests {
         std::fs::write(&path, "line1\nline2\ntarget\nline4\nline5").unwrap();
 
         let tool = PatternSearchTool;
-        let args = serde_json::json!({ 
-            "pattern": "target", 
+        let args = serde_json::json!({
+            "pattern": "target",
             "path": tmpdir.path().to_string_lossy().to_string(),
             "context_lines": 1
         });
@@ -481,7 +481,7 @@ mod tests {
         std::fs::write(&path, "import time; time.sleep(0.1)").unwrap();
 
         let tool = TestRunTool;
-        let args = serde_json::json!({ 
+        let args = serde_json::json!({
             "executable_path": "sleep.py",
             "timeout_secs": 5
         });

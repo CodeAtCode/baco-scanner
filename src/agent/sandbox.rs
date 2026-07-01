@@ -113,7 +113,9 @@ impl WaitWithTimeout for std::process::Child {
             }
         }
         // Use wait_with_output to capture stdout/stderr
-        let output = self.wait_with_output().map_err(|e| format!("wait_with_output: {}", e))?;
+        let output = self
+            .wait_with_output()
+            .map_err(|e| format!("wait_with_output: {}", e))?;
         if output.status.code() == Some(-15) {
             return Err("timeout".to_string());
         }
@@ -188,11 +190,11 @@ mod tests {
     fn test_resolve_safe_path_success() {
         let tmpdir = tempfile::tempdir().unwrap();
         let sandbox = ToolSandbox::new(tmpdir.path().to_path_buf(), 30);
-        
+
         // Create a file first
         let test_file = tmpdir.path().join("test.txt");
         std::fs::write(&test_file, "content").unwrap();
-        
+
         let result = sandbox.resolve_safe_path("test.txt");
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), test_file);
@@ -202,7 +204,7 @@ mod tests {
     fn test_resolve_safe_path_path_traversal() {
         let tmpdir = tempfile::tempdir().unwrap();
         let sandbox = ToolSandbox::new(tmpdir.path().to_path_buf(), 30);
-        
+
         let result = sandbox.resolve_safe_path("../etc/passwd");
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Path traversal"));
@@ -212,7 +214,7 @@ mod tests {
     fn test_resolve_safe_path_nonexistent() {
         let tmpdir = tempfile::tempdir().unwrap();
         let sandbox = ToolSandbox::new(tmpdir.path().to_path_buf(), 30);
-        
+
         let result = sandbox.resolve_safe_path("nonexistent.txt");
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Path does not exist"));
@@ -222,10 +224,10 @@ mod tests {
     fn test_create_temp_file_success() {
         let tmpdir = tempfile::tempdir().unwrap();
         let sandbox = ToolSandbox::new(tmpdir.path().to_path_buf(), 30);
-        
+
         let result = sandbox.create_temp_file("newfile.txt", "hello world");
         assert!(result.is_ok());
-        
+
         let created_path = result.unwrap();
         assert!(created_path.exists());
         let content = std::fs::read_to_string(&created_path).unwrap();
@@ -236,7 +238,7 @@ mod tests {
     fn test_create_temp_file_path_traversal() {
         let tmpdir = tempfile::tempdir().unwrap();
         let sandbox = ToolSandbox::new(tmpdir.path().to_path_buf(), 30);
-        
+
         let result = sandbox.create_temp_file("../outside.txt", "content");
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Path traversal"));
@@ -246,7 +248,7 @@ mod tests {
     fn test_create_temp_file_blocks_dangerous_content() {
         let tmpdir = tempfile::tempdir().unwrap();
         let sandbox = ToolSandbox::new(tmpdir.path().to_path_buf(), 30);
-        
+
         let result = sandbox.create_temp_file("bad.py", "import os; os.system('rm -rf /')");
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Validation failed"));
@@ -256,7 +258,7 @@ mod tests {
     fn test_run_with_timeout_success() {
         let tmpdir = tempfile::tempdir().unwrap();
         let sandbox = ToolSandbox::new(tmpdir.path().to_path_buf(), 30);
-        
+
         let result = sandbox.run_with_timeout("/bin/echo", &["hello"], Some(5));
         assert!(result.is_ok());
         let tool_result = result.unwrap();
@@ -268,7 +270,7 @@ mod tests {
     fn test_run_with_timeout_failure() {
         let tmpdir = tempfile::tempdir().unwrap();
         let sandbox = ToolSandbox::new(tmpdir.path().to_path_buf(), 30);
-        
+
         let result = sandbox.run_with_timeout("false", &[], Some(5));
         assert!(result.is_ok());
         let tool_result = result.unwrap();
@@ -279,7 +281,7 @@ mod tests {
     fn test_is_path_allowed_nonexistent_path() {
         let tmpdir = tempfile::tempdir().unwrap();
         let sandbox = ToolSandbox::new(tmpdir.path().to_path_buf(), 30);
-        
+
         // Path that doesn't exist but parent is within tempdir
         let non_existent = tmpdir.path().join("subdir").join("file.txt");
         let allowed = sandbox.is_path_allowed(&non_existent);

@@ -183,7 +183,12 @@ mod tests {
 
     #[test]
     fn test_create_empty_finding() {
-        let finding = create_empty_finding("test.rs", 1, vec!["tool1".to_string()], Some("test-model".to_string()));
+        let finding = create_empty_finding(
+            "test.rs",
+            1,
+            vec!["tool1".to_string()],
+            Some("test-model".to_string()),
+        );
 
         assert!(finding.finding.id.is_empty());
         assert!(finding.finding.title.is_empty());
@@ -209,10 +214,19 @@ mod tests {
     #[test]
     fn test_create_audit_finding() {
         let reasoning = "No vulnerabilities found after thorough analysis";
-        let finding = create_audit_finding("test.rs", 2, vec!["file_read".to_string()], reasoning.to_string(), Some("model".to_string()));
+        let finding = create_audit_finding(
+            "test.rs",
+            2,
+            vec!["file_read".to_string()],
+            reasoning.to_string(),
+            Some("model".to_string()),
+        );
 
         assert!(finding.finding.id.starts_with("agent-"));
-        assert_eq!(finding.finding.title, "Security Audit - No Critical Vulnerabilities Detected");
+        assert_eq!(
+            finding.finding.title,
+            "Security Audit - No Critical Vulnerabilities Detected"
+        );
         assert_eq!(finding.finding.description, reasoning);
         assert_eq!(finding.finding.severity, Severity::Medium);
         assert_eq!(finding.finding.confidence_score, 0.7);
@@ -232,14 +246,14 @@ mod tests {
     async fn test_execute_tool_calls_single_tool() {
         let mut registry = ToolRegistry::new();
         registry.register(Box::new(crate::agent::tools::FileReadTool));
-        
+
         let tmpdir = tempfile::tempdir().unwrap();
         let path = tmpdir.path().join("test.txt");
         std::fs::write(&path, "hello").unwrap();
-        
+
         let sandbox = ToolSandbox::new(tmpdir.path().to_path_buf(), 30);
         let progress_cb: ProgressCallback = Arc::new(|_| {});
-        
+
         let response = ChatResponse {
             content: "".to_string(),
             tool_calls: vec![ToolCall {
@@ -250,9 +264,9 @@ mod tests {
             raw: serde_json::json!({}),
             model_used: "test".to_string(),
         };
-        
+
         let messages = vec![ChatMessage::user("test")];
-        
+
         let (tools_used, test_path, compile_path, messages) = execute_tool_calls(
             &registry,
             &sandbox,
@@ -263,8 +277,9 @@ mod tests {
             1,
             10,
             "Turn",
-        ).await;
-        
+        )
+        .await;
+
         assert_eq!(tools_used, vec!["file_read".to_string()]);
         assert!(test_path.is_none());
         assert!(compile_path.is_none());
@@ -275,11 +290,11 @@ mod tests {
     async fn test_execute_tool_calls_file_write_path_capture() {
         let mut registry = ToolRegistry::new();
         registry.register(Box::new(crate::agent::tools::FileWriteTool));
-        
+
         let tmpdir = tempfile::tempdir().unwrap();
         let sandbox = ToolSandbox::new(tmpdir.path().to_path_buf(), 30);
         let progress_cb: ProgressCallback = Arc::new(|_| {});
-        
+
         let response = ChatResponse {
             content: "".to_string(),
             tool_calls: vec![ToolCall {
@@ -290,9 +305,9 @@ mod tests {
             raw: serde_json::json!({}),
             model_used: "test".to_string(),
         };
-        
+
         let messages = vec![ChatMessage::user("test")];
-        
+
         let (tools_used, test_path, compile_path, _) = execute_tool_calls(
             &registry,
             &sandbox,
@@ -303,8 +318,9 @@ mod tests {
             1,
             10,
             "Turn",
-        ).await;
-        
+        )
+        .await;
+
         assert_eq!(tools_used, vec!["file_write".to_string()]);
         assert!(test_path.is_some());
         assert!(compile_path.is_none());
@@ -314,11 +330,11 @@ mod tests {
     async fn test_execute_tool_calls_test_compile_path_capture() {
         let mut registry = ToolRegistry::new();
         registry.register(Box::new(crate::agent::tools::TestCompileTool));
-        
+
         let tmpdir = tempfile::tempdir().unwrap();
         let sandbox = ToolSandbox::new(tmpdir.path().to_path_buf(), 30);
         let progress_cb: ProgressCallback = Arc::new(|_| {});
-        
+
         let response = ChatResponse {
             content: "".to_string(),
             tool_calls: vec![ToolCall {
@@ -329,9 +345,9 @@ mod tests {
             raw: serde_json::json!({}),
             model_used: "test".to_string(),
         };
-        
+
         let messages = vec![ChatMessage::user("test")];
-        
+
         let (tools_used, test_path, compile_path, _) = execute_tool_calls(
             &registry,
             &sandbox,
@@ -342,8 +358,9 @@ mod tests {
             1,
             10,
             "Turn",
-        ).await;
-        
+        )
+        .await;
+
         assert_eq!(tools_used, vec!["test_compile".to_string()]);
         assert!(test_path.is_none());
         assert!(compile_path.is_some());
@@ -355,7 +372,7 @@ mod tests {
         let tmpdir = tempfile::tempdir().unwrap();
         let sandbox = ToolSandbox::new(tmpdir.path().to_path_buf(), 30);
         let progress_cb: ProgressCallback = Arc::new(|_| {});
-        
+
         let response = ChatResponse {
             content: "".to_string(),
             tool_calls: vec![ToolCall {
@@ -366,9 +383,9 @@ mod tests {
             raw: serde_json::json!({}),
             model_used: "test".to_string(),
         };
-        
+
         let messages = vec![ChatMessage::user("test")];
-        
+
         let (tools_used, _, _, messages) = execute_tool_calls(
             &registry,
             &sandbox,
@@ -379,8 +396,9 @@ mod tests {
             1,
             10,
             "Turn",
-        ).await;
-        
+        )
+        .await;
+
         assert!(tools_used.is_empty());
         assert_eq!(messages.len(), 1); // No new messages since tool not found
     }
@@ -389,11 +407,11 @@ mod tests {
     async fn test_execute_tool_calls_tool_error() {
         let mut registry = ToolRegistry::new();
         registry.register(Box::new(crate::agent::tools::FileReadTool));
-        
+
         let tmpdir = tempfile::tempdir().unwrap();
         let sandbox = ToolSandbox::new(tmpdir.path().to_path_buf(), 30);
         let progress_cb: ProgressCallback = Arc::new(|_| {});
-        
+
         let response = ChatResponse {
             content: "".to_string(),
             tool_calls: vec![ToolCall {
@@ -404,9 +422,9 @@ mod tests {
             raw: serde_json::json!({}),
             model_used: "test".to_string(),
         };
-        
+
         let messages = vec![ChatMessage::user("test")];
-        
+
         let (_, _, _, messages) = execute_tool_calls(
             &registry,
             &sandbox,
@@ -417,8 +435,9 @@ mod tests {
             1,
             10,
             "Turn",
-        ).await;
-        
+        )
+        .await;
+
         // Should have assistant call + user error message
         assert_eq!(messages.len(), 3);
         assert!(messages[2].content.contains("error"));
@@ -429,11 +448,11 @@ mod tests {
         let mut registry = ToolRegistry::new();
         registry.register(Box::new(crate::agent::tools::FileReadTool));
         registry.register(Box::new(crate::agent::tools::FileWriteTool));
-        
+
         let tmpdir = tempfile::tempdir().unwrap();
         let sandbox = ToolSandbox::new(tmpdir.path().to_path_buf(), 30);
         let progress_cb: ProgressCallback = Arc::new(|_| {});
-        
+
         let response = ChatResponse {
             content: "".to_string(),
             tool_calls: vec![
@@ -451,9 +470,9 @@ mod tests {
             raw: serde_json::json!({}),
             model_used: "test".to_string(),
         };
-        
+
         let messages = vec![ChatMessage::user("test")];
-        
+
         let (tools_used, test_path, _, _) = execute_tool_calls(
             &registry,
             &sandbox,
@@ -464,8 +483,9 @@ mod tests {
             1,
             10,
             "Turn",
-        ).await;
-        
+        )
+        .await;
+
         assert_eq!(tools_used.len(), 2);
         assert!(tools_used.contains(&"file_read".to_string()));
         assert!(tools_used.contains(&"file_write".to_string()));

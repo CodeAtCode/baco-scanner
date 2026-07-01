@@ -471,23 +471,26 @@ mod tests {
 
         let session = AgentSession::new(mock_client, &config, tmpdir.path(), progress_cb);
 
-        let result = session.analyze_file(test_file.to_string_lossy().as_ref()).await;
+        let result = session
+            .analyze_file(test_file.to_string_lossy().as_ref())
+            .await;
         assert!(result.is_ok());
         let finding = result.unwrap();
         // Should have an empty finding since no LLM responses
-        assert!(finding.finding.title.is_empty() || finding.finding.title.contains("Security Audit"));
+        assert!(
+            finding.finding.title.is_empty() || finding.finding.title.contains("Security Audit")
+        );
     }
 
     #[tokio::test]
     async fn test_analyze_file_with_mock_llm_tool_call() {
         let responses = vec![
             // First turn: tool call
-            MockLlmClient::mock_tool_call(
-                "file_read",
-                json!({ "path": "test.rs" }),
-            ),
+            MockLlmClient::mock_tool_call("file_read", json!({ "path": "test.rs" })),
             // Second turn: final response with vulnerability
-            MockLlmClient::mock_final_response(r#"{"title": "Buffer Overflow", "description": "Found buffer overflow", "severity": "High", "cwe_id": "CWE-120"}"#),
+            MockLlmClient::mock_final_response(
+                r#"{"title": "Buffer Overflow", "description": "Found buffer overflow", "severity": "High", "cwe_id": "CWE-120"}"#,
+            ),
         ];
 
         let mock_client = MockLlmClient::new(responses);
@@ -507,10 +510,12 @@ mod tests {
 
         let session = AgentSession::new(mock_client, &config, tmpdir.path(), progress_cb);
 
-        let result = session.analyze_file(test_file.to_string_lossy().as_ref()).await;
+        let result = session
+            .analyze_file(test_file.to_string_lossy().as_ref())
+            .await;
         assert!(result.is_ok());
         let finding = result.unwrap();
-        
+
         // Should have parsed the JSON finding
         assert!(!finding.finding.title.is_empty());
         assert_eq!(finding.agent_turns, 2);
@@ -546,12 +551,16 @@ mod tests {
 
         let session = AgentSession::new(mock_client, &config, tmpdir.path(), progress_cb);
 
-        let result = session.analyze_file(test_file.to_string_lossy().as_ref()).await;
+        let result = session
+            .analyze_file(test_file.to_string_lossy().as_ref())
+            .await;
         assert!(result.is_ok());
         let finding = result.unwrap();
-        
+
         // Should have an audit finding
-        assert!(finding.finding.title.contains("Security Audit") || finding.finding.title.is_empty());
+        assert!(
+            finding.finding.title.contains("Security Audit") || finding.finding.title.is_empty()
+        );
     }
 
     #[tokio::test]
@@ -618,7 +627,7 @@ mod tests {
         let result = session.verify_finding("test.rs", &finding).await;
         assert!(result.is_ok());
         let verified = result.unwrap();
-        
+
         assert_eq!(verified.agent_turns, 2);
         assert!(!verified.tools_used.is_empty());
         assert!(verified.test_log.is_some());
@@ -626,14 +635,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_verify_finding_unconfirmed() {
-        let responses = vec![
-            ChatResponse {
-                content: "Could not reproduce the vulnerability. Test compilation failed.".to_string(),
-                tool_calls: vec![],
-                raw: json!({}),
-                model_used: "mock".to_string(),
-            },
-        ];
+        let responses = vec![ChatResponse {
+            content: "Could not reproduce the vulnerability. Test compilation failed.".to_string(),
+            tool_calls: vec![],
+            raw: json!({}),
+            model_used: "mock".to_string(),
+        }];
 
         let mock_client = MockLlmClient::new(responses);
         let config = AgentConfig {
@@ -682,15 +689,18 @@ mod tests {
         let result = session.verify_finding("test.rs", &finding).await;
         assert!(result.is_ok());
         let verified = result.unwrap();
-        
+
         // Should be marked as NeedsReview since not confirmed
-        assert_eq!(verified.finding.verification_status, Some(crate::findings::VerificationStatus::NeedsReview));
+        assert_eq!(
+            verified.finding.verification_status,
+            Some(crate::findings::VerificationStatus::NeedsReview)
+        );
     }
 
     #[test]
     fn test_progress_callback_type() {
         // Verify that ProgressCallback can be created and called
-        let mut called = false;
+        let _called = false;
         let cb: ProgressCallback = Arc::new(|_msg| {
             // Note: This test demonstrates the limitation - the closure cannot modify outer vars
             // In real usage, ProgressCallback would use channels or other mechanisms

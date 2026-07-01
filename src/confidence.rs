@@ -12,7 +12,7 @@ impl ConfidenceCalculator {
             Severity::Low => 20.0,
             Severity::Info => 10.0,
         };
-        
+
         let mut score = base_score;
 
         // Add base confidence for having any source

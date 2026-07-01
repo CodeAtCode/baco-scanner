@@ -2,8 +2,7 @@
 //!
 //! These tests verify interactions between multiple components.
 
-mod cli;
 mod agent;
-mod phase;
-mod semgrep;
+mod cli;
 mod determinism;
+mod semgrep;
