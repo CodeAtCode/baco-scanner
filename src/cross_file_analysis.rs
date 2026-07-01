@@ -197,25 +197,34 @@ impl ModuleBoundaryTracker {
         tracker.sensitive_sinks.insert("execute".to_string());
         tracker.sensitive_sinks.insert("query".to_string());
 
-        // Common external input sources
-        tracker.input_sources.insert("request".to_string());
-        tracker.input_sources.insert("params".to_string());
-        tracker.input_sources.insert("query".to_string());
-        tracker.input_sources.insert("body".to_string());
-        tracker.input_sources.insert("headers".to_string());
-        tracker.input_sources.insert("cookie".to_string());
-        tracker.input_sources.insert("session".to_string());
-        tracker.input_sources.insert("input".to_string());
+        // Common external input sources - use more specific patterns
+        tracker.input_sources.insert("request.params".to_string());
+        tracker.input_sources.insert("request.query".to_string());
+        tracker.input_sources.insert("request.body".to_string());
+        tracker.input_sources.insert("request.headers".to_string());
+        tracker.input_sources.insert("request.cookie".to_string());
+        tracker.input_sources.insert("request.session".to_string());
+        tracker.input_sources.insert("argv[".to_string());
         tracker.input_sources.insert("stdin".to_string());
-        tracker.input_sources.insert("argv".to_string());
-        tracker.input_sources.insert("environ".to_string());
-        tracker.input_sources.insert("getenv".to_string());
+        tracker.input_sources.insert("environ[".to_string());
+        tracker.input_sources.insert("getenv(".to_string());
+        tracker.input_sources.insert("request.".to_string());
 
         tracker
     }
 
     /// Check if a line contains an entry point.
     pub fn is_entry_point(&self, line: &str) -> bool {
+        // Skip private/internal functions (starting with _)
+        if line.trim().starts_with("fn_")
+            || line.trim().starts_with("fn _")
+            || line.trim().starts_with("function _")
+            || line.trim().starts_with("def _")
+            || line.trim().starts_with("async def _")
+        {
+            return false;
+        }
+
         for patterns in self.entry_points.values() {
             for pattern in patterns {
                 if line.contains(pattern) {

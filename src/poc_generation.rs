@@ -55,10 +55,20 @@ pub struct PoCGenerationResult {
 }
 
 /// Engine for generating proofs of concept.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct PoCGenerationEngine {
     /// Templates for different vulnerability types.
     pub templates: HashMap<String, PoCTemplate>,
+}
+
+impl Default for PoCGenerationEngine {
+    fn default() -> Self {
+        let mut engine = Self {
+            templates: HashMap::new(),
+        };
+        engine.init_templates();
+        engine
+    }
 }
 
 /// A template for generating PoCs.

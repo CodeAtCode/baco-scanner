@@ -355,6 +355,7 @@ fn test_env_override_toml_takes_precedence() {
     let mut guard = EnvVarGuard::new();
     guard.set("LLM_DISCOVERY_KEY", "env-key");
     guard.set("LLM_VERIFICATION_KEY", "env-key");
+    guard.set("LLM_AGGREGATION_KEY", "env-key");
 
     let toml_str = r#"
         [project]

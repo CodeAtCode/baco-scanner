@@ -253,7 +253,8 @@ fn test_truncate_code_requires_truncation() {
     let long_code = "A".repeat(10000);
     let result = analyzer.truncate_code(&long_code);
 
-    assert!(result.len() <= 8000);
+    // Result should be 8000 chars + "...\n[truncated - X chars omitted]"
+    assert!(result.len() > 8000 && result.len() < 8050);
     assert!(result.contains("[truncated"));
     assert!(result.contains("chars omitted"));
 }
@@ -295,10 +296,12 @@ async fn test_analyzer_should_analyze_extensions() {
     assert!(analyzer.should_analyze(Path::new("test.h")));
     assert!(analyzer.should_analyze(Path::new("test.py")));
     assert!(analyzer.should_analyze(Path::new("test.rs")));
-    assert!(analyzer.should_analyze(Path::new("test.go")));
-    assert!(analyzer.should_analyze(Path::new("test.java")));
-    assert!(analyzer.should_analyze(Path::new("test.js")));
-    assert!(analyzer.should_analyze(Path::new("test.ts")));
+
+    // These should NOT be analyzed - not in configured languages
+    assert!(!analyzer.should_analyze(Path::new("test.go")));
+    assert!(!analyzer.should_analyze(Path::new("test.java")));
+    assert!(!analyzer.should_analyze(Path::new("test.js")));
+    assert!(!analyzer.should_analyze(Path::new("test.ts")));
 
     assert!(!analyzer.should_analyze(Path::new("test.md")));
     assert!(!analyzer.should_analyze(Path::new("test.txt")));

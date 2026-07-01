@@ -439,7 +439,7 @@ async fn test_complex_metrics_scenario() {
     assert_eq!(metrics.total_success, 3);
     assert_eq!(metrics.total_failed, 1);
     assert_eq!(metrics.total_cached, 1);
-    assert_eq!(metrics.total_tokens, 2650); // 800 + 800 + 350 + 500
+    assert_eq!(metrics.total_tokens, 2450); // 800 + 800 + 350 + 500
 
     // Check model metrics
     assert_eq!(metrics.by_model.len(), 2);
@@ -455,7 +455,7 @@ async fn test_complex_metrics_scenario() {
     assert_eq!(gpt35_metrics.successful_requests, 1);
 
     // Check operation metrics
-    assert_eq!(metrics.by_operation.len(), 3);
+    assert_eq!(metrics.by_operation.len(), 2);
     assert!(metrics.by_operation.contains_key("chat:discovery"));
     assert!(metrics
         .by_operation

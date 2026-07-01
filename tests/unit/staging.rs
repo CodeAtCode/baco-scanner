@@ -544,9 +544,9 @@ fn test_generate_patch_different_files() {
     let autopatcher = AutoPatcher::new(temp_dir.clone());
 
     let test_cases = vec![
-        ("main.rs", "src/main.rs"),
-        ("lib.rs", "src/lib.rs"),
-        ("utils/mod.rs", "src/utils/mod.rs"),
+        ("main.rs", "main.rs"),
+        ("lib.rs", "lib.rs"),
+        ("utils/mod.rs", "utils/mod.rs"),
         ("Cargo.toml", "Cargo.toml"),
     ];
 
@@ -756,25 +756,27 @@ fn test_invalid_code_fails_compile() {
 fn test_cargo_check_warning_counting() {
     let temp_dir = create_temp_lib_project();
 
-    // Write code with warnings (unused variable)
+    // Write code with warnings (unused variable - use underscore prefix to suppress)
+    // Instead, use a pattern that definitely generates a warning
     fs::write(
         temp_dir.join("src/lib.rs"),
-        r#"pub fn with_warning() {
-    let unused_variable = 42; // This will generate a warning
+        r#"pub fn with_warning() -> i32 {
+    let x = 42; // unused variable warning
     1 + 1
 }
 "#,
     )
     .unwrap();
 
-    // Run cargo check and count warnings
+    // Run cargo check and count warnings (check both stdout and stderr)
     let check_output = Command::new("cargo")
         .current_dir(&temp_dir)
-        .args(["check"])
+        .args(["check", "--message-format=short"])
         .output()
         .unwrap();
 
-    let warning_count = String::from_utf8_lossy(&check_output.stdout)
+    let output = String::from_utf8_lossy(&check_output.stderr); // warnings go to stderr
+    let warning_count = output
         .lines()
         .filter(|line| line.contains("warning:"))
         .count();

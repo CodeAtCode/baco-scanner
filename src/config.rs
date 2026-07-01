@@ -91,7 +91,7 @@ pub struct ScannerSettings {
     pub performance: PerformanceSettings,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SemgrepSettings {
     #[serde(default = "default_true")]
     pub enabled: bool,
@@ -99,6 +99,16 @@ pub struct SemgrepSettings {
     pub cache_dir: Option<String>,
     #[serde(default)]
     pub exclude_rules: Vec<String>,
+}
+
+impl Default for SemgrepSettings {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            cache_dir: None,
+            exclude_rules: Vec::new(),
+        }
+    }
 }
 
 fn default_true() -> bool {
