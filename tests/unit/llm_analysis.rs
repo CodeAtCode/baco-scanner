@@ -3,12 +3,12 @@
 //! Tests cover: CWE extraction, recommendation generation, PoC/mitigation code
 //! generation, LLM response parsing, and analyzer behavior.
 
-use baco::llm_analysis::{
-    extract_cwe_id, generate_recommendation, generate_poc_code, generate_mitigation_code,
-    LlmAnalyzer
-};
-use baco::llm::LlmConfig;
 use baco::config::ScannerConfig;
+use baco::llm::LlmConfig;
+use baco::llm_analysis::{
+    extract_cwe_id, generate_mitigation_code, generate_poc_code, generate_recommendation,
+    LlmAnalyzer,
+};
 use std::path::Path;
 
 // ============================================================================
@@ -33,9 +33,18 @@ fn test_extract_cwe_id_in_sentence() {
 
 #[test]
 fn test_extract_cwe_id_various_numbers() {
-    assert_eq!(extract_cwe_id("Path traversal CWE-22 vulnerability"), Some("CWE-22".to_string()));
-    assert_eq!(extract_cwe_id("SQL injection CWE-89 detected"), Some("CWE-89".to_string()));
-    assert_eq!(extract_cwe_id("Buffer overflow CWE-119"), Some("CWE-119".to_string()));
+    assert_eq!(
+        extract_cwe_id("Path traversal CWE-22 vulnerability"),
+        Some("CWE-22".to_string())
+    );
+    assert_eq!(
+        extract_cwe_id("SQL injection CWE-89 detected"),
+        Some("CWE-89".to_string())
+    );
+    assert_eq!(
+        extract_cwe_id("Buffer overflow CWE-119"),
+        Some("CWE-119".to_string())
+    );
 }
 
 #[test]
@@ -306,7 +315,7 @@ fn test_should_analyze_multiple_languages() {
         client,
         vec!["c".to_string(), "python".to_string()],
         512,
-        &scanner_config
+        &scanner_config,
     );
 
     assert!(analyzer.should_analyze(Path::new("test.c")));
@@ -442,7 +451,13 @@ fn test_parse_llm_response_with_fix_code() {
     assert_eq!(findings.len(), 1);
 
     let finding = &findings[0];
-    assert_eq!(finding.diff_hunk, Some("reader = xmlReaderForFile(filename, NULL, XML_PARSE_NOENT | XML_PARSE_NONET);".to_string()));
+    assert_eq!(
+        finding.diff_hunk,
+        Some(
+            "reader = xmlReaderForFile(filename, NULL, XML_PARSE_NOENT | XML_PARSE_NONET);"
+                .to_string()
+        )
+    );
 }
 
 #[test]
@@ -473,7 +488,10 @@ fn test_parse_llm_response_without_fix_code_uses_after() {
 
     let finding = &findings[0];
     assert_eq!(finding.cwe_id, Some("CWE-22".to_string()));
-    assert_eq!(finding.diff_hunk, Some("char *validated = validate_path(input); open(validated, O_RDONLY);".to_string()));
+    assert_eq!(
+        finding.diff_hunk,
+        Some("char *validated = validate_path(input); open(validated, O_RDONLY);".to_string())
+    );
 }
 
 #[test]
@@ -754,7 +772,10 @@ fn test_parse_llm_response_code_location_format() {
     let result = analyzer.parse_llm_response(json_response, "/path/to/file.c", "test-model");
     assert!(result.is_ok());
     let findings = result.unwrap();
-    assert_eq!(findings[0].code_location, Some("/path/to/file.c:42".to_string()));
+    assert_eq!(
+        findings[0].code_location,
+        Some("/path/to/file.c:42".to_string())
+    );
 }
 
 #[test]
@@ -799,10 +820,14 @@ fn test_severity_mapping_critical() {
     let scanner_config = ScannerConfig::default();
     let analyzer = LlmAnalyzer::new(client, vec!["c".to_string()], 512, &scanner_config);
 
-    let json_response = "[{\"severity\":\"CRITICAL\",\"title\":\"Test\",\"description\":\"Desc\",\"line\":1}]";
+    let json_response =
+        "[{\"severity\":\"CRITICAL\",\"title\":\"Test\",\"description\":\"Desc\",\"line\":1}]";
     let result = analyzer.parse_llm_response(json_response, "test.c", "test-model");
     assert!(result.is_ok());
-    assert_eq!(result.unwrap()[0].severity, baco::findings::Severity::Critical);
+    assert_eq!(
+        result.unwrap()[0].severity,
+        baco::findings::Severity::Critical
+    );
 }
 
 #[test]
@@ -812,7 +837,8 @@ fn test_severity_mapping_high() {
     let scanner_config = ScannerConfig::default();
     let analyzer = LlmAnalyzer::new(client, vec!["c".to_string()], 512, &scanner_config);
 
-    let json_response = "[{\"severity\":\"HIGH\",\"title\":\"Test\",\"description\":\"Desc\",\"line\":1}]";
+    let json_response =
+        "[{\"severity\":\"HIGH\",\"title\":\"Test\",\"description\":\"Desc\",\"line\":1}]";
     let result = analyzer.parse_llm_response(json_response, "test.c", "test-model");
     assert!(result.is_ok());
     assert_eq!(result.unwrap()[0].severity, baco::findings::Severity::High);
@@ -825,10 +851,14 @@ fn test_severity_mapping_medium() {
     let scanner_config = ScannerConfig::default();
     let analyzer = LlmAnalyzer::new(client, vec!["c".to_string()], 512, &scanner_config);
 
-    let json_response = "[{\"severity\":\"MEDIUM\",\"title\":\"Test\",\"description\":\"Desc\",\"line\":1}]";
+    let json_response =
+        "[{\"severity\":\"MEDIUM\",\"title\":\"Test\",\"description\":\"Desc\",\"line\":1}]";
     let result = analyzer.parse_llm_response(json_response, "test.c", "test-model");
     assert!(result.is_ok());
-    assert_eq!(result.unwrap()[0].severity, baco::findings::Severity::Medium);
+    assert_eq!(
+        result.unwrap()[0].severity,
+        baco::findings::Severity::Medium
+    );
 }
 
 #[test]
@@ -838,7 +868,8 @@ fn test_severity_mapping_unknown_defaults_low() {
     let scanner_config = ScannerConfig::default();
     let analyzer = LlmAnalyzer::new(client, vec!["c".to_string()], 512, &scanner_config);
 
-    let json_response = "[{\"severity\":\"UNKNOWN\",\"title\":\"Test\",\"description\":\"Desc\",\"line\":1}]";
+    let json_response =
+        "[{\"severity\":\"UNKNOWN\",\"title\":\"Test\",\"description\":\"Desc\",\"line\":1}]";
     let result = analyzer.parse_llm_response(json_response, "test.c", "test-model");
     assert!(result.is_ok());
     assert_eq!(result.unwrap()[0].severity, baco::findings::Severity::Low);

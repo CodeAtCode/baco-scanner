@@ -350,52 +350,22 @@ impl GitHistoryAnalyzer {
         let risky_patterns = self.identify_risky_patterns(file_path)?;
         let confidence_modifiers = self.generate_confidence_scores(file_path)?;
 
-        // Calculate overall git confidence score
-        let git_confidence_score = calculate_overall_confidence(
-            &related_commits,
-            &vulnerability_patterns,
-            &risky_patterns,
-        );
-
         Ok(GitAnalysisResult {
-            related_commits,
-            vulnerability_patterns,
-            risky_patterns,
+            related_commits: related_commits.clone(),
+            vulnerability_patterns: vulnerability_patterns.clone(),
+            risky_patterns: risky_patterns.clone(),
             confidence_modifiers,
-            git_confidence_score,
+            git_confidence_score: calculate_overall_confidence(
+                &related_commits,
+                &vulnerability_patterns,
+                &risky_patterns,
+            ),
         })
-    }
-
-    /// Correlate findings with git history
-    pub fn correlate_with_finding(
-        &self,
-        file_path: &str,
-        cwe_id: Option<&str>,
-    ) -> Result<GitAnalysisResult, String> {
-        let mut result = self.analyze(file_path)?;
-
-        // If looking for specific CWE, filter patterns
-        if let Some(cwe) = cwe_id {
-            result
-                .vulnerability_patterns
-                .retain(|p| p.cwe_id.as_deref() == Some(cwe));
-        }
-
-        Ok(result)
     }
 
     /// Update AnalysisContext with git analysis results
     pub fn update_context(&self, ctx: &mut AnalysisContext, result: &GitAnalysisResult) {
         update_context(ctx, result);
-    }
-
-    /// Get commit statistics for a file
-    pub fn get_commit_stats(
-        &self,
-        file_path: &str,
-    ) -> Result<std::collections::HashMap<String, i32>, String> {
-        let commits = self.find_related_commits(file_path, None, 100)?;
-        Ok(crate::git_analysis::helpers::get_commit_stats(&commits))
     }
 }
 

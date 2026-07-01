@@ -131,6 +131,16 @@ impl ExtendedVerificationPhase {
         }
     }
 
+    /// Get project type
+    pub fn project_type(&self) -> &DetectProjectType {
+        &self.project_type
+    }
+
+    /// Get security practices
+    pub fn security_practices(&self) -> &Vec<String> {
+        &self.security_practices
+    }
+
     /// Execute verification on all findings
     pub fn execute(
         &mut self,
@@ -400,21 +410,6 @@ impl ExtendedVerificationPhase {
             average_confidence,
             high_confidence_findings,
         }
-    }
-
-    /// Get project type
-    pub fn project_type(&self) -> &DetectProjectType {
-        &self.project_type
-    }
-
-    /// Get analysis context
-    pub fn context(&self) -> &AnalysisContext {
-        &self.context
-    }
-
-    /// Get security practices
-    pub fn security_practices(&self) -> &[String] {
-        &self.security_practices
     }
 }
 

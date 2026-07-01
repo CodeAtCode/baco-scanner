@@ -105,16 +105,6 @@ impl FileHasher {
 
         Ok(hash)
     }
-
-    /// Clear the hash cache
-    pub fn clear_cache(&mut self) {
-        self.cache.clear();
-    }
-
-    /// Get cached hash if available
-    pub fn get_cached_hash(&self, path: &Path) -> Option<&String> {
-        self.cache.get(path)
-    }
 }
 
 impl Default for FileHasher {

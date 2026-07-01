@@ -37,6 +37,19 @@ impl PocCompiler {
         }
     }
 
+    /// Check if a language is supported for PoC validation
+    pub fn is_supported(language: &str) -> bool {
+        matches!(
+            language.to_lowercase().as_str(),
+            "rust" | "python" | "python3" | "javascript" | "js" | "node"
+        )
+    }
+
+    /// Return list of supported languages
+    pub fn supported_languages() -> Vec<&'static str> {
+        vec!["rust", "python", "python3", "javascript", "js", "node"]
+    }
+
     /// Validate Rust code using rustc --edition 2021 --check
     pub fn validate_rust(code: &str) -> PoCCompileResult {
         let temp_file = match tempfile::NamedTempFile::new() {
@@ -145,19 +158,6 @@ impl PocCompiler {
                 }
             }
         }
-    }
-
-    /// Get supported languages
-    pub fn supported_languages() -> Vec<&'static str> {
-        vec!["rust", "python", "javascript"]
-    }
-
-    /// Check if a language is supported
-    pub fn is_supported(language: &str) -> bool {
-        matches!(
-            language.to_lowercase().as_str(),
-            "rust" | "python" | "python3" | "javascript" | "js" | "node"
-        )
     }
 }
 

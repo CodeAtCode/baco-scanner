@@ -82,6 +82,7 @@ pub fn update_context(ctx: &mut AnalysisContext, result: &GitAnalysisResult) {
 }
 
 /// Get commit statistics for a file
+#[allow(dead_code)]
 pub fn get_commit_stats(commits: &[CommitReference]) -> HashMap<String, i32> {
     let mut stats = HashMap::new();
     stats.insert("total_commits".to_string(), commits.len() as i32);

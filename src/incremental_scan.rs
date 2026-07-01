@@ -26,14 +26,6 @@ impl FileHashStore {
         }
     }
 
-    /// Create a hash store with the current timestamp
-    pub fn with_timestamp(timestamp: i64) -> Self {
-        Self {
-            hashes: HashMap::new(),
-            last_scan: Some(timestamp),
-        }
-    }
-
     /// Get the hash for a file path
     pub fn get_hash(&self, path: &Path) -> Option<&String> {
         let key = path.to_string_lossy().to_string();

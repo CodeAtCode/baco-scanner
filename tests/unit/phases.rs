@@ -491,7 +491,10 @@ fn test_finding_verification_status_none_initially() {
 fn test_finding_verification_status_can_be_set() {
     let mut finding = create_test_finding("test-11", "Test", Severity::Medium);
     finding.verification_status = Some(VerificationStatus::Confirmed);
-    assert_eq!(finding.verification_status, Some(VerificationStatus::Confirmed));
+    assert_eq!(
+        finding.verification_status,
+        Some(VerificationStatus::Confirmed)
+    );
 }
 
 #[test]
@@ -634,7 +637,11 @@ fn test_finding_ids_are_unique() {
     unique_ids.sort();
     unique_ids.dedup();
 
-    assert_eq!(ids.len(), unique_ids.len(), "All finding IDs should be unique");
+    assert_eq!(
+        ids.len(),
+        unique_ids.len(),
+        "All finding IDs should be unique"
+    );
 }
 
 // ============================================================================

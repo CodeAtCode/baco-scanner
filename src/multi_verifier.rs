@@ -162,17 +162,6 @@ impl MultiVerifier {
         s.bytes().fold(0u32, |acc, b| acc.wrapping_add(b as u32))
     }
 
-    pub fn get_failure_rate(&self) -> f32 {
-        let failures = self.api_failure_count.load(Ordering::SeqCst);
-        let total = self.total_verifications.load(Ordering::SeqCst);
-
-        if total == 0 {
-            0.0
-        } else {
-            failures as f32 / total as f32
-        }
-    }
-
     pub fn reset_circuit_breaker(&self) {
         self.api_failure_count.store(0, Ordering::SeqCst);
         self.total_verifications.store(0, Ordering::SeqCst);

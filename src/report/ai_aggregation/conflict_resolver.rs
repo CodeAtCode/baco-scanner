@@ -76,6 +76,15 @@ impl ConflictResolver {
         location: &str,
         findings: &[&VulnerabilityFinding],
     ) -> FindingConflict {
+        if findings.is_empty() {
+            return FindingConflict {
+                findings: vec![],
+                conflict_type: ConflictType::SeverityMismatch,
+                resolution: ConflictResolution::HighestSeverity,
+                resolution_reason: "No findings to resolve".to_string(),
+            };
+        }
+
         let mut sorted: Vec<_> = findings.iter().collect();
         sorted.sort_by(|a, b| {
             let severity_order = |s: &Severity| match s {
