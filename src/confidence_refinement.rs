@@ -369,7 +369,7 @@ impl ConfidenceRefinementPhase {
     }
 
     /// Analyze code context for vulnerability support/contradiction.
-    fn analyze_code_context(&self, code: &str) -> ContextAnalysis {
+    pub fn analyze_code_context(&self, code: &str) -> ContextAnalysis {
         let code_lower = code.to_lowercase();
 
         // Patterns that support the vulnerability
@@ -487,7 +487,7 @@ impl Default for ConfidenceRefinementPhase {
 }
 
 /// Helper struct for code context analysis.
-struct ContextAnalysis {
+pub struct ContextAnalysis {
     supports: bool,
     contradicts: bool,
     explanation: String,

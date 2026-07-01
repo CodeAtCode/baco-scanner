@@ -122,7 +122,7 @@ impl ReportAggregationPhase {
     }
 
     /// Deduplicate findings by file path, line number, and CWE ID.
-    fn deduplicate_findings(
+    pub fn deduplicate_findings(
         &self,
         findings: Vec<VulnerabilityFinding>,
     ) -> Vec<VulnerabilityFinding> {
@@ -152,7 +152,7 @@ impl ReportAggregationPhase {
     }
 
     /// Calculate aggregate statistics from findings.
-    fn calculate_statistics(&self, findings: &[VulnerabilityFinding]) -> AggregateStatistics {
+    pub fn calculate_statistics(&self, findings: &[VulnerabilityFinding]) -> AggregateStatistics {
         let mut stats = AggregateStatistics {
             total_findings: findings.len(),
             ..Default::default()
@@ -211,7 +211,7 @@ impl ReportAggregationPhase {
     }
 
     /// Generate executive summary based on statistics and findings.
-    fn generate_executive_summary(
+    pub fn generate_executive_summary(
         &self,
         stats: &AggregateStatistics,
         findings: &[VulnerabilityFinding],
@@ -305,7 +305,10 @@ impl ReportAggregationPhase {
     }
 
     /// Prioritize findings based on severity, confidence, and other factors.
-    fn prioritize_findings(&self, findings: &[VulnerabilityFinding]) -> Vec<PrioritizedFinding> {
+    pub fn prioritize_findings(
+        &self,
+        findings: &[VulnerabilityFinding],
+    ) -> Vec<PrioritizedFinding> {
         let mut scored: Vec<(usize, f32, String)> = findings
             .iter()
             .enumerate()
