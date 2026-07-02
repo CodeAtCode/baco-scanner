@@ -9,7 +9,7 @@ use std::result::Result;
 
 pub mod ai_aggregation;
 pub mod confidence_scoring;
-pub mod cross_file_analysis;
+
 pub mod git_analysis;
 pub mod indexing;
 
@@ -36,9 +36,6 @@ pub mod parallel_safety_tests;
 
 #[cfg(test)]
 pub mod confidence_scoring_test;
-
-#[cfg(test)]
-pub mod cross_file_analysis_test;
 
 #[cfg(test)]
 pub mod git_analysis_test;

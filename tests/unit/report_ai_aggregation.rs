@@ -210,7 +210,7 @@ async fn test_async_compatible() {
 
 #[test]
 fn test_conflict_resolver_resolve_severity_conflict() {
-    let findings = vec![
+    let findings = [
         make_finding(
             "f1",
             Severity::Critical,
@@ -247,7 +247,7 @@ fn test_conflict_resolver_resolve_severity_conflict() {
 
 #[test]
 fn test_conflict_resolver_resolve_cwe_conflict() {
-    let findings = vec![
+    let findings = [
         make_finding(
             "f1",
             Severity::High,
@@ -280,7 +280,7 @@ fn test_conflict_resolver_resolve_cwe_conflict() {
 
 #[test]
 fn test_conflict_resolver_resolve_verification_conflict_verified() {
-    let findings = vec![
+    let findings = [
         make_finding(
             "f1",
             Severity::High,
@@ -316,7 +316,7 @@ fn test_conflict_resolver_resolve_verification_conflict_verified() {
 
 #[test]
 fn test_conflict_resolver_resolve_confidence_conflict() {
-    let findings = vec![
+    let findings = [
         make_finding(
             "f1",
             Severity::High,

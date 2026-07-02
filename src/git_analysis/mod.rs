@@ -11,6 +11,8 @@ mod analyzer;
 mod helpers;
 mod models;
 mod patterns;
+#[cfg(test)]
+mod tests;
 
 // Re-export public API
 pub use analyzer::{GitAnalyzer, GitHistoryAnalyzer};

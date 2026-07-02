@@ -25,7 +25,7 @@ pub mod confidence;
 pub mod confidence_refinement;
 pub mod config;
 pub mod context;
-pub mod cross_file_analysis;
+
 pub mod crossfile;
 pub mod cve_bootstrap;
 pub mod cve_client;
