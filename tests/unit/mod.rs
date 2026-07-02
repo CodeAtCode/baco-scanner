@@ -2,6 +2,7 @@
 //!
 //! These tests focus on isolated functionality without external dependencies.
 
+// Include centralized fixtures - copy from tests/fixtures.rs
 mod agent_executor;
 mod confidence_refinement;
 mod config;

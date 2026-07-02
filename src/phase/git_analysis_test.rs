@@ -9,8 +9,8 @@ mod tests {
     use crate::scanner::Scanner;
     use tempfile::TempDir;
 
-    #[tokio::test]
-    async fn test_git_analysis_phase_name_and_order() {
+    #[test]
+    fn test_git_analysis_phase_name_and_order() {
         let phase = GitAnalysisPhase;
         assert_eq!(phase.name(), "GitAnalysis");
         assert_eq!(phase.order(), 7);

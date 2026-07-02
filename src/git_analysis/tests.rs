@@ -497,7 +497,7 @@ mod tests {
 
         let confidence = calculate_overall_confidence(&commits, &patterns, &risky);
 
-        assert!(confidence >= 0.5 && confidence <= 1.0);
+        assert!((0.5..=1.0).contains(&confidence));
     }
 
     #[test]

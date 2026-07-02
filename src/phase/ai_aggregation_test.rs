@@ -8,8 +8,8 @@ mod tests {
     use crate::scanner::Scanner;
     use tempfile::TempDir;
 
-    #[tokio::test]
-    async fn test_ai_aggregation_phase_name_and_order() {
+    #[test]
+    fn test_ai_aggregation_phase_name_and_order() {
         let phase = AiAggregationPhase;
         assert_eq!(phase.name(), "AiAggregation");
         assert_eq!(phase.order(), 10);

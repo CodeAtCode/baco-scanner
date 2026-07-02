@@ -1,6 +1,7 @@
 //! Unit tests for scanner phases
 //!
 //! Tests cover all phase types, execution order, phase context, and finding processing.
+#![allow(clippy::useless_vec)] // Test code: vec! is clearer for small arrays
 
 use baco::checkpoint::ScanPhase;
 use baco::config::{self, PerformanceSettings, TicketConfig};
@@ -9,6 +10,8 @@ use baco::llm_metrics::LlmMetricsTracker;
 use indicatif::ProgressBar;
 use std::path::PathBuf;
 use tempfile::TempDir;
+
+// Use centralized fixtures from tests root
 
 /// Create a test finding with minimal configuration
 fn create_test_finding(id: &str, title: &str, severity: Severity) -> VulnerabilityFinding {
@@ -1183,14 +1186,14 @@ fn test_finding_clone() {
 #[test]
 fn test_severity_clone() {
     let severity = Severity::High;
-    let cloned = severity.clone();
+    let cloned = severity; // Severity is Copy
     assert_eq!(severity, cloned);
 }
 
 #[test]
 fn test_verification_status_clone() {
     let status = VerificationStatus::Confirmed;
-    let cloned = status.clone();
+    let cloned = status; // VerificationStatus is Copy
     assert_eq!(status, cloned);
 }
 

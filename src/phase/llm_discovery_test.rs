@@ -6,8 +6,8 @@ mod tests {
     use crate::scanner::Scanner;
     use tempfile::TempDir;
 
-    #[tokio::test]
-    async fn test_llm_discovery_phase_name_and_order() {
+    #[test]
+    fn test_llm_discovery_phase_name_and_order() {
         let phase = LlmDiscoveryPhase;
         assert_eq!(phase.name(), "LlmDiscovery");
         assert_eq!(phase.order(), 4);

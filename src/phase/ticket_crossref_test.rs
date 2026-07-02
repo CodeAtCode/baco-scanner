@@ -8,8 +8,8 @@ mod tests {
     use crate::scanner::Scanner;
     use tempfile::TempDir;
 
-    #[tokio::test]
-    async fn test_ticket_crossref_phase_name_and_order() {
+    #[test]
+    fn test_ticket_crossref_phase_name_and_order() {
         let phase = TicketCrossRefPhase;
         assert_eq!(phase.name(), "TicketCrossRef");
         assert_eq!(phase.order(), 6);

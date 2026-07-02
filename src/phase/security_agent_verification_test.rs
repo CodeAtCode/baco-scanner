@@ -8,8 +8,8 @@ mod tests {
     use crate::scanner::Scanner;
     use tempfile::TempDir;
 
-    #[tokio::test]
-    async fn test_security_agent_verification_phase_name_and_order() {
+    #[test]
+    fn test_security_agent_verification_phase_name_and_order() {
         let phase = SecurityAgentVerificationPhase;
         assert_eq!(phase.name(), "SecurityAgentVerification");
         assert_eq!(phase.order(), 6);

@@ -11,8 +11,8 @@ mod tests {
     use crate::scanner::Scanner;
     use tempfile::TempDir;
 
-    #[tokio::test]
-    async fn test_confidence_scoring_phase_name_and_order() {
+    #[test]
+    fn test_confidence_scoring_phase_name_and_order() {
         let phase = ConfidenceScoringPhase;
         assert_eq!(phase.name(), "ConfidenceScoring");
         assert_eq!(phase.order(), 9);

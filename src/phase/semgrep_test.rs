@@ -6,8 +6,8 @@ mod tests {
     use crate::scanner::Scanner;
     use tempfile::TempDir;
 
-    #[tokio::test]
-    async fn test_semgrep_phase_name_and_order() {
+    #[test]
+    fn test_semgrep_phase_name_and_order() {
         let phase = SemgrepPhase;
         assert_eq!(phase.name(), "Semgrep");
         assert_eq!(phase.order(), 2);
@@ -37,8 +37,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_semgrep_phase_integration() {
+    #[test]
+    fn test_semgrep_phase_integration() {
         let temp_dir = TempDir::new().unwrap();
         let config = ScannerConfig::default();
 

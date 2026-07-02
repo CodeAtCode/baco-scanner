@@ -7,8 +7,8 @@ mod tests {
     use std::fs;
     use tempfile::TempDir;
 
-    #[tokio::test]
-    async fn test_indexing_phase_name_and_order() {
+    #[test]
+    fn test_indexing_phase_name_and_order() {
         let phase = IndexingPhase;
         assert_eq!(phase.name(), "Indexing");
         assert_eq!(phase.order(), 1);

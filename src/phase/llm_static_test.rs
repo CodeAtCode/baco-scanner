@@ -6,8 +6,8 @@ mod tests {
     use crate::scanner::Scanner;
     use tempfile::TempDir;
 
-    #[tokio::test]
-    async fn test_llm_static_phase_name_and_order() {
+    #[test]
+    fn test_llm_static_phase_name_and_order() {
         let phase = LlmStaticAnalysisPhase;
         assert_eq!(phase.name(), "LlmStaticAnalysis");
         assert_eq!(phase.order(), 3);

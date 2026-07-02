@@ -8,8 +8,8 @@ mod tests {
     use crate::scanner::Scanner;
     use tempfile::TempDir;
 
-    #[tokio::test]
-    async fn test_reporting_phase_name_and_order() {
+    #[test]
+    fn test_reporting_phase_name_and_order() {
         let phase = ReportingPhase;
         assert_eq!(phase.name(), "Reporting");
         assert_eq!(phase.order(), 11);
