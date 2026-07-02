@@ -179,17 +179,17 @@ fn test_weighted_selection_not_applicable() {
     // without weights. This test verifies the basic round-robin behavior.
     let selector = ModelSelector::new(vec!["weighted-a".to_string(), "weighted-b".to_string()]);
 
-    // Verify round-robin pattern returns both models (order may vary due to AtomicUsize)
+    // Verify round-robin pattern returns both models
     let first = selector.next();
     let second = selector.next();
     let third = selector.next();
     let fourth = selector.next();
 
-    // Should alternate between the two models
-    assert!(first == Some("weighted-a".to_string()) || first == Some("weighted-b".to_string()));
-    assert!(second == Some("weighted-a".to_string()) || second == Some("weighted-b".to_string()));
-    assert_ne!(first, third); // Every other call should be the same
-    assert_ne!(second, fourth);
+    // Should return models in sequence (first call starts at index 0)
+    assert_eq!(first, Some("weighted-a".to_string()));
+    assert_eq!(second, Some("weighted-b".to_string()));
+    assert_eq!(third, Some("weighted-a".to_string()));
+    assert_eq!(fourth, Some("weighted-b".to_string()));
 }
 
 // ============================================================================
