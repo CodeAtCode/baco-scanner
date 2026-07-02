@@ -45,11 +45,16 @@ jobs:
         run: cargo install cargo-tarpaulin
       - name: Run tests with coverage
         run: cargo tarpaulin --all-targets --out Xml --output-dir cobertura --timeout 900 --engine LLVM
+      - name: Verify coverage file exists
+        run: |
+          ls -la ./cobertura/
+          test -f ./cobertura/cobertura.xml && echo "Coverage file found" || (echo "Coverage file NOT found!" && exit 1)
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
           files: ./cobertura/cobertura.xml
-          fail_ci_if_error: false
+          fail_ci_if_error: true
+          verbose: true
           token: ${{ secrets.CODECOV_TOKEN }}
 
   # Build and package only on release tags
