@@ -56,6 +56,7 @@ pub enum IssueCategory {
     MemoryCorruption,
     Injection,
     AuthenticationBypass,
+    IntegerOverflow,
 
     // Business Logic (no standard CWE)
     BusinessLogicFlaw,
@@ -89,6 +90,7 @@ impl std::fmt::Display for IssueCategory {
             IssueCategory::MemoryCorruption => write!(f, "memory_corruption"),
             IssueCategory::Injection => write!(f, "injection"),
             IssueCategory::AuthenticationBypass => write!(f, "authentication_bypass"),
+            IssueCategory::IntegerOverflow => write!(f, "integer_overflow"),
             IssueCategory::BusinessLogicFlaw => write!(f, "business_logic_flaw"),
             IssueCategory::RaceCondition => write!(f, "race_condition"),
             IssueCategory::DataLeakage => write!(f, "data_leakage"),

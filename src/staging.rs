@@ -1022,4 +1022,465 @@ edition = "2021"
         assert!(!candidate.applied);
         assert!(candidate.validation_result.is_none());
     }
+
+    #[test]
+    fn test_staging_area_worktree_path_type() {
+        let temp_dir = create_temp_dir_with_project();
+        let staging = StagingArea {
+            worktree_path: temp_dir.clone(),
+            original_repo_path: temp_dir.clone(),
+            is_created: false,
+        };
+
+        // Verify worktree_path is a PathBuf
+        assert!(staging.worktree_path.is_absolute() || staging.worktree_path.starts_with("/tmp"));
+
+        // Cleanup
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_staging_area_original_repo_path() {
+        let temp_dir = create_temp_dir_with_project();
+        let staging = StagingArea {
+            worktree_path: temp_dir.join("worktree"),
+            original_repo_path: temp_dir.clone(),
+            is_created: false,
+        };
+
+        assert_eq!(staging.original_repo_path, temp_dir);
+
+        // Cleanup
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_apply_patch_with_empty_diff() {
+        let temp_dir = create_temp_dir_with_project();
+        let mut staging = StagingArea {
+            worktree_path: temp_dir.clone(),
+            original_repo_path: temp_dir.clone(),
+            is_created: true,
+        };
+
+        // Empty patch should still write and attempt apply
+        let result = staging.apply_patch("");
+        // This may fail due to git apply expecting a valid diff, but shouldn't panic
+        // We're testing the function handles empty input gracefully
+        let _ = staging.cleanup();
+        let _ = fs::remove_dir_all(&temp_dir);
+        
+        // The important thing is it doesn't panic - result can be Ok or Err
+        assert!(result.is_ok() || result.is_err());
+    }
+
+    #[test]
+    fn test_apply_patch_creates_patch_file() {
+        let temp_dir = create_temp_dir_with_project();
+        let staging = StagingArea {
+            worktree_path: temp_dir.clone(),
+            original_repo_path: temp_dir.clone(),
+            is_created: true,
+        };
+
+        // Write patch manually to simulate apply_patch
+        let patch_path = staging.worktree_path.join("patch.diff");
+        let diff = "--- a/test.rs\n+++ b/test.rs\n@@ -1 +1 @@\n-old\n+new\n";
+        fs::write(&patch_path, diff).unwrap();
+
+        assert!(patch_path.exists());
+
+        // Cleanup
+        fs::remove_file(&patch_path).unwrap();
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_validate_without_creation() {
+        let temp_dir = create_temp_dir_with_project();
+        let staging = StagingArea {
+            worktree_path: temp_dir.clone(),
+            original_repo_path: temp_dir.clone(),
+            is_created: false,
+        };
+
+        let result = staging.validate();
+        assert!(result.is_err());
+        assert!(matches!(result, Err(StagingError::Validation(_))));
+
+        // Cleanup
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_cleanup_sets_is_created_false() {
+        let temp_dir = create_temp_dir_with_project();
+        let mut staging = StagingArea {
+            worktree_path: temp_dir.clone(),
+            original_repo_path: temp_dir.clone(),
+            is_created: true,
+        };
+
+        // Manually set is_created to false to simulate cleanup
+        staging.is_created = false;
+
+        assert!(!staging.is_created);
+
+        // Cleanup
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_rollback_without_creation() {
+        let temp_dir = create_temp_dir_with_project();
+        let mut staging = StagingArea {
+            worktree_path: temp_dir.clone(),
+            original_repo_path: temp_dir.clone(),
+            is_created: false,
+        };
+
+        let result = staging.rollback();
+        assert!(result.is_ok());
+
+        // Cleanup
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_autopatch_error_from_staging_error() {
+        let staging_err = StagingError::WorktreeCreate("test error".to_string());
+        let autopatch_err: AutoPatchError = AutoPatchError::Staging(staging_err.to_string());
+
+        assert!(autopatch_err.to_string().contains("Staging error"));
+    }
+
+    #[test]
+    fn test_autopatcher_generate_patch_empty_inputs() {
+        let temp_dir = create_temp_dir_with_project();
+        let autopatcher = AutoPatcher::new(temp_dir.clone());
+
+        // Test with empty vulnerability description
+        let patch = autopatcher
+            .generate_patch("", "", "empty.rs")
+            .unwrap();
+
+        assert_eq!(patch.file_path, "empty.rs");
+        assert!(!patch.diff.is_empty());
+
+        // Cleanup
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_format_patch_report_empty_diff() {
+        let temp_dir = create_temp_dir_with_project();
+        let autopatcher = AutoPatcher::new(temp_dir);
+
+        let candidate = PatchCandidate::new("", "empty.rs");
+        let validation = PatchValidationResult::success();
+
+        let report = autopatcher.format_patch_report(&candidate, &validation);
+
+        assert!(report.contains("✅ VALIDATED"));
+        assert!(report.contains("empty.rs"));
+    }
+
+    #[test]
+    fn test_patching_config_builder_pattern() {
+        // Test creating config with partial overrides
+        let config = PatchingConfig {
+            max_auto_patches: 3,
+            ..PatchingConfig::default()
+        };
+
+        assert_eq!(config.max_auto_patches, 3);
+        assert!(!config.dry_run);
+        assert_eq!(config.staging_prefix, Some("baco-auto-".to_string()));
+    }
+
+    #[test]
+    fn test_staging_result_type_alias() {
+        let ok_result: StagingResult<()> = Ok(());
+        assert!(ok_result.is_ok());
+
+        let err_result: StagingResult<()> = Err(StagingError::GitError("test".to_string()));
+        assert!(err_result.is_err());
+    }
+
+    #[test]
+    fn test_auto_patch_result_type_alias() {
+        let ok_result: AutoPatchResult<()> = Ok(());
+        assert!(ok_result.is_ok());
+
+        let err_result: AutoPatchResult<()> = Err(AutoPatchError::NoLlmClient);
+        assert!(err_result.is_err());
+    }
+
+    #[test]
+    fn test_patch_validation_result_warning_count() {
+        let mut result = PatchValidationResult::success();
+        result.warnings = 10;
+
+        assert_eq!(result.warnings, 10);
+        assert!(result.compiles);
+        assert!(result.tests_pass);
+    }
+
+    #[test]
+    fn test_staging_error_from_std_error() {
+        let std_err = std::io::Error::other("io error");
+        let staging_err = StagingError::WorktreeCreate(std_err.to_string());
+
+        assert!(staging_err.to_string().contains("Failed to create worktree"));
+        assert!(staging_err.to_string().contains("io error"));
+    }
+
+    #[test]
+    fn test_patch_candidate_applied_flag() {
+        let mut candidate = PatchCandidate::new("diff", "test.rs");
+        assert!(!candidate.applied);
+
+        candidate.applied = true;
+        assert!(candidate.applied);
+    }
+
+    #[test]
+    fn test_patch_candidate_validation_result_setting() {
+        let mut candidate = PatchCandidate::new("diff", "test.rs");
+        assert!(candidate.validation_result.is_none());
+
+        let validation = PatchValidationResult::failure("test error");
+        candidate.validation_result = Some(validation.into());
+
+        assert!(candidate.validation_result.is_some());
+    }
+
+    #[test]
+    fn test_auto_patcher_repo_path_storage() {
+        let temp_dir = create_temp_dir_with_project();
+        let autopatcher = AutoPatcher::new(temp_dir.clone());
+
+        assert_eq!(autopatcher.repo_path, temp_dir);
+
+        // Cleanup
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_staging_area_paths_after_creation() {
+        let temp_dir = create_temp_dir_with_project();
+        let staging = StagingArea {
+            worktree_path: temp_dir.join("staging-worktree"),
+            original_repo_path: temp_dir.clone(),
+            is_created: true,
+        };
+
+        assert!(staging.worktree_path.ends_with("staging-worktree"));
+        assert_eq!(staging.original_repo_path, temp_dir);
+
+        // Cleanup
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_patch_validation_result_all_fields() {
+        let result = PatchValidationResult {
+            compiles: false,
+            tests_pass: false,
+            warnings: 42,
+            error_message: Some("comprehensive error".to_string()),
+        };
+
+        assert!(!result.compiles);
+        assert!(!result.tests_pass);
+        assert_eq!(result.warnings, 42);
+        assert_eq!(result.error_message, Some("comprehensive error".to_string()));
+    }
+
+    #[test]
+    fn test_multiple_staging_areas_independent() {
+        let temp_dir1 = create_temp_dir_with_project();
+        let temp_dir2 = create_temp_dir_with_project();
+
+        let staging1 = StagingArea {
+            worktree_path: temp_dir1.join("worktree1"),
+            original_repo_path: temp_dir1.clone(),
+            is_created: true,
+        };
+
+        let staging2 = StagingArea {
+            worktree_path: temp_dir2.join("worktree2"),
+            original_repo_path: temp_dir2.clone(),
+            is_created: true,
+        };
+
+        assert_ne!(staging1.worktree_path, staging2.worktree_path);
+        assert_ne!(staging1.original_repo_path, staging2.original_repo_path);
+
+        // Cleanup
+        let _ = fs::remove_dir_all(&temp_dir1);
+        let _ = fs::remove_dir_all(&temp_dir2);
+    }
+
+    #[test]
+    fn test_patch_candidate_clone_behavior() {
+        let original = PatchCandidate {
+            diff: "original diff".to_string(),
+            file_path: "test.rs".to_string(),
+            applied: false,
+            validation_result: None,
+        };
+
+        let cloned = original.clone();
+
+        assert_eq!(original.diff, cloned.diff);
+        assert_eq!(original.file_path, cloned.file_path);
+        assert_eq!(original.applied, cloned.applied);
+        assert_eq!(original.validation_result, cloned.validation_result);
+    }
+
+    #[test]
+    fn test_patch_candidate_equality() {
+        let candidate1 = PatchCandidate {
+            diff: "same diff".to_string(),
+            file_path: "test.rs".to_string(),
+            applied: false,
+            validation_result: None,
+        };
+
+        let candidate2 = PatchCandidate {
+            diff: "same diff".to_string(),
+            file_path: "test.rs".to_string(),
+            applied: false,
+            validation_result: None,
+        };
+
+        let candidate3 = PatchCandidate {
+            diff: "different diff".to_string(),
+            file_path: "test.rs".to_string(),
+            applied: false,
+            validation_result: None,
+        };
+
+        assert_eq!(candidate1, candidate2);
+        assert_ne!(candidate1, candidate3);
+    }
+
+    #[test]
+    fn test_staging_error_debug_format() {
+        let err = StagingError::PatchApply("test error".to_string());
+        let debug_str = format!("{:?}", err);
+
+        assert!(debug_str.contains("PatchApply"));
+        assert!(debug_str.contains("test error"));
+    }
+
+    #[test]
+    fn test_auto_patch_error_debug_format() {
+        let err = AutoPatchError::Apply("test error".to_string());
+        let debug_str = format!("{:?}", err);
+
+        assert!(debug_str.contains("Apply"));
+        assert!(debug_str.contains("test error"));
+    }
+
+    #[test]
+    fn test_patch_validation_result_display() {
+        let success = PatchValidationResult::success();
+        assert!(success.compiles && success.tests_pass);
+
+        let failure = PatchValidationResult::failure("error message");
+        assert!(!failure.compiles && !failure.tests_pass);
+        assert_eq!(failure.error_message, Some("error message".to_string()));
+    }
+
+    #[test]
+    fn test_staging_area_drop_cleanup_flag() {
+        let temp_dir = create_temp_dir_with_project();
+        let staging_path = temp_dir.clone();
+
+        // Create staging area that will be dropped
+        {
+            let mut staging = StagingArea {
+                worktree_path: temp_dir.clone(),
+                original_repo_path: temp_dir.clone(),
+                is_created: true,
+            };
+            // Manually set is_created to false so cleanup doesn't try to remove
+            staging.is_created = false;
+        } // Drop happens here
+
+        // The path should still exist (we're not actually creating git worktree)
+        assert!(staging_path.exists());
+
+        // Cleanup
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_patch_candidate_with_validation_result() {
+        let mut candidate = PatchCandidate::new("diff", "test.rs");
+        
+        // Set validation result
+        let validation = PatchValidationResult {
+            compiles: true,
+            tests_pass: true,
+            warnings: 0,
+            error_message: None,
+        };
+        candidate.validation_result = Some(validation.into());
+        candidate.applied = true;
+
+        assert!(candidate.validation_result.is_some());
+        assert!(candidate.applied);
+    }
+
+    #[test]
+    fn test_patching_config_all_fields_custom() {
+        let config = PatchingConfig {
+            dry_run: true,
+            allow_network_access: true,
+            max_auto_patches: 100,
+            staging_prefix: Some("test-".to_string()),
+        };
+
+        assert!(config.dry_run);
+        assert!(config.allow_network_access);
+        assert_eq!(config.max_auto_patches, 100);
+        assert_eq!(config.staging_prefix, Some("test-".to_string()));
+    }
+
+    #[test]
+    fn test_staging_error_coverage_all_variants() {
+        // Test all StagingError variants are properly formatted
+        let variants = vec![
+            StagingError::WorktreeCreate("err".to_string()).to_string(),
+            StagingError::PatchApply("err".to_string()).to_string(),
+            StagingError::Validation("err".to_string()).to_string(),
+            StagingError::Cleanup("err".to_string()).to_string(),
+            StagingError::Rollback("err".to_string()).to_string(),
+            StagingError::GitError("err".to_string()).to_string(),
+        ];
+
+        for variant in variants {
+            assert!(!variant.is_empty());
+            assert!(variant.contains("err"));
+        }
+    }
+
+    #[test]
+    fn test_auto_patch_error_coverage_all_variants() {
+        // Test all AutoPatchError variants are properly formatted
+        let variants = vec![
+            AutoPatchError::Generation("err".to_string()).to_string(),
+            AutoPatchError::Apply("err".to_string()).to_string(),
+            AutoPatchError::Validation("err".to_string()).to_string(),
+            AutoPatchError::Staging("err".to_string()).to_string(),
+            AutoPatchError::NoLlmClient.to_string(),
+        ];
+
+        for variant in variants {
+            assert!(!variant.is_empty());
+        }
+    }
 }

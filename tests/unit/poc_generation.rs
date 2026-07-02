@@ -123,6 +123,73 @@ fn test_engine_creation_has_expected_templates() {
     assert!(has_sql_injection || has_command_injection || has_path_traversal || has_xss);
 }
 
+#[test]
+fn test_engine_new_initializes_templates_once() {
+    // Verify that new() properly initializes templates
+    // This tests the constructor path specifically
+    let engine = PoCGenerationEngine::new();
+    
+    // Templates should be populated after construction
+    assert!(!engine.templates.is_empty(), "Engine should have templates after new()");
+    
+    // Verify key templates are present
+    assert!(
+        engine.templates.keys().any(|k| k.starts_with("CWE-")),
+        "Should have CWE-based template keys"
+    );
+}
+
+#[test]
+fn test_engine_default_vs_new_equivalence() {
+    // Verify that default() and new() produce equivalent engines
+    let engine_new = PoCGenerationEngine::new();
+    let engine_default = PoCGenerationEngine::default();
+    
+    // Both should have the same number of templates
+    assert_eq!(
+        engine_new.templates.len(),
+        engine_default.templates.len(),
+        "new() and default() should create engines with same template count"
+    );
+    
+    // Both should have the same template keys
+    let keys_new: std::collections::HashSet<_> = engine_new.templates.keys().collect();
+    let keys_default: std::collections::HashSet<_> = engine_default.templates.keys().collect();
+    assert_eq!(keys_new, keys_default, "Template keys should match");
+}
+
+#[test]
+fn test_engine_template_initialization_completeness() {
+    // Test that init_templates populates all expected vulnerability types
+    let engine = PoCGenerationEngine::new();
+    
+    // Check for presence of templates across different formats
+    let python_count = engine.templates.values().filter(|t| t.format() == PoCFormat::Python).count();
+    let rust_count = engine.templates.values().filter(|t| t.format() == PoCFormat::Rust).count();
+    let shell_count = engine.templates.values().filter(|t| t.format() == PoCFormat::Shell).count();
+    let go_count = engine.templates.values().filter(|t| t.format() == PoCFormat::Go).count();
+    
+    // Should have templates in all supported formats
+    assert!(python_count > 0, "Should have Python templates");
+    assert!(rust_count > 0, "Should have Rust templates");
+    assert!(shell_count > 0, "Should have Shell templates");
+    assert!(go_count > 0, "Should have Go templates");
+}
+
+#[test]
+fn test_engine_new_with_multiple_instances() {
+    // Verify that multiple engine instances are independent
+    let engine1 = PoCGenerationEngine::new();
+    let engine2 = PoCGenerationEngine::new();
+    
+    // Both should have templates
+    assert!(!engine1.templates.is_empty());
+    assert!(!engine2.templates.is_empty());
+    
+    // Template counts should match
+    assert_eq!(engine1.templates.len(), engine2.templates.len());
+}
+
 // ============================================================================
 // PoCFormat Tests
 // ============================================================================
@@ -740,6 +807,126 @@ fn test_poc_code_not_empty() {
         let poc = &result.proofs[0];
         assert!(!poc.code.is_empty());
     }
+}
+
+#[test]
+fn test_generate_with_unverified_finding() {
+    // Test handling of findings without verification status
+    let engine = PoCGenerationEngine::new();
+    let mut finding = create_test_finding("CWE-89", Severity::High);
+    finding.verification_status = None;
+    let context = AnalysisContext::default();
+
+    let result = engine.generate(&[finding], &context, &[PoCFormat::Python]);
+
+    // Should still generate PoC for high severity even without explicit verification
+    assert!(!result.proofs.is_empty() || result.errors.is_empty());
+}
+
+#[test]
+fn test_generate_with_confirmed_status() {
+    // Test that confirmed findings are processed
+    let engine = PoCGenerationEngine::new();
+    let mut finding = create_test_finding("CWE-78", Severity::High);
+    finding.verification_status = Some(VerificationStatus::Confirmed);
+    let context = AnalysisContext::default();
+
+    let result = engine.generate(&[finding], &context, &[PoCFormat::Python]);
+
+    assert!(!result.proofs.is_empty());
+}
+
+#[test]
+fn test_error_collection_on_template_missing() {
+    // Test that errors are properly collected when templates are missing
+    let engine = PoCGenerationEngine::new();
+    let finding = create_test_finding("CWE-999", Severity::Critical);
+    let context = AnalysisContext::default();
+
+    let result = engine.generate(&[finding], &context, &[PoCFormat::Python]);
+
+    // Should have errors for unknown CWE
+    assert!(!result.errors.is_empty() || result.proofs.is_empty());
+}
+
+#[test]
+fn test_mitigation_description_format() {
+    // Test that mitigation descriptions follow expected format
+    let engine = PoCGenerationEngine::new();
+    let finding = create_test_finding("CWE-89", Severity::High);
+
+    let mitigation = engine.generate_mitigation(&finding);
+
+    assert!(mitigation.is_some());
+    let m = mitigation.unwrap();
+    assert!(m.description.starts_with("Mitigation"));
+}
+
+#[test]
+fn test_poc_id_uniqueness() {
+    // Test that generated PoCs have unique IDs
+    let engine = PoCGenerationEngine::new();
+    let finding = create_test_finding("CWE-89", Severity::High);
+    let context = AnalysisContext::default();
+
+    let result1 = engine.generate(&[finding.clone()], &context, &[PoCFormat::Python]);
+    let result2 = engine.generate(&[finding], &context, &[PoCFormat::Python]);
+
+    if !result1.proofs.is_empty() && !result2.proofs.is_empty() {
+        // IDs should be different (due to timestamp-based UUID)
+        assert_ne!(result1.proofs[0].id, result2.proofs[0].id);
+    }
+}
+
+#[test]
+fn test_template_key_format() {
+    // Test that template keys follow expected CWE:Format format
+    let engine = PoCGenerationEngine::new();
+    
+    for key in engine.templates.keys() {
+        // Keys should contain a colon separating CWE and format
+        assert!(key.contains(':'), "Template key should contain colon: {}", key);
+        
+        let parts: Vec<&str> = key.split(':').collect();
+        assert_eq!(parts.len(), 2, "Template key should have exactly 2 parts");
+        assert!(parts[0].starts_with("CWE-"), "First part should be CWE ID");
+    }
+}
+
+#[test]
+fn test_generate_critical_severity_included() {
+    // Test that Critical severity findings are always included
+    let engine = PoCGenerationEngine::new();
+    let finding = create_test_finding("CWE-89", Severity::Critical);
+    let context = AnalysisContext::default();
+
+    let result = engine.generate(&[finding], &context, &[PoCFormat::Python]);
+
+    assert!(!result.proofs.is_empty(), "Critical severity should generate PoC");
+}
+
+#[test]
+fn test_generate_with_mixed_verification_statuses() {
+    // Test generation with findings having different verification statuses
+    let engine = PoCGenerationEngine::new();
+    let findings = vec![
+        {
+            let mut f = create_test_finding("CWE-89", Severity::High);
+            f.verification_status = Some(VerificationStatus::Confirmed);
+            f
+        },
+        {
+            let mut f = create_test_finding("CWE-78", Severity::Critical);
+            f.verification_status = None;
+            f
+        },
+    ];
+    let context = AnalysisContext::default();
+
+    let result = engine.generate(&findings, &context, &[PoCFormat::Python]);
+
+    // Should handle mixed statuses gracefully
+    assert!(!result.proofs.is_empty() || result.errors.is_empty());
 }
 
 // ============================================================================

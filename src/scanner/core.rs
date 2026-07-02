@@ -11,6 +11,9 @@ use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::watch;
 
+// Type alias for phase result to reduce complexity
+type PhaseResult = Result<(Vec<VulnerabilityFinding>, Vec<String>), String>;
+
 pub struct ScannerState {
     pub findings: Vec<VulnerabilityFinding>,
     pub current_phase: ScanPhase,
@@ -305,7 +308,7 @@ impl Scanner {
                 Some(handle) => Some(handle.await),
                 None => None,
             };
-            let llm_static_result = match llm_static_handle {
+            let llm_static_result: Option<PhaseResult> = match llm_static_handle {
                 Some(handle) => Some(handle.await),
                 None => None,
             };

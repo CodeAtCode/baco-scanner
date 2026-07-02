@@ -703,4 +703,301 @@ mod tests {
         assert_eq!(refinements.len(), 3);
         assert!(refinements["f3"].refined_score > refinements["f3"].original_score);
     }
+
+    #[test]
+    fn test_confidence_boost_calculation_exact_values() {
+        let phase = ConfidenceRefinementPhase::new();
+        let context = AnalysisContext::default();
+
+        // Base score 0.8, no modifiers expected
+        let finding = create_finding_with_params("f1", "Test finding", Severity::Medium);
+        let refinements = phase.run(vec![finding], &context);
+        let refined = refinements.get("f1").unwrap();
+
+        // Base 0.8 should stay at 0.8 since test.rs triggers test code penalty
+        assert!((refined.original_score - 0.8).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_multi_source_exact_boost() {
+        let phase = ConfidenceRefinementPhase::new();
+        let context = AnalysisContext::default();
+
+        let mut finding = create_finding_with_params("f1", "Test finding", Severity::Medium);
+        finding.file_path = "src/main.rs".to_string();
+        finding.sources = vec!["semgrep".to_string(), "llm".to_string()];
+
+        let refinements = phase.run(vec![finding], &context);
+        let refined = refinements.get("f1").unwrap();
+
+        // 0.8 base + 0.1 multi-source = 0.9
+        assert!((refined.refined_score - 0.9).abs() < 0.01);
+        assert!(refined
+            .factors
+            .contains(&ConfidenceFactor::MultiSourceConfirmation));
+    }
+
+    #[test]
+    fn test_cross_file_exact_boost() {
+        let phase = ConfidenceRefinementPhase::new();
+        let context = AnalysisContext::default();
+
+        let mut finding = create_finding_with_params("f1", "Test finding", Severity::Medium);
+        finding.file_path = "src/main.rs".to_string();
+        finding.cross_file_references = Some(vec!["src/util.rs".to_string()]);
+
+        let refinements = phase.run(vec![finding], &context);
+        let refined = refinements.get("f1").unwrap();
+
+        // 0.8 base + 0.08 cross-file = 0.88
+        assert!((refined.refined_score - 0.88).abs() < 0.001);
+        assert!(refined
+            .factors
+            .contains(&ConfidenceFactor::CrossFileReachability));
+    }
+
+    #[test]
+    fn test_multi_source_and_cross_file_combined() {
+        let phase = ConfidenceRefinementPhase::new();
+        let context = AnalysisContext::default();
+
+        let mut finding = create_finding_with_params("f1", "Test finding", Severity::Medium);
+        finding.file_path = "src/main.rs".to_string();
+        finding.sources = vec!["semgrep".to_string(), "llm".to_string()];
+        finding.cross_file_references = Some(vec!["src/util.rs".to_string()]);
+
+        let refinements = phase.run(vec![finding], &context);
+        let refined = refinements.get("f1").unwrap();
+
+        // 0.8 + 0.1 (multi-source) + 0.08 (cross-file) = 0.98
+        assert!((refined.refined_score - 0.98).abs() < 0.001);
+        assert_eq!(refined.factors.len(), 2);
+    }
+
+    #[test]
+    fn test_verification_status_confirmed_boost() {
+        let phase = ConfidenceRefinementPhase::new();
+        let context = AnalysisContext::default();
+
+        let mut finding = create_finding_with_params("f1", "Test finding", Severity::Medium);
+        finding.file_path = "src/main.rs".to_string();
+        finding.verification_status = Some(VerificationStatus::Confirmed);
+
+        let refinements = phase.run(vec![finding], &context);
+        let refined = refinements.get("f1").unwrap();
+
+        // 0.8 + 0.15 confirmed = 0.95
+        assert!((refined.refined_score - 0.95).abs() < 0.001);
+        assert!(refined.factors.contains(&ConfidenceFactor::VerifiedByLlm));
+    }
+
+    #[test]
+    fn test_verification_status_false_positive_penalty() {
+        let phase = ConfidenceRefinementPhase::new();
+        let context = AnalysisContext::default();
+
+        let mut finding = create_finding_with_params("f1", "Test finding", Severity::Medium);
+        finding.file_path = "src/main.rs".to_string();
+        finding.verification_status = Some(VerificationStatus::FalsePositive);
+
+        let refinements = phase.run(vec![finding], &context);
+        let refined = refinements.get("f1").unwrap();
+
+        // 0.8 - 0.3 false positive = 0.5
+        assert!((refined.refined_score - 0.5).abs() < 0.001);
+        assert!(refined
+            .factors
+            .contains(&ConfidenceFactor::FalsePositiveDetected));
+    }
+
+    #[test]
+    fn test_verification_status_needs_review_no_change() {
+        let phase = ConfidenceRefinementPhase::new();
+        let context = AnalysisContext::default();
+
+        let mut finding = create_finding_with_params("f1", "Test finding", Severity::Medium);
+        finding.file_path = "src/main.rs".to_string();
+        finding.verification_status = Some(VerificationStatus::NeedsReview);
+
+        let refinements = phase.run(vec![finding], &context);
+        let refined = refinements.get("f1").unwrap();
+
+        // 0.8 unchanged for NeedsReview
+        assert!((refined.refined_score - 0.8).abs() < 0.001);
+        assert!(refined.explanation[0].contains("pending"));
+    }
+
+    #[test]
+    fn test_verification_status_failed_penalty() {
+        let phase = ConfidenceRefinementPhase::new();
+        let context = AnalysisContext::default();
+
+        let mut finding = create_finding_with_params("f1", "Test finding", Severity::Medium);
+        finding.file_path = "src/main.rs".to_string();
+        finding.verification_status = Some(VerificationStatus::Failed);
+
+        let refinements = phase.run(vec![finding], &context);
+        let refined = refinements.get("f1").unwrap();
+
+        // 0.8 - 0.1 failed = 0.7
+        assert!((refined.refined_score - 0.7).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_empty_findings_returns_empty_map() {
+        let phase = ConfidenceRefinementPhase::new();
+        let context = AnalysisContext::default();
+
+        let findings: Vec<VulnerabilityFinding> = vec![];
+        let refinements = phase.run(findings, &context);
+
+        assert!(refinements.is_empty());
+    }
+
+    #[test]
+    fn test_confidence_at_max_clamped_correctly() {
+        let phase = ConfidenceRefinementPhase::new();
+        let context = AnalysisContext::default();
+
+        let mut finding = create_finding_with_params("f1", "Test finding", Severity::Critical);
+        finding.file_path = "src/main.rs".to_string();
+        finding.confidence_score = 0.95;
+        finding.sources = vec!["semgrep".to_string(), "llm".to_string()];
+        finding.cross_file_references = Some(vec!["src/util.rs".to_string()]);
+        finding.verification_status = Some(VerificationStatus::Confirmed);
+
+        let refinements = phase.run(vec![finding], &context);
+        let refined = refinements.get("f1").unwrap();
+
+        // Would be 0.95 + 0.1 + 0.08 + 0.15 + 0.05 (severity) = 1.28, clamped to 1.0
+        assert!((refined.refined_score - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_low_confidence_source_penalty() {
+        let phase = ConfidenceRefinementPhase::new();
+        let context = AnalysisContext::default();
+
+        let mut finding = create_finding_with_params("f1", "Test finding", Severity::Medium);
+        finding.file_path = "src/main.rs".to_string();
+        finding.sources = vec!["bandit".to_string()];
+
+        let refinements = phase.run(vec![finding], &context);
+        let refined = refinements.get("f1").unwrap();
+
+        // 0.8 - 0.05 low confidence source = 0.75
+        assert!((refined.refined_score - 0.75).abs() < 0.001);
+        assert!(refined.factors.contains(&ConfidenceFactor::LowConfidenceSource));
+    }
+
+    #[test]
+    fn test_severity_boost_for_high_severity() {
+        let phase = ConfidenceRefinementPhase::new();
+        let context = AnalysisContext::default();
+
+        let mut finding = create_finding_with_params("f1", "Test finding", Severity::Critical);
+        finding.file_path = "src/main.rs".to_string();
+        finding.confidence_score = 0.85; // above 0.7 threshold
+
+        let refinements = phase.run(vec![finding], &context);
+        let refined = refinements.get("f1").unwrap();
+
+        // 0.85 + 0.05 severity boost = 0.90 (main.rs is not test code)
+        assert!((refined.refined_score - 0.9).abs() < 0.001);
+        assert!(refined.factors.contains(&ConfidenceFactor::SeverityBoost));
+    }
+
+    #[test]
+    fn test_neutral_code_context() {
+        let phase = ConfidenceRefinementPhase::new();
+        let analysis = phase.analyze_code_context("regular function call here");
+
+        assert!(!analysis.supports);
+        assert!(!analysis.contradicts);
+        assert_eq!(analysis.explanation, "Code context is neutral");
+    }
+
+    #[test]
+    fn test_historical_data_record_verification_updates_stats() {
+        let mut data = HistoricalData::new();
+
+        data.record_verification("CWE-79", false);
+        data.record_verification("CWE-79", false);
+        data.record_verification("CWE-79", true);
+        data.record_verification("CWE-89", false);
+
+        let stats_79 = data.get_stats("CWE-79");
+        assert_eq!(stats_79.total, 3);
+        assert_eq!(stats_79.confirmed, 2);
+        assert_eq!(stats_79.false_positives, 1);
+
+        let stats_89 = data.get_stats("CWE-89");
+        assert_eq!(stats_89.total, 1);
+        assert_eq!(stats_89.confirmed, 1);
+        assert_eq!(stats_89.false_positives, 0);
+    }
+
+    #[test]
+    fn test_historical_data_unknown_cwe_returns_default() {
+        let data = HistoricalData::new();
+
+        let stats = data.get_stats("CWE-UNKNOWN");
+        assert_eq!(stats.total, 0);
+        assert_eq!(stats.confirmed, 0);
+        assert_eq!(stats.false_positives, 0);
+    }
+
+    #[test]
+    fn test_context_analysis_with_only_support_patterns() {
+        let phase = ConfidenceRefinementPhase::new();
+        let code = "request.params.input";
+
+        let analysis = phase.analyze_code_context(code);
+
+        assert!(analysis.supports);
+        assert!(!analysis.contradicts);
+    }
+
+    #[test]
+    fn test_context_analysis_with_only_contradict_patterns() {
+        let phase = ConfidenceRefinementPhase::new();
+        let code = "validate(sanitize(escape(input)))";
+
+        let analysis = phase.analyze_code_context(code);
+
+        assert!(!analysis.supports);
+        assert!(analysis.contradicts);
+    }
+
+    #[test]
+    fn test_third_party_code_node_modules() {
+        let phase = ConfidenceRefinementPhase::new();
+        let context = AnalysisContext::default();
+
+        let mut finding = create_finding_with_params("f1", "Test finding", Severity::High);
+        finding.file_path = "node_modules/express/lib/router.js".to_string();
+
+        let refinements = phase.run(vec![finding], &context);
+        let refined = refinements.get("f1").unwrap();
+
+        assert!(refined.factors.contains(&ConfidenceFactor::ThirdPartyCode));
+        assert!(refined.refined_score < refined.original_score);
+    }
+
+    #[test]
+    fn test_low_base_confidence_stays_non_negative() {
+        let phase = ConfidenceRefinementPhase::new();
+        let context = AnalysisContext::default();
+
+        let mut finding = create_finding_with_params("f1", "Test finding", Severity::Low);
+        finding.file_path = "src/main.rs".to_string();
+        finding.confidence_score = 0.1;
+        finding.verification_status = Some(VerificationStatus::FalsePositive);
+
+        let refinements = phase.run(vec![finding], &context);
+        let refined = refinements.get("f1").unwrap();
+
+        // 0.1 - 0.3 = -0.2, clamped to 0.0
+        assert!((refined.refined_score - 0.0).abs() < 0.001);
+    }
 }

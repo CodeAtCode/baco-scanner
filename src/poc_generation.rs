@@ -86,6 +86,13 @@ pub struct PoCTemplate {
     description: String,
 }
 
+impl PoCTemplate {
+    /// Get the format of this template.
+    pub fn format(&self) -> PoCFormat {
+        self.format
+    }
+}
+
 impl PoCGenerationEngine {
     /// Create a new PoC generation engine with default templates.
     pub fn new() -> Self {
