@@ -50,7 +50,7 @@ pub fn detect_project_type(path: &Path) -> ProjectType {
 }
 
 /// Detect project type from Cargo.toml
-fn detect_from_cargo_toml(path: &Path) -> Option<ProjectType> {
+pub fn detect_from_cargo_toml(path: &Path) -> Option<ProjectType> {
     let cargo_path = path.join("Cargo.toml");
     if !cargo_path.exists() {
         return None;
@@ -137,7 +137,7 @@ fn detect_from_cargo_toml(path: &Path) -> Option<ProjectType> {
 }
 
 /// Detect project type from package.json
-fn detect_from_package_json(path: &Path) -> ProjectType {
+pub fn detect_from_package_json(path: &Path) -> ProjectType {
     let package_path = path.join("package.json");
     if !package_path.exists() {
         return ProjectType::Unknown;

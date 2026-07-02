@@ -75,7 +75,7 @@ impl SemgrepRunner {
 
     /// Check if a rule check_id should be excluded based on exclude_rules patterns.
     /// Supports exact match and prefix match (e.g., "python.lang" excludes all "python.lang.*" rules).
-    fn should_exclude_rule(&self, check_id: &str) -> bool {
+    pub fn should_exclude_rule(&self, check_id: &str) -> bool {
         self.exclude_rules.iter().any(|pattern| {
             // Exact match
             if check_id == pattern {
@@ -129,7 +129,7 @@ impl SemgrepRunner {
         .map_err(|e| format!("Semgrep task panicked: {}", e))?
     }
 
-    fn parse_json_output(&self, json: &[u8]) -> Result<Vec<VulnerabilityFinding>, String> {
+    pub fn parse_json_output(&self, json: &[u8]) -> Result<Vec<VulnerabilityFinding>, String> {
         let results: serde_json::Value = serde_json::from_slice(json)
             .map_err(|e| format!("Failed to parse semgrep JSON: {}", e))?;
 
