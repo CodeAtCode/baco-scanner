@@ -116,7 +116,12 @@ impl GitHistoryAnalyzer {
         let mut commits = Vec::new();
 
         let mut revwalk = self.repo.revwalk().map_err(|e| e.to_string())?;
-        revwalk.push_head().map_err(|e| e.to_string())?;
+
+        // If there are no commits, return empty list
+        if revwalk.push_head().is_err() {
+            return Ok(commits);
+        }
+
         revwalk
             .set_sorting(git2::Sort::TIME)
             .map_err(|e| e.to_string())?;

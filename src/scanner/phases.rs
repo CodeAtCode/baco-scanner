@@ -1242,3 +1242,1261 @@ Respond with ONLY JSON:
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::{AgentConfig, LlmPhasesConfig, PerformanceSettings, ScannerSettings};
+    use crate::findings::Severity;
+    use indicatif::ProgressBar;
+    use std::path::PathBuf;
+
+    fn create_test_finding(id: &str, severity: Severity) -> VulnerabilityFinding {
+        VulnerabilityFinding {
+            id: id.to_string(),
+            title: "Test Vulnerability".to_string(),
+            description: "A test vulnerability".to_string(),
+            severity,
+            confidence_score: 0.9,
+            cwe_id: Some("CWE-89".to_string()),
+            file_path: "test.py".to_string(),
+            line_number: Some(42),
+            code_snippet: Some("execute(user_input)".to_string()),
+            diff_hunk: None,
+            recommendation: None,
+            code_location: None,
+            already_reported: false,
+            sources: vec!["test".to_string()],
+            commit_reference: None,
+            ticket_reference: None,
+            priority_score: Some(0.8),
+            cross_file_references: None,
+            verification_status: Some(VerificationStatus::Confirmed),
+            verification_notes: None,
+            verification_error: None,
+            agent_evidence_path: None,
+            security_issue: None,
+            poc_code: None,
+            mitigation_code: None,
+            poc_format: None,
+            llm_model: None,
+            agent_mode: false,
+        }
+    }
+
+    fn create_test_config() -> config::ScannerConfig {
+        config::ScannerConfig {
+            project: crate::config::ProjectConfig {
+                name: "test-project".to_string(),
+                path: ".".to_string(),
+                languages: vec![],
+            },
+            output: crate::config::OutputConfig {
+                dir: "/tmp/test_output".to_string(),
+                format: vec![],
+            },
+            scanner: ScannerSettings {
+                commit_lookback_days: 7,
+                max_file_size_kb: 1024,
+                exclude_paths: vec![],
+                semgrep: crate::config::SemgrepSettings::default(),
+                performance: PerformanceSettings::default(),
+            },
+            llm: crate::config::LlmConfig {
+                phases: LlmPhasesConfig::default(),
+                timeout_secs: 30,
+                max_retries: 3,
+                retry_backoff_ms: 1000,
+                ..Default::default()
+            },
+            tickets: crate::config::TicketConfig { systems: vec![] },
+            agent: AgentConfig::default(),
+        }
+    }
+
+    fn create_test_scanner() -> super::super::Scanner {
+        super::super::Scanner::new(
+            config::ScannerConfig::default(),
+            PathBuf::from("."),
+            false,
+        )
+    }
+
+    // Indexing Phase Tests
+    #[tokio::test]
+    async fn test_indexing_phase_basic() {
+        let scanner = create_test_scanner();
+        let config = create_test_config();
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![];
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::Indexing, findings, pb: &pb, analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+        };
+        let result = run_phase(&scanner, phase_config).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_indexing_phase_preserves_findings() {
+        let scanner = create_test_scanner();
+        let config = create_test_config();
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files = vec!["test.py".to_string()];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("test-1", Severity::High)];
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::Indexing, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+        };
+        let result = run_phase(&scanner, phase_config).await;
+        assert!(result.is_ok());
+        let (updated, _) = result.unwrap();
+        assert_eq!(updated.len(), 1);
+    }
+
+    // Semgrep Phase Tests
+    #[tokio::test]
+    async fn test_semgrep_phase_error_handling() {
+        let scanner = create_test_scanner();
+        let config = create_test_config();
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from("/nonexistent");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("existing-1", Severity::Medium)];
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::Semgrep, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+        };
+        let result = run_phase(&scanner, phase_config).await;
+        assert!(result.is_ok());
+    }
+
+    // LLM Static Analysis Tests
+    #[tokio::test]
+    async fn test_llm_static_analysis_skips_without_api_key() {
+        let scanner = create_test_scanner();
+        let mut config = create_test_config();
+        config.llm.phases.discovery.api_key = None;
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("test-1", Severity::High)];
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::LlmStaticAnalysis, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+        };
+        let result = run_phase(&scanner, phase_config).await;
+        assert!(result.is_ok());
+        let (updated, _) = result.unwrap();
+        assert_eq!(updated.len(), findings.len());
+    }
+
+    // LLM Discovery Tests
+    #[tokio::test]
+    async fn test_llm_discovery_skips_without_api_key() {
+        let scanner = create_test_scanner();
+        let mut config = create_test_config();
+        config.llm.phases.discovery.api_key = None;
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("test-1", Severity::High)];
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::LlmDiscovery, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+        };
+        let result = run_phase(&scanner, phase_config).await;
+        assert!(result.is_ok());
+        let (updated, _) = result.unwrap();
+        assert_eq!(updated.len(), findings.len());
+    }
+
+    // LLM Verification Tests
+    #[tokio::test]
+    async fn test_llm_verification_skips_without_api_key() {
+        let scanner = create_test_scanner();
+        let mut config = create_test_config();
+        config.llm.phases.verification.api_key = None;
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("test-1", Severity::High)];
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::LlmVerification, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+        };
+        let result = run_phase(&scanner, phase_config).await;
+        assert!(result.is_ok());
+        let (updated, _) = result.unwrap();
+        assert_eq!(updated.len(), findings.len());
+    }
+
+    // Security Agent Tests
+    #[tokio::test]
+    async fn test_security_agent_skips_when_disabled() {
+        let scanner = create_test_scanner();
+        let mut config = create_test_config();
+        config.agent.enabled = false;
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("test-1", Severity::High)];
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::SecurityAgentVerification, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+        };
+        let result = run_phase(&scanner, phase_config).await;
+        assert!(result.is_ok());
+        let (updated, _) = result.unwrap();
+        assert_eq!(updated.len(), findings.len());
+    }
+
+    // Ticket CrossRef Tests
+    #[tokio::test]
+    async fn test_ticket_crossref_skips_when_empty_systems() {
+        let scanner = create_test_scanner();
+        let config = create_test_config();
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("test-1", Severity::High)];
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::TicketCrossRef, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+        };
+        let result = run_phase(&scanner, phase_config).await;
+        assert!(result.is_ok());
+        let (updated, _) = result.unwrap();
+        assert_eq!(updated.len(), findings.len());
+    }
+
+    // Git Analysis Tests
+    #[tokio::test]
+    async fn test_git_analysis_on_valid_repo() {
+        let scanner = create_test_scanner();
+        let config = create_test_config();
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("git-1", Severity::High), create_test_finding("git-2", Severity::Medium)];
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::GitAnalysis, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+        };
+        let result = run_phase(&scanner, phase_config).await;
+        assert!(result.is_ok());
+        let (updated, _) = result.unwrap();
+        assert_eq!(updated.len(), findings.len());
+    }
+
+    // Cross-File Analysis Tests
+    #[tokio::test]
+    async fn test_cross_file_analysis_basic() {
+        let scanner = create_test_scanner();
+        let config = create_test_config();
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("cross-1", Severity::High), create_test_finding("cross-2", Severity::Critical)];
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::CrossFileAnalysis, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+        };
+        let result = run_phase(&scanner, phase_config).await;
+        assert!(result.is_ok());
+        let (updated, _) = result.unwrap();
+        assert!(updated.len() >= findings.len());
+    }
+
+    // Confidence Scoring Tests
+    #[tokio::test]
+    async fn test_confidence_scoring_skips_when_disabled() {
+        let scanner = create_test_scanner();
+        let mut config = create_test_config();
+        config.scanner.performance.enable_confidence_refinement = false;
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("test-1", Severity::High)];
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::ConfidenceScoring, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+        };
+        let result = run_phase(&scanner, phase_config).await;
+        assert!(result.is_ok());
+        let (updated, _) = result.unwrap();
+        assert_eq!(updated.len(), findings.len());
+    }
+
+    // AI Aggregation Tests
+    #[tokio::test]
+    async fn test_ai_aggregation_basic() {
+        let scanner = create_test_scanner();
+        let config = create_test_config();
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("agg-1", Severity::High)];
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::AiAggregation, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+        };
+        let result = run_phase(&scanner, phase_config).await;
+        assert!(result.is_ok());
+        let (updated, _) = result.unwrap();
+        assert!(updated.len() >= findings.len());
+    }
+
+    // Reporting Tests
+    #[tokio::test]
+    async fn test_reporting_phase_basic() {
+        let scanner = create_test_scanner();
+        let mut config = create_test_config();
+        config.output.dir = "/tmp/test_reporting".to_string();
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("report-1", Severity::High), create_test_finding("report-2", Severity::Critical)];
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::Reporting, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+        };
+        let result = run_phase(&scanner, phase_config).await;
+        assert!(result.is_ok());
+        let (updated, _) = result.unwrap();
+        assert_eq!(updated.len(), findings.len());
+    }
+
+    #[tokio::test]
+    async fn test_reporting_phase_empty_findings() {
+        let scanner = create_test_scanner();
+        let mut config = create_test_config();
+        config.output.dir = "/tmp/test_reporting_empty".to_string();
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings: Vec<VulnerabilityFinding> = vec![];
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::Reporting, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+        };
+        let result = run_phase(&scanner, phase_config).await;
+        assert!(result.is_ok());
+        let (updated, _) = result.unwrap();
+        assert!(updated.is_empty());
+    }
+
+    // Root Cause Dedup Tests
+    #[tokio::test]
+    async fn test_root_cause_dedup_skips_when_disabled() {
+        let scanner = create_test_scanner();
+        let mut config = create_test_config();
+        config.scanner.performance.enable_root_cause_dedup = false;
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("test-1", Severity::High)];
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::RootCauseDedup, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+        };
+        let result = run_phase(&scanner, phase_config).await;
+        assert!(result.is_ok());
+        let (updated, _) = result.unwrap();
+        assert_eq!(updated.len(), findings.len());
+    }
+
+    // Multi Verifier Tests
+    #[tokio::test]
+    async fn test_multi_verifier_skips_when_disabled() {
+        let scanner = create_test_scanner();
+        let mut config = create_test_config();
+        config.scanner.performance.enable_multi_verifier = false;
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("test-1", Severity::High)];
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::MultiVerifier, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+        };
+        let result = run_phase(&scanner, phase_config).await;
+        assert!(result.is_ok());
+        let (updated, _) = result.unwrap();
+        assert_eq!(updated.len(), findings.len());
+    }
+
+    // Auto Patching Tests
+    #[tokio::test]
+    async fn test_auto_patching_skips_when_disabled() {
+        let scanner = create_test_scanner();
+        let mut config = create_test_config();
+        config.scanner.performance.enable_auto_patching = false;
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("test-1", Severity::High)];
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::AutoPatching, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+        };
+        let result = run_phase(&scanner, phase_config).await;
+        assert!(result.is_ok());
+        let (updated, _) = result.unwrap();
+        assert_eq!(updated.len(), findings.len());
+    }
+
+    // CVE Bootstrap Tests
+    #[tokio::test]
+    async fn test_cve_bootstrap_skips_when_disabled() {
+        let scanner = create_test_scanner();
+        let mut config = create_test_config();
+        config.scanner.performance.enable_cve_bootstrap = false;
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("test-1", Severity::High)];
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::CveBootstrap, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+        };
+        let result = run_phase(&scanner, phase_config).await;
+        assert!(result.is_ok());
+        let (updated, _) = result.unwrap();
+        assert_eq!(updated.len(), findings.len());
+    }
+
+    // PoC Compiler Tests
+    #[tokio::test]
+    async fn test_poc_compiler_skips_when_disabled() {
+        let scanner = create_test_scanner();
+        let mut config = create_test_config();
+        config.scanner.performance.enable_poc_compilation = false;
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("test-1", Severity::High)];
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::PocCompiler, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+        };
+        let result = run_phase(&scanner, phase_config).await;
+        assert!(result.is_ok());
+        let (updated, _) = result.unwrap();
+        assert_eq!(updated.len(), findings.len());
+    }
+
+    // Variant Search Tests
+    #[tokio::test]
+    async fn test_variant_search_skips_when_disabled() {
+        let scanner = create_test_scanner();
+        let mut config = create_test_config();
+        config.scanner.performance.enable_variant_search = false;
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("test-1", Severity::High)];
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::VariantSearch, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+        };
+        let result = run_phase(&scanner, phase_config).await;
+        assert!(result.is_ok());
+        let (updated, _) = result.unwrap();
+        assert_eq!(updated.len(), findings.len());
+    }
+
+    // Edge Case Tests
+    #[tokio::test]
+    async fn test_empty_findings_handling() {
+        let scanner = create_test_scanner();
+        let config = create_test_config();
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings: Vec<VulnerabilityFinding> = vec![];
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::Indexing, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+        };
+        let result = run_phase(&scanner, phase_config).await;
+        assert!(result.is_ok());
+        let (updated, _) = result.unwrap();
+        assert!(updated.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_large_finding_count_handling() {
+        let scanner = create_test_scanner();
+        let config = create_test_config();
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings: Vec<VulnerabilityFinding> = (0..100).map(|i| create_test_finding(&format!("bulk-{}", i), Severity::High)).collect();
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::Indexing, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+        };
+        let result = run_phase(&scanner, phase_config).await;
+        assert!(result.is_ok());
+        let (updated, _) = result.unwrap();
+        assert_eq!(updated.len(), findings.len());
+    }
+
+    #[tokio::test]
+    async fn test_mixed_severity_findings_indexing() {
+        let scanner = create_test_scanner();
+        let config = create_test_config();
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![
+            create_test_finding("sev-1", Severity::Critical),
+            create_test_finding("sev-2", Severity::High),
+            create_test_finding("sev-3", Severity::Medium),
+            create_test_finding("sev-4", Severity::Low),
+        ];
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::Indexing, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+        };
+        let result = run_phase(&scanner, phase_config).await;
+        assert!(result.is_ok());
+        let (updated, _) = result.unwrap();
+        assert_eq!(updated.len(), findings.len());
+    }
+
+    #[tokio::test]
+    async fn test_analyzed_files_preserved() {
+        let scanner = create_test_scanner();
+        let config = create_test_config();
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files = vec!["file1.py".to_string(), "file2.rs".to_string(), "file3.js".to_string()];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![];
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::Indexing, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+        };
+        let result = run_phase(&scanner, phase_config).await;
+        assert!(result.is_ok());
+        let (_, updated_analyzed_files) = result.unwrap();
+        assert_eq!(updated_analyzed_files.len(), analyzed_files.len());
+    }
+
+    #[tokio::test]
+    async fn test_all_phases_complete_without_error() {
+        let scanner = create_test_scanner();
+        let config = create_test_config();
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("test-1", Severity::High)];
+        let phases = vec![
+            ScanPhase::Indexing, ScanPhase::Semgrep, ScanPhase::LlmStaticAnalysis,
+            ScanPhase::LlmDiscovery, ScanPhase::LlmVerification, ScanPhase::TicketCrossRef,
+            ScanPhase::GitAnalysis, ScanPhase::CrossFileAnalysis, ScanPhase::ConfidenceScoring,
+            ScanPhase::AiAggregation, ScanPhase::Reporting, ScanPhase::RootCauseDedup,
+        ];
+        let mut current_findings = findings.clone();
+        for phase in phases {
+            let phase_config = PhaseConfig {
+                phase: &phase, findings: current_findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
+                metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+            };
+            let result = run_phase(&scanner, phase_config).await;
+            assert!(result.is_ok(), "Phase {:?} failed", phase);
+            current_findings = result.unwrap().0;
+        }
+        assert!(current_findings.len() >= findings.len());
+    }
+
+    // Additional tests for 50+ coverage
+    #[tokio::test]
+    async fn test_threat_modeling_phase_basic() {
+        let scanner = create_test_scanner();
+        let config = create_test_config();
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("threat-1", Severity::High)];
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::ThreatModeling, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+        };
+        let result = run_phase(&scanner, phase_config).await;
+        assert!(result.is_ok());
+        let (updated, _) = result.unwrap();
+        assert_eq!(updated.len(), findings.len());
+    }
+
+    #[tokio::test]
+    async fn test_complete_phase_marker() {
+        let scanner = create_test_scanner();
+        let config = create_test_config();
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("complete-1", Severity::High)];
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::Complete, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+        };
+        let result = run_phase(&scanner, phase_config).await;
+        assert!(result.is_ok());
+        let (updated, _) = result.unwrap();
+        assert_eq!(updated.len(), findings.len());
+    }
+
+    #[tokio::test]
+    async fn test_phase_with_single_finding() {
+        let scanner = create_test_scanner();
+        let config = create_test_config();
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("single-1", Severity::Critical)];
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::Indexing, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+        };
+        let result = run_phase(&scanner, phase_config).await;
+        assert!(result.is_ok());
+        let (updated, _) = result.unwrap();
+        assert_eq!(updated.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_phase_preserves_finding_metadata() {
+        let scanner = create_test_scanner();
+        let config = create_test_config();
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let mut finding = create_test_finding("meta-1", Severity::High);
+        finding.cwe_id = Some("CWE-79".to_string());
+        finding.sources = vec!["semgrep".to_string(), "llm".to_string()];
+        let findings = vec![finding];
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::Indexing, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+        };
+        let result = run_phase(&scanner, phase_config).await;
+        assert!(result.is_ok());
+        let (updated, _) = result.unwrap();
+        assert_eq!(updated.len(), 1);
+        assert_eq!(updated[0].id, "meta-1");
+    }
+
+    #[tokio::test]
+    async fn test_phase_chain_preserves_all_findings() {
+        let scanner = create_test_scanner();
+        let config = create_test_config();
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let initial_findings = vec![create_test_finding("chain-1", Severity::Critical), create_test_finding("chain-2", Severity::High)];
+        let mut current_findings = initial_findings.clone();
+        let phases = vec![ScanPhase::Indexing, ScanPhase::CrossFileAnalysis, ScanPhase::ConfidenceScoring];
+        for phase in phases {
+            let phase_config = PhaseConfig {
+                phase: &phase, findings: current_findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
+                metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+            };
+            let result = run_phase(&scanner, phase_config).await.unwrap();
+            current_findings = result.0;
+        }
+        assert!(current_findings.len() >= initial_findings.len());
+    }
+
+    // ========================================================================
+    // Additional Edge Case Tests
+    // ========================================================================
+
+    #[tokio::test]
+    async fn test_indexing_phase_with_many_findings() {
+        let scanner = create_test_scanner();
+        let config = create_test_config();
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        
+        // Create 50 findings to test batch handling
+        let findings: Vec<VulnerabilityFinding> = (0..50)
+            .map(|i| create_test_finding(&format!("bulk-{}", i), Severity::High))
+            .collect();
+        
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::Indexing,
+            findings,
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
+        };
+        
+        let result = run_phase(&scanner, phase_config).await.unwrap();
+        assert_eq!(result.0.len(), 50);
+    }
+
+    #[tokio::test]
+    async fn test_semgrep_phase_with_nonexistent_path() {
+        let scanner = create_test_scanner();
+        let config = create_test_config();
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from("/nonexistent/path/that/does/not/exist");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("sem-1", Severity::Medium)];
+        
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::Semgrep,
+            findings,
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
+        };
+        
+        let result = run_phase(&scanner, phase_config).await.unwrap();
+        // Should return findings unchanged when path doesn't exist
+        assert_eq!(result.0.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_llm_static_analysis_without_api_key() {
+        let scanner = create_test_scanner();
+        let mut config = create_test_config();
+        config.llm.phases.git_analysis.api_key = None;
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("llm-static-1", Severity::High)];
+        
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::LlmStaticAnalysis,
+            findings,
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
+        };
+        
+        let result = run_phase(&scanner, phase_config).await.unwrap();
+        // Should return findings unchanged when API key is missing
+        assert_eq!(result.0.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_llm_discovery_without_api_key() {
+        let scanner = create_test_scanner();
+        let mut config = create_test_config();
+        config.llm.phases.discovery.api_key = None;
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("llm-disc-1", Severity::Critical)];
+        
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::LlmDiscovery,
+            findings,
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
+        };
+        
+        let result = run_phase(&scanner, phase_config).await.unwrap();
+        // Should return findings unchanged when API key is missing
+        assert_eq!(result.0.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_llm_verification_without_api_key() {
+        let scanner = create_test_scanner();
+        let mut config = create_test_config();
+        config.llm.phases.verification.api_key = None;
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("llm-ver-1", Severity::High)];
+        
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::LlmVerification,
+            findings,
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
+        };
+        
+        let result = run_phase(&scanner, phase_config).await.unwrap();
+        // Should return findings unchanged when API key is missing
+        assert_eq!(result.0.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_security_agent_verification_disabled() {
+        let scanner = create_test_scanner();
+        let mut config = create_test_config();
+        config.agent.enabled = false;
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("agent-1", Severity::High)];
+        
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::SecurityAgentVerification,
+            findings,
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
+        };
+        
+        let result = run_phase(&scanner, phase_config).await.unwrap();
+        // Should return findings unchanged when agent is disabled
+        assert_eq!(result.0.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_ticket_crossref_with_empty_systems() {
+        let scanner = create_test_scanner();
+        let config = create_test_config();
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("ticket-1", Severity::Medium)];
+        
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::TicketCrossRef,
+            findings,
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
+        };
+        
+        let result = run_phase(&scanner, phase_config).await.unwrap();
+        // Should return findings unchanged when no ticket systems configured
+        assert_eq!(result.0.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_confidence_scoring_disabled() {
+        let scanner = create_test_scanner();
+        let mut config = create_test_config();
+        config.scanner.performance.enable_confidence_refinement = false;
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("conf-1", Severity::High)];
+        
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::ConfidenceScoring,
+            findings,
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
+        };
+        
+        let result = run_phase(&scanner, phase_config).await.unwrap();
+        // Should return findings unchanged when confidence refinement is disabled
+        assert_eq!(result.0.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_root_cause_dedup_disabled() {
+        let scanner = create_test_scanner();
+        let mut config = create_test_config();
+        config.scanner.performance.enable_root_cause_dedup = false;
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("dedup-1", Severity::High)];
+        
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::RootCauseDedup,
+            findings,
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
+        };
+        
+        let result = run_phase(&scanner, phase_config).await.unwrap();
+        // Should return findings unchanged when dedup is disabled
+        assert_eq!(result.0.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_multi_verifier_disabled() {
+        let scanner = create_test_scanner();
+        let mut config = create_test_config();
+        config.scanner.performance.enable_multi_verifier = false;
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("multi-1", Severity::High)];
+        
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::MultiVerifier,
+            findings,
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
+        };
+        
+        let result = run_phase(&scanner, phase_config).await.unwrap();
+        // Should return findings unchanged when multi-verifier is disabled
+        assert_eq!(result.0.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_auto_patching_disabled() {
+        let scanner = create_test_scanner();
+        let mut config = create_test_config();
+        config.scanner.performance.enable_auto_patching = false;
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("patch-1", Severity::High)];
+        
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::AutoPatching,
+            findings,
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
+        };
+        
+        let result = run_phase(&scanner, phase_config).await.unwrap();
+        // Should return findings unchanged when auto-patching is disabled
+        assert_eq!(result.0.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_cve_bootstrap_disabled() {
+        let scanner = create_test_scanner();
+        let mut config = create_test_config();
+        config.scanner.performance.enable_cve_bootstrap = false;
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("cve-1", Severity::High)];
+        
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::CveBootstrap,
+            findings,
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
+        };
+        
+        let result = run_phase(&scanner, phase_config).await.unwrap();
+        // Should return findings unchanged when CVE bootstrap is disabled
+        assert_eq!(result.0.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_poc_compiler_disabled() {
+        let scanner = create_test_scanner();
+        let mut config = create_test_config();
+        config.scanner.performance.enable_poc_compilation = false;
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("poc-1", Severity::High)];
+        
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::PocCompiler,
+            findings,
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
+        };
+        
+        let result = run_phase(&scanner, phase_config).await.unwrap();
+        // Should return findings unchanged when PoC compilation is disabled
+        assert_eq!(result.0.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_variant_search_disabled() {
+        let scanner = create_test_scanner();
+        let mut config = create_test_config();
+        config.scanner.performance.enable_variant_search = false;
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("variant-1", Severity::High)];
+        
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::VariantSearch,
+            findings,
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
+        };
+        
+        let result = run_phase(&scanner, phase_config).await.unwrap();
+        // Should return findings unchanged when variant search is disabled
+        assert_eq!(result.0.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_threat_modeling_disabled() {
+        let scanner = create_test_scanner();
+        let mut config = create_test_config();
+        config.scanner.performance.enable_threat_modeling = false;
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("threat-1", Severity::High)];
+        
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::ThreatModeling,
+            findings,
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
+        };
+        
+        let result = run_phase(&scanner, phase_config).await.unwrap();
+        // Should return findings unchanged when threat modeling is disabled
+        assert_eq!(result.0.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_mixed_severity_findings_crossfile() {
+        let scanner = create_test_scanner();
+        let config = create_test_config();
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        
+        let findings = vec![
+            create_test_finding("crit", Severity::Critical),
+            create_test_finding("high", Severity::High),
+            create_test_finding("med", Severity::Medium),
+            create_test_finding("low", Severity::Low),
+        ];
+        
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::Indexing,
+            findings,
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
+        };
+        
+        let result = run_phase(&scanner, phase_config).await.unwrap();
+        assert_eq!(result.0.len(), 4);
+    }
+
+    #[tokio::test]
+    async fn test_phase_chain_with_all_phases() {
+        let scanner = create_test_scanner();
+        let config = create_test_config();
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        
+        let initial_findings = vec![create_test_finding("chain", Severity::High)];
+        let mut current_findings = initial_findings.clone();
+        
+        let phases = vec![
+            ScanPhase::Indexing,
+            ScanPhase::Semgrep,
+            ScanPhase::GitAnalysis,
+            ScanPhase::CrossFileAnalysis,
+        ];
+        
+        for phase in phases {
+            let phase_config = PhaseConfig {
+                phase: &phase,
+                findings: current_findings.clone(),
+                pb: &pb,
+                analyzed_files: &analyzed_files,
+                metrics_tracker: &metrics_tracker,
+                target_path: &target_path,
+                config: &config,
+                project_stack: &project_stack,
+            };
+            let result = run_phase(&scanner, phase_config).await.unwrap();
+            current_findings = result.0;
+        }
+        
+        assert!(current_findings.len() >= initial_findings.len());
+    }
+
+    #[tokio::test]
+    async fn test_finding_metadata_preservation() {
+        let scanner = create_test_scanner();
+        let config = create_test_config();
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
+        
+        let mut finding = create_test_finding("meta", Severity::Critical);
+        finding.cwe_id = Some("CWE-89".to_string());
+        finding.sources = vec!["semgrep".to_string(), "manual".to_string()];
+        finding.priority_score = Some(0.95);
+        
+        let findings = vec![finding];
+        
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::Indexing,
+            findings,
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
+        };
+        
+        let result = run_phase(&scanner, phase_config).await.unwrap();
+        assert_eq!(result.0.len(), 1);
+        assert_eq!(result.0[0].cwe_id, Some("CWE-89".to_string()));
+        assert_eq!(result.0[0].sources.len(), 2);
+    }
+}

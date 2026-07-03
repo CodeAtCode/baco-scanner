@@ -10,7 +10,7 @@
 mod analyzer;
 mod helpers;
 mod models;
-pub(crate) mod patterns;
+pub mod patterns;
 #[cfg(test)]
 mod tests;
 

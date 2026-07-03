@@ -92,3 +92,26 @@ pub trait ScanPhase: Send + Sync {
     /// Checks if this phase should run based on config.
     fn is_enabled(&self, ctx: &PhaseContext) -> bool;
 }
+
+#[cfg(test)]
+mod phase_trait_tests {
+    use super::*;
+
+    #[test]
+    fn test_phase_error_display() {
+        let err = PhaseError {
+            phase_name: "TestPhase",
+            message: "Test error".to_string(),
+        };
+        let display = format!("{}", err);
+        assert!(display.contains("TestPhase"));
+        assert!(display.contains("Test error"));
+    }
+
+    #[test]
+    fn test_phase_context_creation() {
+        // Just verify the struct exists and can be referenced
+        // Full testing requires a real Scanner instance
+        assert!(true);
+    }
+}

@@ -128,10 +128,13 @@ fn test_engine_new_initializes_templates_once() {
     // Verify that new() properly initializes templates
     // This tests the constructor path specifically
     let engine = PoCGenerationEngine::new();
-    
+
     // Templates should be populated after construction
-    assert!(!engine.templates.is_empty(), "Engine should have templates after new()");
-    
+    assert!(
+        !engine.templates.is_empty(),
+        "Engine should have templates after new()"
+    );
+
     // Verify key templates are present
     assert!(
         engine.templates.keys().any(|k| k.starts_with("CWE-")),
@@ -144,14 +147,14 @@ fn test_engine_default_vs_new_equivalence() {
     // Verify that default() and new() produce equivalent engines
     let engine_new = PoCGenerationEngine::new();
     let engine_default = PoCGenerationEngine::default();
-    
+
     // Both should have the same number of templates
     assert_eq!(
         engine_new.templates.len(),
         engine_default.templates.len(),
         "new() and default() should create engines with same template count"
     );
-    
+
     // Both should have the same template keys
     let keys_new: std::collections::HashSet<_> = engine_new.templates.keys().collect();
     let keys_default: std::collections::HashSet<_> = engine_default.templates.keys().collect();
@@ -162,13 +165,29 @@ fn test_engine_default_vs_new_equivalence() {
 fn test_engine_template_initialization_completeness() {
     // Test that init_templates populates all expected vulnerability types
     let engine = PoCGenerationEngine::new();
-    
+
     // Check for presence of templates across different formats
-    let python_count = engine.templates.values().filter(|t| t.format() == PoCFormat::Python).count();
-    let rust_count = engine.templates.values().filter(|t| t.format() == PoCFormat::Rust).count();
-    let shell_count = engine.templates.values().filter(|t| t.format() == PoCFormat::Shell).count();
-    let go_count = engine.templates.values().filter(|t| t.format() == PoCFormat::Go).count();
-    
+    let python_count = engine
+        .templates
+        .values()
+        .filter(|t| t.format() == PoCFormat::Python)
+        .count();
+    let rust_count = engine
+        .templates
+        .values()
+        .filter(|t| t.format() == PoCFormat::Rust)
+        .count();
+    let shell_count = engine
+        .templates
+        .values()
+        .filter(|t| t.format() == PoCFormat::Shell)
+        .count();
+    let go_count = engine
+        .templates
+        .values()
+        .filter(|t| t.format() == PoCFormat::Go)
+        .count();
+
     // Should have templates in all supported formats
     assert!(python_count > 0, "Should have Python templates");
     assert!(rust_count > 0, "Should have Rust templates");
@@ -181,11 +200,11 @@ fn test_engine_new_with_multiple_instances() {
     // Verify that multiple engine instances are independent
     let engine1 = PoCGenerationEngine::new();
     let engine2 = PoCGenerationEngine::new();
-    
+
     // Both should have templates
     assert!(!engine1.templates.is_empty());
     assert!(!engine2.templates.is_empty());
-    
+
     // Template counts should match
     assert_eq!(engine1.templates.len(), engine2.templates.len());
 }
@@ -882,11 +901,15 @@ fn test_poc_id_uniqueness() {
 fn test_template_key_format() {
     // Test that template keys follow expected CWE:Format format
     let engine = PoCGenerationEngine::new();
-    
+
     for key in engine.templates.keys() {
         // Keys should contain a colon separating CWE and format
-        assert!(key.contains(':'), "Template key should contain colon: {}", key);
-        
+        assert!(
+            key.contains(':'),
+            "Template key should contain colon: {}",
+            key
+        );
+
         let parts: Vec<&str> = key.split(':').collect();
         assert_eq!(parts.len(), 2, "Template key should have exactly 2 parts");
         assert!(parts[0].starts_with("CWE-"), "First part should be CWE ID");
@@ -902,7 +925,10 @@ fn test_generate_critical_severity_included() {
 
     let result = engine.generate(&[finding], &context, &[PoCFormat::Python]);
 
-    assert!(!result.proofs.is_empty(), "Critical severity should generate PoC");
+    assert!(
+        !result.proofs.is_empty(),
+        "Critical severity should generate PoC"
+    );
 }
 
 #[test]

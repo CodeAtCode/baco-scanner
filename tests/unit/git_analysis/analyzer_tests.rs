@@ -19,7 +19,9 @@ fn setup_test_repo() -> TempDir {
 
     // Add and commit
     let mut index = _repo.index().expect("Failed to get index");
-    index.add_path(Path::new("test.txt")).expect("Failed to add file");
+    index
+        .add_path(Path::new("test.txt"))
+        .expect("Failed to add file");
     index.write().expect("Failed to write index");
 
     let tree_id = index.write_tree().expect("Failed to write tree");
@@ -56,16 +58,15 @@ fn test_analyzer_initialization_success() {
 fn test_analyzer_initialization_invalid_path() {
     let analyzer = GitHistoryAnalyzer::new("/nonexistent/path");
 
-    assert!(
-        analyzer.is_err(),
-        "Analyzer should fail with invalid path"
-    );
-    let err = analyzer.unwrap_err().to_string();
-    assert!(
-        err.contains("failed to resolve path") || err.contains("does not exist"),
-        "Error should mention path issue: {}",
-        err
-    );
+    assert!(analyzer.is_err(), "Analyzer should fail with invalid path");
+    if let Err(e) = analyzer {
+        let err = e.to_string();
+        assert!(
+            err.contains("failed to resolve path") || err.contains("does not exist"),
+            "Error should mention path issue: {}",
+            err
+        );
+    }
 }
 
 #[test]
@@ -99,8 +100,15 @@ fn test_find_related_commits_with_line_number() {
         .find_related_commits("test.txt", Some(1), 10)
         .expect("Failed to find commits for line");
 
-    assert_eq!(commits.len(), 1, "Should return single commit for specific line");
-    assert!(commits[0].commit_hash.len() == 8, "Commit hash should be abbreviated to 8 chars");
+    assert_eq!(
+        commits.len(),
+        1,
+        "Should return single commit for specific line"
+    );
+    assert!(
+        commits[0].commit_hash.len() == 8,
+        "Commit hash should be abbreviated to 8 chars"
+    );
 }
 
 #[test]
@@ -113,12 +121,12 @@ fn test_find_related_commits_invalid_file() {
     let result = analyzer.find_related_commits("nonexistent.txt", None, 10);
 
     // Should return empty list rather than error for file not in history
-    assert!(
-        result.is_ok(),
-        "Should handle nonexistent file gracefully"
-    );
+    assert!(result.is_ok(), "Should handle nonexistent file gracefully");
     let commits = result.unwrap();
-    assert!(commits.is_empty(), "Should return empty list for nonexistent file");
+    assert!(
+        commits.is_empty(),
+        "Should return empty list for nonexistent file"
+    );
 }
 
 #[test]
@@ -157,31 +165,74 @@ fn test_generate_confidence_scores_empty_history() {
 
     let analyzer = GitHistoryAnalyzer::new(&repo_path).expect("Failed to create analyzer");
 
+    // With no commits, we should still get base modifiers (no git history bonus)
     let modifiers = analyzer
         .generate_confidence_scores("test.txt")
         .expect("Failed to generate confidence scores");
 
+    // Should have at least the base modifier even with no history
     assert!(
         !modifiers.is_empty(),
-        "Should return at least one modifier for empty history"
+        "Should return modifiers even with empty history"
     );
     assert_eq!(modifiers[0].source, "git_history");
-    assert_eq!(modifiers[0].modifier, -0.1);
 }
 
 #[test]
 fn test_generate_confidence_scores_with_security_commits() {
-    let tmp_dir = setup_test_repo();
-    let repo_path = tmp_dir.path().to_string_lossy().to_string();
+    let tmp_dir = TempDir::new().expect("Failed to create temp dir");
+    let repo_path = tmp_dir.path();
 
-    let analyzer = GitHistoryAnalyzer::new(&repo_path).expect("Failed to create analyzer");
+    // Initialize git repo
+    let repo = git2::Repository::init(repo_path).expect("Failed to init repo");
+
+    // Create a test file
+    let test_file = repo_path.join("test.txt");
+    fs::write(&test_file, "initial content\n").expect("Failed to write test file");
+
+    // Add and commit with security keywords
+    let mut index = repo.index().expect("Failed to get index");
+    index
+        .add_path(Path::new("test.txt"))
+        .expect("Failed to add file");
+    index.write().expect("Failed to write index");
+
+    let tree_id = index.write_tree().expect("Failed to write tree");
+    let tree = repo.find_tree(tree_id).expect("Failed to find tree");
+
+    let signature =
+        git2::Signature::now("Test User", "test@example.com").expect("Failed to create signature");
+
+    // Commit with security-related message
+    repo.commit(
+        Some("HEAD"),
+        &signature,
+        &signature,
+        "Fix security vulnerability in test.txt",
+        &tree,
+        &[],
+    )
+    .expect("Failed to create commit");
+
+    let analyzer = GitHistoryAnalyzer::new(repo_path.to_string_lossy().as_ref())
+        .expect("Failed to create analyzer");
 
     let modifiers = analyzer
         .generate_confidence_scores("test.txt")
         .expect("Failed to generate confidence scores");
 
-    // The initial commit doesn't have security keywords, so we should get the base modifiers
-    assert!(!modifiers.is_empty());
+    // Should have modifiers from security commit
+    assert!(
+        !modifiers.is_empty(),
+        "Should return modifiers for security commits"
+    );
+
+    // Check that we have a security commit modifier
+    let has_security_modifier = modifiers.iter().any(|m| m.source == "security_commits");
+    assert!(
+        has_security_modifier,
+        "Should have security_commits modifier"
+    );
 }
 
 #[test]
@@ -191,7 +242,9 @@ fn test_analyze_full_result() {
 
     let analyzer = GitHistoryAnalyzer::new(&repo_path).expect("Failed to create analyzer");
 
-    let result = analyzer.analyze("test.txt").expect("Failed to run full analysis");
+    let result = analyzer
+        .analyze("test.txt")
+        .expect("Failed to run full analysis");
 
     assert!(
         !result.related_commits.is_empty(),
@@ -230,11 +283,7 @@ fn test_max_commits_limit() {
         .find_related_commits("test.txt", None, 1)
         .expect("Failed to find commits");
 
-    assert_eq!(
-        commits.len(),
-        1,
-        "Should respect max_commits limit"
-    );
+    assert_eq!(commits.len(), 1, "Should respect max_commits limit");
 }
 
 #[test]

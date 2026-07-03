@@ -887,7 +887,9 @@ mod tests {
 
         // 0.8 - 0.05 low confidence source = 0.75
         assert!((refined.refined_score - 0.75).abs() < 0.001);
-        assert!(refined.factors.contains(&ConfidenceFactor::LowConfidenceSource));
+        assert!(refined
+            .factors
+            .contains(&ConfidenceFactor::LowConfidenceSource));
     }
 
     #[test]

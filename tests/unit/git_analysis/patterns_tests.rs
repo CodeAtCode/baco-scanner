@@ -20,7 +20,7 @@ fn test_compile_vulnerability_patterns() {
 
     // All patterns should be valid regex
     for (regex, _, _) in &patterns {
-        assert!(regex.as_str().len() > 0);
+        assert!(!regex.as_str().is_empty());
     }
 }
 
@@ -111,12 +111,9 @@ fn test_analyze_commit_message_multiple_cwe_references() {
 fn test_analyze_commit_message_case_insensitive() {
     let keywords = get_security_keywords();
 
-    let (is_security_upper, _) =
-        analyze_commit_message("FIX SECURITY ISSUE", &keywords);
-    let (is_security_lower, _) =
-        analyze_commit_message("fix security issue", &keywords);
-    let (is_security_mixed, _) =
-        analyze_commit_message("Fix SecUrItY Issue", &keywords);
+    let (is_security_upper, _) = analyze_commit_message("FIX SECURITY ISSUE", &keywords);
+    let (is_security_lower, _) = analyze_commit_message("fix security issue", &keywords);
+    let (is_security_mixed, _) = analyze_commit_message("Fix SecUrItY Issue", &keywords);
 
     assert!(is_security_upper, "Should be case insensitive (uppercase)");
     assert!(is_security_lower, "Should be case insensitive (lowercase)");
@@ -168,20 +165,12 @@ fn test_calculate_pattern_confidence_security_fix_bonus() {
     let now = chrono::Utc::now().timestamp();
 
     // Security fix pattern type
-    let confidence_fix = calculate_pattern_confidence(
-        now,
-        false,
-        0,
-        &VulnerabilityPatternType::SecurityFix,
-    );
+    let confidence_fix =
+        calculate_pattern_confidence(now, false, 0, &VulnerabilityPatternType::SecurityFix);
 
     // Non-security pattern type
-    let confidence_other = calculate_pattern_confidence(
-        now,
-        false,
-        0,
-        &VulnerabilityPatternType::SecurityTodo,
-    );
+    let confidence_other =
+        calculate_pattern_confidence(now, false, 0, &VulnerabilityPatternType::SecurityTodo);
 
     assert!(
         confidence_fix > confidence_other,
@@ -210,16 +199,13 @@ fn test_calculate_pattern_confidence_cap_at_one() {
 
     // Maximum bonuses
     let confidence = calculate_pattern_confidence(
-        now,       // Recent
-        true,      // Security fix
-        5,         // Multiple CWE refs
+        now,  // Recent
+        true, // Security fix
+        5,    // Multiple CWE refs
         &VulnerabilityPatternType::SecurityVulnerability,
     );
 
-    assert!(
-        confidence <= 1.0,
-        "Confidence should be capped at 1.0"
-    );
+    assert!(confidence <= 1.0, "Confidence should be capped at 1.0");
 }
 
 #[test]
@@ -227,7 +213,9 @@ fn test_vulnerability_pattern_matches_cwe() {
     let patterns = compile_vulnerability_patterns();
 
     let cwe_message = "Fixed CWE-79 XSS vulnerability";
-    let has_match = patterns.iter().any(|(regex, _, _)| regex.is_match(cwe_message));
+    let has_match = patterns
+        .iter()
+        .any(|(regex, _, _)| regex.is_match(cwe_message));
 
     assert!(has_match, "Should match CWE reference");
 }
@@ -237,7 +225,9 @@ fn test_vulnerability_pattern_matches_cve() {
     let patterns = compile_vulnerability_patterns();
 
     let cve_message = "Patch for CVE-2024-1234";
-    let has_match = patterns.iter().any(|(regex, _, _)| regex.is_match(cve_message));
+    let has_match = patterns
+        .iter()
+        .any(|(regex, _, _)| regex.is_match(cve_message));
 
     assert!(has_match, "Should match CVE reference");
 }
@@ -247,7 +237,9 @@ fn test_vulnerability_pattern_matches_security_fix() {
     let patterns = compile_vulnerability_patterns();
 
     let fix_message = "Fix security vulnerability in input validation";
-    let has_match = patterns.iter().any(|(regex, _, _)| regex.is_match(fix_message));
+    let has_match = patterns
+        .iter()
+        .any(|(regex, _, _)| regex.is_match(fix_message));
 
     assert!(has_match, "Should match security fix pattern");
 }
@@ -257,9 +249,10 @@ fn test_vulnerability_pattern_matches_xss() {
     let patterns = compile_vulnerability_patterns();
 
     let xss_message = "Prevent XSS attack";
-    let has_match = patterns
-        .iter()
-        .any(|(regex, pattern_type, _)| regex.is_match(xss_message) && matches!(pattern_type, VulnerabilityPatternType::InjectionRisk));
+    let has_match = patterns.iter().any(|(regex, pattern_type, _)| {
+        regex.is_match(xss_message)
+            && matches!(pattern_type, VulnerabilityPatternType::InjectionRisk)
+    });
 
     assert!(has_match, "Should match XSS pattern");
 }
@@ -269,9 +262,10 @@ fn test_risky_pattern_matches_emergency() {
     let patterns = compile_risky_patterns();
 
     let emergency_message = "Emergency hotfix for production";
-    let has_match = patterns
-        .iter()
-        .any(|(regex, pattern_type, _)| regex.is_match(emergency_message) && matches!(pattern_type, RiskyPatternType::EmergencyCommit));
+    let has_match = patterns.iter().any(|(regex, pattern_type, _)| {
+        regex.is_match(emergency_message)
+            && matches!(pattern_type, RiskyPatternType::EmergencyCommit)
+    });
 
     assert!(has_match, "Should match emergency pattern");
 }
@@ -281,9 +275,9 @@ fn test_risky_pattern_matches_security_bypass() {
     let patterns = compile_risky_patterns();
 
     let bypass_message = "Bypass security check for testing";
-    let has_match = patterns
-        .iter()
-        .any(|(regex, pattern_type, _)| regex.is_match(bypass_message) && matches!(pattern_type, RiskyPatternType::SecurityBypass));
+    let has_match = patterns.iter().any(|(regex, pattern_type, _)| {
+        regex.is_match(bypass_message) && matches!(pattern_type, RiskyPatternType::SecurityBypass)
+    });
 
     assert!(has_match, "Should match security bypass pattern");
 }
@@ -293,9 +287,9 @@ fn test_risky_pattern_matches_revert() {
     let patterns = compile_risky_patterns();
 
     let revert_message = "Revert previous changes";
-    let has_match = patterns
-        .iter()
-        .any(|(regex, pattern_type, _)| regex.is_match(revert_message) && matches!(pattern_type, RiskyPatternType::Revert));
+    let has_match = patterns.iter().any(|(regex, pattern_type, _)| {
+        regex.is_match(revert_message) && matches!(pattern_type, RiskyPatternType::Revert)
+    });
 
     assert!(has_match, "Should match revert pattern");
 }

@@ -2,10 +2,17 @@
 
 mod checkpoint;
 mod core;
+#[cfg(test)]
+pub(crate) mod phases;
+#[cfg(not(test))]
 mod phases;
 
 // Re-export public API from core
 pub use core::{Scanner, ScannerState};
+
+// Re-export phases for testing
+#[cfg(test)]
+pub use phases::{run_phase, PhaseConfig};
 
 // Use the checkpoint module for save/load
 use crate::checkpoint::ScanPhase;
@@ -128,9 +135,7 @@ mod tests {
                 ..Default::default()
             },
             agent: AgentConfig::default(),
-            tickets: crate::config::TicketConfig {
-                systems: vec![],
-            },
+            tickets: crate::config::TicketConfig { systems: vec![] },
         }
     }
 
@@ -167,7 +172,10 @@ mod tests {
     fn test_scan_phase_debug_format() {
         assert_eq!(format!("{:?}", ScanPhase::Indexing), "Indexing");
         assert_eq!(format!("{:?}", ScanPhase::Semgrep), "Semgrep");
-        assert_eq!(format!("{:?}", ScanPhase::LlmStaticAnalysis), "LlmStaticAnalysis");
+        assert_eq!(
+            format!("{:?}", ScanPhase::LlmStaticAnalysis),
+            "LlmStaticAnalysis"
+        );
         assert_eq!(format!("{:?}", ScanPhase::Complete), "Complete");
     }
 
@@ -179,7 +187,9 @@ mod tests {
 
         let scanner = Scanner::new(config.clone(), target_path.clone(), false);
 
-        let result = scanner.run_phase(&ScanPhase::Indexing, vec![], &pb, &[]).await;
+        let result = scanner
+            .run_phase(&ScanPhase::Indexing, vec![], &pb, &[])
+            .await;
         assert!(result.is_ok());
 
         let (findings, analyzed_files) = result.unwrap();
@@ -199,7 +209,9 @@ mod tests {
         ];
 
         let scanner = Scanner::new(config.clone(), target_path.clone(), false);
-        let result = scanner.run_phase(&ScanPhase::CrossFileAnalysis, findings, &pb, &[]).await;
+        let result = scanner
+            .run_phase(&ScanPhase::CrossFileAnalysis, findings, &pb, &[])
+            .await;
 
         assert!(result.is_ok());
         let (findings, _) = result.unwrap();
@@ -219,7 +231,9 @@ mod tests {
         ];
 
         let scanner = Scanner::new(config.clone(), target_path.clone(), false);
-        let result = scanner.run_phase(&ScanPhase::Reporting, findings, &pb, &[]).await;
+        let result = scanner
+            .run_phase(&ScanPhase::Reporting, findings, &pb, &[])
+            .await;
 
         assert!(result.is_ok());
         let (findings, _) = result.unwrap();
@@ -240,7 +254,9 @@ mod tests {
         ];
 
         let scanner = Scanner::new(config.clone(), target_path.clone(), false);
-        let result = scanner.run_phase(&ScanPhase::CrossFileAnalysis, findings, &pb, &[]).await;
+        let result = scanner
+            .run_phase(&ScanPhase::CrossFileAnalysis, findings, &pb, &[])
+            .await;
 
         assert!(result.is_ok());
         let (findings, _) = result.unwrap();

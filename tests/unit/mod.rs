@@ -21,3 +21,12 @@ mod semgrep;
 mod staging;
 mod incremental_scan_tests;
 // tickets module has both tickets.rs and tickets/ directory - skip to avoid conflict
+
+// Error handling tests
+mod error_tests;
+
+// Checkpoint save/load tests
+mod scanner_checkpoint_tests;
+
+// Scanner core tests
+mod scanner_core_tests;

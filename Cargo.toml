@@ -66,6 +66,7 @@ mockall = "0.13"
 serial_test = "3"
 futures = "0.3"
 mockito = "1"
+visibility = "0.1"
 
 [[test]]
 name = "unit_tests"

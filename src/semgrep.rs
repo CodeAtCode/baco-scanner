@@ -21,7 +21,7 @@ pub struct SemgrepRunner {
 }
 
 /// Read a file and extract lines around the target line for code snippet
-fn extract_code_snippet(file_path: &str, target_line: u32, context_lines: usize) -> String {
+pub(crate) fn extract_code_snippet(file_path: &str, target_line: u32, context_lines: usize) -> String {
     let path = PathBuf::from(file_path);
     if !path.exists() {
         return format!("Line {}: [file not found]", target_line);
@@ -714,5 +714,217 @@ mod tests {
         assert_eq!(runner.exclude_rules.len(), 2);
         assert!(runner.exclude_rules.contains(&"rule1".to_string()));
         assert!(runner.exclude_rules.contains(&"rule2".to_string()));
+    }
+
+    #[test]
+    fn test_extract_code_snippet_file_read_error() {
+        // Test case where file exists but cannot be read (permission denied, etc.)
+        // We use a directory instead of a file to trigger the error path
+        let temp_dir = std::env::temp_dir();
+        let snippet = extract_code_snippet(temp_dir.to_str().unwrap(), 1, 2);
+        // Directory read will fail, triggering the Err path
+        assert!(snippet.contains("[unable to read file]") || snippet.contains("[file not found]"));
+    }
+
+    #[test]
+    fn test_extract_code_snippet_fewer_lines_than_context() {
+        let temp_dir = std::env::temp_dir();
+        let test_file = temp_dir.join("test_short_file.txt");
+        let content = "line 1\n"; // Only 1 line
+        std::fs::write(&test_file, content).unwrap();
+
+        // Request context of 5 lines for a file with only 1 line
+        let snippet = extract_code_snippet(test_file.to_str().unwrap(), 1, 5);
+
+        // Should show the single available line
+        assert!(snippet.contains("line 1"));
+        assert!(snippet.contains(">>"));
+
+        std::fs::remove_file(&test_file).ok();
+    }
+
+    #[test]
+    fn test_parse_semgrep_aggregated_empty_message() {
+        let mock_json = r#"{
+            "results": [
+                {"check_id": "empty.msg.issue", "path": "file1.py", "start": {"line": 1}, "extra": {"message": "", "metadata": {"cwe": ["CWE-1"]}}},
+                {"check_id": "empty.msg.issue", "path": "file2.py", "start": {"line": 2}, "extra": {"message": "", "metadata": {"cwe": ["CWE-1"]}}}
+            ]
+        }"#;
+        let runner = SemgrepRunner::new(None, vec![]);
+        let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
+        assert_eq!(findings.len(), 1);
+        // When base_message is empty and other_count > 0, uses "detected in N locations"
+        assert!(findings[0].description.contains("detected in 2 locations"));
+    }
+
+    #[test]
+    fn test_parse_semgrep_aggregated_single_with_empty_message() {
+        let mock_json = r#"{
+            "results": [
+                {"check_id": "single.empty.msg", "path": "file1.py", "start": {"line": 1}, "extra": {"message": "", "metadata": {"cwe": ["CWE-1"]}}}
+            ]
+        }"#;
+        let runner = SemgrepRunner::new(None, vec![]);
+        let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
+        assert_eq!(findings.len(), 1);
+        // For single finding with empty message, description is the empty message (not fallback)
+        assert_eq!(findings[0].description, "");
+    }
+
+    #[test]
+    fn test_parse_semgrep_missing_extra_metadata() {
+        let mock_json = r#"{
+            "results": [
+                {"check_id": "test.issue", "path": "test.py", "start": {"line": 1}, "extra": {"message": "Test message"}}
+            ]
+        }"#;
+        let runner = SemgrepRunner::new(None, vec![]);
+        let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].cwe_id, None);
+    }
+
+    #[test]
+    fn test_parse_semgrep_missing_extra_object() {
+        let mock_json = r#"{
+            "results": [
+                {"check_id": "test.issue", "path": "test.py", "start": {"line": 1}}
+            ]
+        }"#;
+        let runner = SemgrepRunner::new(None, vec![]);
+        let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].severity, Severity::Info);
+        assert_eq!(findings[0].cwe_id, None);
+    }
+
+    #[test]
+    fn test_parse_semgrep_missing_message_in_extra() {
+        let mock_json = r#"{
+            "results": [
+                {"check_id": "no.msg.test", "path": "test.py", "start": {"line": 1}, "extra": {"metadata": {"cwe": ["CWE-89"]}}}
+            ]
+        }"#;
+        let runner = SemgrepRunner::new(None, vec![]);
+        let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
+        assert_eq!(findings.len(), 1);
+        // Should use fallback description when message is missing
+        assert!(findings[0].description.contains("no.msg.test"));
+    }
+
+    #[test]
+    fn test_parse_semgrep_missing_check_id() {
+        let mock_json = r#"{
+            "results": [
+                {"path": "test.py", "start": {"line": 1}, "extra": {"message": "Test"}},
+                {"check_id": "valid.rule", "path": "test2.py", "start": {"line": 2}, "extra": {"message": "Valid"}}
+            ]
+        }"#;
+        let runner = SemgrepRunner::new(None, vec![]);
+        let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
+        // Entry without check_id should be skipped
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].title, "valid.rule");
+    }
+
+    #[test]
+    fn test_parse_semgrep_with_excluded_rule() {
+        let mock_json = r#"{
+            "results": [
+                {"check_id": "python.lang.security.injection", "path": "test.py", "start": {"line": 1}, "extra": {"message": "Should be excluded"}},
+                {"check_id": "other.rule", "path": "test2.py", "start": {"line": 2}, "extra": {"message": "Should be included"}}
+            ]
+        }"#;
+        let runner = SemgrepRunner::new(None, vec!["python.lang.security".to_string()]);
+        let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
+        // python.lang.security.* should be excluded
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].title, "other.rule");
+    }
+
+    #[test]
+    fn test_parse_semgrep_aggregated_with_base_message_and_multiple() {
+        let mock_json = r#"{
+            "results": [
+                {"check_id": "multi.with.msg", "path": "file1.py", "start": {"line": 1}, "extra": {"message": "Base issue found", "metadata": {"cwe": ["CWE-1"]}}},
+                {"check_id": "multi.with.msg", "path": "file2.py", "start": {"line": 2}, "extra": {"message": "Base issue found", "metadata": {"cwe": ["CWE-1"]}}},
+                {"check_id": "multi.with.msg", "path": "file3.py", "start": {"line": 3}, "extra": {"message": "Base issue found", "metadata": {"cwe": ["CWE-1"]}}}
+            ]
+        }"#;
+        let runner = SemgrepRunner::new(None, vec![]);
+        let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
+        assert_eq!(findings.len(), 1);
+        // When base_message is not empty and other_count > 1: "Base issue found (and 2 other locations)"
+        assert!(findings[0].description.contains("Base issue found"));
+        assert!(findings[0].description.contains("2 other locations"));
+    }
+
+    #[test]
+    fn test_parse_semgrep_aggregated_with_base_message_single_other() {
+        let mock_json = r#"{
+            "results": [
+                {"check_id": "multi.two.msg", "path": "file1.py", "start": {"line": 1}, "extra": {"message": "Found issue", "metadata": {"cwe": ["CWE-1"]}}},
+                {"check_id": "multi.two.msg", "path": "file2.py", "start": {"line": 2}, "extra": {"message": "Found issue", "metadata": {"cwe": ["CWE-1"]}}}
+            ]
+        }"#;
+        let runner = SemgrepRunner::new(None, vec![]);
+        let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
+        assert_eq!(findings.len(), 1);
+        // When base_message is not empty and other_count == 1: "Found issue (and 1 other location)" - singular
+        assert!(findings[0].description.contains("Found issue"));
+        assert!(findings[0].description.contains("1 other location"));
+        // Should NOT have "locations" (plural)
+        assert!(!findings[0].description.contains("locations"));
+    }
+
+    #[test]
+    fn test_parse_semgrep_aggregated_empty_message_single_location() {
+        let mock_json = r#"{
+            "results": [
+                {"check_id": "empty.single", "path": "file1.py", "start": {"line": 1}, "extra": {"message": "", "metadata": {"cwe": ["CWE-1"]}}}
+            ]
+        }"#;
+        let runner = SemgrepRunner::new(None, vec![]);
+        let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
+        assert_eq!(findings.len(), 1);
+        // Single location with empty message returns empty string as description
+        assert_eq!(findings[0].description, "");
+    }
+
+    #[test]
+    fn test_extract_code_snippet_exact_context_fit() {
+        let temp_dir = std::env::temp_dir();
+        let test_file = temp_dir.join("test_exact_context.txt");
+        // File has exactly context_lines * 2 + 1 lines, target in middle
+        let content = "line 1\nline 2\nline 3\nline 4\nline 5\n";
+        std::fs::write(&test_file, content).unwrap();
+
+        // Request 2 context lines around line 3 - should fit exactly
+        let snippet = extract_code_snippet(test_file.to_str().unwrap(), 3, 2);
+
+        assert!(snippet.contains("line 1"));
+        assert!(snippet.contains("line 2"));
+        assert!(snippet.contains(">>")); // line 3 marked
+        assert!(snippet.contains("line 4"));
+        assert!(snippet.contains("line 5"));
+
+        std::fs::remove_file(&test_file).ok();
+    }
+
+    #[test]
+    fn test_extract_code_snippet_file_with_single_line() {
+        let temp_dir = std::env::temp_dir();
+        let test_file = temp_dir.join("test_single_line.txt");
+        let content = "only line 1\n"; // Exactly 1 line
+        std::fs::write(&test_file, content).unwrap();
+
+        // Request context of 2 for a 1-line file, target beyond file - should show all lines
+        let snippet = extract_code_snippet(test_file.to_str().unwrap(), 5, 2);
+
+        assert!(snippet.contains("only line 1"));
+        // When target is beyond file and lines.len() <= context_lines, shows all lines from start
+
+        std::fs::remove_file(&test_file).ok();
     }
 }

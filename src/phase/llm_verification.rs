@@ -95,3 +95,20 @@ impl ScanPhase for LlmVerificationPhase {
         ctx.scanner.config.llm.phases.verification.api_key.is_some()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_llm_verification_phase_name() {
+        let phase = LlmVerificationPhase;
+        assert_eq!(phase.name(), "LlmVerification");
+    }
+
+    #[test]
+    fn test_llm_verification_phase_order() {
+        let phase = LlmVerificationPhase;
+        assert_eq!(phase.order(), 5);
+    }
+}

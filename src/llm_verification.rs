@@ -773,11 +773,7 @@ mod tests {
             "Output encoding applied".to_string(),
         ];
 
-        let confidence = phase.calculate_refined_confidence(
-            &finding,
-            &mitigating_factors,
-            &[],
-        );
+        let confidence = phase.calculate_refined_confidence(&finding, &mitigating_factors, &[]);
 
         // Should reduce confidence by 0.1 per mitigating factor (0.7 - 0.2 = 0.5)
         assert!((confidence - 0.5).abs() < 0.01);
@@ -827,11 +823,7 @@ mod tests {
         finding.already_reported = true;
         let mitigating_factors = vec!["Sanitization detected".to_string()];
 
-        let confidence = phase.calculate_refined_confidence(
-            &finding,
-            &mitigating_factors,
-            &[],
-        );
+        let confidence = phase.calculate_refined_confidence(&finding, &mitigating_factors, &[]);
 
         // High severity (+0.1), already reported (-0.05), 1 mitigating factor (-0.1)
         // 0.7 + 0.1 - 0.05 - 0.1 = 0.65
@@ -850,7 +842,7 @@ mod tests {
         let finding = make_test_finding("Low confidence issue", Severity::Low, Some("code"));
         let mut low_confidence_finding = finding.clone();
         low_confidence_finding.confidence_score = 0.1;
-        
+
         let many_factors = vec![
             "Factor 1".to_string(),
             "Factor 2".to_string(),
@@ -858,35 +850,25 @@ mod tests {
             "Factor 4".to_string(),
             "Factor 5".to_string(),
         ];
-        
-        let confidence = phase.calculate_refined_confidence(
-            &low_confidence_finding,
-            &many_factors,
-            &[],
-        );
+
+        let confidence =
+            phase.calculate_refined_confidence(&low_confidence_finding, &many_factors, &[]);
         assert!(confidence >= 0.0);
 
         // Test confidence doesn't exceed 1.0
-        let high_confidence_finding = make_test_finding("High confidence", Severity::Critical, Some("code"));
+        let high_confidence_finding =
+            make_test_finding("High confidence", Severity::Critical, Some("code"));
         let mut max_confidence_finding = high_confidence_finding.clone();
         max_confidence_finding.confidence_score = 0.95;
-        
-        let confidence = phase.calculate_refined_confidence(
-            &max_confidence_finding,
-            &[],
-            &[],
-        );
+
+        let confidence = phase.calculate_refined_confidence(&max_confidence_finding, &[], &[]);
         assert!(confidence <= 1.0);
     }
 
     #[test]
     fn test_new_with_none_llm_client() {
         let context = AnalysisContext::default();
-        let phase = ExtendedVerificationPhase::new(
-            DetectProjectType::CLI,
-            context,
-            None,
-        );
+        let phase = ExtendedVerificationPhase::new(DetectProjectType::CLI, context, None);
 
         assert_eq!(*phase.project_type(), DetectProjectType::CLI);
         assert!(!phase.security_practices().is_empty());
@@ -1088,10 +1070,7 @@ mod tests {
 
         // CWE-190 is a known false positive pattern
         assert!(result.false_positive_reason.is_some());
-        assert!(result
-            .false_positive_reason
-            .unwrap()
-            .contains("CWE-190"));
+        assert!(result.false_positive_reason.unwrap().contains("CWE-190"));
     }
 
     #[test]
@@ -1166,9 +1145,18 @@ mod tests {
 
         // Manually create report to test statistics calculation
         let total = results.len();
-        let confirmed = results.iter().filter(|r| r.status == VerificationStatus::Confirmed).count();
-        let false_positives = results.iter().filter(|r| r.status == VerificationStatus::FalsePositive).count();
-        let needs_review = results.iter().filter(|r| r.status == VerificationStatus::NeedsReview).count();
+        let confirmed = results
+            .iter()
+            .filter(|r| r.status == VerificationStatus::Confirmed)
+            .count();
+        let false_positives = results
+            .iter()
+            .filter(|r| r.status == VerificationStatus::FalsePositive)
+            .count();
+        let needs_review = results
+            .iter()
+            .filter(|r| r.status == VerificationStatus::NeedsReview)
+            .count();
 
         assert_eq!(total, 3);
         assert_eq!(confirmed, 1);

@@ -46,7 +46,10 @@ fn test_vulnerability_pattern_type_to_string() {
         (VulnerabilityPatternType::InjectionRisk, "Injection Risk"),
         (VulnerabilityPatternType::AuthIssue, "Auth Issue"),
         (VulnerabilityPatternType::CryptoMisuse, "Crypto Misuse"),
-        (VulnerabilityPatternType::Custom("Custom Pattern".to_string()), "Custom Pattern"),
+        (
+            VulnerabilityPatternType::Custom("Custom Pattern".to_string()),
+            "Custom Pattern",
+        ),
     ];
 
     for (pattern_type, expected) in patterns {
