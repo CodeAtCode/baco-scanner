@@ -9,7 +9,6 @@
 
 use baco::scanner_types::patch::PatchCandidate;
 use baco::staging::*;
-use mockito::Server;
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
@@ -53,6 +52,33 @@ edition = "2021"
 "#,
     )
     .unwrap();
+
+    // Initialize git repository for staging worktree support
+    Command::new("git")
+        .args(["init"])
+        .current_dir(&temp_dir)
+        .output()
+        .expect("Failed to init git repo");
+    Command::new("git")
+        .args(["config", "user.email", "test@test.com"])
+        .current_dir(&temp_dir)
+        .output()
+        .expect("Failed to set git email");
+    Command::new("git")
+        .args(["config", "user.name", "Test User"])
+        .current_dir(&temp_dir)
+        .output()
+        .expect("Failed to set git name");
+    Command::new("git")
+        .args(["add", "."])
+        .current_dir(&temp_dir)
+        .output()
+        .expect("Failed to git add");
+    Command::new("git")
+        .args(["commit", "-m", "Initial commit"])
+        .current_dir(&temp_dir)
+        .output()
+        .expect("Failed to git commit");
 
     temp_dir
 }
@@ -1140,8 +1166,8 @@ fn test_autopatcher_execute_batch_skips_missing_code_snippet() {
     let result = autopatcher.execute_batch(&findings, &config);
 
     assert!(result.is_ok());
-    // Finding is still returned (for manual review)
-    assert_eq!(result.unwrap().len(), 1);
+    // Finding without code snippet is skipped by autopatcher
+    assert_eq!(result.unwrap().len(), 0);
 
     cleanup_temp_dir(&temp_dir);
 }
@@ -1910,7 +1936,7 @@ fn test_autopatcher_validate_patch_with_real_worktree() {
     let result = autopatcher.validate_patch(&candidate);
     assert!(result.is_ok(), "validate_patch should not panic");
 
-    let validation = result.unwrap();
+    let _validation = result.unwrap();
     // Without actual LLM-generated patch content, validation may fail at apply step
     // but we're testing the code path executes
 
