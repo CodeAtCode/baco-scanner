@@ -20,7 +20,9 @@ mod project_type;
 mod report_ai_aggregation;
 mod semgrep;
 mod staging;
-// tickets module has both tickets.rs and tickets/ directory - skip to avoid conflict
+
+// Tickets tests - covers extract_meaningful_words and TicketSearcher
+mod tickets;
 
 // Error handling tests
 mod error_tests;
