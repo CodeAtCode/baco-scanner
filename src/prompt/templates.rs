@@ -507,13 +507,22 @@ mod tests {
     fn test_baco_phase_display() {
         assert_eq!(BacoPhase::Indexing.to_string(), "indexing");
         assert_eq!(BacoPhase::Semgrep.to_string(), "semgrep");
-        assert_eq!(BacoPhase::LlmStaticAnalysis.to_string(), "llm_static_analysis");
+        assert_eq!(
+            BacoPhase::LlmStaticAnalysis.to_string(),
+            "llm_static_analysis"
+        );
         assert_eq!(BacoPhase::LlmDiscovery.to_string(), "llm_discovery");
         assert_eq!(BacoPhase::LlmVerification.to_string(), "llm_verification");
         assert_eq!(BacoPhase::TicketCrossRef.to_string(), "ticket_crossref");
         assert_eq!(BacoPhase::GitAnalysis.to_string(), "git_analysis");
-        assert_eq!(BacoPhase::CrossFileAnalysis.to_string(), "cross_file_analysis");
-        assert_eq!(BacoPhase::ConfidenceScoring.to_string(), "confidence_scoring");
+        assert_eq!(
+            BacoPhase::CrossFileAnalysis.to_string(),
+            "cross_file_analysis"
+        );
+        assert_eq!(
+            BacoPhase::ConfidenceScoring.to_string(),
+            "confidence_scoring"
+        );
         assert_eq!(BacoPhase::AiAggregation.to_string(), "ai_aggregation");
         assert_eq!(BacoPhase::Reporting.to_string(), "reporting");
     }
@@ -542,7 +551,7 @@ mod tests {
         let mut vars = TemplateVariables::new();
         vars.insert("KEY1".to_string(), "value1".to_string());
         vars.insert("KEY2".to_string(), "value2".to_string());
-        
+
         assert_eq!(vars.len(), 2);
         assert_eq!(vars.get("KEY1"), Some(&"value1".to_string()));
         assert_eq!(vars.get("KEY2"), Some(&"value2".to_string()));
@@ -553,7 +562,7 @@ mod tests {
     fn test_template_variables_is_empty() {
         let mut vars = TemplateVariables::new();
         assert!(vars.is_empty());
-        
+
         vars.insert("KEY".to_string(), "value".to_string());
         assert!(!vars.is_empty());
     }
@@ -562,7 +571,7 @@ mod tests {
     #[test]
     fn test_default_prompts_all_fields_non_empty() {
         let prompts = get_all_defaults();
-        
+
         assert!(!prompts.indexing.is_empty());
         assert!(!prompts.semgrep.is_empty());
         assert!(!prompts.llm_static_analysis.is_empty());
@@ -685,7 +694,7 @@ mod tests {
     #[test]
     fn test_all_phases_return_different_prompts() {
         let prompts = get_all_defaults();
-        
+
         let all_prompts = vec![
             &prompts.indexing,
             &prompts.semgrep,
@@ -699,12 +708,15 @@ mod tests {
             &prompts.ai_aggregation,
             &prompts.reporting,
         ];
-        
+
         // Check all prompts are unique
         for i in 0..all_prompts.len() {
             for j in (i + 1)..all_prompts.len() {
-                assert_ne!(all_prompts[i], all_prompts[j], 
-                    "Prompts for phase {} and {} should be different", i, j);
+                assert_ne!(
+                    all_prompts[i], all_prompts[j],
+                    "Prompts for phase {} and {} should be different",
+                    i, j
+                );
             }
         }
     }
@@ -722,15 +734,18 @@ mod tests {
     #[test]
     fn test_template_variables_multiple_inserts() {
         let mut vars = TemplateVariables::new();
-        
+
         for i in 0..10 {
             vars.insert(format!("KEY_{}", i), format!("value_{}", i));
         }
-        
+
         assert_eq!(vars.len(), 10);
-        
+
         for i in 0..10 {
-            assert_eq!(vars.get(&format!("KEY_{}", i)), Some(&format!("value_{}", i)));
+            assert_eq!(
+                vars.get(&format!("KEY_{}", i)),
+                Some(&format!("value_{}", i))
+            );
         }
     }
 
@@ -782,7 +797,9 @@ mod tests {
         assert!(prompts.llm_verification.contains("%%FINDING_TITLE%%"));
         assert!(prompts.llm_verification.contains("%%FILE_PATH%%"));
         assert!(prompts.llm_verification.contains("%%LINE_NUMBER%%"));
-        assert!(prompts.llm_verification.contains("%%VULNERABILITY_DESCRIPTION%%"));
+        assert!(prompts
+            .llm_verification
+            .contains("%%VULNERABILITY_DESCRIPTION%%"));
         assert!(prompts.llm_verification.contains("%%SOURCE_LIST%%"));
         assert!(prompts.llm_verification.contains("confirmed"));
         assert!(prompts.llm_verification.contains("false_positive"));
@@ -794,7 +811,9 @@ mod tests {
         let prompts = get_all_defaults();
         assert!(prompts.ticket_crossref.contains("%%VULNERABILITY_TITLE%%"));
         assert!(prompts.ticket_crossref.contains("%%FILE_PATH%%"));
-        assert!(prompts.ticket_crossref.contains("%%VULNERABILITY_DESCRIPTION%%"));
+        assert!(prompts
+            .ticket_crossref
+            .contains("%%VULNERABILITY_DESCRIPTION%%"));
         assert!(prompts.ticket_crossref.contains("%%TICKET_SYSTEMS%%"));
     }
 
@@ -808,7 +827,9 @@ mod tests {
     #[test]
     fn test_cross_file_analysis_template_variables() {
         let prompts = get_all_defaults();
-        assert!(prompts.cross_file_analysis.contains("%%VULNERABILITY_LIST%%"));
+        assert!(prompts
+            .cross_file_analysis
+            .contains("%%VULNERABILITY_LIST%%"));
     }
 
     #[test]
@@ -847,25 +868,21 @@ mod tests {
             BacoPhase::LlmStaticAnalysis,
             BacoPhase::LlmDiscovery,
         ];
-        
+
         let mut sorted = phases.clone();
         sorted.sort();
-        
+
         assert_eq!(phases, sorted);
     }
 
     // Test ProjectType ordering
     #[test]
     fn test_project_type_ordering() {
-        let types = vec![
-            ProjectType::CLI,
-            ProjectType::Web,
-            ProjectType::Library,
-        ];
-        
+        let types = vec![ProjectType::CLI, ProjectType::Web, ProjectType::Library];
+
         let mut sorted = types.clone();
         sorted.sort();
-        
+
         assert_eq!(types, sorted);
     }
 }

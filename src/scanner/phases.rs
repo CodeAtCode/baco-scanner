@@ -1315,11 +1315,7 @@ mod tests {
     }
 
     fn create_test_scanner() -> super::super::Scanner {
-        super::super::Scanner::new(
-            config::ScannerConfig::default(),
-            PathBuf::from("."),
-            false,
-        )
+        super::super::Scanner::new(config::ScannerConfig::default(), PathBuf::from("."), false)
     }
 
     // Indexing Phase Tests
@@ -1334,8 +1330,14 @@ mod tests {
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings = vec![];
         let phase_config = PhaseConfig {
-            phase: &ScanPhase::Indexing, findings, pb: &pb, analyzed_files: &analyzed_files,
-            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+            phase: &ScanPhase::Indexing,
+            findings,
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
         };
         let result = run_phase(&scanner, phase_config).await;
         assert!(result.is_ok());
@@ -1352,8 +1354,14 @@ mod tests {
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings = vec![create_test_finding("test-1", Severity::High)];
         let phase_config = PhaseConfig {
-            phase: &ScanPhase::Indexing, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
-            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+            phase: &ScanPhase::Indexing,
+            findings: findings.clone(),
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
         };
         let result = run_phase(&scanner, phase_config).await;
         assert!(result.is_ok());
@@ -1373,8 +1381,14 @@ mod tests {
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings = vec![create_test_finding("existing-1", Severity::Medium)];
         let phase_config = PhaseConfig {
-            phase: &ScanPhase::Semgrep, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
-            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+            phase: &ScanPhase::Semgrep,
+            findings: findings.clone(),
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
         };
         let result = run_phase(&scanner, phase_config).await;
         assert!(result.is_ok());
@@ -1393,8 +1407,14 @@ mod tests {
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings = vec![create_test_finding("test-1", Severity::High)];
         let phase_config = PhaseConfig {
-            phase: &ScanPhase::LlmStaticAnalysis, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
-            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+            phase: &ScanPhase::LlmStaticAnalysis,
+            findings: findings.clone(),
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
         };
         let result = run_phase(&scanner, phase_config).await;
         assert!(result.is_ok());
@@ -1415,8 +1435,14 @@ mod tests {
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings = vec![create_test_finding("test-1", Severity::High)];
         let phase_config = PhaseConfig {
-            phase: &ScanPhase::LlmDiscovery, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
-            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+            phase: &ScanPhase::LlmDiscovery,
+            findings: findings.clone(),
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
         };
         let result = run_phase(&scanner, phase_config).await;
         assert!(result.is_ok());
@@ -1437,8 +1463,14 @@ mod tests {
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings = vec![create_test_finding("test-1", Severity::High)];
         let phase_config = PhaseConfig {
-            phase: &ScanPhase::LlmVerification, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
-            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+            phase: &ScanPhase::LlmVerification,
+            findings: findings.clone(),
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
         };
         let result = run_phase(&scanner, phase_config).await;
         assert!(result.is_ok());
@@ -1459,8 +1491,14 @@ mod tests {
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings = vec![create_test_finding("test-1", Severity::High)];
         let phase_config = PhaseConfig {
-            phase: &ScanPhase::SecurityAgentVerification, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
-            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+            phase: &ScanPhase::SecurityAgentVerification,
+            findings: findings.clone(),
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
         };
         let result = run_phase(&scanner, phase_config).await;
         assert!(result.is_ok());
@@ -1480,8 +1518,14 @@ mod tests {
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings = vec![create_test_finding("test-1", Severity::High)];
         let phase_config = PhaseConfig {
-            phase: &ScanPhase::TicketCrossRef, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
-            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+            phase: &ScanPhase::TicketCrossRef,
+            findings: findings.clone(),
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
         };
         let result = run_phase(&scanner, phase_config).await;
         assert!(result.is_ok());
@@ -1499,10 +1543,19 @@ mod tests {
         let analyzed_files: Vec<String> = vec![];
         let target_path = PathBuf::from(".");
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
-        let findings = vec![create_test_finding("git-1", Severity::High), create_test_finding("git-2", Severity::Medium)];
+        let findings = vec![
+            create_test_finding("git-1", Severity::High),
+            create_test_finding("git-2", Severity::Medium),
+        ];
         let phase_config = PhaseConfig {
-            phase: &ScanPhase::GitAnalysis, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
-            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+            phase: &ScanPhase::GitAnalysis,
+            findings: findings.clone(),
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
         };
         let result = run_phase(&scanner, phase_config).await;
         assert!(result.is_ok());
@@ -1520,10 +1573,19 @@ mod tests {
         let analyzed_files: Vec<String> = vec![];
         let target_path = PathBuf::from(".");
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
-        let findings = vec![create_test_finding("cross-1", Severity::High), create_test_finding("cross-2", Severity::Critical)];
+        let findings = vec![
+            create_test_finding("cross-1", Severity::High),
+            create_test_finding("cross-2", Severity::Critical),
+        ];
         let phase_config = PhaseConfig {
-            phase: &ScanPhase::CrossFileAnalysis, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
-            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+            phase: &ScanPhase::CrossFileAnalysis,
+            findings: findings.clone(),
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
         };
         let result = run_phase(&scanner, phase_config).await;
         assert!(result.is_ok());
@@ -1544,8 +1606,14 @@ mod tests {
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings = vec![create_test_finding("test-1", Severity::High)];
         let phase_config = PhaseConfig {
-            phase: &ScanPhase::ConfidenceScoring, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
-            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+            phase: &ScanPhase::ConfidenceScoring,
+            findings: findings.clone(),
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
         };
         let result = run_phase(&scanner, phase_config).await;
         assert!(result.is_ok());
@@ -1565,8 +1633,14 @@ mod tests {
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings = vec![create_test_finding("agg-1", Severity::High)];
         let phase_config = PhaseConfig {
-            phase: &ScanPhase::AiAggregation, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
-            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+            phase: &ScanPhase::AiAggregation,
+            findings: findings.clone(),
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
         };
         let result = run_phase(&scanner, phase_config).await;
         assert!(result.is_ok());
@@ -1585,10 +1659,19 @@ mod tests {
         let analyzed_files: Vec<String> = vec![];
         let target_path = PathBuf::from(".");
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
-        let findings = vec![create_test_finding("report-1", Severity::High), create_test_finding("report-2", Severity::Critical)];
+        let findings = vec![
+            create_test_finding("report-1", Severity::High),
+            create_test_finding("report-2", Severity::Critical),
+        ];
         let phase_config = PhaseConfig {
-            phase: &ScanPhase::Reporting, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
-            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+            phase: &ScanPhase::Reporting,
+            findings: findings.clone(),
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
         };
         let result = run_phase(&scanner, phase_config).await;
         assert!(result.is_ok());
@@ -1608,8 +1691,14 @@ mod tests {
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings: Vec<VulnerabilityFinding> = vec![];
         let phase_config = PhaseConfig {
-            phase: &ScanPhase::Reporting, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
-            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+            phase: &ScanPhase::Reporting,
+            findings: findings.clone(),
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
         };
         let result = run_phase(&scanner, phase_config).await;
         assert!(result.is_ok());
@@ -1630,8 +1719,14 @@ mod tests {
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings = vec![create_test_finding("test-1", Severity::High)];
         let phase_config = PhaseConfig {
-            phase: &ScanPhase::RootCauseDedup, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
-            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+            phase: &ScanPhase::RootCauseDedup,
+            findings: findings.clone(),
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
         };
         let result = run_phase(&scanner, phase_config).await;
         assert!(result.is_ok());
@@ -1652,8 +1747,14 @@ mod tests {
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings = vec![create_test_finding("test-1", Severity::High)];
         let phase_config = PhaseConfig {
-            phase: &ScanPhase::MultiVerifier, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
-            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+            phase: &ScanPhase::MultiVerifier,
+            findings: findings.clone(),
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
         };
         let result = run_phase(&scanner, phase_config).await;
         assert!(result.is_ok());
@@ -1674,8 +1775,14 @@ mod tests {
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings = vec![create_test_finding("test-1", Severity::High)];
         let phase_config = PhaseConfig {
-            phase: &ScanPhase::AutoPatching, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
-            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+            phase: &ScanPhase::AutoPatching,
+            findings: findings.clone(),
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
         };
         let result = run_phase(&scanner, phase_config).await;
         assert!(result.is_ok());
@@ -1696,8 +1803,14 @@ mod tests {
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings = vec![create_test_finding("test-1", Severity::High)];
         let phase_config = PhaseConfig {
-            phase: &ScanPhase::CveBootstrap, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
-            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+            phase: &ScanPhase::CveBootstrap,
+            findings: findings.clone(),
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
         };
         let result = run_phase(&scanner, phase_config).await;
         assert!(result.is_ok());
@@ -1718,8 +1831,14 @@ mod tests {
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings = vec![create_test_finding("test-1", Severity::High)];
         let phase_config = PhaseConfig {
-            phase: &ScanPhase::PocCompiler, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
-            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+            phase: &ScanPhase::PocCompiler,
+            findings: findings.clone(),
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
         };
         let result = run_phase(&scanner, phase_config).await;
         assert!(result.is_ok());
@@ -1740,8 +1859,14 @@ mod tests {
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings = vec![create_test_finding("test-1", Severity::High)];
         let phase_config = PhaseConfig {
-            phase: &ScanPhase::VariantSearch, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
-            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+            phase: &ScanPhase::VariantSearch,
+            findings: findings.clone(),
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
         };
         let result = run_phase(&scanner, phase_config).await;
         assert!(result.is_ok());
@@ -1761,8 +1886,14 @@ mod tests {
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings: Vec<VulnerabilityFinding> = vec![];
         let phase_config = PhaseConfig {
-            phase: &ScanPhase::Indexing, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
-            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+            phase: &ScanPhase::Indexing,
+            findings: findings.clone(),
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
         };
         let result = run_phase(&scanner, phase_config).await;
         assert!(result.is_ok());
@@ -1779,10 +1910,18 @@ mod tests {
         let analyzed_files: Vec<String> = vec![];
         let target_path = PathBuf::from(".");
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
-        let findings: Vec<VulnerabilityFinding> = (0..100).map(|i| create_test_finding(&format!("bulk-{}", i), Severity::High)).collect();
+        let findings: Vec<VulnerabilityFinding> = (0..100)
+            .map(|i| create_test_finding(&format!("bulk-{}", i), Severity::High))
+            .collect();
         let phase_config = PhaseConfig {
-            phase: &ScanPhase::Indexing, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
-            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+            phase: &ScanPhase::Indexing,
+            findings: findings.clone(),
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
         };
         let result = run_phase(&scanner, phase_config).await;
         assert!(result.is_ok());
@@ -1806,8 +1945,14 @@ mod tests {
             create_test_finding("sev-4", Severity::Low),
         ];
         let phase_config = PhaseConfig {
-            phase: &ScanPhase::Indexing, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
-            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+            phase: &ScanPhase::Indexing,
+            findings: findings.clone(),
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
         };
         let result = run_phase(&scanner, phase_config).await;
         assert!(result.is_ok());
@@ -1821,13 +1966,23 @@ mod tests {
         let config = create_test_config();
         let pb = ProgressBar::hidden();
         let metrics_tracker = LlmMetricsTracker::new();
-        let analyzed_files = vec!["file1.py".to_string(), "file2.rs".to_string(), "file3.js".to_string()];
+        let analyzed_files = vec![
+            "file1.py".to_string(),
+            "file2.rs".to_string(),
+            "file3.js".to_string(),
+        ];
         let target_path = PathBuf::from(".");
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings = vec![];
         let phase_config = PhaseConfig {
-            phase: &ScanPhase::Indexing, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
-            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+            phase: &ScanPhase::Indexing,
+            findings: findings.clone(),
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
         };
         let result = run_phase(&scanner, phase_config).await;
         assert!(result.is_ok());
@@ -1846,16 +2001,30 @@ mod tests {
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings = vec![create_test_finding("test-1", Severity::High)];
         let phases = vec![
-            ScanPhase::Indexing, ScanPhase::Semgrep, ScanPhase::LlmStaticAnalysis,
-            ScanPhase::LlmDiscovery, ScanPhase::LlmVerification, ScanPhase::TicketCrossRef,
-            ScanPhase::GitAnalysis, ScanPhase::CrossFileAnalysis, ScanPhase::ConfidenceScoring,
-            ScanPhase::AiAggregation, ScanPhase::Reporting, ScanPhase::RootCauseDedup,
+            ScanPhase::Indexing,
+            ScanPhase::Semgrep,
+            ScanPhase::LlmStaticAnalysis,
+            ScanPhase::LlmDiscovery,
+            ScanPhase::LlmVerification,
+            ScanPhase::TicketCrossRef,
+            ScanPhase::GitAnalysis,
+            ScanPhase::CrossFileAnalysis,
+            ScanPhase::ConfidenceScoring,
+            ScanPhase::AiAggregation,
+            ScanPhase::Reporting,
+            ScanPhase::RootCauseDedup,
         ];
         let mut current_findings = findings.clone();
         for phase in phases {
             let phase_config = PhaseConfig {
-                phase: &phase, findings: current_findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
-                metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+                phase: &phase,
+                findings: current_findings.clone(),
+                pb: &pb,
+                analyzed_files: &analyzed_files,
+                metrics_tracker: &metrics_tracker,
+                target_path: &target_path,
+                config: &config,
+                project_stack: &project_stack,
             };
             let result = run_phase(&scanner, phase_config).await;
             assert!(result.is_ok(), "Phase {:?} failed", phase);
@@ -1876,8 +2045,14 @@ mod tests {
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings = vec![create_test_finding("threat-1", Severity::High)];
         let phase_config = PhaseConfig {
-            phase: &ScanPhase::ThreatModeling, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
-            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+            phase: &ScanPhase::ThreatModeling,
+            findings: findings.clone(),
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
         };
         let result = run_phase(&scanner, phase_config).await;
         assert!(result.is_ok());
@@ -1896,8 +2071,14 @@ mod tests {
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings = vec![create_test_finding("complete-1", Severity::High)];
         let phase_config = PhaseConfig {
-            phase: &ScanPhase::Complete, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
-            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+            phase: &ScanPhase::Complete,
+            findings: findings.clone(),
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
         };
         let result = run_phase(&scanner, phase_config).await;
         assert!(result.is_ok());
@@ -1916,8 +2097,14 @@ mod tests {
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings = vec![create_test_finding("single-1", Severity::Critical)];
         let phase_config = PhaseConfig {
-            phase: &ScanPhase::Indexing, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
-            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+            phase: &ScanPhase::Indexing,
+            findings: findings.clone(),
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
         };
         let result = run_phase(&scanner, phase_config).await;
         assert!(result.is_ok());
@@ -1939,8 +2126,14 @@ mod tests {
         finding.sources = vec!["semgrep".to_string(), "llm".to_string()];
         let findings = vec![finding];
         let phase_config = PhaseConfig {
-            phase: &ScanPhase::Indexing, findings: findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
-            metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+            phase: &ScanPhase::Indexing,
+            findings: findings.clone(),
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
         };
         let result = run_phase(&scanner, phase_config).await;
         assert!(result.is_ok());
@@ -1958,13 +2151,26 @@ mod tests {
         let analyzed_files: Vec<String> = vec![];
         let target_path = PathBuf::from(".");
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
-        let initial_findings = vec![create_test_finding("chain-1", Severity::Critical), create_test_finding("chain-2", Severity::High)];
+        let initial_findings = vec![
+            create_test_finding("chain-1", Severity::Critical),
+            create_test_finding("chain-2", Severity::High),
+        ];
         let mut current_findings = initial_findings.clone();
-        let phases = vec![ScanPhase::Indexing, ScanPhase::CrossFileAnalysis, ScanPhase::ConfidenceScoring];
+        let phases = vec![
+            ScanPhase::Indexing,
+            ScanPhase::CrossFileAnalysis,
+            ScanPhase::ConfidenceScoring,
+        ];
         for phase in phases {
             let phase_config = PhaseConfig {
-                phase: &phase, findings: current_findings.clone(), pb: &pb, analyzed_files: &analyzed_files,
-                metrics_tracker: &metrics_tracker, target_path: &target_path, config: &config, project_stack: &project_stack,
+                phase: &phase,
+                findings: current_findings.clone(),
+                pb: &pb,
+                analyzed_files: &analyzed_files,
+                metrics_tracker: &metrics_tracker,
+                target_path: &target_path,
+                config: &config,
+                project_stack: &project_stack,
             };
             let result = run_phase(&scanner, phase_config).await.unwrap();
             current_findings = result.0;
@@ -1985,12 +2191,12 @@ mod tests {
         let analyzed_files: Vec<String> = vec![];
         let target_path = PathBuf::from(".");
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
-        
+
         // Create 50 findings to test batch handling
         let findings: Vec<VulnerabilityFinding> = (0..50)
             .map(|i| create_test_finding(&format!("bulk-{}", i), Severity::High))
             .collect();
-        
+
         let phase_config = PhaseConfig {
             phase: &ScanPhase::Indexing,
             findings,
@@ -2001,7 +2207,7 @@ mod tests {
             config: &config,
             project_stack: &project_stack,
         };
-        
+
         let result = run_phase(&scanner, phase_config).await.unwrap();
         assert_eq!(result.0.len(), 50);
     }
@@ -2016,7 +2222,7 @@ mod tests {
         let target_path = PathBuf::from("/nonexistent/path/that/does/not/exist");
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings = vec![create_test_finding("sem-1", Severity::Medium)];
-        
+
         let phase_config = PhaseConfig {
             phase: &ScanPhase::Semgrep,
             findings,
@@ -2027,7 +2233,7 @@ mod tests {
             config: &config,
             project_stack: &project_stack,
         };
-        
+
         let result = run_phase(&scanner, phase_config).await.unwrap();
         // Should return findings unchanged when path doesn't exist
         assert_eq!(result.0.len(), 1);
@@ -2044,7 +2250,7 @@ mod tests {
         let target_path = PathBuf::from(".");
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings = vec![create_test_finding("llm-static-1", Severity::High)];
-        
+
         let phase_config = PhaseConfig {
             phase: &ScanPhase::LlmStaticAnalysis,
             findings,
@@ -2055,7 +2261,7 @@ mod tests {
             config: &config,
             project_stack: &project_stack,
         };
-        
+
         let result = run_phase(&scanner, phase_config).await.unwrap();
         // Should return findings unchanged when API key is missing
         assert_eq!(result.0.len(), 1);
@@ -2072,7 +2278,7 @@ mod tests {
         let target_path = PathBuf::from(".");
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings = vec![create_test_finding("llm-disc-1", Severity::Critical)];
-        
+
         let phase_config = PhaseConfig {
             phase: &ScanPhase::LlmDiscovery,
             findings,
@@ -2083,7 +2289,7 @@ mod tests {
             config: &config,
             project_stack: &project_stack,
         };
-        
+
         let result = run_phase(&scanner, phase_config).await.unwrap();
         // Should return findings unchanged when API key is missing
         assert_eq!(result.0.len(), 1);
@@ -2100,7 +2306,7 @@ mod tests {
         let target_path = PathBuf::from(".");
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings = vec![create_test_finding("llm-ver-1", Severity::High)];
-        
+
         let phase_config = PhaseConfig {
             phase: &ScanPhase::LlmVerification,
             findings,
@@ -2111,7 +2317,7 @@ mod tests {
             config: &config,
             project_stack: &project_stack,
         };
-        
+
         let result = run_phase(&scanner, phase_config).await.unwrap();
         // Should return findings unchanged when API key is missing
         assert_eq!(result.0.len(), 1);
@@ -2128,7 +2334,7 @@ mod tests {
         let target_path = PathBuf::from(".");
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings = vec![create_test_finding("agent-1", Severity::High)];
-        
+
         let phase_config = PhaseConfig {
             phase: &ScanPhase::SecurityAgentVerification,
             findings,
@@ -2139,7 +2345,7 @@ mod tests {
             config: &config,
             project_stack: &project_stack,
         };
-        
+
         let result = run_phase(&scanner, phase_config).await.unwrap();
         // Should return findings unchanged when agent is disabled
         assert_eq!(result.0.len(), 1);
@@ -2155,7 +2361,7 @@ mod tests {
         let target_path = PathBuf::from(".");
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings = vec![create_test_finding("ticket-1", Severity::Medium)];
-        
+
         let phase_config = PhaseConfig {
             phase: &ScanPhase::TicketCrossRef,
             findings,
@@ -2166,7 +2372,7 @@ mod tests {
             config: &config,
             project_stack: &project_stack,
         };
-        
+
         let result = run_phase(&scanner, phase_config).await.unwrap();
         // Should return findings unchanged when no ticket systems configured
         assert_eq!(result.0.len(), 1);
@@ -2183,7 +2389,7 @@ mod tests {
         let target_path = PathBuf::from(".");
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings = vec![create_test_finding("conf-1", Severity::High)];
-        
+
         let phase_config = PhaseConfig {
             phase: &ScanPhase::ConfidenceScoring,
             findings,
@@ -2194,7 +2400,7 @@ mod tests {
             config: &config,
             project_stack: &project_stack,
         };
-        
+
         let result = run_phase(&scanner, phase_config).await.unwrap();
         // Should return findings unchanged when confidence refinement is disabled
         assert_eq!(result.0.len(), 1);
@@ -2211,7 +2417,7 @@ mod tests {
         let target_path = PathBuf::from(".");
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings = vec![create_test_finding("dedup-1", Severity::High)];
-        
+
         let phase_config = PhaseConfig {
             phase: &ScanPhase::RootCauseDedup,
             findings,
@@ -2222,7 +2428,7 @@ mod tests {
             config: &config,
             project_stack: &project_stack,
         };
-        
+
         let result = run_phase(&scanner, phase_config).await.unwrap();
         // Should return findings unchanged when dedup is disabled
         assert_eq!(result.0.len(), 1);
@@ -2239,7 +2445,7 @@ mod tests {
         let target_path = PathBuf::from(".");
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings = vec![create_test_finding("multi-1", Severity::High)];
-        
+
         let phase_config = PhaseConfig {
             phase: &ScanPhase::MultiVerifier,
             findings,
@@ -2250,7 +2456,7 @@ mod tests {
             config: &config,
             project_stack: &project_stack,
         };
-        
+
         let result = run_phase(&scanner, phase_config).await.unwrap();
         // Should return findings unchanged when multi-verifier is disabled
         assert_eq!(result.0.len(), 1);
@@ -2267,7 +2473,7 @@ mod tests {
         let target_path = PathBuf::from(".");
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings = vec![create_test_finding("patch-1", Severity::High)];
-        
+
         let phase_config = PhaseConfig {
             phase: &ScanPhase::AutoPatching,
             findings,
@@ -2278,7 +2484,7 @@ mod tests {
             config: &config,
             project_stack: &project_stack,
         };
-        
+
         let result = run_phase(&scanner, phase_config).await.unwrap();
         // Should return findings unchanged when auto-patching is disabled
         assert_eq!(result.0.len(), 1);
@@ -2295,7 +2501,7 @@ mod tests {
         let target_path = PathBuf::from(".");
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings = vec![create_test_finding("cve-1", Severity::High)];
-        
+
         let phase_config = PhaseConfig {
             phase: &ScanPhase::CveBootstrap,
             findings,
@@ -2306,7 +2512,7 @@ mod tests {
             config: &config,
             project_stack: &project_stack,
         };
-        
+
         let result = run_phase(&scanner, phase_config).await.unwrap();
         // Should return findings unchanged when CVE bootstrap is disabled
         assert_eq!(result.0.len(), 1);
@@ -2323,7 +2529,7 @@ mod tests {
         let target_path = PathBuf::from(".");
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings = vec![create_test_finding("poc-1", Severity::High)];
-        
+
         let phase_config = PhaseConfig {
             phase: &ScanPhase::PocCompiler,
             findings,
@@ -2334,7 +2540,7 @@ mod tests {
             config: &config,
             project_stack: &project_stack,
         };
-        
+
         let result = run_phase(&scanner, phase_config).await.unwrap();
         // Should return findings unchanged when PoC compilation is disabled
         assert_eq!(result.0.len(), 1);
@@ -2351,7 +2557,7 @@ mod tests {
         let target_path = PathBuf::from(".");
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings = vec![create_test_finding("variant-1", Severity::High)];
-        
+
         let phase_config = PhaseConfig {
             phase: &ScanPhase::VariantSearch,
             findings,
@@ -2362,7 +2568,7 @@ mod tests {
             config: &config,
             project_stack: &project_stack,
         };
-        
+
         let result = run_phase(&scanner, phase_config).await.unwrap();
         // Should return findings unchanged when variant search is disabled
         assert_eq!(result.0.len(), 1);
@@ -2379,7 +2585,7 @@ mod tests {
         let target_path = PathBuf::from(".");
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
         let findings = vec![create_test_finding("threat-1", Severity::High)];
-        
+
         let phase_config = PhaseConfig {
             phase: &ScanPhase::ThreatModeling,
             findings,
@@ -2390,7 +2596,7 @@ mod tests {
             config: &config,
             project_stack: &project_stack,
         };
-        
+
         let result = run_phase(&scanner, phase_config).await.unwrap();
         // Should return findings unchanged when threat modeling is disabled
         assert_eq!(result.0.len(), 1);
@@ -2405,14 +2611,14 @@ mod tests {
         let analyzed_files: Vec<String> = vec![];
         let target_path = PathBuf::from(".");
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
-        
+
         let findings = vec![
             create_test_finding("crit", Severity::Critical),
             create_test_finding("high", Severity::High),
             create_test_finding("med", Severity::Medium),
             create_test_finding("low", Severity::Low),
         ];
-        
+
         let phase_config = PhaseConfig {
             phase: &ScanPhase::Indexing,
             findings,
@@ -2423,7 +2629,7 @@ mod tests {
             config: &config,
             project_stack: &project_stack,
         };
-        
+
         let result = run_phase(&scanner, phase_config).await.unwrap();
         assert_eq!(result.0.len(), 4);
     }
@@ -2437,17 +2643,17 @@ mod tests {
         let analyzed_files: Vec<String> = vec![];
         let target_path = PathBuf::from(".");
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
-        
+
         let initial_findings = vec![create_test_finding("chain", Severity::High)];
         let mut current_findings = initial_findings.clone();
-        
+
         let phases = vec![
             ScanPhase::Indexing,
             ScanPhase::Semgrep,
             ScanPhase::GitAnalysis,
             ScanPhase::CrossFileAnalysis,
         ];
-        
+
         for phase in phases {
             let phase_config = PhaseConfig {
                 phase: &phase,
@@ -2462,7 +2668,7 @@ mod tests {
             let result = run_phase(&scanner, phase_config).await.unwrap();
             current_findings = result.0;
         }
-        
+
         assert!(current_findings.len() >= initial_findings.len());
     }
 
@@ -2475,14 +2681,14 @@ mod tests {
         let analyzed_files: Vec<String> = vec![];
         let target_path = PathBuf::from(".");
         let project_stack: Option<crate::scanner_types::project::ProjectStack> = None;
-        
+
         let mut finding = create_test_finding("meta", Severity::Critical);
         finding.cwe_id = Some("CWE-89".to_string());
         finding.sources = vec!["semgrep".to_string(), "manual".to_string()];
         finding.priority_score = Some(0.95);
-        
+
         let findings = vec![finding];
-        
+
         let phase_config = PhaseConfig {
             phase: &ScanPhase::Indexing,
             findings,
@@ -2493,7 +2699,7 @@ mod tests {
             config: &config,
             project_stack: &project_stack,
         };
-        
+
         let result = run_phase(&scanner, phase_config).await.unwrap();
         assert_eq!(result.0.len(), 1);
         assert_eq!(result.0[0].cwe_id, Some("CWE-89".to_string()));

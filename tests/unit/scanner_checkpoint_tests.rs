@@ -371,7 +371,10 @@ fn test_checkpoint_resume_from_all_phases() {
         (ScanPhase::AutoPatching, ScanPhase::CveBootstrap),
         (ScanPhase::CveBootstrap, ScanPhase::PocCompiler),
         (ScanPhase::PocCompiler, ScanPhase::VariantSearch),
-        (ScanPhase::VariantSearch, ScanPhase::SecurityAgentVerification),
+        (
+            ScanPhase::VariantSearch,
+            ScanPhase::SecurityAgentVerification,
+        ),
         (ScanPhase::SecurityAgentVerification, ScanPhase::Complete),
         (ScanPhase::Complete, ScanPhase::Indexing),
         (ScanPhase::Error, ScanPhase::Indexing),
@@ -469,7 +472,10 @@ fn test_checkpoint_json_roundtrip() {
     assert_eq!(checkpoint.file_count, loaded.file_count);
     assert_eq!(checkpoint.current_phase, loaded.current_phase);
     assert_eq!(checkpoint.completed_phases, loaded.completed_phases);
-    assert_eq!(checkpoint.findings_so_far.len(), loaded.findings_so_far.len());
+    assert_eq!(
+        checkpoint.findings_so_far.len(),
+        loaded.findings_so_far.len()
+    );
 
     let _ = fs::remove_file(&temp_path);
 }

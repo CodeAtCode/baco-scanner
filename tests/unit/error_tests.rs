@@ -2,9 +2,7 @@
 //!
 //! Tests cover all error types, display formatting, and error conversion.
 
-use baco::error::{
-    LlmError, PhaseError, ScanError, SemgrepError,
-};
+use baco::error::{LlmError, PhaseError, ScanError, SemgrepError};
 
 // ============================================================================
 // ScanError Tests
@@ -67,7 +65,7 @@ fn test_scan_error_toml_from_str() {
     // Alternative TOML test using a different invalid format
     #[derive(Debug, serde::Deserialize)]
     struct Empty;
-    let toml_content = "key = ";  // incomplete value
+    let toml_content = "key = "; // incomplete value
     let result: Result<Empty, toml::de::Error> = toml::from_str(toml_content);
     assert!(result.is_err());
     let err: ScanError = result.unwrap_err().into();
@@ -319,7 +317,7 @@ fn test_semgrep_error_config() {
 fn test_phase_error_into_scan_error() {
     let phase_err = PhaseError::Indexing("test error".to_string());
     let scan_err: ScanError = phase_err.into();
-    
+
     match scan_err {
         ScanError::Phase { phase, source } => {
             assert!(matches!(source, PhaseError::Indexing(_)));

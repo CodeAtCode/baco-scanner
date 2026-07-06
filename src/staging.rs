@@ -1548,7 +1548,8 @@ edition = "2021"
         };
 
         // Test with multiline diff
-        let diff = "--- a/test.rs\n+++ b/test.rs\n@@ -1,3 +1,3 @@\n-old line\n+new line\n more lines\n";
+        let diff =
+            "--- a/test.rs\n+++ b/test.rs\n@@ -1,3 +1,3 @@\n-old line\n+new line\n more lines\n";
         let result = staging.apply_patch(diff);
         let _ = staging.cleanup();
         let _ = fs::remove_dir_all(&temp_dir);
@@ -1762,7 +1763,11 @@ edition = "2021"
     fn test_autopatcher_new_with_relative_path() {
         let autopatcher = AutoPatcher::new(PathBuf::from("./test-repo"));
 
-        assert!(autopatcher.repo_path.as_os_str().to_string_lossy().contains("test-repo"));
+        assert!(autopatcher
+            .repo_path
+            .as_os_str()
+            .to_string_lossy()
+            .contains("test-repo"));
     }
 
     #[test]
@@ -1770,7 +1775,10 @@ edition = "2021"
         let autopatcher = AutoPatcher::new(PathBuf::from("/tmp/test-repo"));
 
         assert!(autopatcher.repo_path.is_absolute());
-        assert!(autopatcher.repo_path.to_string_lossy().contains("test-repo"));
+        assert!(autopatcher
+            .repo_path
+            .to_string_lossy()
+            .contains("test-repo"));
     }
 
     #[test]
@@ -1932,7 +1940,9 @@ edition = "2021"
         let autopatcher = AutoPatcher::new(temp_dir.clone());
 
         // Test that we can call methods in sequence (without actually executing)
-        let patch = autopatcher.generate_patch("desc", "code", "file.rs").unwrap();
+        let patch = autopatcher
+            .generate_patch("desc", "code", "file.rs")
+            .unwrap();
         assert!(!patch.diff.is_empty());
 
         // Cleanup

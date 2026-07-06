@@ -12,6 +12,7 @@ mod agent_executor;
 mod confidence_refinement;
 mod config;
 mod cross_file_analysis;
+mod incremental_scan_tests;
 mod llm;
 mod llm_analysis;
 mod poc_generation;
@@ -19,7 +20,6 @@ mod project_type;
 mod report_ai_aggregation;
 mod semgrep;
 mod staging;
-mod incremental_scan_tests;
 // tickets module has both tickets.rs and tickets/ directory - skip to avoid conflict
 
 // Error handling tests

@@ -609,8 +609,10 @@ impl Scanner {
 mod tests {
     use super::*;
     use crate::checkpoint::ScanPhase;
-    use crate::config::{ScannerConfig, PerformanceSettings, OutputConfig, ProjectConfig, LlmConfig, LlmPhasesConfig};
-    use crate::findings::{VulnerabilityFinding, Severity, VerificationStatus};
+    use crate::config::{
+        LlmConfig, LlmPhasesConfig, OutputConfig, PerformanceSettings, ProjectConfig, ScannerConfig,
+    };
+    use crate::findings::{Severity, VerificationStatus, VulnerabilityFinding};
     use std::sync::Arc;
 
     /// Test helper: Create a minimal valid ScannerConfig for testing
@@ -662,40 +664,39 @@ mod tests {
     fn test_scanner_with_initial_findings() {
         let config = create_test_config();
         let target_path = PathBuf::from("/tmp/test-target");
-        let initial_findings = vec![
-            VulnerabilityFinding {
-                id: "test-1".to_string(),
-                title: "Test Finding".to_string(),
-                description: "Test description".to_string(),
-                severity: Severity::High,
-                confidence_score: 0.8,
-                cwe_id: Some("CWE-79".to_string()),
-                file_path: "test.c".to_string(),
-                line_number: Some(42),
-                code_snippet: None,
-                diff_hunk: None,
-                recommendation: None,
-                code_location: None,
-                already_reported: false,
-                sources: vec![],
-                commit_reference: None,
-                ticket_reference: None,
-                priority_score: None,
-                cross_file_references: None,
-                verification_status: None,
-                verification_notes: None,
-                verification_error: None,
-                agent_evidence_path: None,
-                security_issue: None,
-                poc_code: None,
-                mitigation_code: None,
-                poc_format: None,
-                llm_model: None,
-                agent_mode: false,
-            }
-        ];
+        let initial_findings = vec![VulnerabilityFinding {
+            id: "test-1".to_string(),
+            title: "Test Finding".to_string(),
+            description: "Test description".to_string(),
+            severity: Severity::High,
+            confidence_score: 0.8,
+            cwe_id: Some("CWE-79".to_string()),
+            file_path: "test.c".to_string(),
+            line_number: Some(42),
+            code_snippet: None,
+            diff_hunk: None,
+            recommendation: None,
+            code_location: None,
+            already_reported: false,
+            sources: vec![],
+            commit_reference: None,
+            ticket_reference: None,
+            priority_score: None,
+            cross_file_references: None,
+            verification_status: None,
+            verification_notes: None,
+            verification_error: None,
+            agent_evidence_path: None,
+            security_issue: None,
+            poc_code: None,
+            mitigation_code: None,
+            poc_format: None,
+            llm_model: None,
+            agent_mode: false,
+        }];
 
-        let scanner = Scanner::with_initial_findings(config, target_path, initial_findings.clone(), false);
+        let scanner =
+            Scanner::with_initial_findings(config, target_path, initial_findings.clone(), false);
 
         assert_eq!(scanner.state.borrow().findings.len(), 1);
         assert_eq!(scanner.state.borrow().findings[0].id, "test-1");
@@ -836,38 +837,36 @@ mod tests {
         assert_eq!(scanner.findings().len(), 1);
 
         // Update with new findings
-        let new_findings = vec![
-            VulnerabilityFinding {
-                id: "test-2".to_string(),
-                title: "Test 2".to_string(),
-                description: "Test desc 2".to_string(),
-                severity: Severity::Critical,
-                confidence_score: 0.95,
-                cwe_id: Some("CWE-89".to_string()),
-                file_path: "sql.rs".to_string(),
-                line_number: Some(100),
-                code_snippet: None,
-                diff_hunk: None,
-                recommendation: None,
-                code_location: None,
-                already_reported: false,
-                sources: vec!["semgrep".to_string()],
-                commit_reference: None,
-                ticket_reference: None,
-                priority_score: None,
-                cross_file_references: None,
-                verification_status: Some(VerificationStatus::Confirmed),
-                verification_notes: None,
-                verification_error: None,
-                agent_evidence_path: None,
-                security_issue: None,
-                poc_code: None,
-                mitigation_code: None,
-                poc_format: None,
-                llm_model: None,
-                agent_mode: false,
-            }
-        ];
+        let new_findings = vec![VulnerabilityFinding {
+            id: "test-2".to_string(),
+            title: "Test 2".to_string(),
+            description: "Test desc 2".to_string(),
+            severity: Severity::Critical,
+            confidence_score: 0.95,
+            cwe_id: Some("CWE-89".to_string()),
+            file_path: "sql.rs".to_string(),
+            line_number: Some(100),
+            code_snippet: None,
+            diff_hunk: None,
+            recommendation: None,
+            code_location: None,
+            already_reported: false,
+            sources: vec!["semgrep".to_string()],
+            commit_reference: None,
+            ticket_reference: None,
+            priority_score: None,
+            cross_file_references: None,
+            verification_status: Some(VerificationStatus::Confirmed),
+            verification_notes: None,
+            verification_error: None,
+            agent_evidence_path: None,
+            security_issue: None,
+            poc_code: None,
+            mitigation_code: None,
+            poc_format: None,
+            llm_model: None,
+            agent_mode: false,
+        }];
 
         scanner.update_findings(new_findings.clone());
         assert_eq!(scanner.findings().len(), 1);
@@ -890,7 +889,10 @@ mod tests {
         let target_path = PathBuf::from("/tmp/target");
         let scanner = Scanner::new(config, target_path, false);
 
-        assert_eq!(scanner.checkpoint_path, PathBuf::from("/tmp/custom-output/checkpoint.json"));
+        assert_eq!(
+            scanner.checkpoint_path,
+            PathBuf::from("/tmp/custom-output/checkpoint.json")
+        );
     }
 
     #[test]
@@ -963,38 +965,36 @@ mod tests {
         let target_path = PathBuf::from("/tmp/test-target");
         let scanner = Scanner::new(config, target_path, false);
 
-        let findings = vec![
-            VulnerabilityFinding {
-                id: "test-1".to_string(),
-                title: "Test".to_string(),
-                description: "Test desc".to_string(),
-                severity: Severity::Medium,
-                confidence_score: 0.5,
-                cwe_id: None,
-                file_path: "test.rs".to_string(),
-                line_number: None,
-                code_snippet: None,
-                diff_hunk: None,
-                recommendation: None,
-                code_location: None,
-                already_reported: false,
-                sources: vec![],
-                commit_reference: None,
-                ticket_reference: None,
-                priority_score: None,
-                cross_file_references: None,
-                verification_status: None,
-                verification_notes: None,
-                verification_error: None,
-                agent_evidence_path: None,
-                security_issue: None,
-                poc_code: None,
-                mitigation_code: None,
-                poc_format: None,
-                llm_model: None,
-                agent_mode: false,
-            }
-        ];
+        let findings = vec![VulnerabilityFinding {
+            id: "test-1".to_string(),
+            title: "Test".to_string(),
+            description: "Test desc".to_string(),
+            severity: Severity::Medium,
+            confidence_score: 0.5,
+            cwe_id: None,
+            file_path: "test.rs".to_string(),
+            line_number: None,
+            code_snippet: None,
+            diff_hunk: None,
+            recommendation: None,
+            code_location: None,
+            already_reported: false,
+            sources: vec![],
+            commit_reference: None,
+            ticket_reference: None,
+            priority_score: None,
+            cross_file_references: None,
+            verification_status: None,
+            verification_notes: None,
+            verification_error: None,
+            agent_evidence_path: None,
+            security_issue: None,
+            poc_code: None,
+            mitigation_code: None,
+            poc_format: None,
+            llm_model: None,
+            agent_mode: false,
+        }];
 
         let multi_progress = MultiProgress::new();
         let pb = multi_progress.add(ProgressBar::new(100));
@@ -1156,7 +1156,10 @@ mod tests {
         let target_path = PathBuf::from("/tmp/target");
         let scanner = Scanner::new(config, target_path, false);
 
-        assert_eq!(scanner.checkpoint_path, PathBuf::from("/tmp/output/nested/path/checkpoint.json"));
+        assert_eq!(
+            scanner.checkpoint_path,
+            PathBuf::from("/tmp/output/nested/path/checkpoint.json")
+        );
     }
 
     #[test]
@@ -1295,7 +1298,11 @@ mod tests {
             project: ProjectConfig {
                 name: "max-test".to_string(),
                 path: "/tmp/max-test".to_string(),
-                languages: vec!["rust".to_string(), "python".to_string(), "javascript".to_string()],
+                languages: vec![
+                    "rust".to_string(),
+                    "python".to_string(),
+                    "javascript".to_string(),
+                ],
             },
             output: OutputConfig {
                 dir: "/tmp/max-output".to_string(),
@@ -1304,7 +1311,11 @@ mod tests {
             scanner: crate::config::ScannerSettings {
                 commit_lookback_days: 365,
                 max_file_size_kb: 102400,
-                exclude_paths: vec!["node_modules".to_string(), "target".to_string(), ".git".to_string()],
+                exclude_paths: vec![
+                    "node_modules".to_string(),
+                    "target".to_string(),
+                    ".git".to_string(),
+                ],
                 semgrep: crate::config::SemgrepSettings::default(),
                 performance: PerformanceSettings::default(),
             },
@@ -1330,19 +1341,19 @@ mod tests {
     #[test]
     fn test_scanner_checkpoint_file_exists_when_created() {
         use std::fs;
-        
+
         let mut config = create_test_config();
         let temp_dir = format!("/tmp/scanner_test_{}", std::process::id());
         let _ = fs::create_dir_all(&temp_dir);
         config.output.dir = temp_dir.clone();
-        
+
         let target_path = PathBuf::from("/tmp/target");
         let scanner = Scanner::new(config, target_path, false);
 
         // Verify checkpoint path is correctly computed
         assert!(scanner.checkpoint_path.starts_with(&temp_dir));
         assert!(scanner.checkpoint_path.ends_with("checkpoint.json"));
-        
+
         // Clean up
         let _ = fs::remove_dir_all(&temp_dir);
     }
@@ -1353,24 +1364,39 @@ mod tests {
         let mut config = create_test_config();
         config.scanner.performance.enable_parallel_phases = true;
         config.scanner.performance.early_termination_threshold = 50.0;
-        
+
         let target_path = PathBuf::from("/tmp/target");
         let scanner = Scanner::new(config, target_path, false);
 
         assert!(scanner.config.scanner.performance.enable_parallel_phases);
-        assert_eq!(scanner.config.scanner.performance.early_termination_threshold, 50.0);
+        assert_eq!(
+            scanner
+                .config
+                .scanner
+                .performance
+                .early_termination_threshold,
+            50.0
+        );
     }
 
     #[test]
     fn test_scanner_with_exclude_paths() {
         let mut config = create_test_config();
-        config.scanner.exclude_paths = vec!["tests/".to_string(), "target/".to_string(), ".git/".to_string()];
-        
+        config.scanner.exclude_paths = vec![
+            "tests/".to_string(),
+            "target/".to_string(),
+            ".git/".to_string(),
+        ];
+
         let target_path = PathBuf::from("/tmp/target");
         let scanner = Scanner::new(config, target_path, false);
 
         assert_eq!(scanner.config.scanner.exclude_paths.len(), 3);
-        assert!(scanner.config.scanner.exclude_paths.contains(&"tests/".to_string()));
+        assert!(scanner
+            .config
+            .scanner
+            .exclude_paths
+            .contains(&"tests/".to_string()));
     }
 
     #[tokio::test]
@@ -1401,39 +1427,37 @@ mod tests {
         let scanner = Scanner::new(config, target_path, false);
 
         // Many analyzed files but only 1 finding
-        let findings = vec![
-            VulnerabilityFinding {
-                id: "test-1".to_string(),
-                title: "Test".to_string(),
-                description: "Test desc".to_string(),
-                severity: Severity::Medium,
-                confidence_score: 0.5,
-                cwe_id: None,
-                file_path: "test.rs".to_string(),
-                line_number: None,
-                code_snippet: None,
-                diff_hunk: None,
-                recommendation: None,
-                code_location: None,
-                already_reported: false,
-                sources: vec![],
-                commit_reference: None,
-                ticket_reference: None,
-                priority_score: None,
-                cross_file_references: None,
-                verification_status: None,
-                verification_notes: None,
-                verification_error: None,
-                agent_evidence_path: None,
-                security_issue: None,
-                poc_code: None,
-                mitigation_code: None,
-                poc_format: None,
-                llm_model: None,
-                agent_mode: false,
-            }
-        ];
-        
+        let findings = vec![VulnerabilityFinding {
+            id: "test-1".to_string(),
+            title: "Test".to_string(),
+            description: "Test desc".to_string(),
+            severity: Severity::Medium,
+            confidence_score: 0.5,
+            cwe_id: None,
+            file_path: "test.rs".to_string(),
+            line_number: None,
+            code_snippet: None,
+            diff_hunk: None,
+            recommendation: None,
+            code_location: None,
+            already_reported: false,
+            sources: vec![],
+            commit_reference: None,
+            ticket_reference: None,
+            priority_score: None,
+            cross_file_references: None,
+            verification_status: None,
+            verification_notes: None,
+            verification_error: None,
+            agent_evidence_path: None,
+            security_issue: None,
+            poc_code: None,
+            mitigation_code: None,
+            poc_format: None,
+            llm_model: None,
+            agent_mode: false,
+        }];
+
         let analyzed_files: Vec<String> = (0..1000)
             .map(|i| format!("/path/to/file_{}.rs", i))
             .collect();
@@ -1612,7 +1636,9 @@ mod tests {
 
         let findings = scanner.findings();
         assert_eq!(findings.len(), 4);
-        assert!(findings.iter().any(|f| f.verification_status == Some(VerificationStatus::Confirmed)));
+        assert!(findings
+            .iter()
+            .any(|f| f.verification_status == Some(VerificationStatus::Confirmed)));
     }
 
     #[test]
@@ -1623,7 +1649,7 @@ mod tests {
 
         // Verify cve_entries field exists and is initially empty
         assert!(scanner.cve_entries.is_empty());
-        
+
         // Note: cve_entries is private, we can only test it's initialized
     }
 
@@ -1635,7 +1661,7 @@ mod tests {
 
         // Verify project_stack field exists and is initially None
         assert!(scanner.project_stack.is_none());
-        
+
         // Note: project_stack is private, we can only test it's initialized
     }
 
@@ -1659,7 +1685,11 @@ mod tests {
             recommendation: None,
             code_location: None,
             already_reported: false,
-            sources: vec!["semgrep".to_string(), "llm".to_string(), "agent".to_string()],
+            sources: vec![
+                "semgrep".to_string(),
+                "llm".to_string(),
+                "agent".to_string(),
+            ],
             commit_reference: None,
             ticket_reference: None,
             priority_score: None,
@@ -1722,7 +1752,8 @@ mod tests {
             assert_eq!(
                 scanner.checkpoint_path.to_string_lossy(),
                 expected_checkpoint,
-                "Failed for output_dir: {}", output_dir
+                "Failed for output_dir: {}",
+                output_dir
             );
         }
     }
@@ -1731,45 +1762,46 @@ mod tests {
     fn test_scanner_initial_findings_preserved() {
         let config = create_test_config();
         let target_path = PathBuf::from("/tmp/test-target");
-        
-        let initial_findings = vec![
-            VulnerabilityFinding {
-                id: "initial-1".to_string(),
-                title: "Initial Finding 1".to_string(),
-                description: "Initial desc 1".to_string(),
-                severity: Severity::High,
-                confidence_score: 0.9,
-                cwe_id: Some("CWE-79".to_string()),
-                file_path: "initial.rs".to_string(),
-                line_number: Some(10),
-                code_snippet: None,
-                diff_hunk: None,
-                recommendation: None,
-                code_location: None,
-                already_reported: false,
-                sources: vec!["pre-scan".to_string()],
-                commit_reference: Some("abc123".to_string()),
-                ticket_reference: Some("ISSUE-1".to_string()),
-                priority_score: Some(0.95),
-                cross_file_references: None,
-                verification_status: Some(VerificationStatus::NeedsReview),
-                verification_notes: Some("Needs manual review".to_string()),
-                verification_error: None,
-                agent_evidence_path: None,
-                security_issue: None,
-                poc_code: None,
-                mitigation_code: None,
-                poc_format: None,
-                llm_model: Some("test-model".to_string()),
-                agent_mode: false,
-            }
-        ];
+
+        let initial_findings = vec![VulnerabilityFinding {
+            id: "initial-1".to_string(),
+            title: "Initial Finding 1".to_string(),
+            description: "Initial desc 1".to_string(),
+            severity: Severity::High,
+            confidence_score: 0.9,
+            cwe_id: Some("CWE-79".to_string()),
+            file_path: "initial.rs".to_string(),
+            line_number: Some(10),
+            code_snippet: None,
+            diff_hunk: None,
+            recommendation: None,
+            code_location: None,
+            already_reported: false,
+            sources: vec!["pre-scan".to_string()],
+            commit_reference: Some("abc123".to_string()),
+            ticket_reference: Some("ISSUE-1".to_string()),
+            priority_score: Some(0.95),
+            cross_file_references: None,
+            verification_status: Some(VerificationStatus::NeedsReview),
+            verification_notes: Some("Needs manual review".to_string()),
+            verification_error: None,
+            agent_evidence_path: None,
+            security_issue: None,
+            poc_code: None,
+            mitigation_code: None,
+            poc_format: None,
+            llm_model: Some("test-model".to_string()),
+            agent_mode: false,
+        }];
 
         let scanner = Scanner::with_initial_findings(config, target_path, initial_findings, false);
 
         assert_eq!(scanner.state.borrow().findings.len(), 1);
         assert_eq!(scanner.state.borrow().findings[0].id, "initial-1");
-        assert_eq!(scanner.state.borrow().findings[0].sources, vec!["pre-scan".to_string()]);
+        assert_eq!(
+            scanner.state.borrow().findings[0].sources,
+            vec!["pre-scan".to_string()]
+        );
     }
 
     #[test]
@@ -1850,7 +1882,10 @@ mod tests {
         let findings = scanner.findings();
         assert_eq!(findings.len(), 1);
         assert!(findings[0].agent_mode);
-        assert_eq!(findings[0].agent_evidence_path, Some("/tmp/agent-evidence/trace-1.json".to_string()));
+        assert_eq!(
+            findings[0].agent_evidence_path,
+            Some("/tmp/agent-evidence/trace-1.json".to_string())
+        );
         assert_eq!(findings[0].poc_format, Some("rust".to_string()));
     }
 
@@ -2080,7 +2115,10 @@ mod tests {
         });
 
         let findings = scanner.findings();
-        assert_eq!(findings[0].commit_reference, Some("a1b2c3d4e5f6".to_string()));
+        assert_eq!(
+            findings[0].commit_reference,
+            Some("a1b2c3d4e5f6".to_string())
+        );
     }
 
     #[test]
@@ -2207,7 +2245,10 @@ mod tests {
         });
 
         let findings = scanner.findings();
-        assert_eq!(findings[0].verification_notes, Some("Manually verified by security team".to_string()));
+        assert_eq!(
+            findings[0].verification_notes,
+            Some("Manually verified by security team".to_string())
+        );
     }
 
     #[test]
@@ -2248,6 +2289,9 @@ mod tests {
         });
 
         let findings = scanner.findings();
-        assert_eq!(findings[0].verification_error, Some("Connection timeout during verification".to_string()));
+        assert_eq!(
+            findings[0].verification_error,
+            Some("Connection timeout during verification".to_string())
+        );
     }
 }

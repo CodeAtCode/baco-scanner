@@ -341,7 +341,9 @@ mod tests {
 
         assert!(threat_model.contains("**Data Store**: Database connection"));
         assert!(threat_model.contains("Access: Application service layer"));
-        assert!(threat_model.contains("Risks: SQL injection, privilege escalation, data exfiltration"));
+        assert!(
+            threat_model.contains("Risks: SQL injection, privilege escalation, data exfiltration")
+        );
     }
 
     #[test]
@@ -462,7 +464,9 @@ mod tests {
         let architecture = "file upload enabled\nConfiguration files";
         let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
 
-        assert!(threat_model.contains("**File System**: Upload directories, config files, temp files"));
+        assert!(
+            threat_model.contains("**File System**: Upload directories, config files, temp files")
+        );
     }
 
     #[test]
@@ -609,10 +613,7 @@ mod tests {
     fn test_mitigation_spoofing_recommendations() {
         let threat_model = ThreatModelingPhase::generate_threat_model_static("Full stack");
 
-        let spoofing_section = threat_model
-            .split("#### S - Spoofing")
-            .nth(1)
-            .unwrap_or("");
+        let spoofing_section = threat_model.split("#### S - Spoofing").nth(1).unwrap_or("");
 
         assert!(spoofing_section.contains("Recommendation"));
         assert!(spoofing_section.contains("strong auth"));
@@ -958,7 +959,10 @@ file system: Temporary files only
         }
 
         let duration = start.elapsed();
-        assert!(duration.as_millis() < 1000, "Should complete 100 iterations in under 1 second");
+        assert!(
+            duration.as_millis() < 1000,
+            "Should complete 100 iterations in under 1 second"
+        );
     }
 
     #[test]

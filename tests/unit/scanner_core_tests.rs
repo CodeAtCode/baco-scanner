@@ -106,7 +106,8 @@ fn test_scanner_with_initial_findings() {
     let target_path = PathBuf::from("/tmp/test-project");
     let initial_findings = vec![create_test_finding(), create_test_finding()];
 
-    let scanner = Scanner::with_initial_findings(config, target_path, initial_findings.clone(), false);
+    let scanner =
+        Scanner::with_initial_findings(config, target_path, initial_findings.clone(), false);
 
     let findings = scanner.findings();
     assert_eq!(findings.len(), 2);
@@ -283,7 +284,14 @@ fn test_scanner_config_accessible() {
     let scanner = Scanner::new(config.clone(), target_path, false);
 
     assert_eq!(scanner.config.output.dir, config.output.dir);
-    assert_eq!(scanner.config.scanner.performance.early_termination_threshold, 100.0);
+    assert_eq!(
+        scanner
+            .config
+            .scanner
+            .performance
+            .early_termination_threshold,
+        100.0
+    );
 }
 
 // ============================================================================
@@ -426,7 +434,14 @@ fn test_scanner_early_termination_config() {
     config.scanner.performance.early_termination_threshold = 1000.0;
 
     let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), false);
-    assert_eq!(scanner.config.scanner.performance.early_termination_threshold, 1000.0);
+    assert_eq!(
+        scanner
+            .config
+            .scanner
+            .performance
+            .early_termination_threshold,
+        1000.0
+    );
 }
 
 #[test]
@@ -436,7 +451,14 @@ fn test_scanner_early_termination_disabled() {
     config.scanner.performance.early_termination_threshold = 0.0;
 
     let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), false);
-    assert_eq!(scanner.config.scanner.performance.early_termination_threshold, 0.0);
+    assert_eq!(
+        scanner
+            .config
+            .scanner
+            .performance
+            .early_termination_threshold,
+        0.0
+    );
 }
 
 // ============================================================================
@@ -633,5 +655,12 @@ fn test_scanner_with_custom_config_values() {
     let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), false);
 
     assert_eq!(scanner.config.output.dir, "/custom/output/dir");
-    assert_eq!(scanner.config.scanner.performance.early_termination_threshold, 50.0);
+    assert_eq!(
+        scanner
+            .config
+            .scanner
+            .performance
+            .early_termination_threshold,
+        50.0
+    );
 }
