@@ -1077,3 +1077,108 @@ fn test_full_pipeline_with_exclusions_and_aggregation() {
     assert_eq!(aggregated.title, "multi.issue");
     assert_eq!(unique.title, "unique.issue");
 }
+
+#[test]
+fn test_parse_severity_matching() {
+    // Test all severity levels based on check_id
+    let test_cases = vec![
+        ("critical.vulnerability", baco::scanner_types::Severity::Critical),
+        ("HIGH.error", baco::scanner_types::Severity::High),
+        ("medium.warning", baco::scanner_types::Severity::Medium),
+        ("low.issue", baco::scanner_types::Severity::Low),
+        ("info.notice", baco::scanner_types::Severity::Info),
+        ("unknown.type", baco::scanner_types::Severity::Info),
+    ];
+
+    for (check_id, expected_severity) in test_cases {
+        let mock_json = format!(r#"{{
+            "results": [
+                {{
+                    "check_id": "{}",
+                    "path": "test.py",
+                    "start": {{"line": 1}},
+                    "extra": {{"message": "Test"}}
+                }}
+            ]
+        }}"#, check_id);
+
+        let runner = SemgrepRunner::new(None, vec!["python.lang".to_string()]);
+        let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
+
+        assert_eq!(findings.len(), 1, "Failed for check_id: {}", check_id);
+        assert_eq!(findings[0].severity, expected_severity, "Severity mismatch for: {}", check_id);
+    }
+}
+
+#[test]
+fn test_parse_cwe_id_extraction() {
+    // Test with CWE metadata present
+    let mock_json_with_cwe = r#"{
+        "results": [
+            {
+                "check_id": "test.issue",
+                "path": "test.py",
+                "start": {"line": 1},
+                "extra": {
+                    "message": "Test finding",
+                    "metadata": {
+                        "cwe": ["CWE-79", "CWE-80"]
+                    }
+                }
+            }
+        ]
+    }"#;
+
+    let runner = SemgrepRunner::new(None, vec!["python.lang".to_string()]);
+    let findings = runner.parse_json_output(mock_json_with_cwe.as_bytes()).unwrap();
+
+    assert_eq!(findings.len(), 1);
+    assert!(findings[0].cwe_id.is_some());
+    assert_eq!(findings[0].cwe_id.as_ref().unwrap(), "CWE-79");
+}
+
+#[test]
+fn test_parse_without_cwe_id() {
+    // Test without CWE metadata
+    let mock_json_no_cwe = r#"{
+        "results": [
+            {
+                "check_id": "test.issue",
+                "path": "test.py",
+                "start": {"line": 1},
+                "extra": {
+                    "message": "Test finding"
+                }
+            }
+        ]
+    }"#;
+
+    let runner = SemgrepRunner::new(None, vec!["python.lang".to_string()]);
+    let findings = runner.parse_json_output(mock_json_no_cwe.as_bytes()).unwrap();
+
+    assert_eq!(findings.len(), 1);
+    assert!(findings[0].cwe_id.is_none());
+}
+
+#[test]
+fn test_semgrep_severity_mapping_edge_cases() {
+    let mock_json = r#"{
+        "results": [
+            {"check_id": "security.critical.auth", "path": "test.py", "line": 10, "extra": {"message": "critical", "severity": "critical"}},
+            {"check_id": "security.high.sql", "path": "test.py", "line": 20, "extra": {"message": "high", "severity": "high"}},
+            {"check_id": "security.medium.xss", "path": "test.py", "line": 30, "extra": {"message": "medium", "severity": "medium"}},
+            {"check_id": "security.low.info", "path": "test.py", "line": 40, "extra": {"message": "low", "severity": "low"}},
+            {"check_id": "unknown.rule", "path": "test.py", "line": 50, "extra": {"message": "unknown", "severity": "info"}}
+        ]
+    }"#;
+
+    let runner = SemgrepRunner::new(None, vec![]);
+    let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
+
+    assert_eq!(findings.len(), 5);
+    assert_eq!(findings[0].severity, Severity::Critical);
+    assert_eq!(findings[1].severity, Severity::High);
+    assert_eq!(findings[2].severity, Severity::Medium);
+    assert_eq!(findings[3].severity, Severity::Low);
+    assert_eq!(findings[4].severity, Severity::Info);
+}

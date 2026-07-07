@@ -32,3 +32,7 @@ mod scanner_checkpoint_tests;
 
 // Scanner core tests
 mod scanner_core_tests;
+
+// Threat modeling tests
+mod threat_model;
+mod threat_model_file;

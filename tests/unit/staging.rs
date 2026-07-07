@@ -2278,3 +2278,75 @@ fn test_patch_validation_result_display() {
     // Should not panic when formatting
     assert!(!_display.is_empty());
 }
+
+#[test]
+fn test_auto_patch_error_display() {
+    // Test Generation error
+    let err = AutoPatchError::Generation("test error".to_string());
+    let msg = err.to_string();
+    assert!(msg.contains("Failed to generate patch"));
+    assert!(msg.contains("test error"));
+
+    // Test Apply error
+    let err = AutoPatchError::Apply("apply failed".to_string());
+    assert!(err.to_string().contains("Failed to apply patch"));
+
+    // Test Validation error
+    let err = AutoPatchError::Validation("validation failed".to_string());
+    assert!(err.to_string().contains("Validation failed"));
+
+    // Test Staging error
+    let err = AutoPatchError::Staging("staging error".to_string());
+    assert!(err.to_string().contains("Staging error"));
+
+    // Test NoLlmClient error
+    let err = AutoPatchError::NoLlmClient;
+    assert!(err.to_string().contains("No LLM client configured"));
+}
+
+#[test]
+fn test_auto_patcher_generate_patch() {
+    let temp_dir = create_temp_rust_project();
+    fs::write(temp_dir.join("src/main.rs"), "fn main() {}").unwrap();
+
+    // Create a proper git repo for staging
+    Command::new("git")
+        .current_dir(&temp_dir)
+        .args(["init"])
+        .output()
+        .unwrap();
+    Command::new("git")
+        .current_dir(&temp_dir)
+        .args(["config", "user.email", "test@test.com"])
+        .output()
+        .unwrap();
+    Command::new("git")
+        .current_dir(&temp_dir)
+        .args(["config", "user.name", "Test"])
+        .output()
+        .unwrap();
+    Command::new("git")
+        .current_dir(&temp_dir)
+        .args(["add", "."])
+        .output()
+        .unwrap();
+    Command::new("git")
+        .current_dir(&temp_dir)
+        .args(["commit", "-m", "initial"])
+        .output()
+        .unwrap();
+
+    let _staging = StagingArea::create(&temp_dir).unwrap();
+    let auto_patcher = AutoPatcher::new(temp_dir.clone());
+
+    let result = auto_patcher.generate_patch(
+        "test vulnerability",
+        "vulnerable code",
+        "src/main.rs",
+    );
+
+    // Should return a PatchCandidate (may be empty without LLM)
+    assert!(result.is_ok());
+
+    cleanup_temp_dir(&temp_dir);
+}

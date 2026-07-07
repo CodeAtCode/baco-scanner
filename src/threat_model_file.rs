@@ -232,7 +232,8 @@ impl ThreatModelFile {
     }
 
     /// Parse a threat model file from string content
-    fn parse(content: &str) -> Result<Self, String> {
+    #[cfg_attr(test, visibility::make(pub))]
+    pub fn parse(content: &str) -> Result<Self, String> {
         let content = content.trim();
 
         if !content.starts_with("---") {

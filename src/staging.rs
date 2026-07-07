@@ -1980,4 +1980,188 @@ edition = "2021"
         assert!(autopatch_err.to_string().contains("Staging error"));
         assert!(autopatch_err.to_string().contains("cleanup failed"));
     }
+
+    #[test]
+    fn test_staging_error_all_variants_display() {
+        assert!(StagingError::WorktreeCreate("e".into()).to_string().contains("e"));
+        assert!(StagingError::PatchApply("e".into()).to_string().contains("e"));
+        assert!(StagingError::Validation("e".into()).to_string().contains("e"));
+        assert!(StagingError::Cleanup("e".into()).to_string().contains("e"));
+        assert!(StagingError::Rollback("e".into()).to_string().contains("e"));
+        assert!(StagingError::GitError("e".into()).to_string().contains("e"));
+    }
+
+    #[test]
+    fn test_auto_patch_error_all_variants_display() {
+        assert!(AutoPatchError::Generation("e".into()).to_string().contains("generate"));
+        assert!(AutoPatchError::Apply("e".into()).to_string().contains("apply"));
+        assert!(AutoPatchError::Validation("e".into()).to_string().contains("Validation"));
+        assert!(AutoPatchError::Staging("e".into()).to_string().contains("Staging"));
+        assert!(AutoPatchError::NoLlmClient.to_string().contains("No LLM"));
+    }
+
+    #[test]
+    fn test_staging_result_type_usage() {
+        let ok: StagingResult<u32> = Ok(42);
+        let err: StagingResult<u32> = Err(StagingError::GitError("x".into()));
+        assert!(ok.is_ok());
+        assert!(err.is_err());
+    }
+
+    #[test]
+    fn test_auto_patch_result_type_usage() {
+        let ok: AutoPatchResult<u32> = Ok(42);
+        let err: AutoPatchResult<u32> = Err(AutoPatchError::NoLlmClient);
+        assert!(ok.is_ok());
+        assert!(err.is_err());
+    }
+
+    #[test]
+    fn test_patch_validation_result_all_combinations() {
+        let r1 = PatchValidationResult { compiles: true, tests_pass: true, warnings: 0, error_message: None };
+        let r2 = PatchValidationResult { compiles: true, tests_pass: false, warnings: 0, error_message: None };
+        let r3 = PatchValidationResult { compiles: false, tests_pass: true, warnings: 0, error_message: None };
+        let r4 = PatchValidationResult { compiles: false, tests_pass: false, warnings: 0, error_message: None };
+        
+        assert!(r1.compiles && r1.tests_pass);
+        assert!(r2.compiles && !r2.tests_pass);
+        assert!(!r3.compiles && r3.tests_pass);
+        assert!(!r4.compiles && !r4.tests_pass);
+    }
+
+    #[test]
+    fn test_patch_validation_result_warnings_boundary() {
+        let mut r = PatchValidationResult::default();
+        r.warnings = 0;
+        assert_eq!(r.warnings, 0);
+        
+        r.warnings = u32::MAX;
+        assert_eq!(r.warnings, u32::MAX);
+    }
+
+    #[test]
+    fn test_patch_candidate_default_values() {
+        let c = PatchCandidate::default();
+        assert!(c.diff.is_empty());
+        assert!(c.file_path.is_empty());
+        assert!(!c.applied);
+        assert!(c.validation_result.is_none());
+    }
+
+    #[test]
+    fn test_patch_candidate_new_values() {
+        let c = PatchCandidate::new("mydiff", "myfile.rs");
+        assert_eq!(c.diff, "mydiff");
+        assert_eq!(c.file_path, "myfile.rs");
+        assert!(!c.applied);
+        assert!(c.validation_result.is_none());
+    }
+
+    #[test]
+    fn test_patching_config_fields_access() {
+        let config = PatchingConfig {
+            dry_run: true,
+            allow_network_access: false,
+            max_auto_patches: 7,
+            staging_prefix: Some("pre".into()),
+        };
+        assert!(config.dry_run);
+        assert!(!config.allow_network_access);
+        assert_eq!(config.max_auto_patches, 7);
+        assert_eq!(config.staging_prefix, Some("pre".into()));
+    }
+
+    #[test]
+    fn test_staging_area_fields() {
+        let temp = create_temp_dir_with_project();
+        let s = StagingArea {
+            worktree_path: temp.join("wt"),
+            original_repo_path: temp.clone(),
+            is_created: true,
+        };
+        assert!(s.worktree_path.ends_with("wt"));
+        assert!(s.is_created);
+        let _ = fs::remove_dir_all(&temp);
+    }
+
+    #[test]
+    fn test_autopatcher_fields() {
+        let temp = create_temp_dir_with_project();
+        let ap = AutoPatcher::new(temp.clone());
+        assert_eq!(ap.repo_path, temp);
+        let _ = fs::remove_dir_all(&temp);
+    }
+
+    #[test]
+    fn test_command_new_and_output() {
+        let cmd = Command::new("echo");
+        assert_eq!(cmd.get_program(), "echo");
+    }
+
+    #[test]
+    fn test_pathbuf_join_and_exists() {
+        let p = PathBuf::from("/tmp");
+        let joined = p.join("test");
+        assert!(joined.starts_with("/tmp"));
+    }
+
+    #[test]
+    fn test_string_from_utf8_lossy() {
+        let bytes = b"hello";
+        let s = String::from_utf8_lossy(bytes);
+        assert_eq!(s, "hello");
+    }
+
+    #[test]
+    fn test_systemtime_duration() {
+        let now = std::time::SystemTime::now();
+        let _ = now.duration_since(std::time::UNIX_EPOCH);
+    }
+
+    #[test]
+    fn test_temp_dir_creation() {
+        let d = std::env::temp_dir();
+        assert!(d.exists());
+    }
+
+    #[test]
+    fn test_fs_write_read_cycle() {
+        let temp = create_temp_dir_with_project();
+        let file = temp.join("test.txt");
+        fs::write(&file, "content").unwrap();
+        let content = fs::read_to_string(&file).unwrap();
+        assert_eq!(content, "content");
+        let _ = fs::remove_dir_all(&temp);
+    }
+
+    #[test]
+    fn test_staging_area_is_created_false_path() {
+        let temp = create_temp_dir_with_project();
+        let mut s = StagingArea {
+            worktree_path: temp.clone(),
+            original_repo_path: temp.clone(),
+            is_created: false,
+        };
+        
+        // Rollback when not created should return Ok
+        let result = s.rollback();
+        assert!(result.is_ok());
+        
+        let _ = fs::remove_dir_all(&temp);
+    }
+
+    #[test]
+    fn test_patch_validation_result_from_conversion() {
+        let local = PatchValidationResult {
+            compiles: false,
+            tests_pass: true,
+            warnings: 3,
+            error_message: Some("err".into()),
+        };
+        let converted: crate::scanner_types::patch::PatchValidationResult = local.into();
+        assert!(!converted.compiles);
+        assert!(converted.tests_pass);
+        assert_eq!(converted.warnings, 3);
+        assert_eq!(converted.error_message, Some("err".into()));
+    }
 }

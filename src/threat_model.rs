@@ -51,7 +51,8 @@ impl ThreatModelingPhase {
     }
 
     /// Load architecture summary from AnalysisContext or regenerate via CodebaseUnderstanding.
-    fn load_or_generate_architecture(_target_path: &Path, context: &AnalysisContext) -> String {
+    #[cfg_attr(test, visibility::make(pub))]
+    pub fn load_or_generate_architecture(_target_path: &Path, context: &AnalysisContext) -> String {
         if !context.architecture_summary.is_empty() {
             tracing::debug!("Using existing architecture summary from context");
             context.architecture_summary.clone()
@@ -123,7 +124,7 @@ Output as structured markdown with clear threat categorization.
 
     /// Generate threat model using static analysis fallback (no LLM).
     #[cfg_attr(test, visibility::make(pub))]
-    fn generate_threat_model_static(architecture: &str) -> String {
+    pub fn generate_threat_model_static(architecture: &str) -> String {
         let mut threat_model = String::from("=== THREAT MODEL: STRIDE Analysis ===\n\n");
 
         // Parse architecture for key components (check for negations first)
@@ -262,7 +263,8 @@ Output as structured markdown with clear threat categorization.
     }
 
     /// Save threat model to AnalysisContext.
-    fn save_to_context(target_path: &Path, threat_model: &str) {
+    #[cfg_attr(test, visibility::make(pub))]
+    pub fn save_to_context(target_path: &Path, threat_model: &str) {
         let mut ctx =
             AnalysisContext::load(target_path).unwrap_or_else(|_| AnalysisContext::default());
         ctx.threat_model = Some(threat_model.to_string());
@@ -979,5 +981,293 @@ file system: Temporary files only
             duration.as_millis() < 5000,
             "Should complete 10 iterations with large input in under 5 seconds"
         );
+    }
+
+    #[test]
+    fn test_threat_model_all_negation_variants() {
+        let test_cases = vec![
+            "No database",
+            "no database",
+            "No DB",
+            "no db",
+            "No database found",
+            "no database found",
+        ];
+        
+        for arch in test_cases {
+            let tm = ThreatModelingPhase::generate_threat_model_static(arch);
+            assert!(!tm.contains("SQL injection"), "Failed for: {}", arch);
+        }
+    }
+
+    #[test]
+    fn test_threat_model_filesystem_negation_variants() {
+        let test_cases = vec![
+            "No file system",
+            "no file system",
+            "No filesystem",
+            "no filesystem",
+        ];
+        
+        for arch in test_cases {
+            let tm = ThreatModelingPhase::generate_threat_model_static(arch);
+            assert!(!tm.contains("Path traversal"), "Failed for: {}", arch);
+        }
+    }
+
+    #[test]
+    fn test_threat_model_api_detection_variants() {
+        let test_cases = vec![
+            "HTTP endpoint",
+            "API router",
+            "http endpoint",
+            "api router",
+        ];
+        
+        for arch in test_cases {
+            let tm = ThreatModelingPhase::generate_threat_model_static(arch);
+            assert!(tm.contains("HTTP/HTTPS API"), "Failed for: {}", arch);
+        }
+    }
+
+    #[test]
+    fn test_threat_model_database_detection_variants() {
+        let test_cases = vec![
+            "database: sqlite",
+            "data store: postgres",
+            "sqlite",
+            "postgres",
+            "mysql",
+        ];
+        
+        for arch in test_cases {
+            let tm = ThreatModelingPhase::generate_threat_model_static(arch);
+            assert!(tm.contains("Database connection"), "Failed for: {}", arch);
+        }
+    }
+
+    #[test]
+    fn test_threat_model_filesystem_detection_variants() {
+        let test_cases = vec![
+            "file system: uploads",
+            "filesystem: config",
+            "file access",
+            "file upload",
+        ];
+        
+        for arch in test_cases {
+            let tm = ThreatModelingPhase::generate_threat_model_static(arch);
+            assert!(tm.contains("File System"), "Failed for: {}", arch);
+        }
+    }
+
+    #[test]
+    fn test_threat_model_combined_components() {
+        let arch = "HTTP + database + file system";
+        let tm = ThreatModelingPhase::generate_threat_model_static(arch);
+        
+        assert!(tm.contains("HTTP/HTTPS API"));
+        assert!(tm.contains("Database connection"));
+        assert!(tm.contains("File System"));
+    }
+
+    #[test]
+    fn test_threat_model_stride_all_sections_present() {
+        let tm = ThreatModelingPhase::generate_threat_model_static("full stack");
+        
+        assert!(tm.contains("#### S - Spoofing"));
+        assert!(tm.contains("#### T - Tampering"));
+        assert!(tm.contains("#### R - Repudiation"));
+        assert!(tm.contains("#### I - Information Disclosure"));
+        assert!(tm.contains("#### D - Denial of Service"));
+        assert!(tm.contains("#### E - Elevation of Privilege"));
+    }
+
+    #[test]
+    fn test_threat_model_recommendations_all_present() {
+        let tm = ThreatModelingPhase::generate_threat_model_static("full stack");
+        
+        assert!(tm.contains("Recommendation"));
+        assert!(tm.contains("strong auth"));
+        assert!(tm.contains("Input sanitization"));
+        assert!(tm.contains("Comprehensive logging"));
+        assert!(tm.contains("Log sanitization"));
+        assert!(tm.contains("Rate limiting"));
+        assert!(tm.contains("Role-based access control"));
+    }
+
+    #[test]
+    fn test_threat_model_empty_input() {
+        let tm = ThreatModelingPhase::generate_threat_model_static("");
+        assert!(tm.contains("TRUST BOUNDARIES"));
+        assert!(!tm.is_empty());
+    }
+
+    #[test]
+    fn test_threat_model_whitespace_only() {
+        let tm = ThreatModelingPhase::generate_threat_model_static("   \n\n   ");
+        assert!(tm.contains("TRUST BOUNDARIES"));
+        assert!(!tm.is_empty());
+    }
+
+    #[test]
+    fn test_threat_model_special_characters() {
+        let tm = ThreatModelingPhase::generate_threat_model_static("<script>alert('xss')</script>");
+        assert!(tm.contains("TRUST BOUNDARIES"));
+        assert!(!tm.is_empty());
+    }
+
+    #[test]
+    fn test_threat_model_unicode_input() {
+        let tm = ThreatModelingPhase::generate_threat_model_static("café naïve résumé");
+        assert!(tm.contains("TRUST BOUNDARIES"));
+        assert!(!tm.is_empty());
+    }
+
+    #[test]
+    fn test_threat_model_very_long_input() {
+        let long_input = "A".repeat(50000);
+        let tm = ThreatModelingPhase::generate_threat_model_static(&long_input);
+        assert!(tm.contains("TRUST BOUNDARIES"));
+        assert!(!tm.is_empty());
+    }
+
+    #[test]
+    fn test_threat_model_newline_variations() {
+        let tm = ThreatModelingPhase::generate_threat_model_static("Line1\r\nLine2\nLine3\rLine4");
+        assert!(tm.contains("TRUST BOUNDARIES"));
+        assert!(!tm.is_empty());
+    }
+
+    #[test]
+    fn test_threat_model_multiple_database_mentions() {
+        let arch = "Database: PostgreSQL\nAnother database: MySQL\nSQLite also used";
+        let tm = ThreatModelingPhase::generate_threat_model_static(arch);
+        assert!(tm.contains("Database connection"));
+        assert!(tm.contains("SQL injection"));
+    }
+
+    #[test]
+    fn test_threat_model_mixed_case_keywords() {
+        let arch = "hTtP Endpoints\nDaTaBaSe: SQL\nFiLe SyStEm";
+        let tm = ThreatModelingPhase::generate_threat_model_static(arch);
+        assert!(tm.contains("TRUST BOUNDARIES"));
+    }
+
+    #[test]
+    fn test_threat_model_overlapping_patterns() {
+        let arch = "No database but database backup exists";
+        let tm = ThreatModelingPhase::generate_threat_model_static(arch);
+        assert!(!tm.contains("SQL injection"));
+    }
+
+    #[tokio::test]
+    async fn test_threat_model_run_creates_context() {
+        let tmp = tempfile::tempdir().unwrap();
+        let ctx = AnalysisContext::default();
+        
+        let result = ThreatModelingPhase::run(tmp.path(), &ctx, None).await;
+        assert!(result.is_ok());
+        
+        let loaded = AnalysisContext::load(tmp.path()).unwrap();
+        assert!(loaded.threat_model.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_threat_model_run_with_existing_context() {
+        let tmp = tempfile::tempdir().unwrap();
+        let ctx = AnalysisContext {
+            project_type: crate::project_type::ProjectType::Web,
+            architecture_summary: "Test arch".into(),
+            threat_model: None,
+            invariants: Vec::new(),
+            findings_so_far: Vec::new(),
+        };
+        ctx.save(tmp.path()).unwrap();
+        
+        let result = ThreatModelingPhase::run(tmp.path(), &ctx, None).await;
+        assert!(result.is_ok());
+        
+        let loaded = AnalysisContext::load(tmp.path()).unwrap();
+        assert!(loaded.threat_model.is_some());
+    }
+
+    #[test]
+    fn test_load_or_generate_architecture_with_summary() {
+        let tmp = tempfile::tempdir().unwrap();
+        let ctx = AnalysisContext {
+            project_type: crate::project_type::ProjectType::Web,
+            architecture_summary: "Existing arch".into(),
+            threat_model: None,
+            invariants: Vec::new(),
+            findings_so_far: Vec::new(),
+        };
+        ctx.save(tmp.path()).unwrap();
+        
+        let arch = ThreatModelingPhase::load_or_generate_architecture(tmp.path(), &ctx);
+        assert_eq!(arch, "Existing arch");
+    }
+
+    #[test]
+    fn test_load_or_generate_architecture_without_summary() {
+        let tmp = tempfile::tempdir().unwrap();
+        let ctx = AnalysisContext::default();
+        ctx.save(tmp.path()).unwrap();
+        
+        let arch = ThreatModelingPhase::load_or_generate_architecture(tmp.path(), &ctx);
+        assert_eq!(arch, "No architecture summary available");
+    }
+
+    #[test]
+    fn test_save_to_context_creates_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        ThreatModelingPhase::save_to_context(tmp.path(), "Test threat model");
+        
+        let loaded = AnalysisContext::load(tmp.path()).unwrap();
+        assert!(loaded.threat_model.is_some());
+        assert_eq!(loaded.threat_model.as_ref().unwrap(), "Test threat model");
+    }
+
+    #[test]
+    fn test_save_to_context_overwrites_existing() {
+        let tmp = tempfile::tempdir().unwrap();
+        let ctx = AnalysisContext {
+            project_type: crate::project_type::ProjectType::Web,
+            architecture_summary: "Arch".into(),
+            threat_model: Some("Old".into()),
+            invariants: Vec::new(),
+            findings_so_far: Vec::new(),
+        };
+        ctx.save(tmp.path()).unwrap();
+        
+        ThreatModelingPhase::save_to_context(tmp.path(), "New");
+        
+        let loaded = AnalysisContext::load(tmp.path()).unwrap();
+        assert_eq!(loaded.threat_model.as_ref().unwrap(), "New");
+    }
+
+    #[test]
+    fn test_threat_model_output_format() {
+        let tm = ThreatModelingPhase::generate_threat_model_static("test");
+        
+        assert!(tm.contains("=== THREAT MODEL"));
+        assert!(tm.contains("### 1. TRUST BOUNDARIES"));
+        assert!(tm.contains("### 2. DATA FLOWS"));
+        assert!(tm.contains("### 3. ATTACK SURFACES"));
+        assert!(tm.contains("### 4. STRIDE THREATS"));
+    }
+
+    #[test]
+    fn test_threat_model_line_count() {
+        let tm = ThreatModelingPhase::generate_threat_model_static("test");
+        let lines: Vec<&str> = tm.lines().collect();
+        assert!(lines.len() > 20);
+    }
+
+    #[test]
+    fn test_threat_model_no_empty_lines_at_start() {
+        let tm = ThreatModelingPhase::generate_threat_model_static("test");
+        let first_line = tm.lines().next().unwrap_or("");
+        assert!(!first_line.trim().is_empty());
     }
 }
