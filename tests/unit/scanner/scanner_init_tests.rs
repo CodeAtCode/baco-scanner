@@ -1,6 +1,6 @@
 //! Tests for Scanner initialization and basic operations
 
-use super::fixtures::{
+use tests::fixtures::{
     create_test_config, create_test_finding, create_test_findings, ensure_test_output_dir,
 };
 use baco::scanner::Scanner;

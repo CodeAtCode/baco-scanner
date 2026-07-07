@@ -4,10 +4,14 @@
 //! and utility functions like URL parsing.
 
 use baco::checkpoint::ScanPhase;
-use baco::config::{OutputConfig, PerformanceSettings, ScannerSettings};
+use baco::config::{
+    LlmConfig, LlmPhasesConfig, OutputConfig, PerformanceSettings, ScannerSettings,
+};
 use baco::findings::{Severity, VulnerabilityFinding};
 use baco::scanner::Scanner;
+use std::fs;
 use std::path::PathBuf;
+use tempfile::TempDir;
 
 // ============================================================================
 // Test Fixtures
@@ -663,4 +667,235 @@ fn test_scanner_with_custom_config_values() {
             .early_termination_threshold,
         50.0
     );
+}
+
+// ============================================================================
+// Scanner::run() Tests
+// ============================================================================
+
+/// Helper to create a minimal Rust project in a temp directory
+fn create_minimal_rust_project(temp_dir: &TempDir) -> std::io::Result<PathBuf> {
+    let src_dir = temp_dir.path().join("src");
+    fs::create_dir_all(&src_dir)?;
+
+    // Create Cargo.toml
+    let cargo_toml = r#"[package]
+name = "test-project"
+version = "0.1.0"
+edition = "2021"
+"#;
+    fs::write(temp_dir.path().join("Cargo.toml"), cargo_toml)?;
+
+    // Create src/main.rs
+    let main_rs = r#"fn main() {
+    println!("Hello, world!");
+}
+"#;
+    fs::write(src_dir.join("main.rs"), main_rs)?;
+
+    Ok(temp_dir.path().to_path_buf())
+}
+
+/// Helper to create a config with LLM phases disabled (no API keys)
+fn create_config_without_llm_keys() -> baco::config::ScannerConfig {
+    baco::config::ScannerConfig {
+        output: OutputConfig {
+            dir: "/tmp/baco_run_test_output".to_string(),
+            format: vec!["json".to_string()],
+        },
+        scanner: ScannerSettings {
+            performance: PerformanceSettings {
+                early_termination_threshold: 100.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        llm: LlmConfig {
+            phases: LlmPhasesConfig {
+                // All phases have no API key, so LLM calls will be skipped
+                discovery: Default::default(),
+                verification: Default::default(),
+                aggregation: Default::default(),
+                semgrep: Default::default(),
+                ticket_crossref: Default::default(),
+                git_analysis: Default::default(),
+                cross_file_analysis: Default::default(),
+                confidence_scoring: Default::default(),
+                ai_aggregation: Default::default(),
+                reporting: Default::default(),
+                indexing: Default::default(),
+                prompt_overrides: Default::default(),
+            },
+            ..Default::default()
+        },
+        ..Default::default()
+    }
+}
+
+#[tokio::test]
+async fn test_scanner_run_with_force_flag() {
+    // Create a temp directory with a minimal Rust project
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let project_path = create_minimal_rust_project(&temp_dir).expect("Failed to create project");
+
+    // Create scanner with force=true and no LLM API keys
+    let config = create_config_without_llm_keys();
+    let scanner = Scanner::new(config, project_path, true); // force=true
+
+    // Run the scanner - should complete without panicking
+    // LLM phases will be skipped due to missing API keys
+    let result = scanner.run().await;
+
+    // Assert result is Ok (even if 0 findings)
+    assert!(
+        result.is_ok(),
+        "Scanner run should succeed even without LLM keys. Got error: {:?}",
+        result.err()
+    );
+
+    // Verify we got a result (may be empty findings)
+    let _findings = result.unwrap();
+}
+
+#[tokio::test]
+async fn test_scanner_run_empty_project() {
+    // Create a temp dir with just a Cargo.toml (no src/)
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+
+    // Create only Cargo.toml
+    let cargo_toml = r#"[package]
+name = "empty-project"
+version = "0.1.0"
+edition = "2021"
+"#;
+    fs::write(temp_dir.path().join("Cargo.toml"), cargo_toml).expect("Failed to write Cargo.toml");
+
+    // Create scanner with force=true and no LLM API keys
+    let config = create_config_without_llm_keys();
+    let scanner = Scanner::new(config, temp_dir.path().to_path_buf(), true); // force=true
+
+    // Run the scanner - should complete without panicking
+    let result = scanner.run().await;
+
+    // Assert result is Ok (even if errors about missing src/)
+    assert!(
+        result.is_ok(),
+        "Scanner run should succeed on empty project. Got error: {:?}",
+        result.err()
+    );
+
+    let _findings = result.unwrap();
+}
+
+/// Test with low early termination threshold - exercises early termination branch after parallel phases
+#[tokio::test]
+async fn test_scanner_run_with_low_early_termination() {
+    // Create a temp directory with a minimal Rust project
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let project_path = create_minimal_rust_project(&temp_dir).expect("Failed to create project");
+
+    // Create config with LOW early_termination_threshold = 1.0
+    let mut config = create_config_without_llm_keys();
+    config.scanner.performance.early_termination_threshold = 1.0;
+
+    // Create scanner with force=true and no LLM API keys
+    let scanner = Scanner::new(config, project_path, true); // force=true
+
+    // Run the scanner - should complete (may trigger early termination)
+    let result = scanner.run().await;
+
+    // Assert result is Ok (early termination still returns Ok)
+    assert!(
+        result.is_ok(),
+        "Scanner run should succeed even with low early termination threshold. Got error: {:?}",
+        result.err()
+    );
+
+    // Verify we got a result (may be empty or have findings)
+    let _findings = result.unwrap();
+}
+
+/// Test with initial findings and force flag - exercises checkpoint-load skip path
+#[tokio::test]
+async fn test_scanner_run_with_initial_findings_force() {
+    // Create a temp directory with a minimal Rust project
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let project_path = create_minimal_rust_project(&temp_dir).expect("Failed to create project");
+
+    // Create initial findings
+    let initial_findings: Vec<VulnerabilityFinding> = (0..3)
+        .map(|i| VulnerabilityFinding {
+            id: format!("initial-finding-{}", i),
+            title: "Initial Test Vulnerability".to_string(),
+            description: "A test vulnerability added initially".to_string(),
+            severity: Severity::High,
+            confidence_score: 0.85,
+            cwe_id: Some("CWE-79".to_string()),
+            file_path: "src/test.c".to_string(),
+            line_number: Some(42),
+            code_snippet: Some("printf(user_input)".to_string()),
+            diff_hunk: None,
+            recommendation: Some("Use sanitized input".to_string()),
+            code_location: Some("src/test.c:42".to_string()),
+            already_reported: false,
+            sources: vec!["initial".to_string()],
+            commit_reference: None,
+            ticket_reference: None,
+            priority_score: Some(0.9),
+            cross_file_references: None,
+            verification_status: None,
+            verification_notes: None,
+            verification_error: None,
+            agent_evidence_path: None,
+            security_issue: None,
+            poc_code: None,
+            mitigation_code: None,
+            poc_format: None,
+            llm_model: None,
+            agent_mode: false,
+        })
+        .collect();
+
+    // Create scanner via with_initial_findings with force=true
+    let config = create_config_without_llm_keys();
+    let scanner = Scanner::with_initial_findings(
+        config,
+        project_path,
+        initial_findings.clone(),
+        true, // force=true
+    );
+
+    // Verify initial findings are set in scanner state before running
+    let pre_run_findings = scanner.findings();
+    assert_eq!(
+        pre_run_findings.len(),
+        3,
+        "Scanner should have 3 initial findings before run"
+    );
+
+    // Run the scanner
+    let result = scanner.run().await;
+
+    // Assert result is Ok
+    assert!(
+        result.is_ok(),
+        "Scanner run should succeed with initial findings. Got error: {:?}",
+        result.err()
+    );
+
+    // Note: with force=true, run() starts fresh (ignores initial findings)
+    // This test verifies the scanner can be created with initial findings and run without panicking
+    let _findings = result.unwrap();
+}
+
+/// Test with nonexistent target path - just verifies no panic
+#[tokio::test]
+async fn test_scanner_run_nonexistent_target() {
+    // Create scanner with nonexistent target path and force=true
+    let config = create_config_without_llm_keys();
+    let target_path = PathBuf::from("/nonexistent/path/xyz123");
+    let scanner = Scanner::new(config, target_path, true); // force=true
+
+    // Run the scanner - just verify it doesn't panic
+    let _ = scanner.run().await;
 }

@@ -68,14 +68,6 @@ pub fn calculate_content_hash(content: &[u8]) -> String {
 /// * `old_hash` - Previous hash value
 /// * `new_content` - New content to compare
 ///
-/// # Returns
-/// * `true` if content has changed (hash differs)
-/// * `false` if content is unchanged (hash matches)
-pub fn hash_changed(old_hash: &str, new_content: &[u8]) -> bool {
-    let new_hash = calculate_content_hash(new_content);
-    old_hash != new_hash
-}
-
 /// File hash calculator for use in FileIndex
 pub struct FileHasher {
     /// Cache of calculated hashes (file_path -> hash)
@@ -143,20 +135,6 @@ mod tests {
             hash,
             "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         );
-    }
-
-    #[test]
-    fn test_hash_changed() {
-        let content1 = b"Hello";
-        let content2 = b"World";
-
-        let hash1 = calculate_content_hash(content1);
-
-        // Same content should not show as changed
-        assert!(!hash_changed(&hash1, content1));
-
-        // Different content should show as changed
-        assert!(hash_changed(&hash1, content2));
     }
 
     #[test]

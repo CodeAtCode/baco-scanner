@@ -1297,3 +1297,252 @@ async fn test_aggregation_consensus_recommendations() {
 
     assert!(has_high_confidence || has_false_positive);
 }
+
+// ============================================================================
+// EnrichmentService Tests
+// ============================================================================
+
+use baco::report::ai_aggregation::enrichment::EnrichmentService;
+
+#[test]
+fn test_enrichment_service_new_with_valid_config() {
+    let config = make_config();
+    let _service = EnrichmentService::new(&config);
+
+    // Service should be created successfully
+}
+
+#[test]
+fn test_enrichment_service_new_with_empty_config() {
+    let config = make_config_empty();
+    let _service = EnrichmentService::new(&config);
+
+    // Service should be created successfully (LLM client will be None)
+}
+
+#[tokio::test]
+async fn test_enrich_findings_empty_input() {
+    let config = make_config();
+    let phase = AiAggregationPhase::new(config);
+
+    let findings: Vec<VulnerabilityFinding> = vec![];
+    let (enriched, llm_failed) = phase.enrich_findings_with_llm(&findings).await;
+
+    assert_eq!(enriched.len(), 0);
+    // With empty findings, LLM wasn't actually called
+    assert!(!llm_failed);
+}
+
+#[tokio::test]
+async fn test_enrich_findings_with_empty_description_and_recommendation() {
+    let config = make_config_empty();
+    let phase = AiAggregationPhase::new(config);
+
+    let mut finding = make_finding(
+        "f1",
+        Severity::High,
+        0.8,
+        "src/main.rs",
+        Some(42),
+        Some("CWE-79"),
+        None,
+    );
+    // Clear description and recommendation to test fallback behavior
+    finding.description = String::new();
+    finding.recommendation = None;
+
+    let (enriched, llm_failed) = phase.enrich_findings_with_llm(&[finding]).await;
+
+    assert_eq!(enriched.len(), 1);
+    // With empty config, LLM client is None, so findings are returned unchanged
+    // This means description stays empty (no enrichment happens)
+    assert!(enriched[0].description.is_empty());
+    assert!(enriched[0].recommendation.is_none());
+    // LLM wasn't even attempted, so llm_failed should be false
+    assert!(!llm_failed);
+}
+
+#[test]
+fn test_extract_json_field_valid_json() {
+    let json = r#"{"description": "This is a test", "recommendation": "Fix it"}"#;
+
+    let desc = EnrichmentService::extract_json_field(json, "description");
+    let rec = EnrichmentService::extract_json_field(json, "recommendation");
+
+    assert_eq!(desc, Some("This is a test".to_string()));
+    assert_eq!(rec, Some("Fix it".to_string()));
+}
+
+#[test]
+fn test_extract_json_field_missing_field() {
+    let json = r#"{"description": "This is a test"}"#;
+
+    let rec = EnrichmentService::extract_json_field(json, "recommendation");
+
+    assert_eq!(rec, None);
+}
+
+#[test]
+fn test_extract_json_field_invalid_json() {
+    let json = "not valid json";
+
+    let desc = EnrichmentService::extract_json_field(json, "description");
+
+    assert_eq!(desc, None);
+}
+
+#[test]
+fn test_extract_json_field_empty_string() {
+    let json = "";
+
+    let desc = EnrichmentService::extract_json_field(json, "description");
+
+    assert_eq!(desc, None);
+}
+
+// ============================================================================
+// DeduplicationService Tests
+// ============================================================================
+
+use baco::report::ai_aggregation::deduplication::DeduplicationService;
+
+#[test]
+fn test_deduplication_service_new() {
+    let config = make_config();
+    let _service = DeduplicationService::new(&config);
+
+    // Service should be created successfully
+}
+
+#[test]
+fn test_deduplication_service_new_with_empty_config() {
+    let config = make_config_empty();
+    let _service = DeduplicationService::new(&config);
+
+    // Service should be created successfully
+}
+
+#[tokio::test]
+async fn test_deduplicate_empty_findings() {
+    let config = make_config();
+    let service = DeduplicationService::new(&config);
+
+    let findings: Vec<VulnerabilityFinding> = vec![];
+    let result = service.deduplicate(&findings).await;
+
+    assert_eq!(result.len(), 0);
+}
+
+#[tokio::test]
+async fn test_deduplicate_no_duplicates() {
+    let config = make_config_empty();
+    let service = DeduplicationService::new(&config);
+
+    let findings = vec![
+        make_finding(
+            "f1",
+            Severity::High,
+            0.8,
+            "src/main.rs",
+            Some(42),
+            Some("CWE-79"),
+            None,
+        ),
+        make_finding(
+            "f2",
+            Severity::High,
+            0.8,
+            "src/lib.rs",
+            Some(100),
+            Some("CWE-89"),
+            None,
+        ),
+        make_finding(
+            "f3",
+            Severity::Medium,
+            0.6,
+            "src/utils.rs",
+            Some(50),
+            Some("CWE-22"),
+            None,
+        ),
+    ];
+
+    let result = service.deduplicate(&findings).await;
+
+    // All findings should be kept (different files/locations)
+    assert_eq!(result.len(), 3);
+}
+
+#[tokio::test]
+async fn test_deduplicate_same_file_different_lines() {
+    let config = make_config_empty();
+    let service = DeduplicationService::new(&config);
+
+    let findings = vec![
+        make_finding(
+            "f1",
+            Severity::High,
+            0.8,
+            "src/main.rs",
+            Some(42),
+            Some("CWE-79"),
+            None,
+        ),
+        make_finding(
+            "f2",
+            Severity::High,
+            0.8,
+            "src/main.rs",
+            Some(100),
+            Some("CWE-79"),
+            None,
+        ),
+        make_finding(
+            "f3",
+            Severity::High,
+            0.8,
+            "src/main.rs",
+            Some(200),
+            Some("CWE-79"),
+            None,
+        ),
+    ];
+
+    let result = service.deduplicate(&findings).await;
+
+    // All findings should be kept (lines are more than 3 apart)
+    assert_eq!(result.len(), 3);
+}
+
+#[tokio::test]
+async fn test_deduplicate_findings_without_line_numbers() {
+    let config = make_config_empty();
+    let service = DeduplicationService::new(&config);
+
+    let findings = vec![
+        make_finding(
+            "f1",
+            Severity::High,
+            0.8,
+            "src/main.rs",
+            None,
+            Some("CWE-79"),
+            None,
+        ),
+        make_finding(
+            "f2",
+            Severity::High,
+            0.8,
+            "src/main.rs",
+            None,
+            Some("CWE-79"),
+            None,
+        ),
+    ];
+
+    let result = service.deduplicate(&findings).await;
+
+    // Without line numbers, they can't be considered duplicates
+    assert_eq!(result.len(), 2);
+}

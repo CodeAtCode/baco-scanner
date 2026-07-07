@@ -7,6 +7,9 @@ mod git_analysis;
 
 // Include agent module tests
 mod agent;
+
+// Validation function tests
+mod validation_tests;
 // Include centralized fixtures - copy from tests/fixtures.rs
 mod agent_executor;
 mod confidence_refinement;
