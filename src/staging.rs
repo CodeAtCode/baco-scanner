@@ -1983,9 +1983,15 @@ edition = "2021"
 
     #[test]
     fn test_staging_error_all_variants_display() {
-        assert!(StagingError::WorktreeCreate("e".into()).to_string().contains("e"));
-        assert!(StagingError::PatchApply("e".into()).to_string().contains("e"));
-        assert!(StagingError::Validation("e".into()).to_string().contains("e"));
+        assert!(StagingError::WorktreeCreate("e".into())
+            .to_string()
+            .contains("e"));
+        assert!(StagingError::PatchApply("e".into())
+            .to_string()
+            .contains("e"));
+        assert!(StagingError::Validation("e".into())
+            .to_string()
+            .contains("e"));
         assert!(StagingError::Cleanup("e".into()).to_string().contains("e"));
         assert!(StagingError::Rollback("e".into()).to_string().contains("e"));
         assert!(StagingError::GitError("e".into()).to_string().contains("e"));
@@ -1993,10 +1999,18 @@ edition = "2021"
 
     #[test]
     fn test_auto_patch_error_all_variants_display() {
-        assert!(AutoPatchError::Generation("e".into()).to_string().contains("generate"));
-        assert!(AutoPatchError::Apply("e".into()).to_string().contains("apply"));
-        assert!(AutoPatchError::Validation("e".into()).to_string().contains("Validation"));
-        assert!(AutoPatchError::Staging("e".into()).to_string().contains("Staging"));
+        assert!(AutoPatchError::Generation("e".into())
+            .to_string()
+            .contains("generate"));
+        assert!(AutoPatchError::Apply("e".into())
+            .to_string()
+            .contains("apply"));
+        assert!(AutoPatchError::Validation("e".into())
+            .to_string()
+            .contains("Validation"));
+        assert!(AutoPatchError::Staging("e".into())
+            .to_string()
+            .contains("Staging"));
         assert!(AutoPatchError::NoLlmClient.to_string().contains("No LLM"));
     }
 
@@ -2018,11 +2032,31 @@ edition = "2021"
 
     #[test]
     fn test_patch_validation_result_all_combinations() {
-        let r1 = PatchValidationResult { compiles: true, tests_pass: true, warnings: 0, error_message: None };
-        let r2 = PatchValidationResult { compiles: true, tests_pass: false, warnings: 0, error_message: None };
-        let r3 = PatchValidationResult { compiles: false, tests_pass: true, warnings: 0, error_message: None };
-        let r4 = PatchValidationResult { compiles: false, tests_pass: false, warnings: 0, error_message: None };
-        
+        let r1 = PatchValidationResult {
+            compiles: true,
+            tests_pass: true,
+            warnings: 0,
+            error_message: None,
+        };
+        let r2 = PatchValidationResult {
+            compiles: true,
+            tests_pass: false,
+            warnings: 0,
+            error_message: None,
+        };
+        let r3 = PatchValidationResult {
+            compiles: false,
+            tests_pass: true,
+            warnings: 0,
+            error_message: None,
+        };
+        let r4 = PatchValidationResult {
+            compiles: false,
+            tests_pass: false,
+            warnings: 0,
+            error_message: None,
+        };
+
         assert!(r1.compiles && r1.tests_pass);
         assert!(r2.compiles && !r2.tests_pass);
         assert!(!r3.compiles && r3.tests_pass);
@@ -2034,7 +2068,7 @@ edition = "2021"
         let mut r = PatchValidationResult::default();
         r.warnings = 0;
         assert_eq!(r.warnings, 0);
-        
+
         r.warnings = u32::MAX;
         assert_eq!(r.warnings, u32::MAX);
     }
@@ -2142,11 +2176,11 @@ edition = "2021"
             original_repo_path: temp.clone(),
             is_created: false,
         };
-        
+
         // Rollback when not created should return Ok
         let result = s.rollback();
         assert!(result.is_ok());
-        
+
         let _ = fs::remove_dir_all(&temp);
     }
 

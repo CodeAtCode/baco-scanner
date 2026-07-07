@@ -955,10 +955,7 @@ mod tests {
 
     #[test]
     fn test_semgrep_runner_new_with_multiple_exclude_rules() {
-        let runner = SemgrepRunner::new(
-            None,
-            vec!["rule1".into(), "rule2".into(), "rule3".into()],
-        );
+        let runner = SemgrepRunner::new(None, vec!["rule1".into(), "rule2".into(), "rule3".into()]);
         assert_eq!(runner.exclude_rules.len(), 3);
     }
 
@@ -1055,7 +1052,11 @@ mod tests {
         std::fs::write(&test_file, "").unwrap();
 
         let snippet = extract_code_snippet(test_file.to_str().unwrap(), 1, 2);
-        assert!(snippet.is_empty() || snippet.contains("[unable to read file]") || snippet.contains("Line 1"));
+        assert!(
+            snippet.is_empty()
+                || snippet.contains("[unable to read file]")
+                || snippet.contains("Line 1")
+        );
 
         std::fs::remove_file(&test_file).ok();
     }
@@ -1068,7 +1069,7 @@ mod tests {
 
         let snippet = extract_code_snippet(test_file.to_str().unwrap(), 3, 1);
         let lines: Vec<&str> = snippet.lines().collect();
-        
+
         let marker_line = lines.iter().find(|l| l.contains(">>")).unwrap();
         assert!(marker_line.contains("line 3"));
 
@@ -1084,7 +1085,7 @@ mod tests {
             cwe_id: Some("CWE-79".into()),
             message: Some("Test message".into()),
         };
-        
+
         assert_eq!(raw.path, "test.rs");
         assert_eq!(raw.line, 42);
         assert_eq!(raw.severity, Severity::High);
@@ -1101,7 +1102,7 @@ mod tests {
             cwe_id: None,
             message: None,
         };
-        
+
         assert!(raw.cwe_id.is_none());
         assert!(raw.message.is_none());
     }
@@ -1109,20 +1110,20 @@ mod tests {
     #[test]
     fn test_severity_mapping_all_variants() {
         let runner = SemgrepRunner::new(None, vec![]);
-        
+
         // Test severity detection from check_id
         let json_critical = r#"{"results": [{"check_id": "critical.issue", "path": "f.py", "start": {"line": 1}, "extra": {"message": "m"}}]}"#;
         let findings = runner.parse_json_output(json_critical.as_bytes()).unwrap();
         assert_eq!(findings[0].severity, Severity::Critical);
-        
+
         let json_high = r#"{"results": [{"check_id": "high.issue", "path": "f.py", "start": {"line": 1}, "extra": {"message": "m"}}]}"#;
         let findings = runner.parse_json_output(json_high.as_bytes()).unwrap();
         assert_eq!(findings[0].severity, Severity::High);
-        
+
         let json_medium = r#"{"results": [{"check_id": "medium.issue", "path": "f.py", "start": {"line": 1}, "extra": {"message": "m"}}]}"#;
         let findings = runner.parse_json_output(json_medium.as_bytes()).unwrap();
         assert_eq!(findings[0].severity, Severity::Medium);
-        
+
         let json_low = r#"{"results": [{"check_id": "low.issue", "path": "f.py", "start": {"line": 1}, "extra": {"message": "m"}}]}"#;
         let findings = runner.parse_json_output(json_low.as_bytes()).unwrap();
         assert_eq!(findings[0].severity, Severity::Low);
@@ -1131,7 +1132,7 @@ mod tests {
     #[test]
     fn test_parse_json_output_with_missing_optional_fields() {
         let runner = SemgrepRunner::new(None, vec![]);
-        
+
         // Missing extra.metadata
         let json = r#"{"results": [{"check_id": "test", "path": "f.py", "start": {"line": 1}, "extra": {"message": "m"}}]}"#;
         let findings = runner.parse_json_output(json.as_bytes()).unwrap();
@@ -1142,13 +1143,13 @@ mod tests {
     #[test]
     fn test_parse_json_output_aggregation_logic() {
         let runner = SemgrepRunner::new(None, vec![]);
-        
+
         // Single finding - no aggregation
         let json_single = r#"{"results": [{"check_id": "single", "path": "f1.py", "start": {"line": 1}, "extra": {"message": "m"}}]}"#;
         let findings = runner.parse_json_output(json_single.as_bytes()).unwrap();
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].file_path, "f1.py");
-        
+
         // Multiple findings with same check_id - aggregation
         let json_multi = r#"{"results": [{"check_id": "multi", "path": "f1.py", "start": {"line": 1}, "extra": {"message": "m"}}, {"check_id": "multi", "path": "f2.py", "start": {"line": 2}, "extra": {"message": "m"}}]}"#;
         let findings = runner.parse_json_output(json_multi.as_bytes()).unwrap();
@@ -1159,7 +1160,7 @@ mod tests {
     #[test]
     fn test_parse_json_output_description_formatting() {
         let runner = SemgrepRunner::new(None, vec![]);
-        
+
         // Single with message
         let json = r#"{"results": [{"check_id": "test", "path": "f.py", "start": {"line": 1}, "extra": {"message": "Custom message"}}]}"#;
         let findings = runner.parse_json_output(json.as_bytes()).unwrap();
@@ -1170,7 +1171,7 @@ mod tests {
     #[ignore] // JSON parsing issue - needs investigation
     fn test_parse_json_output_id_generation() {
         let runner = SemgrepRunner::new(None, vec![]);
-        
+
         let json = r#"{"results": [{"check_id": "test.rule", "path": "f.py", "start": {"line": 1}, "extra": {"message": "m", "metadata": {"cwe": ["CWE-79"]}}}]}",#;
         let findings = runner.parse_json_output(json.as_bytes()).unwrap();
         
@@ -1184,37 +1185,40 @@ mod tests {
         
         let json = r#"{"results": [{"check_id": "test", "path": "src/test.rs", "start": {"line": 1}, "extra": {"message": "m"}}]}"#;
         let findings = runner.parse_json_output(json.as_bytes()).unwrap();
-        
+
         assert!(findings[0].code_snippet.is_some());
     }
 
     #[test]
     fn test_parse_json_output_recommendation_field() {
         let runner = SemgrepRunner::new(None, vec![]);
-        
+
         let json = r#"{"results": [{"check_id": "test", "path": "f.py", "start": {"line": 1}, "extra": {"message": "m"}}]}"#;
         let findings = runner.parse_json_output(json.as_bytes()).unwrap();
-        
-        assert_eq!(findings[0].recommendation, Some("Review and fix this issue".into()));
+
+        assert_eq!(
+            findings[0].recommendation,
+            Some("Review and fix this issue".into())
+        );
     }
 
     #[test]
     fn test_parse_json_output_sources_field() {
         let runner = SemgrepRunner::new(None, vec![]);
-        
+
         let json = r#"{"results": [{"check_id": "test", "path": "f.py", "start": {"line": 1}, "extra": {"message": "m"}}]}"#;
         let findings = runner.parse_json_output(json.as_bytes()).unwrap();
-        
+
         assert_eq!(findings[0].sources, vec![String::from("semgrep")]);
     }
 
     #[test]
     fn test_parse_json_output_llm_model_field() {
         let runner = SemgrepRunner::new(None, vec![]);
-        
+
         let json = r#"{"results": [{"check_id": "test", "path": "f.py", "start": {"line": 1}, "extra": {"message": "m"}}]}"#;
         let findings = runner.parse_json_output(json.as_bytes()).unwrap();
-        
+
         assert_eq!(findings[0].llm_model, Some("semgrep".into()));
     }
 
@@ -1232,7 +1236,7 @@ mod tests {
         std::fs::write(&test_file, "line 1\nline 2\nline 3\n").unwrap();
 
         let snippet = extract_code_snippet(test_file.to_str().unwrap(), 2, 1);
-        
+
         assert!(snippet.contains("|")); // Line number separator
         assert!(snippet.contains(">>")); // Target line marker
         assert!(snippet.contains("line 1"));
@@ -1245,10 +1249,10 @@ mod tests {
     #[test]
     fn test_semgrep_json_output_with_null_fields() {
         let runner = SemgrepRunner::new(None, vec![]);
-        
+
         let json = r#"{"results": [{"check_id": "test", "path": "f.py", "start": {"line": 1}, "extra": {"message": null, "metadata": null}}]}"#;
         let findings = runner.parse_json_output(json.as_bytes()).unwrap();
-        
+
         assert_eq!(findings.len(), 1);
         assert!(findings[0].cwe_id.is_none());
     }
@@ -1256,27 +1260,27 @@ mod tests {
     #[test]
     fn test_semgrep_json_output_with_empty_array_results() {
         let runner = SemgrepRunner::new(None, vec![]);
-        
+
         let json = r#"{"results": []}"#;
         let findings = runner.parse_json_output(json.as_bytes()).unwrap();
-        
+
         assert!(findings.is_empty());
     }
 
     #[test]
     fn test_semgrep_json_output_with_no_results_key() {
         let runner = SemgrepRunner::new(None, vec![]);
-        
+
         let json = r#"{"errors": []}"#;
         let findings = runner.parse_json_output(json.as_bytes()).unwrap();
-        
+
         assert!(findings.is_empty());
     }
 
     #[test]
     fn test_semgrep_exclude_rule_with_empty_pattern() {
         let runner = SemgrepRunner::new(None, vec!["".into()]);
-        
+
         // Empty pattern should match everything (starts with "")
         assert!(runner.should_exclude_rule("any.rule"));
     }

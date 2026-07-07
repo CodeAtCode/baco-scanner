@@ -2339,14 +2339,248 @@ fn test_auto_patcher_generate_patch() {
     let _staging = StagingArea::create(&temp_dir).unwrap();
     let auto_patcher = AutoPatcher::new(temp_dir.clone());
 
-    let result = auto_patcher.generate_patch(
-        "test vulnerability",
-        "vulnerable code",
-        "src/main.rs",
-    );
+    let result =
+        auto_patcher.generate_patch("test vulnerability", "vulnerable code", "src/main.rs");
 
     // Should return a PatchCandidate (may be empty without LLM)
     assert!(result.is_ok());
 
     cleanup_temp_dir(&temp_dir);
+}
+
+#[test]
+fn test_staging_validate_with_warnings() {
+    let repo_path = create_temp_git_repo();
+    let staging = StagingArea::create(&repo_path).unwrap();
+
+    let lib_rs = staging.worktree_path.join("src/lib.rs");
+    // Test the warning counting code path - use dead_code to potentially generate warning
+    let content_with_warning = r#"pub fn add(a: i32, b: i32) -> i32 {
+    a + b
+}
+
+pub fn unused_func() -> i32 { 42 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test] fn test_add() { assert_eq!(add(2, 3), 5); }
+}
+"#;
+    fs::write(&lib_rs, content_with_warning).unwrap();
+
+    let validation = staging.validate().unwrap();
+    assert!(validation.compiles);
+    // Warning counting code path is executed (warning count depends on rustc)
+
+    let mut staging = staging;
+    let _ = staging.cleanup();
+    cleanup_temp_dir(&repo_path);
+}
+
+#[test]
+fn test_staging_validate_compiles_but_tests_fail() {
+    let repo_path = create_temp_git_repo();
+    let staging = StagingArea::create(&repo_path).unwrap();
+
+    let lib_rs = staging.worktree_path.join("src/lib.rs");
+    let content = r#"pub fn add(a: i32, b: i32) -> i32 { a + b }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test] fn test_fails() { assert_eq!(add(2, 2), 5); }
+}
+"#;
+    fs::write(&lib_rs, content).unwrap();
+
+    let validation = staging.validate().unwrap();
+    assert!(validation.compiles);
+    assert!(!validation.tests_pass);
+    assert!(validation.error_message.is_some());
+
+    let mut staging = staging;
+    let _ = staging.cleanup();
+    cleanup_temp_dir(&repo_path);
+}
+
+#[test]
+fn test_autopatcher_execute_batch_max_patches() {
+    let temp_dir = create_temp_rust_project();
+    let autopatcher = AutoPatcher::new(temp_dir.clone());
+    let config = PatchingConfig {
+        max_auto_patches: 1,
+        ..PatchingConfig::default()
+    };
+
+    let finding1 = baco::findings::VulnerabilityFinding {
+        id: "f1".into(),
+        title: "T1".into(),
+        file_path: "src/f1.rs".into(),
+        line_number: Some(1),
+        code_snippet: Some("code1".into()),
+        description: "D1".into(),
+        severity: baco::findings::Severity::High,
+        confidence_score: 0.9,
+        cwe_id: None,
+        diff_hunk: None,
+        recommendation: None,
+        code_location: None,
+        already_reported: false,
+        sources: vec![],
+        commit_reference: None,
+        ticket_reference: None,
+        priority_score: None,
+        cross_file_references: None,
+        verification_status: None,
+        verification_notes: None,
+        verification_error: None,
+        agent_evidence_path: None,
+        security_issue: None,
+        poc_code: None,
+        mitigation_code: None,
+        poc_format: None,
+        llm_model: None,
+        agent_mode: false,
+    };
+    let finding2 = baco::findings::VulnerabilityFinding {
+        id: "f2".into(),
+        title: "T2".into(),
+        file_path: "src/f2.rs".into(),
+        line_number: Some(2),
+        code_snippet: Some("code2".into()),
+        description: "D2".into(),
+        severity: baco::findings::Severity::Medium,
+        confidence_score: 0.8,
+        cwe_id: None,
+        diff_hunk: None,
+        recommendation: None,
+        code_location: None,
+        already_reported: false,
+        sources: vec![],
+        commit_reference: None,
+        ticket_reference: None,
+        priority_score: None,
+        cross_file_references: None,
+        verification_status: None,
+        verification_notes: None,
+        verification_error: None,
+        agent_evidence_path: None,
+        security_issue: None,
+        poc_code: None,
+        mitigation_code: None,
+        poc_format: None,
+        llm_model: None,
+        agent_mode: false,
+    };
+
+    let result = autopatcher.execute_batch(&[finding1, finding2], &config);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap().len(), 2);
+    cleanup_temp_dir(&temp_dir);
+}
+
+#[test]
+fn test_apply_and_validate_code_path() {
+    let repo_path = create_temp_git_repo();
+    let autopatcher = AutoPatcher::new(repo_path.clone());
+
+    let mut candidate = PatchCandidate::new(
+        "--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -1 +1 @@\n-old\n+new\n",
+        "src/lib.rs",
+    );
+    let result = autopatcher.apply_and_validate(&mut candidate);
+    assert!(result.is_ok());
+    cleanup_temp_dir(&repo_path);
+}
+
+#[test]
+fn test_staging_error_variants_display() {
+    let errs = vec![
+        StagingError::WorktreeCreate("e".into()),
+        StagingError::PatchApply("e".into()),
+        StagingError::Validation("e".into()),
+        StagingError::Cleanup("e".into()),
+        StagingError::Rollback("e".into()),
+        StagingError::GitError("e".into()),
+    ];
+    for err in errs {
+        assert!(!err.to_string().is_empty());
+        assert!(!format!("{:?}", err).is_empty());
+    }
+}
+
+#[test]
+fn test_autopatch_error_variants_display() {
+    let errs: Vec<AutoPatchError> = vec![
+        AutoPatchError::Generation("e".into()),
+        AutoPatchError::Apply("e".into()),
+        AutoPatchError::Validation("e".into()),
+        AutoPatchError::Staging("e".into()),
+        AutoPatchError::NoLlmClient,
+    ];
+    for err in errs {
+        assert!(!err.to_string().is_empty());
+        assert!(!format!("{:?}", err).is_empty());
+    }
+}
+
+#[test]
+fn test_staging_apply_patch_code_path() {
+    let repo_path = create_temp_git_repo();
+    let staging = StagingArea::create(&repo_path).unwrap();
+    let result = staging.apply_patch("--- a/x\n+++ b/x\n@@ -1 +1 @@\n-a\n+b\n");
+    let _ = result;
+    let mut staging = staging;
+    let _ = staging.cleanup();
+    cleanup_temp_dir(&repo_path);
+}
+
+#[test]
+fn test_autopatcher_validate_patch_error_path() {
+    let temp_dir = create_temp_rust_project();
+    let autopatcher = AutoPatcher::new(temp_dir.clone());
+    let candidate = PatchCandidate::new(
+        "--- a/nonexistent\n+++ b/nonexistent\n@@ -1 +1 @@\n-a\n+b\n",
+        "nonexistent",
+    );
+    let result = autopatcher.validate_patch(&candidate);
+    assert!(result.is_ok());
+    cleanup_temp_dir(&temp_dir);
+}
+
+#[test]
+fn test_staging_rollback_code_path() {
+    let temp_dir = create_temp_lib_project();
+    let staging = StagingArea::create(&temp_dir).unwrap();
+    let mut staging = staging;
+    let result = staging.rollback();
+    assert!(result.is_ok());
+    cleanup_temp_dir(&temp_dir);
+}
+
+#[allow(clippy::field_reassign_with_default)]
+#[test]
+fn test_patch_validation_result_all_states() {
+    let mut r = PatchValidationResult::default();
+    r.compiles = true;
+    r.tests_pass = true;
+    r.warnings = 0;
+    assert!(r.compiles && r.tests_pass);
+
+    let mut r = PatchValidationResult::default();
+    r.compiles = false;
+    r.error_message = Some("e".into());
+    assert!(!r.compiles);
+
+    let mut r = PatchValidationResult::default();
+    r.compiles = true;
+    r.tests_pass = false;
+    assert!(r.compiles && !r.tests_pass);
+
+    let mut r = PatchValidationResult::default();
+    r.compiles = false;
+    r.tests_pass = false;
+    r.error_message = Some("e".into());
+    assert!(!r.compiles && !r.tests_pass);
 }

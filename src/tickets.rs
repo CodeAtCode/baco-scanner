@@ -1730,7 +1730,7 @@ mod tests {
             credentials: None,
         }];
         let searcher = TicketSearcher::new(systems);
-        
+
         let result = searcher.parse_github_url("https://github.enterprise.com/owner/repo");
         assert!(result.is_ok());
         let (owner, repo) = result.unwrap();
@@ -1747,7 +1747,7 @@ mod tests {
             credentials: None,
         }];
         let searcher = TicketSearcher::new(systems);
-        
+
         let result = searcher.parse_github_url("https://www.github.com/owner/repo");
         assert!(result.is_ok());
         let (owner, repo) = result.unwrap();
@@ -1764,7 +1764,7 @@ mod tests {
             credentials: None,
         }];
         let searcher = TicketSearcher::new(systems);
-        
+
         let result = searcher.parse_github_url("https://github.com/owner/repo?param=value");
         assert!(result.is_ok());
         let (owner, repo) = result.unwrap();
@@ -1781,7 +1781,7 @@ mod tests {
             credentials: None,
         }];
         let searcher = TicketSearcher::new(systems);
-        
+
         let result = searcher.parse_github_url("https://github.com/owner/repo#section");
         assert!(result.is_ok());
         let (owner, _repo) = result.unwrap();
@@ -1797,7 +1797,10 @@ mod tests {
             credentials: None,
         }];
         let searcher = TicketSearcher::new(systems);
-        let results = searcher.search_for_finding("CVE-2024-1234 sql injection").await.unwrap();
+        let results = searcher
+            .search_for_finding("CVE-2024-1234 sql injection")
+            .await
+            .unwrap();
         assert_eq!(results.len(), 0);
     }
 
@@ -1810,7 +1813,10 @@ mod tests {
             credentials: None,
         }];
         let searcher = TicketSearcher::new(systems);
-        let results = searcher.search_for_finding("CVE-2024-1234 python").await.unwrap();
+        let results = searcher
+            .search_for_finding("CVE-2024-1234 python")
+            .await
+            .unwrap();
         assert_eq!(results.len(), 0);
     }
 
@@ -1823,7 +1829,10 @@ mod tests {
             credentials: None,
         }];
         let searcher = TicketSearcher::new(systems);
-        let results = searcher.search_for_finding("python xss vulnerability").await.unwrap();
+        let results = searcher
+            .search_for_finding("python xss vulnerability")
+            .await
+            .unwrap();
         assert_eq!(results.len(), 0);
     }
 
@@ -1836,7 +1845,10 @@ mod tests {
             credentials: None,
         }];
         let searcher = TicketSearcher::new(systems);
-        let results = searcher.search_for_finding("CVE-2024-1234 python sql injection").await.unwrap();
+        let results = searcher
+            .search_for_finding("CVE-2024-1234 python sql injection")
+            .await
+            .unwrap();
         assert_eq!(results.len(), 0);
     }
 
@@ -1890,7 +1902,7 @@ mod tests {
             status: "open".into(),
             title: "Test vulnerability".into(),
         };
-        
+
         assert_eq!(ref_ticket.ticket_id, "123");
         assert_eq!(ref_ticket.ticket_url, "https://test.com");
         assert_eq!(ref_ticket.system, "github");
@@ -1973,7 +1985,10 @@ mod tests {
             credentials: None,
         }];
         let searcher = TicketSearcher::new(systems);
-        let results = searcher.search_for_finding("vulnerability café naïve").await.unwrap();
+        let results = searcher
+            .search_for_finding("vulnerability café naïve")
+            .await
+            .unwrap();
         assert_eq!(results.len(), 0);
     }
 
@@ -1986,7 +2001,10 @@ mod tests {
             credentials: None,
         }];
         let searcher = TicketSearcher::new(systems);
-        let results = searcher.search_for_finding("<script>alert('xss')</script>").await.unwrap();
+        let results = searcher
+            .search_for_finding("<script>alert('xss')</script>")
+            .await
+            .unwrap();
         assert_eq!(results.len(), 0);
     }
 
@@ -1999,7 +2017,10 @@ mod tests {
             credentials: None,
         }];
         let searcher = TicketSearcher::new(systems);
-        let results = searcher.search_for_finding("'; DROP TABLE users; --").await.unwrap();
+        let results = searcher
+            .search_for_finding("'; DROP TABLE users; --")
+            .await
+            .unwrap();
         assert_eq!(results.len(), 0);
     }
 
@@ -2012,7 +2033,10 @@ mod tests {
             credentials: None,
         }];
         let searcher = TicketSearcher::new(systems);
-        let results = searcher.search_for_finding("../../../etc/passwd").await.unwrap();
+        let results = searcher
+            .search_for_finding("../../../etc/passwd")
+            .await
+            .unwrap();
         assert_eq!(results.len(), 0);
     }
 }

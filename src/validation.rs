@@ -195,8 +195,8 @@ mod tests {
 
     #[test]
     fn test_validate_config_valid_file() {
-        use tempfile::NamedTempFile;
         use std::io::Write;
+        use tempfile::NamedTempFile;
         let mut temp_file = NamedTempFile::new().unwrap();
         // Write a minimal valid config
         let config_content = r#"
@@ -204,7 +204,7 @@ mod tests {
 semgrep_enabled = true
 "#;
         temp_file.write_all(config_content.as_bytes()).unwrap();
-        
+
         let result = validate_config(temp_file.path());
         // May fail validation but should parse
         assert!(result.is_ok() || result.is_err());
@@ -212,11 +212,11 @@ semgrep_enabled = true
 
     #[test]
     fn test_validate_config_invalid_parse() {
-        use tempfile::NamedTempFile;
         use std::io::Write;
+        use tempfile::NamedTempFile;
         let mut temp_file = NamedTempFile::new().unwrap();
         temp_file.write_all(b"invalid toml {{{{").unwrap();
-        
+
         let result = validate_config(temp_file.path());
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("parse"));
@@ -224,12 +224,12 @@ semgrep_enabled = true
 
     #[test]
     fn test_validate_findings_valid_json() {
-        use tempfile::NamedTempFile;
         use std::io::Write;
+        use tempfile::NamedTempFile;
         let mut temp_file = NamedTempFile::new().unwrap();
         let findings = r#"[{"id": "test-1", "title": "T", "description": "D", "severity": "high", "confidence_score": 0.8, "file_path": "f.rs", "line_number": 1, "already_reported": false, "sources": [], "cwe_id": "CWE-79"}]"#;
         temp_file.write_all(findings.as_bytes()).unwrap();
-        
+
         let result = validate_findings(temp_file.path());
         assert!(result.is_ok());
         let findings = result.unwrap();
@@ -238,12 +238,12 @@ semgrep_enabled = true
 
     #[test]
     fn test_validate_findings_generates_missing_id() {
-        use tempfile::NamedTempFile;
         use std::io::Write;
+        use tempfile::NamedTempFile;
         let mut temp_file = NamedTempFile::new().unwrap();
         let findings = r#"[{"id": "", "title": "T", "description": "D", "severity": "high", "confidence_score": 0.8, "file_path": "f.rs", "line_number": 1, "already_reported": false, "sources": [], "cwe_id": "CWE-79"}]"#;
         temp_file.write_all(findings.as_bytes()).unwrap();
-        
+
         let result = validate_findings(temp_file.path());
         assert!(result.is_ok());
         let findings = result.unwrap();
@@ -252,12 +252,12 @@ semgrep_enabled = true
 
     #[test]
     fn test_validate_findings_multiple_findings() {
-        use tempfile::NamedTempFile;
         use std::io::Write;
+        use tempfile::NamedTempFile;
         let mut temp_file = NamedTempFile::new().unwrap();
         let findings = r#"[{"id": "1", "title": "T1", "description": "D1", "severity": "high", "confidence_score": 0.8, "file_path": "f1.rs", "line_number": 1, "already_reported": false, "sources": [], "cwe_id": "CWE-79"}, {"id": "2", "title": "T2", "description": "D2", "severity": "medium", "confidence_score": 0.7, "file_path": "f2.rs", "line_number": 2, "already_reported": false, "sources": [], "cwe_id": "CWE-89"}]"#;
         temp_file.write_all(findings.as_bytes()).unwrap();
-        
+
         let result = validate_findings(temp_file.path());
         assert!(result.is_ok());
         let findings = result.unwrap();
@@ -266,12 +266,12 @@ semgrep_enabled = true
 
     #[test]
     fn test_validate_findings_with_null_id() {
-        use tempfile::NamedTempFile;
         use std::io::Write;
+        use tempfile::NamedTempFile;
         let mut temp_file = NamedTempFile::new().unwrap();
         let findings = r#"[{"id": null, "title": "T", "description": "D", "severity": "high", "confidence_score": 0.8, "file_path": "f.rs", "line_number": 1, "already_reported": false, "sources": [], "cwe_id": "CWE-79"}]"#;
         temp_file.write_all(findings.as_bytes()).unwrap();
-        
+
         let result = validate_findings(temp_file.path());
         // null id should be handled
         assert!(result.is_ok() || result.is_err());
@@ -279,13 +279,13 @@ semgrep_enabled = true
 
     #[test]
     fn test_validate_checkpoint_valid_file() {
-        use tempfile::NamedTempFile;
         use std::io::Write;
+        use tempfile::NamedTempFile;
         let mut temp_file = NamedTempFile::new().unwrap();
         // Write minimal valid checkpoint JSON
         let checkpoint = r#"{"version": 1, "findings": [], "invariants": []}"#;
         temp_file.write_all(checkpoint.as_bytes()).unwrap();
-        
+
         let result = validate_checkpoint(temp_file.path());
         // May fail due to missing required fields but should parse
         assert!(result.is_ok() || result.is_err());
@@ -325,61 +325,64 @@ semgrep_enabled = true
 
     #[test]
     fn test_validate_findings_with_special_chars_in_file_path() {
-        use tempfile::NamedTempFile;
         use std::io::Write;
+        use tempfile::NamedTempFile;
         let mut temp_file = NamedTempFile::new().unwrap();
         let findings = r#"[{"id": "test", "title": "T", "description": "D", "severity": "high", "confidence_score": 0.8, "file_path": "src/test_file.rs", "line_number": 1, "already_reported": false, "sources": [], "cwe_id": "CWE-79"}]"#;
         temp_file.write_all(findings.as_bytes()).unwrap();
-        
+
         let result = validate_findings(temp_file.path());
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_validate_findings_with_unicode_in_file_path() {
-        use tempfile::NamedTempFile;
         use std::io::Write;
+        use tempfile::NamedTempFile;
         let mut temp_file = NamedTempFile::new().unwrap();
         let findings = r#"[{"id": "test", "title": "T", "description": "D", "severity": "high", "confidence_score": 0.8, "file_path": "src/tëst.rs", "line_number": 1, "already_reported": false, "sources": [], "cwe_id": "CWE-79"}]"#;
         temp_file.write_all(findings.as_bytes()).unwrap();
-        
+
         let result = validate_findings(temp_file.path());
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_validate_findings_with_very_long_file_path() {
-        use tempfile::NamedTempFile;
         use std::io::Write;
+        use tempfile::NamedTempFile;
         let mut temp_file = NamedTempFile::new().unwrap();
         let long_path = "a".repeat(200);
-        let findings = format!(r#"[{{"id": "test", "title": "T", "description": "D", "severity": "high", "confidence_score": 0.8, "file_path": "{}", "line_number": 1, "already_reported": false, "sources": [], "cwe_id": "CWE-79"}}]"#, long_path);
+        let findings = format!(
+            r#"[{{"id": "test", "title": "T", "description": "D", "severity": "high", "confidence_score": 0.8, "file_path": "{}", "line_number": 1, "already_reported": false, "sources": [], "cwe_id": "CWE-79"}}]"#,
+            long_path
+        );
         temp_file.write_all(findings.as_bytes()).unwrap();
-        
+
         let result = validate_findings(temp_file.path());
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_validate_findings_with_zero_line_number() {
-        use tempfile::NamedTempFile;
         use std::io::Write;
+        use tempfile::NamedTempFile;
         let mut temp_file = NamedTempFile::new().unwrap();
         let findings = r#"[{"id": "test", "title": "T", "description": "D", "severity": "high", "confidence_score": 0.8, "file_path": "f.rs", "line_number": 0, "already_reported": false, "sources": [], "cwe_id": "CWE-79"}]"#;
         temp_file.write_all(findings.as_bytes()).unwrap();
-        
+
         let result = validate_findings(temp_file.path());
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_validate_findings_with_negative_line_number() {
-        use tempfile::NamedTempFile;
         use std::io::Write;
+        use tempfile::NamedTempFile;
         let mut temp_file = NamedTempFile::new().unwrap();
         let findings = r#"[{"id": "test", "title": "T", "description": "D", "severity": "high", "confidence_score": 0.8, "file_path": "f.rs", "line_number": -1, "already_reported": false, "sources": [], "cwe_id": "CWE-79"}]"#;
         temp_file.write_all(findings.as_bytes()).unwrap();
-        
+
         let result = validate_findings(temp_file.path());
         // JSON number may be parsed as unsigned, so this may fail at parse time
         assert!(result.is_ok() || result.is_err());
@@ -387,24 +390,24 @@ semgrep_enabled = true
 
     #[test]
     fn test_validate_findings_with_empty_sources() {
-        use tempfile::NamedTempFile;
         use std::io::Write;
+        use tempfile::NamedTempFile;
         let mut temp_file = NamedTempFile::new().unwrap();
         let findings = r#"[{"id": "test", "title": "T", "description": "D", "severity": "high", "confidence_score": 0.8, "file_path": "f.rs", "line_number": 1, "already_reported": false, "sources": [], "cwe_id": "CWE-79"}]"#;
         temp_file.write_all(findings.as_bytes()).unwrap();
-        
+
         let result = validate_findings(temp_file.path());
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_validate_findings_with_multiple_sources() {
-        use tempfile::NamedTempFile;
         use std::io::Write;
+        use tempfile::NamedTempFile;
         let mut temp_file = NamedTempFile::new().unwrap();
         let findings = r#"[{"id": "test", "title": "T", "description": "D", "severity": "high", "confidence_score": 0.8, "file_path": "f.rs", "line_number": 1, "already_reported": false, "sources": ["semgrep", "bandit"], "cwe_id": "CWE-79"}]"#;
         temp_file.write_all(findings.as_bytes()).unwrap();
-        
+
         let result = validate_findings(temp_file.path());
         assert!(result.is_ok());
     }

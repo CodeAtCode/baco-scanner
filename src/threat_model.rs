@@ -993,7 +993,7 @@ file system: Temporary files only
             "No database found",
             "no database found",
         ];
-        
+
         for arch in test_cases {
             let tm = ThreatModelingPhase::generate_threat_model_static(arch);
             assert!(!tm.contains("SQL injection"), "Failed for: {}", arch);
@@ -1008,7 +1008,7 @@ file system: Temporary files only
             "No filesystem",
             "no filesystem",
         ];
-        
+
         for arch in test_cases {
             let tm = ThreatModelingPhase::generate_threat_model_static(arch);
             assert!(!tm.contains("Path traversal"), "Failed for: {}", arch);
@@ -1017,13 +1017,8 @@ file system: Temporary files only
 
     #[test]
     fn test_threat_model_api_detection_variants() {
-        let test_cases = vec![
-            "HTTP endpoint",
-            "API router",
-            "http endpoint",
-            "api router",
-        ];
-        
+        let test_cases = vec!["HTTP endpoint", "API router", "http endpoint", "api router"];
+
         for arch in test_cases {
             let tm = ThreatModelingPhase::generate_threat_model_static(arch);
             assert!(tm.contains("HTTP/HTTPS API"), "Failed for: {}", arch);
@@ -1039,7 +1034,7 @@ file system: Temporary files only
             "postgres",
             "mysql",
         ];
-        
+
         for arch in test_cases {
             let tm = ThreatModelingPhase::generate_threat_model_static(arch);
             assert!(tm.contains("Database connection"), "Failed for: {}", arch);
@@ -1054,7 +1049,7 @@ file system: Temporary files only
             "file access",
             "file upload",
         ];
-        
+
         for arch in test_cases {
             let tm = ThreatModelingPhase::generate_threat_model_static(arch);
             assert!(tm.contains("File System"), "Failed for: {}", arch);
@@ -1065,7 +1060,7 @@ file system: Temporary files only
     fn test_threat_model_combined_components() {
         let arch = "HTTP + database + file system";
         let tm = ThreatModelingPhase::generate_threat_model_static(arch);
-        
+
         assert!(tm.contains("HTTP/HTTPS API"));
         assert!(tm.contains("Database connection"));
         assert!(tm.contains("File System"));
@@ -1074,7 +1069,7 @@ file system: Temporary files only
     #[test]
     fn test_threat_model_stride_all_sections_present() {
         let tm = ThreatModelingPhase::generate_threat_model_static("full stack");
-        
+
         assert!(tm.contains("#### S - Spoofing"));
         assert!(tm.contains("#### T - Tampering"));
         assert!(tm.contains("#### R - Repudiation"));
@@ -1086,7 +1081,7 @@ file system: Temporary files only
     #[test]
     fn test_threat_model_recommendations_all_present() {
         let tm = ThreatModelingPhase::generate_threat_model_static("full stack");
-        
+
         assert!(tm.contains("Recommendation"));
         assert!(tm.contains("strong auth"));
         assert!(tm.contains("Input sanitization"));
@@ -1165,10 +1160,10 @@ file system: Temporary files only
     async fn test_threat_model_run_creates_context() {
         let tmp = tempfile::tempdir().unwrap();
         let ctx = AnalysisContext::default();
-        
+
         let result = ThreatModelingPhase::run(tmp.path(), &ctx, None).await;
         assert!(result.is_ok());
-        
+
         let loaded = AnalysisContext::load(tmp.path()).unwrap();
         assert!(loaded.threat_model.is_some());
     }
@@ -1184,10 +1179,10 @@ file system: Temporary files only
             findings_so_far: Vec::new(),
         };
         ctx.save(tmp.path()).unwrap();
-        
+
         let result = ThreatModelingPhase::run(tmp.path(), &ctx, None).await;
         assert!(result.is_ok());
-        
+
         let loaded = AnalysisContext::load(tmp.path()).unwrap();
         assert!(loaded.threat_model.is_some());
     }
@@ -1203,7 +1198,7 @@ file system: Temporary files only
             findings_so_far: Vec::new(),
         };
         ctx.save(tmp.path()).unwrap();
-        
+
         let arch = ThreatModelingPhase::load_or_generate_architecture(tmp.path(), &ctx);
         assert_eq!(arch, "Existing arch");
     }
@@ -1213,7 +1208,7 @@ file system: Temporary files only
         let tmp = tempfile::tempdir().unwrap();
         let ctx = AnalysisContext::default();
         ctx.save(tmp.path()).unwrap();
-        
+
         let arch = ThreatModelingPhase::load_or_generate_architecture(tmp.path(), &ctx);
         assert_eq!(arch, "No architecture summary available");
     }
@@ -1222,7 +1217,7 @@ file system: Temporary files only
     fn test_save_to_context_creates_file() {
         let tmp = tempfile::tempdir().unwrap();
         ThreatModelingPhase::save_to_context(tmp.path(), "Test threat model");
-        
+
         let loaded = AnalysisContext::load(tmp.path()).unwrap();
         assert!(loaded.threat_model.is_some());
         assert_eq!(loaded.threat_model.as_ref().unwrap(), "Test threat model");
@@ -1239,9 +1234,9 @@ file system: Temporary files only
             findings_so_far: Vec::new(),
         };
         ctx.save(tmp.path()).unwrap();
-        
+
         ThreatModelingPhase::save_to_context(tmp.path(), "New");
-        
+
         let loaded = AnalysisContext::load(tmp.path()).unwrap();
         assert_eq!(loaded.threat_model.as_ref().unwrap(), "New");
     }
@@ -1249,7 +1244,7 @@ file system: Temporary files only
     #[test]
     fn test_threat_model_output_format() {
         let tm = ThreatModelingPhase::generate_threat_model_static("test");
-        
+
         assert!(tm.contains("=== THREAT MODEL"));
         assert!(tm.contains("### 1. TRUST BOUNDARIES"));
         assert!(tm.contains("### 2. DATA FLOWS"));
