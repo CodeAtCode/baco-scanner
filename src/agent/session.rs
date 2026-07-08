@@ -75,14 +75,14 @@ impl AgentSession {
             // Return a specific error that callers can handle silently
             return Err(format!("PLACEHOLDER_PATH: {}", file_path));
         }
-        
+
         // Check if file exists before trying to read it
         let file_path_buf = std::path::PathBuf::from(file_path);
         if !file_path_buf.exists() {
             // Return a specific error for missing files
             return Err(format!("FILE_NOT_FOUND: {}", file_path));
         }
-        
+
         let system_prompt = r#"You are an OFFENSIVE SECURITY RESEARCHER specializing in vulnerability discovery. Your mission is to find REAL security issues, not to be polite.
 
 **MINDSET**: Think like an attacker. Assume every input is malicious. Hunt for:

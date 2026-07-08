@@ -42,12 +42,16 @@ impl TicketSearcher {
                 "github" => match self.search_github(system, finding).await {
                     Ok(Some(ticket)) => matches.push(ticket),
                     Ok(None) => {}
-                    Err(e) => tracing::debug!("GitHub search failed (expected in some cases): {}", e),
+                    Err(e) => {
+                        tracing::debug!("GitHub search failed (expected in some cases): {}", e)
+                    }
                 },
                 "gitlab" => match self.search_gitlab(system, finding).await {
                     Ok(Some(ticket)) => matches.push(ticket),
                     Ok(None) => {}
-                    Err(e) => tracing::debug!("GitLab search failed (expected in some cases): {}", e),
+                    Err(e) => {
+                        tracing::debug!("GitLab search failed (expected in some cases): {}", e)
+                    }
                 },
                 _ => {
                     tracing::debug!("Unsupported ticket system: {}", system.system_type);
@@ -148,10 +152,7 @@ impl TicketSearcher {
                 if !response.status().is_success() {
                     // 404 is expected when no results match the query
                     if response.status().as_u16() == 404 {
-                        tracing::debug!(
-                            "GitHub search returned 404 for query: {}",
-                            query
-                        );
+                        tracing::debug!("GitHub search returned 404 for query: {}", query);
                     } else {
                         tracing::warn!(
                             "GitHub search returned status {} for query: {}",

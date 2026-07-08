@@ -443,7 +443,9 @@ pub async fn run_phase(
                             }
                             Err(e) => {
                                 // Silently skip expected errors (placeholder paths, missing files)
-                                if !e.starts_with("PLACEHOLDER_PATH:") && !e.starts_with("FILE_NOT_FOUND:") {
+                                if !e.starts_with("PLACEHOLDER_PATH:")
+                                    && !e.starts_with("FILE_NOT_FOUND:")
+                                {
                                     tracing::warn!(
                                         "Agent analysis failed for {}: {}",
                                         finding.file_path,
