@@ -98,6 +98,194 @@ pub async fn has_valid_checkpoint_findings(
             .any(|f| !f.description.is_empty())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::findings::Severity;
+
+    fn create_test_finding(title: &str, severity: Severity) -> VulnerabilityFinding {
+        VulnerabilityFinding {
+            id: format!("test-{}", title.to_lowercase().replace(' ', "-")),
+            title: title.to_string(),
+            severity,
+            confidence_score: 0.8,
+            file_path: "src/test.rs".to_string(),
+            line_number: Some(42),
+            code_snippet: Some("let x = 5;".to_string()),
+            description: format!("Test vulnerability: {}", title),
+            cwe_id: Some("CWE-79".to_string()),
+            verification_status: None,
+            sources: vec!["test".to_string()],
+            cross_file_references: None,
+            diff_hunk: None,
+            recommendation: None,
+            code_location: None,
+            already_reported: false,
+            commit_reference: None,
+            ticket_reference: None,
+            priority_score: None,
+            verification_notes: None,
+            verification_error: None,
+            agent_evidence_path: None,
+            security_issue: None,
+            poc_code: None,
+            mitigation_code: None,
+            poc_format: None,
+            llm_model: None,
+            agent_mode: false,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_combine_parallel_results_with_all_success() {
+        let findings = vec![create_test_finding("Initial", Severity::Low)];
+
+        let indexing_result = Ok((
+            vec![create_test_finding("Indexing", Severity::Medium)],
+            vec!["file1.rs".to_string()],
+        ));
+
+        let semgrep_result = Ok((
+            vec![create_test_finding("Semgrep", Severity::High)],
+            vec!["file2.rs".to_string()],
+        ));
+
+        let llm_static_result = Ok((
+            vec![create_test_finding("LLM", Severity::Critical)],
+            vec!["file3.rs".to_string()],
+        ));
+
+        let (combined_findings, analyzed_files) = combine_parallel_results(
+            findings,
+            Some(indexing_result),
+            Some(semgrep_result),
+            Some(llm_static_result),
+        );
+
+        // Should have initial + indexing + semgrep + llm findings
+        assert_eq!(combined_findings.len(), 4);
+
+        // LLM results provide analyzed files
+        assert_eq!(analyzed_files.len(), 1);
+        assert_eq!(analyzed_files[0], "file3.rs");
+    }
+
+    #[tokio::test]
+    async fn test_combine_parallel_results_with_none_results() {
+        let findings = vec![create_test_finding("Initial", Severity::Low)];
+
+        let (combined_findings, analyzed_files) =
+            combine_parallel_results(findings.clone(), None, None, None);
+
+        // Should only have initial findings
+        assert_eq!(combined_findings.len(), 1);
+        assert_eq!(combined_findings[0].title, "Initial");
+
+        // No analyzed files when all results are None
+        assert!(analyzed_files.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_combine_parallel_results_with_error_results() {
+        let findings = vec![create_test_finding("Initial", Severity::Low)];
+
+        let indexing_result = Err("Indexing failed".to_string());
+        let semgrep_result = Err("Semgrep failed".to_string());
+        let llm_static_result = Err("LLM failed".to_string());
+
+        let (combined_findings, analyzed_files) = combine_parallel_results(
+            findings,
+            Some(indexing_result),
+            Some(semgrep_result),
+            Some(llm_static_result),
+        );
+
+        // Errors are silently ignored, only initial findings remain
+        assert_eq!(combined_findings.len(), 1);
+
+        // No analyzed files from error results
+        assert!(analyzed_files.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_combine_parallel_results_partial_success() {
+        let findings = vec![create_test_finding("Initial", Severity::Low)];
+
+        let indexing_result = Ok((
+            vec![create_test_finding("Indexing", Severity::Medium)],
+            vec!["file1.rs".to_string()],
+        ));
+
+        let semgrep_result = Err("Semgrep failed".to_string());
+        let llm_static_result = Ok((
+            vec![create_test_finding("LLM", Severity::Critical)],
+            vec!["file3.rs".to_string()],
+        ));
+
+        let (combined_findings, analyzed_files) = combine_parallel_results(
+            findings,
+            Some(indexing_result),
+            Some(semgrep_result),
+            Some(llm_static_result),
+        );
+
+        // Should have initial + indexing + llm (semgrep error ignored)
+        assert_eq!(combined_findings.len(), 3);
+
+        // LLM provides analyzed files
+        assert_eq!(analyzed_files.len(), 1);
+        assert_eq!(analyzed_files[0], "file3.rs");
+    }
+
+    #[tokio::test]
+    async fn test_has_valid_checkpoint_findings_empty() {
+        // Test with a non-existent path - should return false
+        let temp_path = std::path::PathBuf::from("/tmp/nonexistent_checkpoint");
+
+        let result = has_valid_checkpoint_findings(&temp_path, &ScanPhase::Indexing).await;
+        assert!(!result);
+    }
+
+    #[tokio::test]
+    async fn test_parallel_phase_config_creation() {
+        let pb = ProgressBar::hidden();
+        let completed_phases: [ScanPhase; 2] = [ScanPhase::Indexing, ScanPhase::Semgrep];
+
+        let config = ParallelPhaseConfig {
+            indexing_enabled: true,
+            semgrep_enabled: true,
+            llm_static_enabled: false,
+            completed_phases: &completed_phases,
+            progress_bar: &pb,
+        };
+
+        assert!(config.indexing_enabled);
+        assert!(config.semgrep_enabled);
+        assert!(!config.llm_static_enabled);
+        assert_eq!(config.completed_phases.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_parallel_phase_result_creation() {
+        let findings = vec![create_test_finding("Test", Severity::High)];
+        let duration = std::time::Duration::from_secs(42);
+
+        let result = ParallelPhaseResult {
+            indexing_findings: findings.clone(),
+            semgrep_findings: findings.clone(),
+            llm_static_findings: findings,
+            analyzed_files: vec!["test.rs".to_string()],
+            duration,
+        };
+
+        assert_eq!(result.indexing_findings.len(), 1);
+        assert_eq!(result.semgrep_findings.len(), 1);
+        assert_eq!(result.llm_static_findings.len(), 1);
+        assert_eq!(result.analyzed_files.len(), 1);
+        assert_eq!(result.duration.as_secs(), 42);
+    }
+}
+
 /// Combine results from multiple parallel phases
 #[allow(dead_code)]
 pub fn combine_parallel_results(
