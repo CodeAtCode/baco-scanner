@@ -1,26 +1,30 @@
 use crate::checkpoint::Checkpoint;
-use crate::config::ScannerConfig;
+use crate::config::{ConfigError, ScannerConfig};
 use crate::findings::VulnerabilityFinding;
 use std::path::Path;
 
 /// Validate that a file exists and is a file (not a directory).
-pub fn validate_file_exists(path: &Path) -> Result<(), String> {
+pub fn validate_file_exists(path: &Path) -> Result<(), std::io::Error> {
     if !path.exists() {
-        return Err(format!("Path does not exist: {}", path.display()));
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("Path does not exist: {}", path.display()),
+        ));
     }
     if !path.is_file() {
-        return Err(format!("Path is not a file: {}", path.display()));
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!("Path is not a file: {}", path.display()),
+        ));
     }
     Ok(())
 }
 
 /// Validate that a config file exists, parses correctly, and passes business rules.
-pub fn validate_config(path: &Path) -> Result<ScannerConfig, String> {
-    validate_file_exists(path)?;
-    let content = std::fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read config file {}: {}", path.display(), e))?;
-    let config: ScannerConfig = toml::from_str(&content)
-        .map_err(|e| format!("Failed to parse config {}: {}", path.display(), e))?;
+pub fn validate_config(path: &Path) -> Result<ScannerConfig, ConfigError> {
+    validate_file_exists(path).map_err(ConfigError::Io)?;
+    let content = std::fs::read_to_string(path)?;
+    let config: ScannerConfig = toml::from_str(&content)?;
     config.validate()?;
     Ok(config)
 }
@@ -28,7 +32,7 @@ pub fn validate_config(path: &Path) -> Result<ScannerConfig, String> {
 /// Validate that a findings JSON file exists, parses, and contains well-formed findings.
 /// Automatically generates missing IDs for findings.
 pub fn validate_findings(path: &Path) -> Result<Vec<VulnerabilityFinding>, String> {
-    validate_file_exists(path)?;
+    validate_file_exists(path).map_err(|e| e.to_string())?;
     let content = std::fs::read_to_string(path)
         .map_err(|e| format!("Failed to read findings file {}: {}", path.display(), e))?;
     let mut findings: Vec<VulnerabilityFinding> = serde_json::from_str(&content)
@@ -54,7 +58,7 @@ pub fn validate_findings(path: &Path) -> Result<Vec<VulnerabilityFinding>, Strin
 
 /// Validate that a checkpoint file exists, parses, and passes structural checks.
 pub fn validate_checkpoint(path: &Path) -> Result<Checkpoint, String> {
-    validate_file_exists(path)?;
+    validate_file_exists(path).map_err(|e| e.to_string())?;
     Checkpoint::load(path.to_str().ok_or_else(|| {
         format!(
             "Checkpoint path contains invalid characters: {}",
@@ -71,7 +75,8 @@ mod tests {
     fn test_validate_file_exists_nonexistent() {
         let result = validate_file_exists(Path::new("/nonexistent/file.txt"));
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("does not exist"));
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("does not exist"));
     }
 
     #[test]
@@ -79,7 +84,8 @@ mod tests {
         // Use a real directory path that exists but is not a file
         let result = validate_file_exists(Path::new("/tmp"));
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("is not a file"));
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("is not a file"));
     }
 
     #[test]
@@ -105,7 +111,8 @@ mod tests {
 
         let result = validate_config(temp_file.path());
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("parse"));
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("parse"));
     }
 
     #[test]
@@ -123,7 +130,8 @@ mod tests {
 
         let result = validate_findings(temp_file.path());
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("parse"));
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("parse"));
     }
 
     #[test]
@@ -190,7 +198,8 @@ mod tests {
     fn test_validate_file_exists_path_is_directory() {
         let result = validate_file_exists(Path::new("/tmp"));
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("is not a file"));
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("is not a file"));
     }
 
     #[test]
@@ -219,7 +228,8 @@ semgrep_enabled = true
 
         let result = validate_config(temp_file.path());
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("parse"));
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("parse"));
     }
 
     #[test]
@@ -295,14 +305,16 @@ semgrep_enabled = true
     fn test_validate_file_exists_relative_path() {
         let result = validate_file_exists(Path::new("./nonexistent.txt"));
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("does not exist"));
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("does not exist"));
     }
 
     #[test]
     fn test_validate_file_exists_absolute_path() {
         let result = validate_file_exists(Path::new("/tmp/nonexistent_file_12345.txt"));
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("does not exist"));
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("does not exist"));
     }
 
     #[test]

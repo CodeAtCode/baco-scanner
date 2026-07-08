@@ -3,19 +3,28 @@ use thiserror::Error;
 /// Top-level error type for BACO scanner operations
 #[derive(Error, Debug)]
 pub enum ScanError {
-    #[error("Configuration error: {0}")]
-    Config(String),
+    #[error("Missing required environment variable: {0}")]
+    MissingEnvVar(String),
 
-    #[error("Phase execution failed: {phase} - {source}")]
-    Phase {
-        phase: String,
-        #[source]
-        source: PhaseError,
-    },
+    #[error("Git operation failed: {0}")]
+    GitOperationFailed(#[from] git2::Error),
+
+    #[error("LLM client error: {0}")]
+    LlmClientBuildError(String),
+
+    #[error("Rate limit exceeded: {0}")]
+    RateLimitExceeded(String),
+
+    #[error("Configuration error: {0}")]
+    ConfigError(String),
 
     #[error("I/O error: {0}")]
-    Io(#[from] std::io::Error),
+    IoError(#[from] std::io::Error),
 
+    #[error("Parse error: {0}")]
+    ParseError(String),
+
+    // Existing variants preserved
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
 
@@ -42,6 +51,14 @@ pub enum ScanError {
 
     #[error("Unknown error: {0}")]
     Unknown(String),
+
+    // Phase-specific errors
+    #[error("Phase execution failed: {phase} - {source}")]
+    Phase {
+        phase: String,
+        #[source]
+        source: PhaseError,
+    },
 }
 
 /// Phase-specific errors
@@ -136,3 +153,19 @@ impl From<PhaseError> for ScanError {
         }
     }
 }
+
+// Convenience impls for common conversions
+impl From<String> for ScanError {
+    fn from(s: String) -> Self {
+        ScanError::Unknown(s)
+    }
+}
+
+impl From<&str> for ScanError {
+    fn from(s: &str) -> Self {
+        ScanError::Unknown(s.to_string())
+    }
+}
+
+/// Type alias for Result with ScanError
+pub type ScanResult<T> = Result<T, ScanError>;

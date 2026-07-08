@@ -19,6 +19,15 @@ Code coverage at [Codecov.io](https://app.codecov.io/gh/CodeAtCode/baco-scanner/
 
 ## Architecture
 
+### PhaseGraph (Data-Driven Pipeline Orchestration)
+
+BACO uses a **data-driven PhaseGraph** (`src/scanner/pipeline/orchestrator.rs`) that defines phase execution order, dependencies, and metadata in a single source of truth. This eliminates duplication across the codebase and enables:
+
+- **Centralized phase ordering** - All phases defined in one place with execution metadata
+- **Checkpoint/resume support** - Stable phase indices for reliable restart
+- **Extensibility** - New phases can be added without modifying multiple files
+- **Runtime validation** - Phase consistency checked on startup
+
 ### Pipeline Phases
 
 **Core Pipeline (11 phases):**
@@ -218,19 +227,6 @@ Description: %%VULNERABILITY_DESCRIPTION%%
 - `%%VULNERABILITY_DESCRIPTION%%` - Description text
 - `%%FINDINGS_COUNT%%` - Total findings count
 - `%%SCAN_DATE%%` - Scan date
-
-**From external file:**
-```toml
-# In config.toml
-prompt_overrides = "prompts.toml"
-```
-
-Create `prompts.toml`:
-```toml
-[phases]
-llm_static_analysis = "Your custom prompt here..."
-llm_verification = "Your verification prompt..."
-```
 
 Prompts are validated (max 10,000 characters, no null bytes) before use.
 

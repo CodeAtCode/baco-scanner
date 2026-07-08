@@ -36,6 +36,18 @@ exclude_paths = ["tests/", "docs/", "target/"]
 [scanner.semgrep]
 exclude_rules = ["html.security.plaintext-http-link", "html.security.plaintext-http-link.plaintext-http-link"]
 
+[scanner.performance]
+# Enable incremental scanning - skips unchanged files based on SHA256 hash comparison
+# When enabled, file hashes are persisted to output dir and compared on subsequent runs
+# Default: false (full rescan on every run)
+enable_incremental_scan = false
+# Maximum number of parallel tasks for scanning operations
+max_parallel_tasks = 4
+# Enable LLM response caching to avoid redundant API calls
+enable_llm_cache = false
+# Enable file filtering to reduce false positives
+enable_file_filtering = true
+
 # LLM configuration with per-phase settings
 [llm]
 # Timeout in seconds for LLM API requests

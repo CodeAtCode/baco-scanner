@@ -173,10 +173,6 @@ impl FileIndex {
         self.files.iter()
     }
 
-    pub fn get_file_paths(&self) -> Vec<PathBuf> {
-        self.files.iter().map(|f| f.path.clone()).collect()
-    }
-
     pub fn get_hash_store(&self) -> Option<&FileHashStore> {
         self.hash_store.as_ref()
     }

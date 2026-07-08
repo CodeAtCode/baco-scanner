@@ -23,11 +23,19 @@ impl ScanPhase for IndexingPhase {
     ) -> Result<Vec<VulnerabilityFinding>, PhaseError> {
         tracing::info!("Running indexing phase on {:?}", ctx.scanner.target_path);
 
+        // Check if incremental scanning is enabled
+        let enable_incremental = ctx
+            .scanner
+            .config
+            .scanner
+            .performance
+            .enable_incremental_scan;
+
         // Try to load previous hash store for incremental scanning
         let hash_store_path =
             PathBuf::from(&ctx.scanner.config.output.dir).join("file_hashes.json");
 
-        let previous_hash_store = if hash_store_path.exists() {
+        let previous_hash_store = if enable_incremental && hash_store_path.exists() {
             match FileHashStore::load(&hash_store_path.to_string_lossy()) {
                 Ok(store) => {
                     tracing::info!("Loaded previous hash store with {} entries", store.len());
@@ -39,6 +47,9 @@ impl ScanPhase for IndexingPhase {
                 }
             }
         } else {
+            if !enable_incremental {
+                tracing::info!("Incremental scanning is disabled, skipping hash store load");
+            }
             None
         };
 
@@ -59,28 +70,32 @@ impl ScanPhase for IndexingPhase {
             }
         };
 
-        // Save hash store for future incremental scans
-        if let Some(parent) = hash_store_path.parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
-        if let Err(e) = hash_store.save(&hash_store_path.to_string_lossy()) {
-            tracing::warn!("Failed to save hash store: {}", e);
-        } else {
-            tracing::info!("Saved hash store with {} entries", hash_store.len());
-        }
+        // Save hash store for future incremental scans (only if enabled)
+        if enable_incremental {
+            if let Some(parent) = hash_store_path.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            if let Err(e) = hash_store.save(&hash_store_path.to_string_lossy()) {
+                tracing::warn!("Failed to save hash store: {}", e);
+            } else {
+                tracing::info!("Saved hash store with {} entries", hash_store.len());
+            }
 
-        // Log statistics about incremental scanning
-        if previous_hash_store.is_some() {
-            let unchanged_count = index
-                .files
-                .iter()
-                .filter(|f| f.hash.as_ref().is_some())
-                .count();
-            tracing::info!(
-                "Incremental scan: {} total files, {} unchanged from previous scan",
-                index.files.len(),
-                unchanged_count
-            );
+            // Log statistics about incremental scanning
+            if previous_hash_store.is_some() {
+                let unchanged_count = index
+                    .files
+                    .iter()
+                    .filter(|f| f.hash.as_ref().is_some())
+                    .count();
+                tracing::info!(
+                    "Incremental scan: {} total files, {} unchanged from previous scan",
+                    index.files.len(),
+                    unchanged_count
+                );
+            }
+        } else {
+            tracing::info!("Incremental scanning is disabled, skipping hash store save");
         }
 
         Ok(Vec::new())

@@ -4,6 +4,7 @@ use crate::confidence_refinement::ConfidenceRefinementPhase;
 use crate::config;
 use crate::context::AnalysisContext;
 use crate::cve_bootstrap::CveBootstrapper;
+use crate::error::ScanResult;
 use crate::findings::{VerificationStatus, VulnerabilityFinding};
 use crate::git_analysis::GitAnalyzer;
 use crate::indexer::FileIndex;
@@ -44,7 +45,7 @@ pub struct PhaseConfig<'a> {
 pub async fn run_phase(
     scanner: &super::Scanner,
     cfg: PhaseConfig<'_>,
-) -> Result<(Vec<VulnerabilityFinding>, Vec<String>), String> {
+) -> ScanResult<(Vec<VulnerabilityFinding>, Vec<String>)> {
     let PhaseConfig {
         phase,
         mut findings,
@@ -441,11 +442,14 @@ pub async fn run_phase(
                                 }
                             }
                             Err(e) => {
-                                tracing::warn!(
-                                    "Agent analysis failed for {}: {}",
-                                    finding.file_path,
-                                    e
-                                );
+                                // Silently skip expected errors (placeholder paths, missing files)
+                                if !e.starts_with("PLACEHOLDER_PATH:") && !e.starts_with("FILE_NOT_FOUND:") {
+                                    tracing::warn!(
+                                        "Agent analysis failed for {}: {}",
+                                        finding.file_path,
+                                        e
+                                    );
+                                }
                             }
                         }
                     } else {

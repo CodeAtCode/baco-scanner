@@ -9,18 +9,18 @@
 //! - Model operations
 
 #[cfg(test)]
-mod tests {
-    use crate::context::AnalysisContext;
-    use crate::git_analysis::helpers::{
+mod git_analysis_tests {
+    use baco::context::AnalysisContext;
+    use baco::git_analysis::helpers::{
         calculate_overall_confidence, get_commit_stats, update_context,
     };
-    use crate::git_analysis::models::{
-        CommitReference, GitAnalysisResult, GitConfidenceModifier, RiskyCommitPattern,
-        RiskyPatternType, VulnerabilityPattern, VulnerabilityPatternType,
-    };
-    use crate::git_analysis::patterns::{
+    use baco::git_analysis::patterns::{
         analyze_commit_message, calculate_pattern_confidence, compile_risky_patterns,
         compile_vulnerability_patterns, get_security_keywords,
+    };
+    use baco::git_analysis::{
+        CommitReference, GitAnalysisResult, GitConfidenceModifier, RiskyCommitPattern,
+        RiskyPatternType, VulnerabilityPattern, VulnerabilityPatternType,
     };
 
     // ========================================================================

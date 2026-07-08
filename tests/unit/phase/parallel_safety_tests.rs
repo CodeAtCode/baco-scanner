@@ -1,3 +1,4 @@
+#![allow(clippy::test_attr_in_doctest)]
 //! Parallel Safety Tests for BACO
 //!
 //! This module contains tests that verify the parallel execution safety of BACO phases.
@@ -37,45 +38,11 @@
 //!    }
 //! ```
 
-use std::collections::HashMap;
 use std::env;
 use std::sync::{Arc, Mutex};
 use tempfile::TempDir;
 
-/// Guard for environment variables that auto-cleans on drop
-/// This allows safe parallel execution of tests that need env var isolation
-pub struct EnvVarGuard {
-    vars: HashMap<String, Option<String>>,
-}
-
-impl EnvVarGuard {
-    /// Set multiple environment variables, returning a guard that restores them on drop
-    pub fn set(vars: &[(&str, &str)]) -> Self {
-        let mut previous = HashMap::new();
-        for &(key, value) in vars {
-            let old_value = env::var(key).ok();
-            env::set_var(key, value);
-            previous.insert(key.to_string(), old_value);
-        }
-        Self { vars: previous }
-    }
-
-    /// Set a single environment variable
-    fn set_var(key: &str, value: &str) -> Self {
-        Self::set(&[(key, value)])
-    }
-}
-
-impl Drop for EnvVarGuard {
-    fn drop(&mut self) {
-        for (key, old_value) in &self.vars {
-            match old_value {
-                Some(v) => unsafe { env::set_var(key, v) },
-                None => unsafe { env::remove_var(key) },
-            }
-        }
-    }
-}
+use crate::fixtures::EnvVarGuard;
 
 /// Test that multiple tests can set env vars concurrently without interference
 #[tokio::test]
@@ -83,7 +50,7 @@ async fn test_env_var_isolation_parallel() {
     let handles: Vec<_> = (0..10)
         .map(|i| {
             tokio::spawn(async move {
-                let _guard = EnvVarGuard::set_var("BACO_TEST_PARALLEL", &format!("value_{}", i));
+                let _guard = EnvVarGuard::set(&[("BACO_TEST_PARALLEL", &format!("value_{}", i))]);
                 let value = env::var("BACO_TEST_PARALLEL").unwrap();
                 assert_eq!(value, format!("value_{}", i));
                 // Simulate some async work
@@ -160,9 +127,9 @@ async fn test_shared_state_synchronization() {
 /// Test that phase contexts don't share mutable state
 #[tokio::test]
 async fn test_phase_context_isolation() {
-    use crate::config::ScannerConfig;
-    use crate::findings::{Severity, VulnerabilityFinding};
-    use crate::scanner::Scanner;
+    use baco::config::ScannerConfig;
+    use baco::findings::{Severity, VulnerabilityFinding};
+    use baco::scanner::Scanner;
 
     let handles: Vec<_> = (0..5)
         .map(|i| {
@@ -230,7 +197,7 @@ async fn test_phase_context_isolation() {
 /// Test that checkpoint files don't conflict when saved concurrently
 #[tokio::test]
 async fn test_checkpoint_file_isolation() {
-    use crate::checkpoint::{Checkpoint, ScanPhase};
+    use baco::checkpoint::{Checkpoint, ScanPhase};
     use chrono::Utc;
 
     let handles: Vec<_> = (0..5)
@@ -267,9 +234,9 @@ async fn test_checkpoint_file_isolation() {
 /// Test that report generation doesn't have file conflicts
 #[tokio::test]
 async fn test_report_generation_isolation() {
-    use crate::config::ScannerConfig;
-    use crate::findings::{Severity, VulnerabilityFinding};
-    use crate::scanner::Scanner;
+    use baco::config::ScannerConfig;
+    use baco::findings::{Severity, VulnerabilityFinding};
+    use baco::scanner::Scanner;
 
     let handles: Vec<_> = (0..5)
         .map(|i| {
@@ -432,11 +399,11 @@ async fn test_parallel_stress_50_concurrent_tasks() {
         .map(|i| {
             tokio::spawn(async move {
                 // Each task does multiple operations
-                let _guard = EnvVarGuard::set_var("BACO_STRESS_TEST", &format!("task_{}", i));
+                let _guard = EnvVarGuard::set(&[("BACO_STRESS_TEST", &format!("task_{}", i))]);
 
                 let temp_dir = TempDir::new().unwrap();
                 let file_path = temp_dir.path().join("test.txt");
-                std::fs::write(&file_path, &format!("content_{}", i)).unwrap();
+                std::fs::write(file_path.clone(), format!("content_{}", i)).unwrap();
 
                 let content = std::fs::read_to_string(&file_path).unwrap();
                 assert_eq!(content, format!("content_{}", i));

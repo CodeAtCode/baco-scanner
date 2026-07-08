@@ -8,11 +8,9 @@
 //! - Integrate with AnalysisContext for state persistence
 
 mod analyzer;
-mod helpers;
-mod models;
+pub mod helpers;
+pub mod models;
 pub mod patterns;
-#[cfg(test)]
-mod tests;
 
 // Re-export public API
 pub use analyzer::{GitAnalyzer, GitHistoryAnalyzer};

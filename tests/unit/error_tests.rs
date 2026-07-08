@@ -10,7 +10,7 @@ use baco::error::{LlmError, PhaseError, ScanError, SemgrepError};
 
 #[test]
 fn test_scan_error_config() {
-    let err = ScanError::Config("invalid config".to_string());
+    let err = ScanError::ConfigError("invalid config".to_string());
     let display = format!("{}", err);
     assert!(display.contains("Configuration error"));
     assert!(display.contains("invalid config"));
@@ -332,7 +332,7 @@ fn test_phase_error_into_scan_error() {
 fn test_io_error_into_scan_error() {
     let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "not found");
     let scan_err: ScanError = io_err.into();
-    assert!(matches!(scan_err, ScanError::Io(_)));
+    assert!(matches!(scan_err, ScanError::IoError(_)));
 }
 
 #[test]
@@ -360,7 +360,7 @@ fn test_toml_error_into_scan_error() {
 
 #[test]
 fn test_scan_error_debug() {
-    let err = ScanError::Config("test".to_string());
+    let err = ScanError::ConfigError("test".to_string());
     let debug = format!("{:?}", err);
     assert!(debug.contains("Config"));
 }

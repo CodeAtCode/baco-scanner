@@ -8,7 +8,9 @@
 //! - Validation logic
 //! - LLM phase configurations
 
-use baco::config::*;
+use baco::config::{
+    apply_env_overrides, AgentConfig, LlmPhaseConfig, PerformanceSettings, ScannerConfig,
+};
 use serial_test::serial;
 use std::collections::HashMap;
 
@@ -494,8 +496,8 @@ fn test_validate_missing_base_url() {
 
     assert!(result.is_err());
     let err_msg = result.unwrap_err();
-    assert!(err_msg.contains("discovery"));
-    assert!(err_msg.contains("base_url"));
+    assert!(err_msg.to_string().contains("discovery"));
+    assert!(err_msg.to_string().contains("base_url"));
 }
 
 #[test]
@@ -535,8 +537,8 @@ fn test_validate_missing_model() {
 
     assert!(result.is_err());
     let err_msg = result.unwrap_err();
-    assert!(err_msg.contains("discovery"));
-    assert!(err_msg.contains("model"));
+    assert!(err_msg.to_string().contains("discovery"));
+    assert!(err_msg.to_string().contains("model"));
 }
 
 #[test]
@@ -578,8 +580,8 @@ fn test_validate_empty_api_key_skips_validation() {
 
     // May fail due to semgrep not being installed, but not due to LLM config
     if let Err(err_msg) = result {
-        assert!(!err_msg.contains("base_url"));
-        assert!(!err_msg.contains("model"));
+        assert!(!err_msg.to_string().contains("base_url"));
+        assert!(!err_msg.to_string().contains("model"));
     }
 }
 
@@ -624,8 +626,8 @@ fn test_validate_none_api_key_skips_validation() {
     let result = config.validate();
 
     if let Err(err_msg) = result {
-        assert!(!err_msg.contains("base_url"));
-        assert!(!err_msg.contains("model"));
+        assert!(!err_msg.to_string().contains("base_url"));
+        assert!(!err_msg.to_string().contains("model"));
     }
 }
 
@@ -666,7 +668,7 @@ fn test_validate_nonexistent_project_path() {
 
     assert!(result.is_err());
     let err_msg = result.unwrap_err();
-    assert!(err_msg.contains("does not exist"));
+    assert!(err_msg.to_string().contains("does not exist"));
 }
 
 #[test]

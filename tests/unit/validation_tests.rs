@@ -18,14 +18,14 @@ use tempfile::NamedTempFile;
 fn test_validate_file_exists_nonexistent() {
     let result = validate_file_exists(Path::new("/nonexistent/file.txt"));
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("does not exist"));
+    assert!(result.unwrap_err().to_string().contains("does not exist"));
 }
 
 #[test]
 fn test_validate_file_exists_directory() {
     let result = validate_file_exists(Path::new("/tmp"));
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("is not a file"));
+    assert!(result.unwrap_err().to_string().contains("is not a file"));
 }
 
 #[test]
@@ -52,7 +52,7 @@ fn test_validate_config_invalid_toml() {
 
     let result = validate_config(temp_file.path());
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("parse"));
+    assert!(result.unwrap_err().to_string().contains("parse"));
 }
 
 #[test]
@@ -87,7 +87,7 @@ fn test_validate_findings_invalid_json() {
 
     let result = validate_findings(temp_file.path());
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("parse"));
+    assert!(result.unwrap_err().to_string().contains("parse"));
 }
 
 #[test]

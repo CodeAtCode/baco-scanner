@@ -1,11 +1,11 @@
 #[cfg(test)]
 mod tests {
-    use crate::config::ScannerConfig;
-    use crate::findings::Severity;
-    use crate::phase::helpers::create_test_finding;
-    use crate::phase::reporting::ReportingPhase;
-    use crate::phase::{PhaseContext, ScanPhase};
-    use crate::scanner::Scanner;
+    use baco::config::ScannerConfig;
+    use baco::findings::Severity;
+    use baco::phase::helpers::create_test_finding;
+    use baco::phase::reporting::ReportingPhase;
+    use baco::phase::{PhaseContext, ScanPhase};
+    use baco::scanner::Scanner;
     use tempfile::TempDir;
 
     #[test]

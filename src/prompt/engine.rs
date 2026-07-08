@@ -27,6 +27,11 @@ pub struct PromptEngine {
 impl PromptEngine {
     /// Create a new PromptEngine with defaults loaded from prompts/phases/*.md
     pub fn new() -> Self {
+        Self::from_config_overrides(std::collections::HashMap::new())
+    }
+
+    /// Create a PromptEngine with overrides from config
+    pub fn from_config_overrides(overrides: std::collections::HashMap<String, String>) -> Self {
         // Load prompts from markdown files
         let loaded_prompts = loader::load_phase_prompts(None);
 
@@ -71,66 +76,23 @@ impl PromptEngine {
 
         Self {
             defaults,
-            overrides: HashMap::new(),
+            overrides,
             project_type: ProjectType::Web, // default project type
         }
     }
 
-    /// Create engine from ScannerConfig, extracting prompt overrides
-    pub fn from_config(config: &crate::config::ScannerConfig) -> Result<Self, String> {
-        let mut engine = Self::new();
-
-        // Try to load prompt overrides from config if supported
-        let overrides = &config.llm.phases.prompt_overrides;
-        for (phase_name, prompt) in overrides.phase_overrides.iter() {
-            if let Err(e) = Self::validate_prompt(prompt) {
-                tracing::warn!("Invalid prompt override for phase {}: {}", phase_name, e);
-                continue;
-            }
-            engine.overrides.insert(phase_name.clone(), prompt.clone());
-        }
-
-        Ok(engine)
-    }
-    /// Validate a prompt string (check for null bytes, max length)
-    pub fn validate_prompt(prompt: &str) -> Result<(), String> {
-        // Check for null bytes
-        if prompt.contains('\x00') {
-            return Err("Prompt contains null bytes".into());
-        }
-
-        // Check max length
-        if prompt.len() > 10000 {
-            return Err(format!(
-                "Prompt exceeds maximum length of 10000 characters (got {})",
-                prompt.len()
-            ));
-        }
-
-        Ok(())
+    /// Load prompt overrides from a TOML file
+    /// The file should have the structure:
+    /// [phases]
+    /// phase_name = "override prompt text"
+    pub fn load_overrides_from_file(
+        path: &str,
+    ) -> Result<HashMap<String, String>, Box<dyn std::error::Error>> {
+        let content = fs::read_to_string(path)?;
+        let overrides: PromptOverrides = toml::from_str(&content)?;
+        Ok(overrides.phase_overrides)
     }
 
-    /// Load overrides from a separate overrides file
-    pub fn load_overrides_from_file<P: AsRef<std::path::Path>>(
-        &mut self,
-        path: P,
-    ) -> Result<usize, String> {
-        let content =
-            fs::read_to_string(path).map_err(|e| format!("Failed to read overrides: {}", e))?;
-
-        let overrides: crate::config::PromptOverrides =
-            toml::from_str(&content).map_err(|e| format!("Failed to parse overrides: {}", e))?;
-
-        let count = overrides.phase_overrides.len();
-        for (phase_name, prompt) in overrides.phase_overrides {
-            if let Err(e) = Self::validate_prompt(&prompt) {
-                tracing::warn!("Invalid prompt override for phase {}: {}", phase_name, e);
-                continue;
-            }
-            self.overrides.insert(phase_name, prompt);
-        }
-        Ok(count)
-    }
     /// Get prompt for a specific phase
     pub fn get_prompt(&self, phase: &BacoPhase) -> String {
         // Check for override first
@@ -154,11 +116,6 @@ impl PromptEngine {
         };
 
         self.render(default_prompt)
-    }
-
-    /// Set project type (affects Reporting phase customization)
-    pub fn set_project_type(&mut self, project_type: ProjectType) {
-        self.project_type = project_type;
     }
 
     /// Render template by substituting {variable} placeholders
@@ -259,7 +216,6 @@ impl Default for PromptEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::ScannerConfig;
 
     #[test]
     fn test_engine_creation() {
@@ -329,16 +285,6 @@ mod tests {
     }
 
     #[test]
-    fn test_config_integration() {
-        let config = ScannerConfig::default();
-        let engine = PromptEngine::from_config(&config).unwrap();
-        assert!(engine
-            .defaults
-            .indexing
-            .contains("Analyze the project structure"));
-    }
-
-    #[test]
     fn test_prompt_contains_expected_placeholders() {
         let engine = PromptEngine::new();
 
@@ -358,40 +304,5 @@ mod tests {
         assert!(discovery.contains("%%FINDING_TITLE%%"));
         assert!(discovery.contains("%%FILE_PATH%%"));
         assert!(discovery.contains("%%LINE_NUMBER%%"));
-    }
-
-    #[test]
-    fn test_validation_null_bytes() {
-        assert!(PromptEngine::validate_prompt("Test prompt with null\x00byte").is_err());
-    }
-
-    #[test]
-    fn test_validation_max_length() {
-        let long_prompt = "a".repeat(10001);
-        assert!(PromptEngine::validate_prompt(&long_prompt).is_err());
-    }
-
-    #[test]
-    fn test_validation_valid_prompt() {
-        let valid_prompt = "This is a valid prompt with length under 10000";
-        assert!(PromptEngine::validate_prompt(valid_prompt).is_ok());
-    }
-
-    #[test]
-    fn test_validation_null_byte_detection() {
-        let test_cases = vec![
-            "before\x00null",
-            "null\x00after",
-            "\x00at_start",
-            "at_end\x00",
-            "middle\x00more",
-        ];
-        for test in test_cases {
-            assert!(
-                PromptEngine::validate_prompt(test).is_err(),
-                "Should reject: {}",
-                test
-            );
-        }
     }
 }

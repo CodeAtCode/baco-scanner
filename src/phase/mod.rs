@@ -15,42 +15,13 @@ pub mod indexing;
 
 pub mod helpers;
 
-#[cfg(test)]
-pub mod indexing_test;
 pub mod llm_discovery;
-#[cfg(test)]
-pub mod llm_discovery_test;
 pub mod llm_static;
-#[cfg(test)]
-pub mod llm_static_test;
 pub mod llm_verification;
 pub mod reporting;
 pub mod security_agent_verification;
 pub mod semgrep;
-#[cfg(test)]
-pub mod semgrep_test;
 pub mod ticket_crossref;
-
-#[cfg(test)]
-pub mod parallel_safety_tests;
-
-#[cfg(test)]
-pub mod confidence_scoring_test;
-
-#[cfg(test)]
-pub mod git_analysis_test;
-
-#[cfg(test)]
-pub mod reporting_test;
-
-#[cfg(test)]
-pub mod ai_aggregation_test;
-
-#[cfg(test)]
-pub mod ticket_crossref_test;
-
-#[cfg(test)]
-pub mod security_agent_verification_test;
 
 /// Error type for phase execution failures.
 #[derive(Debug, Clone)]

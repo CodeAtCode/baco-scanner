@@ -1,10 +1,10 @@
 #[cfg(test)]
 mod tests {
-    use crate::llm::LlmClient;
-    use crate::llm::LlmConfig;
-    use crate::llm_analysis::LlmAnalyzer;
+    use baco::llm::LlmClient;
+    use baco::llm::LlmConfig;
+    use baco::llm_analysis::LlmAnalyzer;
 
-    use crate::llm_metrics::LlmMetricsTracker;
+    use baco::llm_metrics::LlmMetricsTracker;
     use std::sync::Arc;
 
     #[tokio::test]
@@ -26,7 +26,7 @@ mod tests {
             client,
             languages.clone(),
             1024,
-            &crate::config::ScannerConfig::default(),
+            &baco::config::ScannerConfig::default(),
         );
 
         let json_response = r#"[
@@ -77,7 +77,7 @@ mod tests {
             client,
             languages.clone(),
             1024,
-            &crate::config::ScannerConfig::default(),
+            &baco::config::ScannerConfig::default(),
         );
 
         let json_response = r#"[
@@ -128,7 +128,7 @@ mod tests {
             client,
             languages.clone(),
             1024,
-            &crate::config::ScannerConfig::default(),
+            &baco::config::ScannerConfig::default(),
         );
 
         let json_response = r#"```json

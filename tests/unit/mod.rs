@@ -5,6 +5,9 @@
 // Include git_analysis module tests
 mod git_analysis;
 
+// Include centralized fixtures
+mod fixtures;
+
 // Include agent module tests
 mod agent;
 
@@ -15,7 +18,7 @@ mod agent_executor;
 mod confidence_refinement;
 mod config;
 mod cross_file_analysis;
-mod incremental_scan_tests;
+
 mod llm;
 mod llm_analysis;
 mod poc_generation;
@@ -39,3 +42,9 @@ mod scanner_core_tests;
 // Threat modeling tests
 mod threat_model;
 mod threat_model_file;
+
+// Phase tests
+mod phase;
+
+// Standalone test modules
+mod llm_analysis_test;

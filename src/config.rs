@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::env;
+use std::fmt;
 use std::fs;
 use std::path::PathBuf;
 
@@ -20,45 +21,141 @@ pub struct ScannerConfig {
     pub agent: AgentConfig,
 }
 
+/// Config error with field path and TOML location information
+#[derive(Debug)]
+pub enum ConfigError {
+    /// IO error reading config file
+    Io(std::io::Error),
+    /// TOML parse error with location
+    Parse {
+        message: String,
+        line: Option<u32>,
+        column: Option<u32>,
+    },
+    /// Validation error with field path
+    Validation { field: String, message: String },
+    /// Missing dependency (e.g., semgrep)
+    MissingDependency {
+        tool: String,
+        install_hints: Vec<String>,
+    },
+}
+
+impl fmt::Display for ConfigError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ConfigError::Io(err) => write!(f, "IO error: {}", err),
+            ConfigError::Parse {
+                message,
+                line,
+                column,
+            } => {
+                if let (Some(l), Some(c)) = (line, column) {
+                    write!(
+                        f,
+                        "TOML parse error at line {}, column {}: {}",
+                        l, c, message
+                    )
+                } else {
+                    write!(f, "TOML parse error: {}", message)
+                }
+            }
+            ConfigError::Validation { field, message } => {
+                write!(f, "Validation error at {}: {}", field, message)
+            }
+            ConfigError::MissingDependency {
+                tool,
+                install_hints,
+            } => {
+                write!(f, "{} is not installed or not in PATH", tool)?;
+                if !install_hints.is_empty() {
+                    write!(f, "\nInstall with:")?;
+                    for hint in install_hints {
+                        write!(f, "\n  {}", hint)?;
+                    }
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
+impl std::error::Error for ConfigError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            ConfigError::Io(err) => Some(err),
+            _ => None,
+        }
+    }
+}
+
+impl From<std::io::Error> for ConfigError {
+    fn from(err: std::io::Error) -> Self {
+        ConfigError::Io(err)
+    }
+}
+
+impl From<toml::de::Error> for ConfigError {
+    fn from(err: toml::de::Error) -> Self {
+        // toml::de::Error implements Display with location info like "TOML parse error at line 1, column 10"
+        let msg = err.to_string();
+        ConfigError::Parse {
+            message: msg.clone(),
+            line: None, // toml::de::Error doesn't expose line/column publicly in v0.8
+            column: None,
+        }
+    }
+}
+
 impl ScannerConfig {
-    pub fn from_file(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn from_file(path: &str) -> Result<Self, ConfigError> {
         let content = fs::read_to_string(path)?;
         let config: ScannerConfig = toml::from_str(&content)?;
         Ok(config)
     }
 
-    fn validate_phase(phase_name: &str, phase: &LlmPhaseConfig) -> Result<(), String> {
+    fn validate_phase(phase_name: &str, phase: &LlmPhaseConfig) -> Result<(), ConfigError> {
         // If api_key is empty/None, LLM is disabled for this phase - skip validation
         if phase.api_key.as_ref().is_none_or(|k| k.is_empty()) {
             return Ok(());
         }
 
         if phase.base_url.is_empty() {
-            return Err(format!("{} phase: base_url is required", phase_name));
+            return Err(ConfigError::Validation {
+                field: format!("{}.base_url", phase_name),
+                message: "base_url is required when API key is set".to_string(),
+            });
         }
         let models = phase.get_models();
         if models.is_empty() {
-            return Err(format!(
-                "{} phase: at least one model must be specified (use 'model' or 'models' field)",
-                phase_name
-            ));
+            return Err(ConfigError::Validation {
+                field: format!("{}.model or {}.models", phase_name, phase_name),
+                message: "at least one model must be specified (use 'model' or 'models' field)"
+                    .to_string(),
+            });
         }
         Ok(())
     }
 
-    pub fn validate(&self) -> Result<(), String> {
-        Self::validate_phase("discovery", &self.llm.phases.discovery)?;
-        Self::validate_phase("verification", &self.llm.phases.verification)?;
-        Self::validate_phase("aggregation", &self.llm.phases.aggregation)?;
+    pub fn validate(&self) -> Result<(), ConfigError> {
+        Self::validate_phase("llm.phases.discovery", &self.llm.phases.discovery)?;
+        Self::validate_phase("llm.phases.verification", &self.llm.phases.verification)?;
+        Self::validate_phase("llm.phases.aggregation", &self.llm.phases.aggregation)?;
         let project_path = PathBuf::from(&self.project.path);
         if !project_path.exists() {
-            return Err(format!(
-                "Project path does not exist: {}",
-                self.project.path
-            ));
+            return Err(ConfigError::Validation {
+                field: "project.path".to_string(),
+                message: format!("Project path does not exist: {}", self.project.path),
+            });
         }
         if which::which("semgrep").is_err() {
-            return Err("Semgrep is not installed or not in PATH".into());
+            return Err(ConfigError::MissingDependency {
+                tool: "Semgrep".to_string(),
+                install_hints: vec![
+                    "brew install semgrep".to_string(),
+                    "pip install semgrep".to_string(),
+                ],
+            });
         }
         Ok(())
     }
@@ -218,6 +315,15 @@ pub struct LlmPhasesConfig {
     pub indexing: LlmPhaseConfig,
     #[serde(default)]
     pub prompt_overrides: PromptOverrides,
+}
+
+impl LlmPhasesConfig {
+    /// Create a PromptEngine with overrides from this config
+    pub fn create_prompt_engine(&self) -> crate::prompt::PromptEngine {
+        crate::prompt::PromptEngine::from_config_overrides(
+            self.prompt_overrides.phase_overrides.clone(),
+        )
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -405,6 +511,35 @@ pub fn apply_env_overrides(config: &mut ScannerConfig) {
 mod tests {
     use super::*;
     use serial_test::serial;
+    use std::collections::HashMap;
+
+    /// Guard for environment variables that auto-cleans on drop
+    struct EnvVarGuard {
+        vars: HashMap<String, Option<String>>,
+    }
+
+    impl EnvVarGuard {
+        fn set(vars: &[(&str, &str)]) -> Self {
+            let mut previous = HashMap::new();
+            for &(key, value) in vars {
+                let old_value = std::env::var(key).ok();
+                std::env::set_var(key, value);
+                previous.insert(key.to_string(), old_value);
+            }
+            Self { vars: previous }
+        }
+    }
+
+    impl Drop for EnvVarGuard {
+        fn drop(&mut self) {
+            for (key, old_value) in &self.vars {
+                match old_value {
+                    Some(v) => unsafe { std::env::set_var(key, v) },
+                    None => unsafe { std::env::remove_var(key) },
+                }
+            }
+        }
+    }
 
     #[test]
     fn test_parse() -> Result<(), Box<dyn std::error::Error>> {
@@ -475,10 +610,7 @@ mod tests {
     #[serial]
     fn test_env_override() {
         // Use EnvVarGuard for automatic cleanup and parallel safety
-        let _guard = super::super::phase::parallel_safety_tests::EnvVarGuard::set(&[(
-            "LLM_DISCOVERY_KEY",
-            "env-discovery-key",
-        )]);
+        let _guard = EnvVarGuard::set(&[("LLM_DISCOVERY_KEY", "env-discovery-key")]);
 
         let toml_str = r#"
             [project]
@@ -535,7 +667,7 @@ mod tests {
     #[serial]
     fn test_env_override_phase_isolation() {
         // Set up phase-specific API key environment variables
-        let _guard = super::super::phase::parallel_safety_tests::EnvVarGuard::set(&[
+        let _guard = EnvVarGuard::set(&[
             ("LLM_DISCOVERY_KEY", "only-discovery-key"),
             ("LLM_VERIFICATION_KEY", "only-verification-key"),
             ("LLM_AGGREGATION_KEY", "only-aggregation-key"),
@@ -642,7 +774,7 @@ mod tests {
         let result = config.validate();
         assert!(result.is_err());
         let err_msg = result.err().unwrap();
-        assert!(err_msg.contains("base_url"));
+        assert!(err_msg.to_string().contains("base_url"));
     }
 
     #[test]

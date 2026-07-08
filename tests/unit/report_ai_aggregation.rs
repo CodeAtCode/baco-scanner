@@ -42,6 +42,8 @@ fn make_config_empty() -> LlmConfig {
     }
 }
 
+/// Helper to create a test finding with specific parameters.
+/// This is a local test helper specific to ai_aggregation tests.
 fn make_finding(
     id: &str,
     severity: Severity,

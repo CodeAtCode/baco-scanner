@@ -6,7 +6,18 @@
 //! - Generates comprehensive threat models
 //! - Persists to AnalysisContext
 
+pub mod fs;
+pub mod generation;
+pub mod model;
+
+pub use generation::{
+    generate_threat_model_static, generate_threat_model_with_llm, load_or_generate_architecture,
+    save_to_context,
+};
+pub use model::{ThreatModelFile, ThreatModelFrontmatter};
+
 use crate::context::AnalysisContext;
+use crate::llm::LlmClient;
 use std::path::Path;
 
 /// Threat modeling phase that analyzes codebase architecture and generates STRIDE threat models.
@@ -32,244 +43,22 @@ impl ThreatModelingPhase {
     pub async fn run(
         target_path: &Path,
         context: &AnalysisContext,
-        llm_client: Option<&crate::llm::LlmClient>,
+        llm_client: Option<&LlmClient>,
     ) -> Result<String, String> {
         // Load or rebuild architecture summary from CodebaseUnderstanding
-        let architecture = Self::load_or_generate_architecture(target_path, context);
+        let architecture = load_or_generate_architecture(target_path, context);
 
         let prompt = if let Some(client) = llm_client {
-            Self::generate_threat_model_with_llm(target_path, &architecture, client).await?
+            generate_threat_model_with_llm(target_path, &architecture, client).await?
         } else {
-            Self::generate_threat_model_static(&architecture)
+            generate_threat_model_static(&architecture)
         };
 
         // Persist threat model to context
-        Self::save_to_context(target_path, &prompt);
+        save_to_context(target_path, &prompt);
 
         tracing::info!("Threat modeling complete");
         Ok(prompt)
-    }
-
-    /// Load architecture summary from AnalysisContext or regenerate via CodebaseUnderstanding.
-    #[cfg_attr(test, visibility::make(pub))]
-    pub fn load_or_generate_architecture(_target_path: &Path, context: &AnalysisContext) -> String {
-        if !context.architecture_summary.is_empty() {
-            tracing::debug!("Using existing architecture summary from context");
-            context.architecture_summary.clone()
-        } else {
-            tracing::warn!("No architecture summary in context, using empty architecture");
-            "No architecture summary available".to_string()
-        }
-    }
-
-    /// Generate threat model using LLM with full STRIDE analysis.
-    async fn generate_threat_model_with_llm(
-        target_path: &Path,
-        architecture: &str,
-        client: &crate::llm::LlmClient,
-    ) -> Result<String, String> {
-        let project_type = crate::project_type::detect_project_type(target_path);
-
-        let prompt = format!(
-            r#"You are a senior security engineer performing a STRIDE threat model.
-            
-PROJECT TYPE: {project_type}
-PROJECT PATH: {target_path}
-
-ARCHITECTURE SUMMARY:
-{architecture}
-
-Generate a comprehensive STRIDE threat model including:
-1. TRUST BOUNDARIES: External vs internal systems, user trust levels, component isolation
-2. DATA FLOWS: Request/response cycles, persistence points, sensitive data transit/storage
-3. ATTACK SURFACES: HTTP endpoints, file system access, database connections, plugin interfaces
-4. STRIDE THREATS:
-   - SPOOFING: Impersonation risks, authentication bypass, session hijacking
-   - TAMPERING: Injection, deserialization, data integrity
-   - REPUTATION: Log tampering, non-repudiation, audit trail integrity
-   - INFORMATION DISCLOSURE: Sensitive data exposure, insecure storage, data leakage
-   - DENIAL OF SERVICE: Resource exhaustion, DoS attack vectors, availability impacts
-   - ELEVATION OF PRIVILEGE: Privilege escalation, authorization bypass, vertical/horizontal privilege creep
-
-For each threat:
-- Impact: Low/Medium/High/Critical
-- Likelihood: Low/Medium/High/Critical
-- Recommendation: Specific mitigation strategy
-
-Output as structured markdown with clear threat categorization.
-"#,
-            target_path = target_path.display(),
-            project_type = project_type,
-        );
-
-        let messages = vec![crate::llm::ChatMessage::system(&prompt)];
-
-        match client.chat(&messages).await {
-            Ok(response_with_model) => {
-                tracing::debug!(
-                    "Threat model LLM response length: {} bytes",
-                    response_with_model.content.len()
-                );
-                Ok(response_with_model.content)
-            }
-            Err(e) => {
-                tracing::warn!(
-                    "LLM threat modeling failed: {}. Using static analysis fallback.",
-                    e
-                );
-                Ok(Self::generate_threat_model_static(architecture))
-            }
-        }
-    }
-
-    /// Generate threat model using static analysis fallback (no LLM).
-    #[cfg_attr(test, visibility::make(pub))]
-    pub fn generate_threat_model_static(architecture: &str) -> String {
-        let mut threat_model = String::from("=== THREAT MODEL: STRIDE Analysis ===\n\n");
-
-        // Parse architecture for key components (check for negations first)
-        let no_db = architecture.contains("No database")
-            || architecture.contains("no database")
-            || architecture.contains("No DB")
-            || architecture.contains("no DB");
-        let no_filesys = architecture.contains("No file system")
-            || architecture.contains("no file system")
-            || architecture.contains("No filesystem")
-            || architecture.contains("no filesystem");
-
-        let has_db = !no_db
-            && (architecture.contains("database")
-                || architecture.contains("data store")
-                || architecture.contains("sqlite")
-                || architecture.contains("postgres")
-                || architecture.contains("mysql"));
-        let has_api = architecture.contains("HTTP")
-            || architecture.contains("endpoint")
-            || architecture.contains("API")
-            || architecture.contains("router");
-        let has_filesys = !no_filesys
-            && (architecture.contains("file system")
-                || architecture.contains("filesystem")
-                || architecture.contains("file access")
-                || architecture.contains("file upload"));
-
-        threat_model.push_str("### 1. TRUST BOUNDARIES\n");
-        threat_model.push_str("External -> API Gateway -> Application Logic -> Data Store(s)\n\n");
-
-        if has_api {
-            threat_model
-                .push_str("- **External Interface**: HTTP/HTTPS API (trust boundary: untrusted)\n");
-            threat_model.push_str("  - Entry points: All HTTP endpoints\n");
-            threat_model.push_str("  - Risks: Request forgery, header injection, SSRF\n\n");
-        }
-
-        if has_db {
-            threat_model
-                .push_str("- **Data Store**: Database connection (trust boundary: sensitive)\n");
-            threat_model.push_str("  - Access: Application service layer\n");
-            threat_model
-                .push_str("  - Risks: SQL injection, privilege escalation, data exfiltration\n\n");
-        }
-
-        if has_filesys {
-            threat_model.push_str("- **File System**: Local storage (trust boundary: medium)\n");
-            threat_model.push_str("  - Access: File upload, configuration loading\n");
-            threat_model.push_str(
-                "  - Risks: Path traversal, arbitrary file read/write, supply chain attacks\n\n",
-            );
-        }
-
-        threat_model.push_str("### 2. DATA FLOWS\n");
-        if has_api {
-            threat_model.push_str("- User Request -> API Endpoint -> Validation -> Business Logic -> Data Store -> Response\n");
-            threat_model.push_str("  - Sensitive in transit: Consider TLS enforcement\n");
-            threat_model
-                .push_str("  - Sensitive at rest: Consider encryption, access controls\n\n");
-        }
-
-        if has_db {
-            threat_model.push_str("- Application Write -> Database (authentication required)\n");
-            threat_model.push_str("  - Sensitive data: PII, credentials, session tokens\n");
-            threat_model
-                .push_str("  - Risks: Unauthorized access, data leakage, integrity compromise\n\n");
-        }
-
-        threat_model.push_str("### 3. ATTACK SURFACES\n");
-        threat_model.push_str("- **HTTP Endpoints**: All routes are potential entry points\n");
-        if has_filesys {
-            threat_model
-                .push_str("- **File System**: Upload directories, config files, temp files\n");
-        }
-        if has_db {
-            threat_model.push_str("- **Database**: Direct access points, backup exposure\n");
-        }
-        threat_model.push_str("### 4. STRIDE THREATS\n\n");
-
-        threat_model.push_str("#### S - Spoofing\n");
-        threat_model.push_str("- Authentication bypass via session token manipulation\n");
-        if has_api {
-            threat_model.push_str("- API key forgery, rate limiting circumvention\n");
-        }
-        threat_model.push_str(
-            "**Recommendation**: Implement strong auth, CSRF protection, rate limiting\n\n",
-        );
-
-        threat_model.push_str("#### T - Tampering\n");
-        threat_model.push_str("- Input validation bypass leading to injection attacks\n");
-        if has_db {
-            threat_model.push_str("- SQL injection via unvalidated parameters\n");
-        }
-        if has_filesys {
-            threat_model.push_str("- Path traversal in file operations\n");
-        }
-        threat_model.push_str(
-            "**Recommendation**: Input sanitization, parameterized queries, allowlists\n\n",
-        );
-
-        threat_model.push_str("#### R - Repudiation\n");
-        threat_model.push_str("- Lack of audit logging prevents activity attribution\n");
-        threat_model.push_str("- Session tokens not bound to user identity\n");
-        threat_model
-            .push_str("**Recommendation**: Comprehensive logging, immutable audit trails\n\n");
-
-        threat_model.push_str("#### I - Information Disclosure\n");
-        threat_model.push_str("- Sensitive data in logs or error messages\n");
-        threat_model.push_str("- Insecure storage of credentials or tokens\n");
-        if has_filesys {
-            threat_model.push_str("- Config files with secrets on disk\n");
-        }
-        threat_model.push_str(
-            "**Recommendation**: Log sanitization, secure storage, encryption at rest\n\n",
-        );
-
-        threat_model.push_str("#### D - Denial of Service\n");
-        threat_model.push_str("- Resource exhaustion via unlimited request processing\n");
-        if has_api {
-            threat_model.push_str("- API endpoint overload without rate limiting\n");
-        }
-        if has_filesys {
-            threat_model.push_str("- Disk fill via unbounded file uploads\n");
-        }
-        threat_model
-            .push_str("**Recommendation**: Rate limiting, connection limits, resource quotas\n\n");
-
-        threat_model.push_str("#### E - Elevation of Privilege\n");
-        threat_model.push_str("- Insufficient authorization checks in business logic\n");
-        threat_model.push_str("- Vertical privilege escalation via role manipulation\n");
-        threat_model.push_str("- Horizontal privilege escalation via data access bypass\n");
-        threat_model.push_str("**Recommendation**: Role-based access control, least privilege, authorization middleware\n");
-
-        threat_model
-    }
-
-    /// Save threat model to AnalysisContext.
-    #[cfg_attr(test, visibility::make(pub))]
-    pub fn save_to_context(target_path: &Path, threat_model: &str) {
-        let mut ctx =
-            AnalysisContext::load(target_path).unwrap_or_else(|_| AnalysisContext::default());
-        ctx.threat_model = Some(threat_model.to_string());
-        ctx.save(target_path)
-            .expect("Failed to save threat model to context");
     }
 }
 
@@ -285,7 +74,7 @@ mod tests {
     #[test]
     fn test_threat_model_basic_structure() {
         let architecture = "=== ARCHITECTURAL SUMMARY ===\nHTTP endpoints: 5\nDatabase: SQLite";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(threat_model.contains("=== THREAT MODEL: STRIDE Analysis ==="));
         assert!(threat_model.contains("### 1. TRUST BOUNDARIES"));
@@ -297,7 +86,7 @@ mod tests {
     #[test]
     fn test_threat_model_empty_architecture() {
         let architecture = "";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(threat_model.contains("TRUST BOUNDARIES"));
         assert!(threat_model.contains("STRIDE"));
@@ -307,7 +96,7 @@ mod tests {
     #[test]
     fn test_threat_model_whitespace_only_architecture() {
         let architecture = "   \n\n   \n   ";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(threat_model.contains("TRUST BOUNDARIES"));
         assert!(!threat_model.is_empty());
@@ -316,7 +105,7 @@ mod tests {
     #[test]
     fn test_threat_model_very_long_architecture() {
         let architecture = "A".repeat(10000);
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(&architecture);
+        let threat_model = generate_threat_model_static(&architecture);
 
         assert!(threat_model.contains("TRUST BOUNDARIES"));
         assert!(!threat_model.is_empty());
@@ -329,7 +118,7 @@ mod tests {
     #[test]
     fn test_trust_boundaries_api_detected() {
         let architecture = "HTTP endpoint found\nAPI router configured";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(threat_model.contains("**External Interface**: HTTP/HTTPS API"));
         assert!(threat_model.contains("Entry points: All HTTP endpoints"));
@@ -339,7 +128,7 @@ mod tests {
     #[test]
     fn test_trust_boundaries_database_detected() {
         let architecture = "Database: PostgreSQL\ndata store: SQLite";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(threat_model.contains("**Data Store**: Database connection"));
         assert!(threat_model.contains("Access: Application service layer"));
@@ -351,7 +140,7 @@ mod tests {
     #[test]
     fn test_trust_boundaries_filesystem_detected() {
         let architecture = "file system: User uploads\nfile access enabled";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(threat_model.contains("**File System**: Local storage"));
         assert!(threat_model.contains("Access: File upload, configuration loading"));
@@ -361,7 +150,7 @@ mod tests {
     #[test]
     fn test_trust_boundaries_no_api() {
         let architecture = "No HTTP endpoints\nNo router found\nNo API gateway";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         // "API" is still detected because the check is case-sensitive and looks for "API" substring
         // The function doesn't have a "no API" negation check like it does for database/filesystem
@@ -371,7 +160,7 @@ mod tests {
     #[test]
     fn test_trust_boundaries_no_database() {
         let architecture = "No database\nNo data store";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(!threat_model.contains("**Data Store**: Database connection"));
         assert!(!threat_model.contains("SQL injection"));
@@ -380,7 +169,7 @@ mod tests {
     #[test]
     fn test_trust_boundaries_no_filesystem() {
         let architecture = "No file system\nNo filesystem access";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(!threat_model.contains("**File System**: Local storage"));
         assert!(!threat_model.contains("Path traversal"));
@@ -397,7 +186,7 @@ mod tests {
         ];
 
         for architecture in test_cases {
-            let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+            let threat_model = generate_threat_model_static(architecture);
             assert!(
                 !threat_model.contains("SQL injection"),
                 "Should not detect SQL injection for: {}",
@@ -413,7 +202,7 @@ mod tests {
     #[test]
     fn test_data_flows_api_present() {
         let architecture = "HTTP API enabled\nRequest handling";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(threat_model.contains("User Request -> API Endpoint -> Validation"));
         assert!(threat_model.contains("Sensitive in transit: Consider TLS enforcement"));
@@ -423,7 +212,7 @@ mod tests {
     #[test]
     fn test_data_flows_database_present() {
         let architecture = "database: MySQL\nData persistence";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(threat_model.contains("Application Write -> Database"));
         assert!(threat_model.contains("Sensitive data: PII, credentials, session tokens"));
@@ -433,7 +222,7 @@ mod tests {
     #[test]
     fn test_data_flows_combined_components() {
         let architecture = "HTTP + database + file system";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(threat_model.contains("User Request -> API Endpoint"));
         assert!(threat_model.contains("Application Write -> Database"));
@@ -444,7 +233,7 @@ mod tests {
     #[test]
     fn test_data_flows_no_components() {
         let architecture = "Standalone application\nNo external dependencies";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(threat_model.contains("### 2. DATA FLOWS"));
     }
@@ -456,7 +245,7 @@ mod tests {
     #[test]
     fn test_attack_surfaces_http_endpoints() {
         let architecture = "HTTP endpoints: 10\nREST API";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(threat_model.contains("**HTTP Endpoints**: All routes are potential entry points"));
     }
@@ -464,7 +253,7 @@ mod tests {
     #[test]
     fn test_attack_surfaces_filesystem() {
         let architecture = "file upload enabled\nConfiguration files";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(
             threat_model.contains("**File System**: Upload directories, config files, temp files")
@@ -474,7 +263,7 @@ mod tests {
     #[test]
     fn test_attack_surfaces_database() {
         let architecture = "PostgreSQL database\nDirect SQL access";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(threat_model.contains("**Database**: Direct access points, backup exposure"));
     }
@@ -482,7 +271,7 @@ mod tests {
     #[test]
     fn test_attack_surfaces_all_components() {
         let architecture = "HTTP + database + file system";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(threat_model.contains("**HTTP Endpoints**"));
         assert!(threat_model.contains("**File System**"));
@@ -496,7 +285,7 @@ mod tests {
     #[test]
     fn test_stride_spoofing_section() {
         let architecture = "Full stack application";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(threat_model.contains("#### S - Spoofing"));
         assert!(threat_model.contains("Authentication bypass"));
@@ -507,7 +296,7 @@ mod tests {
     #[test]
     fn test_stride_spoofing_with_api() {
         let architecture = "HTTP API endpoints";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(threat_model.contains("API key forgery, rate limiting circumvention"));
     }
@@ -515,7 +304,7 @@ mod tests {
     #[test]
     fn test_stride_tampering_section() {
         let architecture = "Full stack application";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(threat_model.contains("#### T - Tampering"));
         assert!(threat_model.contains("Input validation bypass"));
@@ -526,7 +315,7 @@ mod tests {
     #[test]
     fn test_stride_tampering_with_database() {
         let architecture = "database: SQLite\nSQL queries";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(threat_model.contains("SQL injection via unvalidated parameters"));
     }
@@ -534,7 +323,7 @@ mod tests {
     #[test]
     fn test_stride_tampering_with_filesystem() {
         let architecture = "file system access\nFile uploads";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(threat_model.contains("Path traversal in file operations"));
     }
@@ -542,7 +331,7 @@ mod tests {
     #[test]
     fn test_stride_repudiation_section() {
         let architecture = "Any architecture";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(threat_model.contains("#### R - Repudiation"));
         assert!(threat_model.contains("Lack of audit logging"));
@@ -553,7 +342,7 @@ mod tests {
     #[test]
     fn test_stride_information_disclosure_section() {
         let architecture = "Full stack application";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(threat_model.contains("#### I - Information Disclosure"));
         assert!(threat_model.contains("Sensitive data in logs or error messages"));
@@ -564,7 +353,7 @@ mod tests {
     #[test]
     fn test_stride_information_disclosure_with_filesystem() {
         let architecture = "file system: Config files";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(threat_model.contains("Config files with secrets on disk"));
     }
@@ -572,7 +361,7 @@ mod tests {
     #[test]
     fn test_stride_denial_of_service_section() {
         let architecture = "Full stack application";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(threat_model.contains("#### D - Denial of Service"));
         assert!(threat_model.contains("Resource exhaustion"));
@@ -582,7 +371,7 @@ mod tests {
     #[test]
     fn test_stride_denial_of_service_with_api() {
         let architecture = "HTTP API";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(threat_model.contains("API endpoint overload without rate limiting"));
     }
@@ -590,7 +379,7 @@ mod tests {
     #[test]
     fn test_stride_denial_of_service_with_filesystem() {
         let architecture = "file uploads enabled";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(threat_model.contains("Disk fill via unbounded file uploads"));
     }
@@ -598,7 +387,7 @@ mod tests {
     #[test]
     fn test_stride_elevation_of_privilege_section() {
         let architecture = "Any architecture";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(threat_model.contains("#### E - Elevation of Privilege"));
         assert!(threat_model.contains("Insufficient authorization checks"));
@@ -613,7 +402,7 @@ mod tests {
 
     #[test]
     fn test_mitigation_spoofing_recommendations() {
-        let threat_model = ThreatModelingPhase::generate_threat_model_static("Full stack");
+        let threat_model = generate_threat_model_static("Full stack");
 
         let spoofing_section = threat_model.split("#### S - Spoofing").nth(1).unwrap_or("");
 
@@ -625,7 +414,7 @@ mod tests {
 
     #[test]
     fn test_mitigation_tampering_recommendations() {
-        let threat_model = ThreatModelingPhase::generate_threat_model_static("Full stack");
+        let threat_model = generate_threat_model_static("Full stack");
 
         let tampering_section = threat_model
             .split("#### T - Tampering")
@@ -640,7 +429,7 @@ mod tests {
 
     #[test]
     fn test_mitigation_repudiation_recommendations() {
-        let threat_model = ThreatModelingPhase::generate_threat_model_static("Full stack");
+        let threat_model = generate_threat_model_static("Full stack");
 
         let repudiation_section = threat_model
             .split("#### R - Repudiation")
@@ -654,7 +443,7 @@ mod tests {
 
     #[test]
     fn test_mitigation_information_disclosure_recommendations() {
-        let threat_model = ThreatModelingPhase::generate_threat_model_static("Full stack");
+        let threat_model = generate_threat_model_static("Full stack");
 
         let id_section = threat_model
             .split("#### I - Information Disclosure")
@@ -669,7 +458,7 @@ mod tests {
 
     #[test]
     fn test_mitigation_dos_recommendations() {
-        let threat_model = ThreatModelingPhase::generate_threat_model_static("Full stack");
+        let threat_model = generate_threat_model_static("Full stack");
 
         let dos_section = threat_model
             .split("#### D - Denial of Service")
@@ -684,7 +473,7 @@ mod tests {
 
     #[test]
     fn test_mitigation_elevation_recommendations() {
-        let threat_model = ThreatModelingPhase::generate_threat_model_static("Full stack");
+        let threat_model = generate_threat_model_static("Full stack");
 
         let eop_section = threat_model
             .split("#### E - Elevation of Privilege")
@@ -704,7 +493,7 @@ mod tests {
     #[test]
     fn test_edge_case_special_characters_in_architecture() {
         let architecture = r#"Special chars: <script>alert('xss')</script>"#;
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(threat_model.contains("TRUST BOUNDARIES"));
         assert!(!threat_model.is_empty());
@@ -713,7 +502,7 @@ mod tests {
     #[test]
     fn test_edge_case_newline_variations() {
         let architecture = "Line1\r\nLine2\nLine3\rLine4";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(threat_model.contains("TRUST BOUNDARIES"));
         assert!(!threat_model.is_empty());
@@ -722,7 +511,7 @@ mod tests {
     #[test]
     fn test_edge_case_very_long_lines() {
         let architecture = "A".repeat(50000) + "\nDatabase found";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(&architecture);
+        let threat_model = generate_threat_model_static(&architecture);
 
         assert!(threat_model.contains("TRUST BOUNDARIES"));
         assert!(!threat_model.is_empty());
@@ -731,7 +520,7 @@ mod tests {
     #[test]
     fn test_edge_case_multiple_database_mentions() {
         let architecture = "Database: PostgreSQL\nAnother database: MySQL\nSQLite also used";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(threat_model.contains("**Data Store**: Database connection"));
         assert!(threat_model.contains("SQL injection"));
@@ -740,7 +529,7 @@ mod tests {
     #[test]
     fn test_edge_case_mixed_case_keywords() {
         let architecture = "hTtP Endpoints\nDaTaBaSe: SQL\nFiLe SyStEm";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(threat_model.contains("TRUST BOUNDARIES"));
     }
@@ -748,7 +537,7 @@ mod tests {
     #[test]
     fn test_edge_case_overlapping_patterns() {
         let architecture = "No database but database backup exists";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(
             !threat_model.contains("SQL injection"),
@@ -839,7 +628,7 @@ file system: User uploads, config files
 Authentication: JWT tokens
 "#;
 
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(threat_model.contains("HTTP/HTTPS API"));
         assert!(threat_model.contains("Database connection"));
@@ -859,7 +648,7 @@ No network access
 No database
 "#;
 
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(!threat_model.contains("HTTP/HTTPS API"));
         assert!(!threat_model.contains("SQL injection"));
@@ -876,7 +665,7 @@ No file system access
 Pure functions
 "#;
 
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         // "no HTTP" won't match "HTTP" detection since it contains "HTTP"
         // The function doesn't have negation checks for API like it does for database/filesystem
@@ -895,7 +684,7 @@ External APIs: Payment gateway, email service
 file system: Temporary files only
 "#;
 
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(threat_model.contains("HTTP/HTTPS API"));
         assert!(threat_model.contains("Database connection"));
@@ -916,7 +705,7 @@ file system: Temporary files only
     #[test]
     fn test_output_is_valid_markdown() {
         let architecture = "Full stack application";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         assert!(threat_model.contains("==="));
         assert!(threat_model.contains("###"));
@@ -926,7 +715,7 @@ file system: Temporary files only
 
     #[test]
     fn test_output_contains_all_stride_letters() {
-        let threat_model = ThreatModelingPhase::generate_threat_model_static("Full stack");
+        let threat_model = generate_threat_model_static("Full stack");
 
         assert!(threat_model.contains("#### S - Spoofing"));
         assert!(threat_model.contains("#### T - Tampering"));
@@ -939,7 +728,7 @@ file system: Temporary files only
     #[test]
     fn test_output_has_consistent_formatting() {
         let architecture = "Test architecture";
-        let threat_model = ThreatModelingPhase::generate_threat_model_static(architecture);
+        let threat_model = generate_threat_model_static(architecture);
 
         let lines: Vec<&str> = threat_model.lines().collect();
 
@@ -957,7 +746,7 @@ file system: Temporary files only
         let start = std::time::Instant::now();
 
         for _ in 0..100 {
-            let _ = ThreatModelingPhase::generate_threat_model_static("Small");
+            let _ = generate_threat_model_static("Small");
         }
 
         let duration = start.elapsed();
@@ -973,7 +762,7 @@ file system: Temporary files only
         let start = std::time::Instant::now();
 
         for _ in 0..10 {
-            let _ = ThreatModelingPhase::generate_threat_model_static(&large_arch);
+            let _ = generate_threat_model_static(&large_arch);
         }
 
         let duration = start.elapsed();
@@ -995,7 +784,7 @@ file system: Temporary files only
         ];
 
         for arch in test_cases {
-            let tm = ThreatModelingPhase::generate_threat_model_static(arch);
+            let tm = generate_threat_model_static(arch);
             assert!(!tm.contains("SQL injection"), "Failed for: {}", arch);
         }
     }
@@ -1010,7 +799,7 @@ file system: Temporary files only
         ];
 
         for arch in test_cases {
-            let tm = ThreatModelingPhase::generate_threat_model_static(arch);
+            let tm = generate_threat_model_static(arch);
             assert!(!tm.contains("Path traversal"), "Failed for: {}", arch);
         }
     }
@@ -1020,7 +809,7 @@ file system: Temporary files only
         let test_cases = vec!["HTTP endpoint", "API router", "http endpoint", "api router"];
 
         for arch in test_cases {
-            let tm = ThreatModelingPhase::generate_threat_model_static(arch);
+            let tm = generate_threat_model_static(arch);
             assert!(tm.contains("HTTP/HTTPS API"), "Failed for: {}", arch);
         }
     }
@@ -1036,7 +825,7 @@ file system: Temporary files only
         ];
 
         for arch in test_cases {
-            let tm = ThreatModelingPhase::generate_threat_model_static(arch);
+            let tm = generate_threat_model_static(arch);
             assert!(tm.contains("Database connection"), "Failed for: {}", arch);
         }
     }
@@ -1051,7 +840,7 @@ file system: Temporary files only
         ];
 
         for arch in test_cases {
-            let tm = ThreatModelingPhase::generate_threat_model_static(arch);
+            let tm = generate_threat_model_static(arch);
             assert!(tm.contains("File System"), "Failed for: {}", arch);
         }
     }
@@ -1059,7 +848,7 @@ file system: Temporary files only
     #[test]
     fn test_threat_model_combined_components() {
         let arch = "HTTP + database + file system";
-        let tm = ThreatModelingPhase::generate_threat_model_static(arch);
+        let tm = generate_threat_model_static(arch);
 
         assert!(tm.contains("HTTP/HTTPS API"));
         assert!(tm.contains("Database connection"));
@@ -1068,7 +857,7 @@ file system: Temporary files only
 
     #[test]
     fn test_threat_model_stride_all_sections_present() {
-        let tm = ThreatModelingPhase::generate_threat_model_static("full stack");
+        let tm = generate_threat_model_static("full stack");
 
         assert!(tm.contains("#### S - Spoofing"));
         assert!(tm.contains("#### T - Tampering"));
@@ -1080,7 +869,7 @@ file system: Temporary files only
 
     #[test]
     fn test_threat_model_recommendations_all_present() {
-        let tm = ThreatModelingPhase::generate_threat_model_static("full stack");
+        let tm = generate_threat_model_static("full stack");
 
         assert!(tm.contains("Recommendation"));
         assert!(tm.contains("strong auth"));
@@ -1093,28 +882,28 @@ file system: Temporary files only
 
     #[test]
     fn test_threat_model_empty_input() {
-        let tm = ThreatModelingPhase::generate_threat_model_static("");
+        let tm = generate_threat_model_static("");
         assert!(tm.contains("TRUST BOUNDARIES"));
         assert!(!tm.is_empty());
     }
 
     #[test]
     fn test_threat_model_whitespace_only() {
-        let tm = ThreatModelingPhase::generate_threat_model_static("   \n\n   ");
+        let tm = generate_threat_model_static("   \n\n   ");
         assert!(tm.contains("TRUST BOUNDARIES"));
         assert!(!tm.is_empty());
     }
 
     #[test]
     fn test_threat_model_special_characters() {
-        let tm = ThreatModelingPhase::generate_threat_model_static("<script>alert('xss')</script>");
+        let tm = generate_threat_model_static("<script>alert('xss')</script>");
         assert!(tm.contains("TRUST BOUNDARIES"));
         assert!(!tm.is_empty());
     }
 
     #[test]
     fn test_threat_model_unicode_input() {
-        let tm = ThreatModelingPhase::generate_threat_model_static("café naïve résumé");
+        let tm = generate_threat_model_static("café naïve résumé");
         assert!(tm.contains("TRUST BOUNDARIES"));
         assert!(!tm.is_empty());
     }
@@ -1122,147 +911,8 @@ file system: Temporary files only
     #[test]
     fn test_threat_model_very_long_input() {
         let long_input = "A".repeat(50000);
-        let tm = ThreatModelingPhase::generate_threat_model_static(&long_input);
+        let tm = generate_threat_model_static(&long_input);
         assert!(tm.contains("TRUST BOUNDARIES"));
         assert!(!tm.is_empty());
-    }
-
-    #[test]
-    fn test_threat_model_newline_variations() {
-        let tm = ThreatModelingPhase::generate_threat_model_static("Line1\r\nLine2\nLine3\rLine4");
-        assert!(tm.contains("TRUST BOUNDARIES"));
-        assert!(!tm.is_empty());
-    }
-
-    #[test]
-    fn test_threat_model_multiple_database_mentions() {
-        let arch = "Database: PostgreSQL\nAnother database: MySQL\nSQLite also used";
-        let tm = ThreatModelingPhase::generate_threat_model_static(arch);
-        assert!(tm.contains("Database connection"));
-        assert!(tm.contains("SQL injection"));
-    }
-
-    #[test]
-    fn test_threat_model_mixed_case_keywords() {
-        let arch = "hTtP Endpoints\nDaTaBaSe: SQL\nFiLe SyStEm";
-        let tm = ThreatModelingPhase::generate_threat_model_static(arch);
-        assert!(tm.contains("TRUST BOUNDARIES"));
-    }
-
-    #[test]
-    fn test_threat_model_overlapping_patterns() {
-        let arch = "No database but database backup exists";
-        let tm = ThreatModelingPhase::generate_threat_model_static(arch);
-        assert!(!tm.contains("SQL injection"));
-    }
-
-    #[tokio::test]
-    async fn test_threat_model_run_creates_context() {
-        let tmp = tempfile::tempdir().unwrap();
-        let ctx = AnalysisContext::default();
-
-        let result = ThreatModelingPhase::run(tmp.path(), &ctx, None).await;
-        assert!(result.is_ok());
-
-        let loaded = AnalysisContext::load(tmp.path()).unwrap();
-        assert!(loaded.threat_model.is_some());
-    }
-
-    #[tokio::test]
-    async fn test_threat_model_run_with_existing_context() {
-        let tmp = tempfile::tempdir().unwrap();
-        let ctx = AnalysisContext {
-            project_type: crate::project_type::ProjectType::Web,
-            architecture_summary: "Test arch".into(),
-            threat_model: None,
-            invariants: Vec::new(),
-            findings_so_far: Vec::new(),
-        };
-        ctx.save(tmp.path()).unwrap();
-
-        let result = ThreatModelingPhase::run(tmp.path(), &ctx, None).await;
-        assert!(result.is_ok());
-
-        let loaded = AnalysisContext::load(tmp.path()).unwrap();
-        assert!(loaded.threat_model.is_some());
-    }
-
-    #[test]
-    fn test_load_or_generate_architecture_with_summary() {
-        let tmp = tempfile::tempdir().unwrap();
-        let ctx = AnalysisContext {
-            project_type: crate::project_type::ProjectType::Web,
-            architecture_summary: "Existing arch".into(),
-            threat_model: None,
-            invariants: Vec::new(),
-            findings_so_far: Vec::new(),
-        };
-        ctx.save(tmp.path()).unwrap();
-
-        let arch = ThreatModelingPhase::load_or_generate_architecture(tmp.path(), &ctx);
-        assert_eq!(arch, "Existing arch");
-    }
-
-    #[test]
-    fn test_load_or_generate_architecture_without_summary() {
-        let tmp = tempfile::tempdir().unwrap();
-        let ctx = AnalysisContext::default();
-        ctx.save(tmp.path()).unwrap();
-
-        let arch = ThreatModelingPhase::load_or_generate_architecture(tmp.path(), &ctx);
-        assert_eq!(arch, "No architecture summary available");
-    }
-
-    #[test]
-    fn test_save_to_context_creates_file() {
-        let tmp = tempfile::tempdir().unwrap();
-        ThreatModelingPhase::save_to_context(tmp.path(), "Test threat model");
-
-        let loaded = AnalysisContext::load(tmp.path()).unwrap();
-        assert!(loaded.threat_model.is_some());
-        assert_eq!(loaded.threat_model.as_ref().unwrap(), "Test threat model");
-    }
-
-    #[test]
-    fn test_save_to_context_overwrites_existing() {
-        let tmp = tempfile::tempdir().unwrap();
-        let ctx = AnalysisContext {
-            project_type: crate::project_type::ProjectType::Web,
-            architecture_summary: "Arch".into(),
-            threat_model: Some("Old".into()),
-            invariants: Vec::new(),
-            findings_so_far: Vec::new(),
-        };
-        ctx.save(tmp.path()).unwrap();
-
-        ThreatModelingPhase::save_to_context(tmp.path(), "New");
-
-        let loaded = AnalysisContext::load(tmp.path()).unwrap();
-        assert_eq!(loaded.threat_model.as_ref().unwrap(), "New");
-    }
-
-    #[test]
-    fn test_threat_model_output_format() {
-        let tm = ThreatModelingPhase::generate_threat_model_static("test");
-
-        assert!(tm.contains("=== THREAT MODEL"));
-        assert!(tm.contains("### 1. TRUST BOUNDARIES"));
-        assert!(tm.contains("### 2. DATA FLOWS"));
-        assert!(tm.contains("### 3. ATTACK SURFACES"));
-        assert!(tm.contains("### 4. STRIDE THREATS"));
-    }
-
-    #[test]
-    fn test_threat_model_line_count() {
-        let tm = ThreatModelingPhase::generate_threat_model_static("test");
-        let lines: Vec<&str> = tm.lines().collect();
-        assert!(lines.len() > 20);
-    }
-
-    #[test]
-    fn test_threat_model_no_empty_lines_at_start() {
-        let tm = ThreatModelingPhase::generate_threat_model_static("test");
-        let first_line = tm.lines().next().unwrap_or("");
-        assert!(!first_line.trim().is_empty());
     }
 }

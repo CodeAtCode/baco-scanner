@@ -12,7 +12,7 @@
 
 use baco::context::AnalysisContext;
 use baco::findings::{Severity, VulnerabilityFinding};
-use baco::threat_model_file::*;
+use baco::threat_model::{ThreatModelFile, ThreatModelFrontmatter};
 use tempfile::tempdir;
 
 // ============================================================================

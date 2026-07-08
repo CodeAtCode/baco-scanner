@@ -55,7 +55,6 @@ pub mod semgrep;
 pub mod severity_rubric;
 pub mod staging;
 pub mod threat_model;
-pub mod threat_model_file;
 pub mod tickets;
 pub mod validation;
 pub mod variant_search;

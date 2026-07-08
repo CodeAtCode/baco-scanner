@@ -3,3 +3,4 @@
 mod analyzer_tests;
 mod models_tests;
 mod patterns_tests;
+mod tests;

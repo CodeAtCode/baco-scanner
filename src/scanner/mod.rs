@@ -1,18 +1,33 @@
 //! Scanner module - orchestrates security scanning phases
 
-mod checkpoint;
+pub mod checkpoint;
 mod core;
+mod env;
+mod orchestrator;
+mod parallel;
 #[cfg(test)]
 pub(crate) mod phases;
 #[cfg(not(test))]
 mod phases;
+mod pipeline;
+mod sequential;
 
 // Re-export public API from core
 pub use core::{Scanner, ScannerState};
 
+// Re-export pipeline orchestration
+pub use pipeline::orchestrator::{Orchestrator, PhaseGraph};
+pub use pipeline::resumption::CheckpointManager;
+
 // Re-export phases for testing
 #[cfg(test)]
 pub use phases::{run_phase, PhaseConfig};
+
+// Re-export utility functions from env
+pub use env::{
+    compute_checkpoint_path, compute_findings_json_path, extract_owner_repo_from_url,
+    get_git_remote_url,
+};
 
 // Use the checkpoint module for save/load
 use crate::checkpoint::ScanPhase;
@@ -43,9 +58,11 @@ impl Scanner {
             },
         )
         .await
+        .map_err(|e| e.to_string())
     }
 
     /// Save checkpoint with current findings
+    #[allow(dead_code)]
     async fn save_checkpoint(
         &self,
         findings: &[VulnerabilityFinding],
@@ -64,6 +81,7 @@ impl Scanner {
     }
 
     /// Load findings from checkpoint for a specific phase
+    #[allow(dead_code)]
     async fn load_checkpoint_findings(&self, phase: &ScanPhase) -> Vec<VulnerabilityFinding> {
         load_checkpoint_findings(&self.checkpoint_path, phase).await
     }

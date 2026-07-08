@@ -1,25 +1,20 @@
 //! Shared test helpers for phase tests.
 //!
-//! This module consolidates duplicated test helper functions across phase test files
-//! to reduce code duplication from 78 groups to ≤10 groups.
+//! Note: For new tests in the `tests/` directory, use the fixtures module instead:
+//! ```rust,ignore
+//! use tests::fixtures::{create_test_finding, create_finding_with_params, create_test_scanner};
+//! ```
+//!
+//! The functions here are kept for backward compatibility with existing tests in `src/`.
 
 use crate::config::ScannerConfig;
 use crate::findings::{Severity, VerificationStatus, VulnerabilityFinding};
 use crate::scanner::Scanner;
 use tempfile::TempDir;
 
-/// Creates a test vulnerability finding with default values.
+/// Create a test vulnerability finding with default values.
 ///
-/// This consolidates 81 lines of duplicated `create_finding` code from 7 phase test files.
-///
-/// # Arguments
-/// * `title` - Title of the finding
-/// * `file_path` - Path to the file containing the finding
-/// * `line` - Line number where the finding occurs
-/// * `severity` - Severity level of the finding
-///
-/// # Returns
-/// A `VulnerabilityFinding` with default test values
+/// For tests in `tests/` directory, prefer `tests::fixtures::create_test_finding`.
 pub fn create_test_finding(
     title: &str,
     file_path: &str,
@@ -58,18 +53,9 @@ pub fn create_test_finding(
     }
 }
 
-/// Creates a test vulnerability finding with customizable ID, title, and severity.
+/// Create a test vulnerability finding with customizable ID, title, and severity.
 ///
-/// This consolidates 96 lines of duplicated `create_finding_with_params` code from
-/// `confidence_refinement.rs` and `cross_file_analysis.rs`.
-///
-/// # Arguments
-/// * `id` - Unique identifier for the finding
-/// * `title` - Title of the finding
-/// * `severity` - Severity level of the finding
-///
-/// # Returns
-/// A `VulnerabilityFinding` with the specified parameters and default test values
+/// For tests in `tests/` directory, prefer `tests::fixtures::create_finding_with_params`.
 pub fn create_finding_with_params(
     id: &str,
     title: &str,
@@ -107,8 +93,7 @@ pub fn create_finding_with_params(
     }
 }
 
-/// Creates a test scanner with default configuration.
-/// Consolidates duplicated scanner setup code across multiple test files.
+/// Create a test scanner with default configuration.
 pub fn create_test_scanner() -> (Scanner, TempDir) {
     let temp_dir = TempDir::new().unwrap();
     let config = ScannerConfig::default();
@@ -116,14 +101,7 @@ pub fn create_test_scanner() -> (Scanner, TempDir) {
     (scanner, temp_dir)
 }
 
-/// Creates a test scanner with a temporary directory.
-///
-/// # Arguments
-/// * `temp_dir` - Optional temporary directory. If None, a new one is created.
-/// * `config` - Optional configuration. If None, default config is used.
-///
-/// # Returns
-/// A tuple of (Scanner, Option<TempDir>) where TempDir is Some if a new temp dir was created.
+/// Create a test scanner with a temporary directory.
 pub fn create_test_scanner_with_options(
     temp_dir: Option<TempDir>,
     config: Option<ScannerConfig>,
@@ -135,7 +113,7 @@ pub fn create_test_scanner_with_options(
     (scanner, Some(temp_dir))
 }
 
-/// Creates a test scanner with default settings.
+/// Create a test scanner with default settings.
 pub fn create_default_test_scanner() -> (Scanner, TempDir) {
     let temp_dir = TempDir::new().unwrap();
     let config = ScannerConfig::default();
@@ -144,11 +122,6 @@ pub fn create_default_test_scanner() -> (Scanner, TempDir) {
 }
 
 /// Macro to create a test context with scanner and empty analyzed_files.
-/// This creates local variables and returns a PhaseContext with mutable references to them.
-/// The scanner, temp_dir, and analyzed_files live for the duration of the test function.
-/// Usage:
-///   let (temp_dir, ctx) = create_ctx!();
-///   // scanner and analyzed_files are accessible via ctx.scanner and ctx.analyzed_files
 #[macro_export]
 macro_rules! create_ctx {
     () => {{
@@ -163,7 +136,6 @@ macro_rules! create_ctx {
 }
 
 /// Macro to create a test context with a finding already added.
-/// Usage: let (temp_dir, ctx) = create_ctx_with_finding!("title", "file.rs", 1, Severity::High);
 #[macro_export]
 macro_rules! create_ctx_with_finding {
     ($title:expr, $file:expr, $line:expr, $severity:expr) => {{

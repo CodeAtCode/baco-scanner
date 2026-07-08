@@ -5,7 +5,6 @@ use regex::Regex;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
-use walkdir::WalkDir;
 
 /// Extract CWE ID from description text
 pub fn extract_cwe_id(description: &str) -> Option<String> {
@@ -533,52 +532,6 @@ impl LlmAnalyzer {
         }
 
         Ok(findings)
-    }
-
-    /// Analyze all files in a directory autonomously for vulnerabilities
-    pub async fn analyze_directory(
-        &self,
-        target_path: &str,
-    ) -> Result<Vec<VulnerabilityFinding>, String> {
-        let mut all_findings = Vec::new();
-        let target = Path::new(target_path);
-
-        tracing::info!(
-            "Starting autonomous LLM security analysis of {}",
-            target_path
-        );
-
-        for entry in WalkDir::new(target).into_iter().filter_entry(|e| {
-            !e.path().starts_with("tests") && !e.path().starts_with("node_modules")
-        }) {
-            let entry = entry.map_err(|e| e.to_string())?;
-            let path = entry.path();
-
-            if path.is_file() && self.should_analyze(path) {
-                tracing::debug!("Analyzing file: {}", path.display());
-                match self.analyze_file(path).await {
-                    Ok(findings) => {
-                        if !findings.is_empty() {
-                            tracing::info!(
-                                "Found {} vulnerabilities in {}",
-                                findings.len(),
-                                path.display()
-                            );
-                        }
-                        all_findings.extend(findings);
-                    }
-                    Err(e) => {
-                        tracing::warn!("Error analyzing {}: {}", path.display(), e);
-                    }
-                }
-            }
-        }
-
-        tracing::info!(
-            "Autonomous LLM analysis complete: {} findings total",
-            all_findings.len()
-        );
-        Ok(all_findings)
     }
 }
 

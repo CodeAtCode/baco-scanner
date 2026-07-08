@@ -1,14 +1,14 @@
 #[cfg(test)]
 mod tests {
-    use crate::confidence::ConfidenceCalculator;
-    use crate::config::ScannerConfig;
-    use crate::create_ctx;
-    use crate::create_ctx_with_finding;
-    use crate::findings::{Severity, VerificationStatus};
-    use crate::phase::confidence_scoring::ConfidenceScoringPhase;
-    use crate::phase::helpers::create_test_finding;
-    use crate::phase::{PhaseContext, ScanPhase};
-    use crate::scanner::Scanner;
+    use baco::confidence::ConfidenceCalculator;
+    use baco::config::ScannerConfig;
+    use baco::create_ctx;
+    use baco::create_ctx_with_finding;
+    use baco::findings::{Severity, VerificationStatus};
+    use baco::phase::confidence_scoring::ConfidenceScoringPhase;
+    use baco::phase::helpers::create_test_finding;
+    use baco::phase::{PhaseContext, ScanPhase};
+    use baco::scanner::Scanner;
     use tempfile::TempDir;
 
     #[test]

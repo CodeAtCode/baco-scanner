@@ -1,9 +1,11 @@
+#![allow(clippy::single_match)]
+
 #[cfg(test)]
 mod tests {
-    use crate::config::ScannerConfig;
-    use crate::phase::semgrep::SemgrepPhase;
-    use crate::phase::{PhaseContext, ScanPhase};
-    use crate::scanner::Scanner;
+    use baco::config::ScannerConfig;
+    use baco::phase::semgrep::SemgrepPhase;
+    use baco::phase::{PhaseContext, ScanPhase};
+    use baco::scanner::Scanner;
     use tempfile::TempDir;
 
     #[test]

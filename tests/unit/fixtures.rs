@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Centralized test fixtures for all BACO tests.
 //!
 //! This module consolidates duplicate test fixture creation code across the test suite
@@ -519,6 +520,55 @@ pub fn shared_temp_dir() -> &'static TempDir {
 pub fn create_subdir_in_shared(_subdir_name: &str) -> TempDir {
     let shared = shared_temp_dir();
     tempfile::tempdir_in(shared.path()).expect("Failed to create subdirectory in shared temp dir")
+}
+
+// ============================================================================
+// Environment Variable Helpers
+// ============================================================================
+
+/// Guard for environment variables that auto-cleans on drop.
+/// This allows safe parallel execution of tests that need env var isolation.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use tests::fixtures::EnvVarGuard;
+///
+/// #[test]
+/// fn test_with_env_vars() {
+///     let _guard = EnvVarGuard::set(&[("MY_VAR", "value")]);
+///     assert_eq!(std::env::var("MY_VAR").unwrap(), "value");
+///     // When _guard drops, vars are restored automatically
+/// }
+/// ```
+use std::collections::HashMap;
+
+pub struct EnvVarGuard {
+    vars: HashMap<String, Option<String>>,
+}
+
+impl EnvVarGuard {
+    /// Set multiple environment variables, returning a guard that restores them on drop.
+    pub fn set(vars: &[(&str, &str)]) -> Self {
+        let mut previous = HashMap::new();
+        for &(key, value) in vars {
+            let old_value = std::env::var(key).ok();
+            std::env::set_var(key, value);
+            previous.insert(key.to_string(), old_value);
+        }
+        Self { vars: previous }
+    }
+}
+
+impl Drop for EnvVarGuard {
+    fn drop(&mut self) {
+        for (key, old_value) in &self.vars {
+            match old_value {
+                Some(v) => unsafe { std::env::set_var(key, v) },
+                None => unsafe { std::env::remove_var(key) },
+            }
+        }
+    }
 }
 
 // ============================================================================

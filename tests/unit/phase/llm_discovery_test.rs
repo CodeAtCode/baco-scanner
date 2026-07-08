@@ -1,9 +1,9 @@
 #[cfg(test)]
 mod tests {
-    use crate::config::ScannerConfig;
-    use crate::phase::llm_discovery::LlmDiscoveryPhase;
-    use crate::phase::{PhaseContext, ScanPhase};
-    use crate::scanner::Scanner;
+    use baco::config::ScannerConfig;
+    use baco::phase::llm_discovery::LlmDiscoveryPhase;
+    use baco::phase::{PhaseContext, ScanPhase};
+    use baco::scanner::Scanner;
     use tempfile::TempDir;
 
     #[test]

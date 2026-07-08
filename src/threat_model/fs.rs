@@ -1,50 +1,13 @@
-//! Threat Model File Persistence
+//! Threat model file persistence operations.
 //!
-//! Provides persistent threat model management with save/load/merge operations.
-//! Uses YAML frontmatter + markdown body format for THREAT_MODEL.md files.
+//! Provides save/load/parse/merge operations for threat model files
+//! using YAML frontmatter + markdown body format.
 
 use crate::context::AnalysisContext;
 use crate::findings::VulnerabilityFinding;
-use chrono::Utc;
-use serde::{Deserialize, Serialize};
+use crate::threat_model::model::{ThreatModelFile, ThreatModelFrontmatter};
 use std::fs;
 use std::path::Path;
-
-/// Threat model file with YAML frontmatter and markdown body
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
-pub struct ThreatModelFile {
-    /// YAML frontmatter containing metadata
-    pub frontmatter: ThreatModelFrontmatter,
-    /// Markdown body containing threat analysis
-    pub body: String,
-}
-
-/// YAML frontmatter for threat model metadata
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct ThreatModelFrontmatter {
-    /// Format version
-    pub version: String,
-    /// ISO 8601 timestamp
-    pub generated_at: String,
-    /// Project type detected
-    pub project_type: String,
-    /// Total threat count
-    pub total_threats: u32,
-    /// High risk areas (file paths)
-    pub high_risk_areas: Vec<String>,
-}
-
-impl Default for ThreatModelFrontmatter {
-    fn default() -> Self {
-        Self {
-            version: "1.0".to_string(),
-            generated_at: Utc::now().to_rfc3339(),
-            project_type: "unknown".to_string(),
-            total_threats: 0,
-            high_risk_areas: Vec::new(),
-        }
-    }
-}
 
 impl ThreatModelFile {
     /// Generate a threat model from analysis context and findings
@@ -75,7 +38,7 @@ impl ThreatModelFile {
         Self {
             frontmatter: ThreatModelFrontmatter {
                 version: "1.0".to_string(),
-                generated_at: Utc::now().to_rfc3339(),
+                generated_at: chrono::Utc::now().to_rfc3339(),
                 project_type: context.project_type.to_string(),
                 total_threats: findings.len() as u32,
                 high_risk_areas,
@@ -240,17 +203,11 @@ impl ThreatModelFile {
             return Err("Missing YAML frontmatter".to_string());
         }
 
-        // Find closing --- marker - it could be:
-        // 1. On its own line after YAML: "...\n---\n..."
-        // 2. Directly after last YAML key (serde_yaml format): "value---\n..."
+        // Find closing --- marker
         let rest = &content[3..];
-
-        // Try to find closing marker - look for --- that's followed by either:
-        // newline + content, or directly followed by content
         let closing_idx = rest.find("---").ok_or("Missing closing --- marker")?;
 
         // The YAML ends right before the closing ---
-        // We need to trim trailing dashes from yaml_str
         let mut yaml_str = &rest[..closing_idx];
         while yaml_str.ends_with('-') {
             yaml_str = &yaml_str[..yaml_str.len() - 1];
