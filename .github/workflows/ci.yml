@@ -65,28 +65,46 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
-      
+
+      - name: Sync version from tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "Release version: $VERSION"
+          sed -i "s/^version = \".*\"/version = \"$VERSION\"/" Cargo.toml
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
       - name: Install cargo-deb
         run: cargo install cargo-deb
-      
+
       - name: Build release binary
         run: cargo build --release
-      
+
       - name: Build .deb package
         run: cargo deb --no-build
-      
+
+      - name: Package binary tarball and checksum
+        run: |
+          ARCHIVE="baco-${VERSION}-x86_64-unknown-linux-gnu.tar.gz"
+          tar -czf "$ARCHIVE" -C target/release baco
+          sha256sum "$ARCHIVE" > "$ARCHIVE.sha256"
+          echo "ARCHIVE=$ARCHIVE" >> "$GITHUB_ENV"
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: baco-deb-package
-          path: target/debian/*.deb
-      
+          name: baco-release-assets
+          path: |
+            target/debian/*.deb
+            baco-*.tar.gz
+            baco-*.tar.gz.sha256
+
       - name: Upload release assets
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/v')
         with:
           files: |
             target/debian/*.deb
-            target/release/baco
+            baco-*.tar.gz
+            baco-*.tar.gz.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
