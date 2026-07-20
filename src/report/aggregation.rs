@@ -7,8 +7,9 @@
 //! - Creates prioritized finding list
 //! - Integrates with AnalysisContext (T5)
 
-use crate::context::AnalysisContext;
+use crate::analysis_context::AnalysisContext;
 use crate::findings::{Severity, VerificationStatus, VulnerabilityFinding};
+use crate::root_cause_dedup::GlobalFpStore;
 
 /// Aggregated statistics from all findings.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
@@ -93,6 +94,7 @@ impl ReportAggregationPhase {
     /// # Arguments
     /// * `findings` - All findings from previous phases
     /// * `context` - AnalysisContext containing previous phase outputs
+    /// * `fp_store` - Optional false positive store to filter out known FPs
     ///
     /// # Returns
     /// `AggregationResult` with statistics, summary, and prioritized findings
@@ -100,9 +102,10 @@ impl ReportAggregationPhase {
         &self,
         findings: Vec<VulnerabilityFinding>,
         _context: &AnalysisContext,
+        fp_store: Option<&GlobalFpStore>,
     ) -> AggregationResult {
         // Step 1: Deduplicate findings by location and type
-        let unique_findings = self.deduplicate_findings(findings);
+        let unique_findings = self.deduplicate_findings(findings, fp_store);
 
         // Step 2: Calculate aggregate statistics
         let statistics = self.calculate_statistics(&unique_findings);
@@ -122,9 +125,14 @@ impl ReportAggregationPhase {
     }
 
     /// Deduplicate findings by file path, line number, and CWE ID.
+    ///
+    /// # Arguments
+    /// * `findings` - All findings to deduplicate
+    /// * `fp_store` - Optional false positive store to filter out known FPs
     pub fn deduplicate_findings(
         &self,
         findings: Vec<VulnerabilityFinding>,
+        fp_store: Option<&GlobalFpStore>,
     ) -> Vec<VulnerabilityFinding> {
         use std::collections::HashSet;
 
@@ -132,6 +140,16 @@ impl ReportAggregationPhase {
         let mut unique = Vec::new();
 
         for finding in findings {
+            // Filter out false positives if FP store is provided
+            if let Some(store) = fp_store {
+                // Use the finding's id to check against FP store
+                // Note: In practice, you might want to compute a root cause ID here
+                // For now, we check the finding's id directly
+                if store.is_false_positive(&finding.id) {
+                    continue;
+                }
+            }
+
             let key = format!(
                 "{}:{}:{}",
                 finding.file_path,
@@ -450,7 +468,7 @@ mod tests {
         let finding3 = make_finding("f3", "Test finding", Severity::Critical);
 
         let findings = vec![finding1, finding2, finding3];
-        let unique = phase.deduplicate_findings(findings);
+        let unique = phase.deduplicate_findings(findings, None);
 
         // All findings have same file, line, and CWE, so they should all be deduplicated to 1
         assert_eq!(unique.len(), 1);
@@ -505,7 +523,7 @@ mod tests {
             make_finding("f2", "Test finding", Severity::High),
         ];
 
-        let result = phase.run(findings, &context);
+        let result = phase.run(findings, &context, None);
 
         // Both findings have same file/line/CWE, so deduplicated to 1
         assert_eq!(result.statistics.total_findings, 1);

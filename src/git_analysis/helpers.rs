@@ -3,7 +3,7 @@
 use git2::Repository;
 use std::collections::HashMap;
 
-use crate::context::AnalysisContext;
+use crate::analysis_context::AnalysisContext;
 use crate::git_analysis::models::{
     CommitReference, GitAnalysisResult, RiskyCommitPattern, VulnerabilityPattern,
 };

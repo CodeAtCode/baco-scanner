@@ -3,7 +3,7 @@
 //! Implements STRIDE-based threat model generation with static analysis
 //! and LLM-assisted modes.
 
-use crate::context::AnalysisContext;
+use crate::analysis_context::AnalysisContext;
 use crate::project_type::detect_project_type;
 use std::path::Path;
 

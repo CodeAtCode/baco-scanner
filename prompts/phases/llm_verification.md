@@ -21,3 +21,19 @@ Return JSON with format:
   "mitigating_factors": ["optional mitigation 1", ...],
   "related_patterns": ["optional pattern 1", ...]
 }
+
+## Triage Step
+
+When a finding is marked as `NeedsReview`, invoke the triage filter for additional analysis:
+
+1. **Triage Prompt**: Send a zero-shot prompt asking "Is this finding a true positive or false positive?"
+2. **Expected Output**: JSON with `{"verdict": "true_positive"|"false_positive", "confidence": 0.0-1.0, "reasoning": "..."}`
+3. **Integration**:
+   - If triage returns `false_positive`: Set status to `FalsePositive`, add reasoning to `verification_notes`
+   - If triage returns `true_positive`: Keep `Confirmed` status, boost confidence by +0.10
+   - On parse failure: Fall back gracefully to `NeedsReview` status
+
+## Confidence Refinement Factors
+
+- `TriageTruePositive`: +0.10 boost when triage confirms true positive
+- `TriageFalsePositive`: -0.25 penalty when triage identifies false positive

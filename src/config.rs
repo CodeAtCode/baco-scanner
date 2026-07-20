@@ -19,6 +19,10 @@ pub struct ScannerConfig {
     pub tickets: TicketConfig,
     #[serde(default)]
     pub agent: AgentConfig,
+    #[serde(default)]
+    pub router: RouterConfig,
+    #[serde(default)]
+    pub aggregation: AggregationConfig,
 }
 
 /// Config error with field path and TOML location information
@@ -415,6 +419,45 @@ fn default_tool_timeout() -> u64 {
 
 fn default_trusted_paths() -> Vec<String> {
     vec![".".to_string()]
+}
+
+/// Router configuration for MoE per-CWE / per-language routing
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct RouterConfig {
+    /// Whether the router is enabled
+    #[serde(default)]
+    pub enabled: bool,
+    /// Default prompt template name
+    #[serde(default = "default_llm_static_analysis")]
+    pub default_prompt: String,
+    /// CWE ID -> PromptSpec overrides
+    #[serde(default)]
+    pub cwe_overrides: HashMap<String, PromptSpec>,
+    /// Language -> PromptSpec overrides
+    #[serde(default)]
+    pub language_overrides: HashMap<String, PromptSpec>,
+}
+
+/// Prompt specification for router overrides
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct PromptSpec {
+    /// The prompt template name to use
+    #[serde(default = "default_llm_static_analysis")]
+    pub prompt_template: String,
+    /// Optional model override for this prompt
+    pub model_override: Option<String>,
+}
+
+fn default_llm_static_analysis() -> String {
+    "llm_static_analysis".to_string()
+}
+
+/// Aggregation configuration including false positive store settings
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct AggregationConfig {
+    /// Path to the false positive store JSON file
+    #[serde(default)]
+    pub fp_store_path: Option<PathBuf>,
 }
 
 fn default_max_parallel_tasks() -> usize {

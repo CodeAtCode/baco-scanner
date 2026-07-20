@@ -8,7 +8,7 @@
 //! - Generates confidence explanations
 //! - Integrates with AnalysisContext (T5)
 
-use crate::context::AnalysisContext;
+use crate::analysis_context::AnalysisContext;
 use crate::findings::{VerificationStatus, VulnerabilityFinding};
 use std::collections::HashMap;
 
@@ -55,6 +55,10 @@ pub enum ConfidenceFactor {
     TestCodeRelated,
     /// Code is in dependency/vendor
     ThirdPartyCode,
+    /// Triage confirmed true positive
+    TriageTruePositive,
+    /// Triage identified false positive
+    TriageFalsePositive,
 }
 
 /// Historical data for confidence refinement.
@@ -354,6 +358,21 @@ impl ConfidenceRefinementPhase {
                     source
                 ));
                 break;
+            }
+        }
+
+        // Factor 9: Tiage-based adjustments
+        if let Some(ref notes) = finding.verification_notes {
+            if notes.contains("triage") || notes.contains("Triage") {
+                if notes.contains("false_positive") || notes.contains("False positive") {
+                    refined_score = (refined_score - 0.25).max(0.0);
+                    factors.push(ConfidenceFactor::TriageFalsePositive);
+                    explanations.push("Triage identified as false positive".to_string());
+                } else if notes.contains("true_positive") || notes.contains("True positive") {
+                    refined_score = (refined_score + 0.10).min(1.0);
+                    factors.push(ConfidenceFactor::TriageTruePositive);
+                    explanations.push("Triage confirmed as true positive".to_string());
+                }
             }
         }
 

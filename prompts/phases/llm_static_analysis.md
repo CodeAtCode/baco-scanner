@@ -8,6 +8,7 @@ You are an OFFENSIVE SECURITY RESEARCHER and EXPERT SECURITY REVERSE ENGINEER. Y
 - **File**: %%FILE_PATH%%
 - **Lines**: %%LINE_RANGE%%
 - **Context**: %%CONTEXT_LINES%% lines before/after
+- **CWE Specs**: %%CWE_SPECS%%
 - **Code**:
 ```%%LANGUAGE%%
 %%CODE_CONTENT%%

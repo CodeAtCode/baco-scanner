@@ -200,6 +200,25 @@ impl FindingsMerger {
         }
     }
 
+    /// Merge findings from multiple scans, deduplicating by RootCauseId
+    ///
+    /// This method takes multiple scans (each scan is a Vec of findings) and merges them
+    /// into a single deduplicated list. Findings with the same id are considered duplicates.
+    pub fn merge_scans(scans: Vec<Vec<VulnerabilityFinding>>) -> Vec<VulnerabilityFinding> {
+        let mut seen_ids = std::collections::HashSet::new();
+        let mut merged = Vec::new();
+
+        for scan in scans {
+            for finding in scan {
+                if seen_ids.insert(finding.id.clone()) {
+                    merged.push(finding);
+                }
+            }
+        }
+
+        merged
+    }
+
     pub fn into_findings(self) -> Vec<VulnerabilityFinding> {
         self.findings
     }

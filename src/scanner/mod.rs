@@ -154,6 +154,8 @@ mod tests {
             },
             agent: AgentConfig::default(),
             tickets: crate::config::TicketConfig { systems: vec![] },
+            router: crate::config::RouterConfig::default(),
+            aggregation: crate::config::AggregationConfig::default(),
         }
     }
 

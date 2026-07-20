@@ -1,0 +1,12 @@
+[router]
+enabled = false
+default_prompt = "llm_static_analysis"
+
+[router.cwe_overrides]
+"79" = { prompt_template = "xss_specialized", model_override = null }
+"89" = { prompt_template = "sqli_specialized", model_override = null }
+"120" = { prompt_template = "buffer_overflow_specialized", model_override = null }
+
+[router.language_overrides]
+"c" = { prompt_template = "c_specialized", model_override = null }
+"rust" = { prompt_template = "rust_specialized", model_override = null }

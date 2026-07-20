@@ -180,6 +180,9 @@ Code location: %%FILE_PATH%%
 Line numbers: %%LINE_RANGE%%
 Context lines: %%CONTEXT_LINES%% (before and after)
 
+Relevant CWE Specifications:
+%%CWE_SPECS%%
+
 Analyze for:
 1. Memory safety issues (buffer overflows, use-after-free)
 2. Input validation gaps (XSS, SQL injection, command injection)

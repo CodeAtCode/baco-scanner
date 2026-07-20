@@ -48,3 +48,16 @@ mod phase;
 
 // Standalone test modules
 mod llm_analysis_test;
+
+// BM25 retrieval tests
+mod bm25_search;
+mod triage_filter;
+
+// Context extraction tests
+mod context_extractor;
+
+// Global false positive store tests
+mod global_fp;
+
+// MoE router tests
+mod cwe_router;

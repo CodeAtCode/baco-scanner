@@ -7,7 +7,7 @@
 //! - Finding prioritization
 //! - Full aggregation workflow
 
-use baco::context::AnalysisContext;
+use baco::analysis_context::AnalysisContext;
 use baco::findings::{IssueCategory, SecurityIssue, Severity, VerificationStatus, VulnerabilityFinding};
 use baco::report::aggregation::{
     AggregateStatistics, AggregationResult, ExecutiveSummary, PrioritizedFinding,

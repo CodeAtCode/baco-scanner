@@ -344,6 +344,8 @@ pub fn create_test_config() -> ScannerConfig {
             enabled: false,
             ..Default::default()
         },
+        router: Default::default(),
+        aggregation: Default::default(),
     }
 }
 
@@ -383,6 +385,8 @@ pub fn create_minimal_config() -> ScannerConfig {
             keep_artifacts: false,
         },
         tickets: TicketConfig::default(),
+        router: Default::default(),
+        aggregation: Default::default(),
     }
 }
 

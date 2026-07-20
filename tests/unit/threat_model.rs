@@ -10,7 +10,7 @@
 //! - Trust boundaries detection
 //! - Edge cases and error handling
 
-use baco::context::AnalysisContext;
+use baco::analysis_context::AnalysisContext;
 use baco::threat_model::*;
 use tempfile::tempdir;
 

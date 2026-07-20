@@ -171,6 +171,7 @@ impl PromptEngine {
             "CODE_CONTENT".to_string(),
             "<code_will_be_injected>".to_string(),
         );
+        vars.insert("CWE_SPECS".to_string(), String::new());
 
         // Git analysis
         vars.insert("FINDING_TITLE".to_string(), "<finding_title>".to_string());

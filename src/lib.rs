@@ -20,11 +20,12 @@
 )]
 
 pub mod agent;
+pub mod analysis_context; // AnalysisContext persistence (renamed from context.rs)
 pub mod checkpoint;
 pub mod confidence;
 pub mod confidence_refinement;
 pub mod config;
-pub mod context;
+pub mod context; // Context extraction module
 
 pub mod crossfile;
 pub mod cve_bootstrap;
@@ -48,7 +49,9 @@ pub mod project_type;
 pub mod prompt;
 pub mod rate_limiter;
 pub mod report;
+pub mod retrieval;
 pub mod root_cause_dedup;
+pub mod router;
 pub mod scanner;
 pub mod scanner_types;
 pub mod semgrep;

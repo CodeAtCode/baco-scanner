@@ -6,7 +6,7 @@
 //! - Includes mitigation examples
 //! - Integrates with AnalysisContext (T5)
 
-use crate::context::AnalysisContext;
+use crate::analysis_context::AnalysisContext;
 use crate::findings::{Severity, VerificationStatus, VulnerabilityFinding};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

@@ -5,7 +5,7 @@
 
 #![allow(clippy::too_many_arguments, unused_imports)]
 
-use baco::context::AnalysisContext;
+use baco::analysis_context::AnalysisContext;
 use baco::findings::{Severity, VerificationStatus, VulnerabilityFinding};
 use baco::llm::LlmConfig;
 use baco::report::ai_aggregation::conflict_resolver::ConflictResolver;

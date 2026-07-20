@@ -1,8 +1,8 @@
 use crate::agent;
+use crate::analysis_context::AnalysisContext;
 use crate::checkpoint::ScanPhase;
 use crate::confidence_refinement::ConfidenceRefinementPhase;
 use crate::config;
-use crate::context::AnalysisContext;
 use crate::cve_bootstrap::CveBootstrapper;
 use crate::error::ScanResult;
 use crate::findings::{VerificationStatus, VulnerabilityFinding};
@@ -635,7 +635,7 @@ Respond with ONLY JSON:
             // Step 2: Generate PoCs for high-severity confirmed findings
             pb.set_message("Phase 5/11: Generating PoCs for high-severity findings...");
 
-            let context = crate::context::AnalysisContext::default();
+            let context = crate::analysis_context::AnalysisContext::default();
             let poc_engine = PoCGenerationEngine::new();
 
             // Determine target languages for PoC based on project stack
@@ -1317,6 +1317,8 @@ mod tests {
             },
             tickets: crate::config::TicketConfig { systems: vec![] },
             agent: AgentConfig::default(),
+            router: crate::config::RouterConfig::default(),
+            aggregation: crate::config::AggregationConfig::default(),
         }
     }
 

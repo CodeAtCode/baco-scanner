@@ -3,7 +3,7 @@
 use git2::Repository;
 use std::path::Path;
 
-use crate::context::AnalysisContext;
+use crate::analysis_context::AnalysisContext;
 use crate::git_analysis::helpers::{calculate_overall_confidence, get_remote_url, update_context};
 use crate::git_analysis::models::{
     CommitReference, GitAnalysisResult, GitConfidenceModifier, RiskyCommitPattern,

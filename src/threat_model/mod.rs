@@ -16,7 +16,7 @@ pub use generation::{
 };
 pub use model::{ThreatModelFile, ThreatModelFrontmatter};
 
-use crate::context::AnalysisContext;
+use crate::analysis_context::AnalysisContext;
 use crate::llm::LlmClient;
 use std::path::Path;
 

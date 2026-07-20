@@ -11,7 +11,7 @@
 //! - Serialization/deserialization
 //! - Template availability
 
-use baco::context::AnalysisContext;
+use baco::analysis_context::AnalysisContext;
 use baco::findings::{
     IssueCategory, SecurityIssue, Severity, VerificationStatus, VulnerabilityFinding,
 };

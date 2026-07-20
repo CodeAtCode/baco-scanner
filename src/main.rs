@@ -379,7 +379,8 @@ fn format_phase(phase: &baco::checkpoint::ScanPhase) -> String {
     let (phase_str, _phase_index) = match phase {
         baco::checkpoint::ScanPhase::Indexing => ("Indexing ⚙️", 0),
         baco::checkpoint::ScanPhase::Semgrep => ("Semgrep 🔍", 1),
-        baco::checkpoint::ScanPhase::LlmStaticAnalysis => ("LLM Static Analysis 🧠", 2),
+        baco::checkpoint::ScanPhase::CweRouting => ("MoE CWE Routing 🎯", 2),
+        baco::checkpoint::ScanPhase::LlmStaticAnalysis => ("LLM Static Analysis 🧠", 3),
         baco::checkpoint::ScanPhase::LlmDiscovery => ("LLM Discovery 🔎", 3),
         baco::checkpoint::ScanPhase::LlmVerification => ("LLM Verification ✅", 4),
         baco::checkpoint::ScanPhase::TicketCrossRef => ("Ticket Cross-Ref 🎫", 5),

@@ -3,7 +3,7 @@
 //! Provides save/load/parse/merge operations for threat model files
 //! using YAML frontmatter + markdown body format.
 
-use crate::context::AnalysisContext;
+use crate::analysis_context::AnalysisContext;
 use crate::findings::VulnerabilityFinding;
 use crate::threat_model::model::{ThreatModelFile, ThreatModelFrontmatter};
 use std::fs;

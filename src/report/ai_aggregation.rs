@@ -10,7 +10,7 @@ pub mod deduplication;
 pub mod enrichment;
 pub mod models;
 
-use crate::context::AnalysisContext;
+use crate::analysis_context::AnalysisContext;
 use crate::findings::{VerificationStatus, VulnerabilityFinding};
 use crate::llm::LlmConfig;
 

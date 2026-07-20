@@ -1,0 +1,225 @@
+{
+  "cwe_specifications": [
+    {
+      "cwe_id": "CWE-79",
+      "name": "Improper Neutralization of Input During Web Page Generation (Cross-site Scripting)",
+      "description": "The software does not neutralize or incorrectly neutralizes user-controllable input before it is placed in output that is used as a web page that is served to other users. This allows attackers to execute malicious scripts in the victim's browser.",
+      "examples": [
+        "Echoing user input directly to HTML without sanitization: <div>${userInput}</div>",
+        "Setting innerHTML with untrusted data in JavaScript: element.innerHTML = userInput",
+        "URL parameters reflected in page without encoding"
+      ],
+      "mitigation": "Use context-aware output encoding (HTML entity encoding for HTML content, URL encoding for query parameters, JavaScript escaping for script blocks). Implement Content Security Policy headers. Use frameworks that auto-escape by default like React or Vue."
+    },
+    {
+      "cwe_id": "CWE-89",
+      "name": "Improper Neutralization of Special Elements used in an SQL Command (SQL Injection)",
+      "description": "The software constructs all or part of an SQL command using externally-influenced input from an upstream component, but it does not neutralize or incorrectly neutralizes special elements that could modify the intended SQL command when it is sent to a database.",
+      "examples": [
+        "String concatenation in SQL: query = \"SELECT * FROM users WHERE id = \" + userInput",
+        "Format string in SQL: sprintf(\"SELECT * FROM products WHERE name = '%s'\", name)",
+        "Direct interpolation: db.execute(f\"DELETE FROM logs WHERE date = '{date}'\")"
+      ],
+      "mitigation": "Use parameterized queries (prepared statements) with bound parameters. Employ ORM frameworks with proper query building. Implement input validation with allowlists. Use stored procedures with parameterized inputs."
+    },
+    {
+      "cwe_id": "CWE-22",
+      "name": "Improper Limitation of a Pathname to a Restricted Directory (Path Traversal)",
+      "description": "The software uses external input to construct a pathname that is intended to identify a file or directory that is located underneath a restricted parent directory, but the software does not properly neutralize special elements within the pathname.",
+      "examples": [
+        "Direct file access: file = open(baseDir + userInput)",
+        "Missing path normalization: Path.new(root, userPath).read()",
+        "No validation of '../' sequences in file paths"
+      ],
+      "mitigation": "Canonicalize paths before validation. Use chroot jails or containerization. Implement allowlists for permitted filenames. Validate paths resolve within expected directory using realpath/CanonicalizePath."
+    },
+    {
+      "cwe_id": "CWE-78",
+      "name": "Improper Neutralization of Special Elements used in an OS Command (OS Command Injection)",
+      "description": "The software constructs all or part of an OS command using externally-influenced input from an upstream component, but it does not neutralize or incorrectly neutralizes special elements that could modify the intended OS command.",
+      "examples": [
+        "Shell execution with user input: system(\"ping \" + userInput)",
+        "Backtick execution: output = `ls ${userPath}`",
+        "Exec with unsanitized arguments: subprocess.call(f\"cat {filename}\", shell=True)"
+      ],
+      "mitigation": "Avoid shell execution entirely when possible. Use argument arrays instead of shell strings (subprocess.run([\"ls\", path])). Implement strict input validation. Use allowlists for permitted commands and arguments."
+    },
+    {
+      "cwe_id": "CWE-119",
+      "name": "Improper Restriction of Operations within the Bounds of a Memory Buffer",
+      "description": "The software performs operations on a memory buffer, but it can read from or write to a memory location that is outside of the intended boundary of the buffer.",
+      "examples": [
+        "Buffer overflow with strcpy: strcpy(dest, src) without length check",
+        "Array out-of-bounds access: arr[index] without bounds validation",
+        "Integer overflow leading to buffer overflow: memcpy(buf, src, size*size)"
+      ],
+      "mitigation": "Use safe string functions (strncpy, snprintf instead of strcpy, sprintf). Enable stack canaries and ASLR. Use memory-safe languages where possible. Implement bounds checking on all array accesses."
+    },
+    {
+      "cwe_id": "CWE-20",
+      "name": "Improper Input Validation",
+      "description": "The software does not validate or incorrectly validates input that can affect the control flow or data flow of a program, leading to security vulnerabilities.",
+      "examples": [
+        "Missing type validation: treating string input as integer",
+        "Insufficient length validation: accepting 1MB input where 100 bytes expected",
+        "No format validation: accepting arbitrary JSON where specific schema required"
+      ],
+      "mitigation": "Implement strict input validation with allowlists. Validate type, length, format, and range. Use schema validation libraries. Apply defense in depth with multiple validation layers."
+    },
+    {
+      "cwe_id": "CWE-125",
+      "name": "Out-of-bounds Read",
+      "description": "The software reads data past the end, or before the beginning, of the intended buffer.",
+      "examples": [
+        "Reading past buffer end: for i in 0..len+1 { buf[i] }",
+        "Negative index access: buf[-1] in languages without protection",
+        "Off-by-one in loop bounds: while (i <= len) instead of i < len"
+      ],
+      "mitigation": "Enable bounds checking in compiler flags. Use safe array access methods. Validate indices before access. Employ memory safety tools like AddressSanitizer during development."
+    },
+    {
+      "cwe_id": "CWE-787",
+      "name": "Out-of-bounds Write",
+      "description": "The software writes data past the end, or before the beginning, of the intended buffer.",
+      "examples": [
+        "Buffer overflow write: strcpy into undersized buffer",
+        "Heap overflow: memcpy with incorrect size calculation",
+        "Stack overflow: recursive function without depth limit"
+      ],
+      "mitigation": "Use bounds-safe languages or libraries. Enable stack protectors and heap canaries. Perform rigorous size validation before memory operations. Use static analysis tools to detect overflow patterns."
+    },
+    {
+      "cwe_id": "CWE-352",
+      "name": "Cross-Site Request Forgery (CSRF)",
+      "description": "A web application does not properly verify that a request originated from the expected source, allowing attackers to trick authenticated users into performing unintended actions.",
+      "examples": [
+        "State-changing GET requests without CSRF tokens",
+        "Missing SameSite cookie attribute",
+        "No CSRF token validation in form submissions"
+      ],
+      "mitigation": "Implement anti-CSRF tokens in all state-changing requests. Set SameSite=Strict or SameSite=Lax on cookies. Use custom request headers for AJAX. Require re-authentication for sensitive operations."
+    },
+    {
+      "cwe_id": "CWE-434",
+      "name": "Unrestricted Upload of File with Dangerous Type",
+      "description": "The software allows the attachment of file types that were not expected by the administrator, which could allow an attacker to upload executable files that can be used to take control of the system.",
+      "examples": [
+        "Accepting .php/.exe/.sh file uploads without validation",
+        "Missing MIME type verification",
+        "Stored uploaded files in web-accessible directory"
+      ],
+      "mitigation": "Implement strict file type allowlists by extension and MIME type. Store uploads outside web root. Use random filenames. Scan uploads for malware. Set executable bits to false on uploaded files."
+    },
+    {
+      "cwe_id": "CWE-502",
+      "name": "Deserialization of Untrusted Data",
+      "description": "The application deserializes untrusted data without sufficiently verifying that the resulting data will be valid, or without enforcing constraints on what objects may be deserialized.",
+      "examples": [
+        "Java deserialize from HTTP parameter without validation",
+        "Python pickle.load() on user-controlled data",
+        "YAML deserialization with unsafe loader: yaml.load(userInput)"
+      ],
+      "mitigation": "Avoid deserializing untrusted data. Use safe serialization formats (JSON instead of pickle). Implement type filtering during deserialization. Validate deserialized objects against expected schemas."
+    },
+    {
+      "cwe_id": "CWE-287",
+      "name": "Improper Authentication",
+      "description": "The software does not properly authenticate users, allowing attackers to impersonate other users or gain unauthorized access.",
+      "examples": [
+        "Weak password requirements (no complexity, no length minimum)",
+        "Credential stuffing vulnerability (no rate limiting)",
+        "Session fixation (session ID not regenerated after login)"
+      ],
+      "mitigation": "Implement strong password policies. Use multi-factor authentication. Regenerate session IDs after authentication. Implement account lockout and rate limiting. Use secure password hashing (Argon2, bcrypt)."
+    },
+    {
+      "cwe_id": "CWE-862",
+      "name": "Missing Authentication for Critical Function",
+      "description": "The software does not perform any authentication for functionality that requires a provable user identity or consumes a significant amount of resources.",
+      "examples": [
+        "Admin endpoint accessible without authentication check",
+        "API key validation missing in critical operations",
+        "Password reset endpoint without token validation"
+      ],
+      "mitigation": "Implement authentication checks at all entry points. Use authentication middleware. Apply principle of least privilege. Regularly audit access control implementations."
+    },
+    {
+      "cwe_id": "CWE-863",
+      "name": "Incorrect Authorization",
+      "description": "The software does not correctly enforce access restrictions for a privileged actor, allowing unauthorized access to resources or functionality.",
+      "examples": [
+        "IDOR vulnerability: /api/users/123 accessible to any user",
+        "Missing role checks: admin function accessible to regular users",
+        "Broken access control in file operations"
+      ],
+      "mitigation": "Implement authorization checks on every request. Use role-based access control (RBAC). Validate resource ownership. Apply principle of least privilege consistently."
+    },
+    {
+      "cwe_id": "CWE-732",
+      "name": "Incorrect Permission Assignment for Critical Resource",
+      "description": "The software sets permissions for a critical resource in a way that allows other actors to have inappropriate access.",
+      "examples": [
+        "World-readable sensitive configuration files",
+        "Directory with 777 permissions allowing any user to modify",
+        "Database credentials stored with overly permissive file mode"
+      ],
+      "mitigation": "Set restrictive file permissions (600 for sensitive files, 700 for directories). Implement regular permission audits. Use environment-specific permission configurations. Apply principle of least privilege."
+    },
+    {
+      "cwe_id": "CWE-306",
+      "name": "Missing Authentication for Critical Function",
+      "description": "The software does not perform an authentication check for a function that should require authentication, allowing unauthenticated access to protected functionality.",
+      "examples": [
+        "Password change endpoint without session validation",
+        "Data export function accessible without login",
+        "Webhook endpoint accepting commands without authentication"
+      ],
+      "mitigation": "Require authentication for all sensitive operations. Implement authentication middleware. Use authentication tokens with proper validation. Log and monitor unauthorized access attempts."
+    },
+    {
+      "cwe_id": "CWE-200",
+      "name": "Exposure of Sensitive Information to an Unauthorized Actor",
+      "description": "The software exposes sensitive information to an actor that is not explicitly authorized to have access to that information.",
+      "examples": [
+        "Error messages revealing stack traces and internal paths",
+        "Debug information exposed in production",
+        "Sensitive data in URLs or logs"
+      ],
+      "mitigation": "Implement generic error messages in production. Disable debug mode. Sanitize logs to remove sensitive data. Use proper access controls on all endpoints. Implement data classification and handling policies."
+    },
+    {
+      "cwe_id": "CWE-201",
+      "name": "Insertion of Sensitive Information into Sent Data",
+      "description": "The software generates a piece of data that contains sensitive information, and then it sends that data to an actor that should not have access to that information.",
+      "examples": [
+        "Sending credit card numbers in email",
+        "Including API keys in client-side code",
+        "Logging authentication tokens"
+      ],
+      "mitigation": "Encrypt sensitive data in transit and at rest. Implement data minimization. Use tokenization for sensitive values. Never log or transmit secrets in plaintext. Apply proper access controls."
+    },
+    {
+      "cwe_id": "CWE-798",
+      "name": "Use of Hard-coded Credentials",
+      "description": "The software contains hard-coded credentials, such as a password or cryptographic key, which it uses for its own inbound authentication, outbound communication to external components, or encryption of internal data.",
+      "examples": [
+        "Hardcoded API keys in source code: const API_KEY = \"abc123\"",
+        "Embedded database passwords in configuration files",
+        "Default credentials not changed: admin/admin123"
+      ],
+      "mitigation": "Use environment variables or secret management systems. Implement proper key rotation. Never commit credentials to version control. Use service accounts with minimal privileges. Scan code for hardcoded secrets."
+    },
+    {
+      "cwe_id": "CWE-327",
+      "name": "Use of a Broken or Risky Cryptographic Algorithm",
+      "description": "The software uses a cryptographic algorithm that is considered broken or risky, making it possible for attackers to decrypt sensitive data or forge signatures.",
+      "examples": [
+        "Using MD5 or SHA1 for password hashing",
+        "DES or 3DES for encryption",
+        "RC4 stream cipher usage",
+        "Self-implemented cryptography instead of standard libraries"
+      ],
+      "mitigation": "Use industry-standard algorithms (AES-256, ChaCha20, Argon2, bcrypt). Keep cryptographic libraries updated. Follow NIST guidelines. Avoid custom cryptography. Implement proper key management."
+    }
+  ]
+}

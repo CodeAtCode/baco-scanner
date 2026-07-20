@@ -10,8 +10,8 @@
 //! - Special regex characters in code (without escaping)
 //! - Overlapping pattern matches
 
+use baco::analysis_context::AnalysisContext;
 use baco::confidence_refinement::{ConfidenceRefinementPhase, HistoricalData};
-use baco::context::AnalysisContext;
 use baco::findings::{Severity, VerificationStatus};
 use baco::phase::helpers::create_finding_with_params;
 

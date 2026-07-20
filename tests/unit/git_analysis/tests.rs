@@ -10,7 +10,7 @@
 
 #[cfg(test)]
 mod git_analysis_tests {
-    use baco::context::AnalysisContext;
+    use baco::analysis_context::AnalysisContext;
     use baco::git_analysis::helpers::{
         calculate_overall_confidence, get_commit_stats, update_context,
     };

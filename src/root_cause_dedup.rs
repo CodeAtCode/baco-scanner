@@ -11,8 +11,12 @@
 use crate::findings::{Severity, VulnerabilityFinding};
 use crate::scanner_types::cve::RootCauseGroup;
 use crate::scanner_types::severity::V3Severity;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::fs;
+use std::path::Path;
+use std::path::PathBuf;
 
 /// Deduplicates vulnerability findings by grouping them by root cause
 pub struct RootCauseDeduplicator {
@@ -110,6 +114,90 @@ impl RootCauseDeduplicator {
 impl Default for RootCauseDeduplicator {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Global false positive store for cross-scan persistence
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct GlobalFpStore {
+    fp_ids: HashSet<String>,
+    #[serde(skip)]
+    path: PathBuf,
+}
+
+impl GlobalFpStore {
+    /// Create a new empty GlobalFpStore with the given path
+    pub fn with_path(path: &Path) -> Self {
+        Self {
+            fp_ids: HashSet::new(),
+            path: path.to_path_buf(),
+        }
+    }
+
+    /// Load the FP store from a JSON file
+    /// If the file is missing or invalid, returns an empty store
+    pub fn load(path: &Path) -> Self {
+        match fs::read_to_string(path) {
+            Ok(content) => match serde_json::from_str::<HashSet<String>>(&content) {
+                Ok(fp_ids) => Self {
+                    fp_ids,
+                    path: path.to_path_buf(),
+                },
+                Err(e) => {
+                    tracing::warn!("Failed to parse FP store at {:?}: {}", path, e);
+                    Self::with_path(path)
+                }
+            },
+            Err(e) => {
+                if e.kind() != std::io::ErrorKind::NotFound {
+                    tracing::warn!("Failed to read FP store at {:?}: {}", path, e);
+                }
+                Self::with_path(path)
+            }
+        }
+    }
+
+    /// Save the FP store to disk as JSON
+    pub fn save(&self) -> Result<(), std::io::Error> {
+        let json = serde_json::to_string_pretty(&self.fp_ids).map_err(std::io::Error::other)?;
+
+        // Ensure parent directory exists
+        if let Some(parent) = self.path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+
+        fs::write(&self.path, json)
+    }
+
+    /// Mark a root cause ID as a false positive
+    pub fn mark_false_positive(&mut self, id: &str) {
+        self.fp_ids.insert(id.to_string());
+        if let Err(e) = self.save() {
+            tracing::warn!("Failed to save FP store after marking {}: {}", id, e);
+        }
+    }
+
+    /// Check if a root cause ID is marked as a false positive
+    pub fn is_false_positive(&self, id: &str) -> bool {
+        self.fp_ids.contains(id)
+    }
+
+    /// Remove a root cause ID from the false positive store
+    pub fn remove(&mut self, id: &str) {
+        self.fp_ids.remove(id);
+        if let Err(e) = self.save() {
+            tracing::warn!("Failed to save FP store after removing {}: {}", id, e);
+        }
+    }
+
+    /// Get the number of false positive IDs in the store
+    pub fn len(&self) -> usize {
+        self.fp_ids.len()
+    }
+
+    /// Check if the store is empty
+    pub fn is_empty(&self) -> bool {
+        self.fp_ids.is_empty()
     }
 }
 

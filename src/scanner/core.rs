@@ -189,6 +189,8 @@ mod tests {
             },
             tickets: crate::config::TicketConfig::default(),
             agent: crate::config::AgentConfig::default(),
+            router: crate::config::RouterConfig::default(),
+            aggregation: crate::config::AggregationConfig::default(),
         }
     }
 

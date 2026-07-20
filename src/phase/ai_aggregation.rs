@@ -1,5 +1,5 @@
 use super::{PhaseContext, PhaseError, ScanPhase};
-use crate::context::AnalysisContext;
+use crate::analysis_context::AnalysisContext;
 use crate::findings::VulnerabilityFinding;
 use crate::llm::LlmConfig;
 use crate::report::ai_aggregation::AiAggregationPhase as AiAggregationRunner;

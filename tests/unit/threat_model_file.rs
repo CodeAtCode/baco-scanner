@@ -10,7 +10,7 @@
 //! - YAML frontmatter parsing edge cases
 //! - File I/O error handling
 
-use baco::context::AnalysisContext;
+use baco::analysis_context::AnalysisContext;
 use baco::findings::{Severity, VulnerabilityFinding};
 use baco::threat_model::{ThreatModelFile, ThreatModelFrontmatter};
 use tempfile::tempdir;

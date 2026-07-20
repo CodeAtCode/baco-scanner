@@ -7,7 +7,7 @@
 //! - Confidence scoring refinement
 //! - Integration with AnalysisContext
 
-use crate::context::AnalysisContext;
+use crate::analysis_context::AnalysisContext;
 use crate::findings::{VerificationStatus, VulnerabilityFinding};
 use crate::llm::LlmClient;
 use crate::project_type::ProjectType as DetectProjectType;
@@ -1162,5 +1162,141 @@ mod tests {
         assert_eq!(confirmed, 1);
         assert_eq!(false_positives, 1);
         assert_eq!(needs_review, 1);
+    }
+}
+
+/// Triage verdict from LLM analysis
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TriageVerdict {
+    TruePositive,
+    FalsePositive,
+}
+
+impl std::fmt::Display for TriageVerdict {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            TriageVerdict::TruePositive => write!(f, "true_positive"),
+            TriageVerdict::FalsePositive => write!(f, "false_positive"),
+        }
+    }
+}
+
+/// Result of LLM-based triage for false positive detection
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TriageResult {
+    pub verdict: TriageVerdict,
+    pub confidence: f32,
+    pub reasoning: String,
+}
+
+/// Triage filter for LLM-based false positive detection
+pub struct TriageFilter {
+    _llm_client: Option<LlmClient>,
+}
+
+/// Triage prompt template for false positive detection
+const TRIAGE_PROMPT_TEMPLATE: &str = concat!(
+    "Analyze this security vulnerability and determine if it is a true positive or false positive.\n\n",
+    "Finding: %%FINDING_TITLE%%\n",
+    "Location: %%FILE_PATH%%:%%LINE_NUMBER%%\n",
+    "Description: %%VULNERABILITY_DESCRIPTION%%\n",
+    "Code: %%CODE_SNIPPET%%\n\n",
+    "Return JSON: {\"verdict\": \"true_positive\"|\"false_positive\", \"confidence\": 0.0-1.0, \"reasoning\": \"...\"}"
+);
+
+impl TriageFilter {
+    /// Create a new TriageFilter
+    pub fn new(_llm_client: Option<LlmClient>) -> Self {
+        Self { _llm_client }
+    }
+
+    /// Triage a single finding using LLM
+    pub async fn triage_finding<C>(
+        &self,
+        finding: &VulnerabilityFinding,
+        client: &C,
+    ) -> Result<TriageResult, String>
+    where
+        C: AsyncLlmClient,
+    {
+        let mut variables = HashMap::new();
+        variables.insert("FINDING_TITLE".to_string(), finding.title.clone());
+        variables.insert("FILE_PATH".to_string(), finding.file_path.clone());
+        variables.insert(
+            "LINE_NUMBER".to_string(),
+            finding
+                .line_number
+                .map(|l| l.to_string())
+                .unwrap_or_default(),
+        );
+        variables.insert(
+            "VULNERABILITY_DESCRIPTION".to_string(),
+            finding.description.clone(),
+        );
+        variables.insert(
+            "CODE_SNIPPET".to_string(),
+            finding.code_snippet.clone().unwrap_or_default(),
+        );
+
+        let prompt = render_template(TRIAGE_PROMPT_TEMPLATE, &variables);
+        let messages = vec![
+            crate::llm::ChatMessage::system(
+                "You are a security expert. Analyze the vulnerability and return JSON only.",
+            ),
+            crate::llm::ChatMessage::user(&prompt),
+        ];
+        let response = client
+            .chat(&messages)
+            .await
+            .map_err(|e| format!("LLM triage failed: {}", e))?;
+        let response_content = response.content;
+
+        self.parse_triage_response(&response_content)
+    }
+
+    /// Parse LLM response into TriageResult
+    fn parse_triage_response(&self, response: &str) -> Result<TriageResult, String> {
+        #[derive(Deserialize)]
+        struct TriageResponse {
+            verdict: String,
+            confidence: f32,
+            reasoning: String,
+        }
+
+        let json_str = response.trim();
+        let parsed: TriageResponse =
+            serde_json::from_str(json_str).map_err(|e| format!("JSON parse error: {}", e))?;
+
+        let verdict = match parsed.verdict.as_str() {
+            "true_positive" => TriageVerdict::TruePositive,
+            "false_positive" => TriageVerdict::FalsePositive,
+            other => return Err(format!("Invalid verdict: {}", other)),
+        };
+
+        Ok(TriageResult {
+            verdict,
+            confidence: parsed.confidence.clamp(0.0, 1.0),
+            reasoning: parsed.reasoning,
+        })
+    }
+}
+
+/// Trait for LLM clients used in triage
+#[async_trait::async_trait]
+pub trait AsyncLlmClient: Send + Sync {
+    async fn chat(
+        &self,
+        messages: &[crate::llm::ChatMessage],
+    ) -> Result<crate::llm::ChatResponseWithModel, String>;
+}
+
+#[async_trait::async_trait]
+impl AsyncLlmClient for crate::llm::LlmClient {
+    async fn chat(
+        &self,
+        messages: &[crate::llm::ChatMessage],
+    ) -> Result<crate::llm::ChatResponseWithModel, String> {
+        crate::llm::LlmClient::chat(self, messages).await
     }
 }

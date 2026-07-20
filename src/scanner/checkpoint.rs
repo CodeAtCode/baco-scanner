@@ -8,6 +8,7 @@ use std::path::Path;
 pub enum ScanPhase {
     Indexing,
     Semgrep,
+    CweRouting,
     LlmStaticAnalysis,
     LlmDiscovery,
     LlmVerification,
@@ -92,7 +93,8 @@ impl Checkpoint {
 
         Ok(match checkpoint.current_phase {
             ScanPhase::Indexing => ScanPhase::Semgrep,
-            ScanPhase::Semgrep => ScanPhase::LlmStaticAnalysis,
+            ScanPhase::Semgrep => ScanPhase::CweRouting,
+            ScanPhase::CweRouting => ScanPhase::LlmStaticAnalysis,
             ScanPhase::LlmStaticAnalysis => ScanPhase::LlmDiscovery,
             ScanPhase::LlmDiscovery => ScanPhase::LlmVerification,
             ScanPhase::LlmVerification => ScanPhase::TicketCrossRef,
@@ -118,6 +120,7 @@ impl Checkpoint {
         match self.current_phase {
             ScanPhase::Indexing => "🔄 Indexing ⚙️".to_string(),
             ScanPhase::Semgrep => "🔍 Semgrep Static Analysis".to_string(),
+            ScanPhase::CweRouting => "🎯 MoE CWE Routing".to_string(),
             ScanPhase::LlmStaticAnalysis => "🧠 LLM Static Analysis".to_string(),
             ScanPhase::LlmDiscovery => "🔎 LLM Discovery".to_string(),
             ScanPhase::LlmVerification => "✅ LLM Verification".to_string(),
@@ -175,6 +178,7 @@ pub async fn save_checkpoint(
     let all_phases = [
         ScanPhase::Indexing,
         ScanPhase::Semgrep,
+        ScanPhase::CweRouting,
         ScanPhase::LlmStaticAnalysis,
         ScanPhase::LlmDiscovery,
         ScanPhase::LlmVerification,

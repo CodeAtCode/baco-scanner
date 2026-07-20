@@ -1,6 +1,7 @@
 use crate::findings::{Severity, VulnerabilityFinding};
 use crate::llm::LlmClient;
 use crate::prompt::loader;
+use crate::retrieval::CweKnowledgeBase;
 use regex::Regex;
 use std::collections::HashMap;
 use std::fs;
@@ -191,6 +192,7 @@ pub struct LlmAnalyzer {
     languages: Vec<String>,
     max_file_size: usize,
     prompt_template: String,
+    cwe_kb: Option<CweKnowledgeBase>,
 }
 
 impl LlmAnalyzer {
@@ -220,11 +222,18 @@ impl LlmAnalyzer {
             &default_prompt,
         );
 
+        // Load CWE knowledge base for retrieval-augmented generation
+        let cwe_kb = CweKnowledgeBase::load_embedded().ok();
+        if cwe_kb.is_none() {
+            tracing::warn!("Failed to load CWE knowledge base - RAG will be disabled");
+        }
+
         Self {
             client,
             languages,
             max_file_size: max_file_size_kb * 1024,
             prompt_template,
+            cwe_kb,
         }
     }
 
@@ -286,6 +295,9 @@ impl LlmAnalyzer {
         let file_path = path.to_string_lossy().to_string();
         let extension = path.extension().and_then(|e| e.to_str()).unwrap_or("");
 
+        // Retrieve relevant CWE specifications using RAG
+        let cwe_specs = self.retrieve_cwe_specs(&file_path, &content);
+
         // Use loaded prompt template with variable substitution
         let prompt = self
             .prompt_template
@@ -293,7 +305,8 @@ impl LlmAnalyzer {
             .replace("%%FILE_PATH%%", &file_path)
             .replace("%%LINE_RANGE%%", "1-max")
             .replace("%%CONTEXT_LINES%%", "3")
-            .replace("%%CODE_CONTENT%%", &self.truncate_code(&content));
+            .replace("%%CODE_CONTENT%%", &self.truncate_code(&content))
+            .replace("%%CWE_SPECS%%", &cwe_specs);
 
         // Debug: log prompt length and first 300 chars
         tracing::info!(
@@ -327,6 +340,47 @@ impl LlmAnalyzer {
                 Ok(Vec::new())
             }
         }
+    }
+
+    /// Retrieve relevant CWE specifications based on file path and code content
+    fn retrieve_cwe_specs(&self, file_path: &str, code_content: &str) -> String {
+        let kb = match &self.cwe_kb {
+            Some(kb) => kb,
+            None => return String::new(),
+        };
+
+        // Build query from file path and first 20 lines of code
+        let query_parts: Vec<String> = vec![
+            file_path.to_string(),
+            code_content.lines().take(20).collect::<Vec<_>>().join(" "),
+        ];
+        let query = query_parts.join(" ");
+
+        // Search for top-3 relevant CWE specifications
+        let results = kb.search(&query, 3);
+
+        if results.is_empty() {
+            return String::new();
+        }
+
+        // Format CWE specs as multi-line string
+        let mut formatted = String::new();
+        for (i, doc) in results.iter().enumerate() {
+            if i > 0 {
+                formatted.push_str("\n\n");
+            }
+            formatted.push_str(&format!("{}: {}\n", doc.cwe_id, doc.name));
+            formatted.push_str(&format!("Description: {}\n", doc.description));
+            if !doc.examples.is_empty() {
+                formatted.push_str("Examples:\n");
+                for example in &doc.examples {
+                    formatted.push_str(&format!("  - {}\n", example));
+                }
+            }
+            formatted.push_str(&format!("Mitigation: {}\n", doc.mitigation));
+        }
+
+        formatted
     }
 
     /// Truncate code to fit in context window

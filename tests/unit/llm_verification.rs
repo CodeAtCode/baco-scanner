@@ -3,7 +3,7 @@
 //! Tests cover: ExtendedVerificationPhase, verification logic, sanitization detection,
 //! false positive detection, confidence scoring, prompt templates, and report generation
 
-use baco::context::AnalysisContext;
+use baco::analysis_context::AnalysisContext;
 use baco::findings::{IssueCategory, SecurityIssue, Severity, VerificationStatus};
 use baco::llm_verification::{
     render_template, ExtendedVerificationPhase, VerificationReport, VerificationResult,
