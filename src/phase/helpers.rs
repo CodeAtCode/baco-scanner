@@ -50,6 +50,7 @@ pub fn create_test_finding(
         poc_format: None,
         llm_model: None,
         agent_mode: false,
+        statement_range: None,
     }
 }
 
@@ -90,6 +91,7 @@ pub fn create_finding_with_params(
         poc_format: None,
         llm_model: None,
         agent_mode: false,
+        statement_range: None,
     }
 }
 

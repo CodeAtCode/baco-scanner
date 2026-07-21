@@ -175,6 +175,7 @@ async fn test_phase_context_isolation() {
                     poc_format: None,
                     llm_model: None,
                     agent_mode: false,
+                    statement_range: None,
                 };
 
                 scanner.add_finding(finding.clone());
@@ -283,6 +284,7 @@ async fn test_report_generation_isolation() {
                         poc_format: None,
                         llm_model: None,
                         agent_mode: false,
+                        statement_range: None,
                     };
                     scanner.add_finding(finding);
                 }

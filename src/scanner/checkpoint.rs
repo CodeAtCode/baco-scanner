@@ -9,6 +9,8 @@ pub enum ScanPhase {
     Indexing,
     Semgrep,
     CweRouting,
+    // T3.1: CPG-guided slicing
+    CpgSlice,
     LlmStaticAnalysis,
     LlmDiscovery,
     LlmVerification,
@@ -27,6 +29,14 @@ pub enum ScanPhase {
     PocCompiler,
     VariantSearch,
     SecurityAgentVerification,
+    // T2.3: MoCQ LLM→semgrep rule synthesis phase
+    RuleSynthesis,
+    // T2.5: Six-phase orchestration (Cloudflare pattern)
+    Hunt,
+    Validate,
+    IndependentVerify,
+    // T3.2: Exploit synthesis with sandbox
+    ExploitSynth,
     Complete,
     Error,
 }
@@ -94,8 +104,13 @@ impl Checkpoint {
         Ok(match checkpoint.current_phase {
             ScanPhase::Indexing => ScanPhase::Semgrep,
             ScanPhase::Semgrep => ScanPhase::CweRouting,
-            ScanPhase::CweRouting => ScanPhase::LlmStaticAnalysis,
-            ScanPhase::LlmStaticAnalysis => ScanPhase::LlmDiscovery,
+            ScanPhase::CweRouting => ScanPhase::CpgSlice,
+            ScanPhase::CpgSlice => ScanPhase::LlmStaticAnalysis,
+            ScanPhase::LlmStaticAnalysis => ScanPhase::Hunt,
+            ScanPhase::Hunt => ScanPhase::Validate,
+            ScanPhase::Validate => ScanPhase::IndependentVerify,
+            ScanPhase::IndependentVerify => ScanPhase::ExploitSynth,
+            ScanPhase::ExploitSynth => ScanPhase::LlmDiscovery,
             ScanPhase::LlmDiscovery => ScanPhase::LlmVerification,
             ScanPhase::LlmVerification => ScanPhase::TicketCrossRef,
             ScanPhase::TicketCrossRef => ScanPhase::GitAnalysis,
@@ -111,7 +126,8 @@ impl Checkpoint {
             ScanPhase::CveBootstrap => ScanPhase::PocCompiler,
             ScanPhase::PocCompiler => ScanPhase::VariantSearch,
             ScanPhase::VariantSearch => ScanPhase::SecurityAgentVerification,
-            ScanPhase::SecurityAgentVerification => ScanPhase::Complete,
+            ScanPhase::SecurityAgentVerification => ScanPhase::RuleSynthesis,
+            ScanPhase::RuleSynthesis => ScanPhase::Complete,
             ScanPhase::Complete | ScanPhase::Error => ScanPhase::Indexing,
         })
     }
@@ -121,6 +137,7 @@ impl Checkpoint {
             ScanPhase::Indexing => "🔄 Indexing ⚙️".to_string(),
             ScanPhase::Semgrep => "🔍 Semgrep Static Analysis".to_string(),
             ScanPhase::CweRouting => "🎯 MoE CWE Routing".to_string(),
+            ScanPhase::CpgSlice => "✂️ CPG-guided Slicing".to_string(),
             ScanPhase::LlmStaticAnalysis => "🧠 LLM Static Analysis".to_string(),
             ScanPhase::LlmDiscovery => "🔎 LLM Discovery".to_string(),
             ScanPhase::LlmVerification => "✅ LLM Verification".to_string(),
@@ -138,6 +155,11 @@ impl Checkpoint {
             ScanPhase::PocCompiler => "💻 PoC Compiler".to_string(),
             ScanPhase::VariantSearch => "🔍 Variant Search".to_string(),
             ScanPhase::SecurityAgentVerification => "🤖 SecurityAgent Verification".to_string(),
+            ScanPhase::RuleSynthesis => "⚗️ Rule Synthesis".to_string(),
+            ScanPhase::Hunt => "🏹 Hunt Phase".to_string(),
+            ScanPhase::Validate => "🛡️ Validate Phase".to_string(),
+            ScanPhase::IndependentVerify => "🔍 Independent Verification".to_string(),
+            ScanPhase::ExploitSynth => "💉 Exploit Synthesis".to_string(),
             ScanPhase::Complete => "✨ Complete".to_string(),
             ScanPhase::Error => "❌ Error".to_string(),
         }
@@ -179,6 +201,7 @@ pub async fn save_checkpoint(
         ScanPhase::Indexing,
         ScanPhase::Semgrep,
         ScanPhase::CweRouting,
+        ScanPhase::CpgSlice,
         ScanPhase::LlmStaticAnalysis,
         ScanPhase::LlmDiscovery,
         ScanPhase::LlmVerification,
@@ -188,6 +211,15 @@ pub async fn save_checkpoint(
         ScanPhase::ConfidenceScoring,
         ScanPhase::AiAggregation,
         ScanPhase::Reporting,
+        ScanPhase::ThreatModeling,
+        ScanPhase::RootCauseDedup,
+        ScanPhase::MultiVerifier,
+        ScanPhase::AutoPatching,
+        ScanPhase::CveBootstrap,
+        ScanPhase::PocCompiler,
+        ScanPhase::VariantSearch,
+        ScanPhase::SecurityAgentVerification,
+        ScanPhase::RuleSynthesis,
     ];
 
     if let Some(pos) = all_phases.iter().position(|p| p == phase) {
@@ -463,8 +495,13 @@ mod tests {
         // Test all phase transitions explicitly
         let test_cases = vec![
             (ScanPhase::Indexing, ScanPhase::Semgrep),
-            (ScanPhase::Semgrep, ScanPhase::LlmStaticAnalysis),
-            (ScanPhase::LlmStaticAnalysis, ScanPhase::LlmDiscovery),
+            (ScanPhase::Semgrep, ScanPhase::CweRouting),
+            (ScanPhase::CweRouting, ScanPhase::CpgSlice),
+            (ScanPhase::CpgSlice, ScanPhase::LlmStaticAnalysis),
+            (ScanPhase::LlmStaticAnalysis, ScanPhase::Hunt),
+            (ScanPhase::Hunt, ScanPhase::Validate),
+            (ScanPhase::Validate, ScanPhase::IndependentVerify),
+            (ScanPhase::IndependentVerify, ScanPhase::LlmDiscovery),
             (ScanPhase::LlmDiscovery, ScanPhase::LlmVerification),
             (ScanPhase::LlmVerification, ScanPhase::TicketCrossRef),
             (ScanPhase::TicketCrossRef, ScanPhase::GitAnalysis),
@@ -483,7 +520,11 @@ mod tests {
                 ScanPhase::VariantSearch,
                 ScanPhase::SecurityAgentVerification,
             ),
-            (ScanPhase::SecurityAgentVerification, ScanPhase::Complete),
+            (
+                ScanPhase::SecurityAgentVerification,
+                ScanPhase::RuleSynthesis,
+            ),
+            (ScanPhase::RuleSynthesis, ScanPhase::Complete),
             (ScanPhase::Complete, ScanPhase::Indexing),
             (ScanPhase::Error, ScanPhase::Indexing),
         ];

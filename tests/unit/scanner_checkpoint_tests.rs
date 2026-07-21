@@ -46,6 +46,7 @@ fn create_test_finding() -> VulnerabilityFinding {
         poc_format: None,
         llm_model: None,
         agent_mode: false,
+        statement_range: None,
     }
 }
 
@@ -318,7 +319,7 @@ fn test_checkpoint_resume_from_semgrep() {
     checkpoint.save(&temp_path).unwrap();
 
     let next_phase = Checkpoint::resume_from(&temp_path).unwrap();
-    assert_eq!(next_phase, ScanPhase::LlmStaticAnalysis);
+    assert_eq!(next_phase, ScanPhase::CweRouting);
 
     let _ = fs::remove_file(&temp_path);
 }
@@ -355,8 +356,13 @@ fn test_checkpoint_resume_from_error() {
 fn test_checkpoint_resume_from_all_phases() {
     let test_cases = vec![
         (ScanPhase::Indexing, ScanPhase::Semgrep),
-        (ScanPhase::Semgrep, ScanPhase::LlmStaticAnalysis),
-        (ScanPhase::LlmStaticAnalysis, ScanPhase::LlmDiscovery),
+        (ScanPhase::Semgrep, ScanPhase::CweRouting),
+        (ScanPhase::CweRouting, ScanPhase::CpgSlice),
+        (ScanPhase::CpgSlice, ScanPhase::LlmStaticAnalysis),
+        (ScanPhase::LlmStaticAnalysis, ScanPhase::Hunt),
+        (ScanPhase::Hunt, ScanPhase::Validate),
+        (ScanPhase::Validate, ScanPhase::IndependentVerify),
+        (ScanPhase::IndependentVerify, ScanPhase::LlmDiscovery),
         (ScanPhase::LlmDiscovery, ScanPhase::LlmVerification),
         (ScanPhase::LlmVerification, ScanPhase::TicketCrossRef),
         (ScanPhase::TicketCrossRef, ScanPhase::GitAnalysis),
@@ -375,7 +381,11 @@ fn test_checkpoint_resume_from_all_phases() {
             ScanPhase::VariantSearch,
             ScanPhase::SecurityAgentVerification,
         ),
-        (ScanPhase::SecurityAgentVerification, ScanPhase::Complete),
+        (
+            ScanPhase::SecurityAgentVerification,
+            ScanPhase::RuleSynthesis,
+        ),
+        (ScanPhase::RuleSynthesis, ScanPhase::Complete),
         (ScanPhase::Complete, ScanPhase::Indexing),
         (ScanPhase::Error, ScanPhase::Indexing),
     ];

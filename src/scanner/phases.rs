@@ -1068,6 +1068,7 @@ Respond with ONLY JSON:
                             poc_format: None,
                             llm_model: None,
                             agent_mode: false,
+                            statement_range: None,
                         };
                         findings.push(finding);
                     }
@@ -1287,6 +1288,7 @@ mod tests {
             poc_format: None,
             llm_model: None,
             agent_mode: false,
+            statement_range: None,
         }
     }
 
@@ -1319,6 +1321,10 @@ mod tests {
             agent: AgentConfig::default(),
             router: crate::config::RouterConfig::default(),
             aggregation: crate::config::AggregationConfig::default(),
+            rulesynth: crate::config::RuleSynthConfig::default(),
+            orchestration: crate::config::OrchestrationConfig::default(),
+            normalization: crate::config::NormalizationConfig::default(),
+            cpg: crate::config::CpgConfig::default(),
         }
     }
 
@@ -2571,5 +2577,138 @@ mod tests {
         assert_eq!(result.0.len(), 1);
         assert_eq!(result.0[0].cwe_id, Some("CWE-89".to_string()));
         assert_eq!(result.0[0].sources.len(), 2);
+    }
+}
+
+// ============================================================================
+// T2.5 Six-Phase Orchestration (Cloudflare pattern)
+// ============================================================================
+
+/// Hunt phase: 7 parallel attack-class prompts
+mod hunt {
+    use crate::findings::VulnerabilityFinding;
+    use crate::llm::LlmClient;
+    use std::path::Path;
+
+    #[derive(Debug, Clone, Default)]
+    #[allow(dead_code)]
+    pub struct OrchestrationConfig {
+        pub enabled: bool,
+        pub hunt_classes: Vec<String>,
+        pub validate_batch_size: usize,
+        pub independent_verify: bool,
+    }
+
+    #[allow(dead_code)]
+    pub struct HuntPhase {
+        llm: LlmClient,
+        config: OrchestrationConfig,
+    }
+
+    impl HuntPhase {
+        #[allow(dead_code)]
+        pub fn new(llm: LlmClient, config: OrchestrationConfig) -> Self {
+            Self { llm, config }
+        }
+
+        #[allow(dead_code)]
+        pub async fn run(
+            &self,
+            _file: &Path,
+            _source: &str,
+        ) -> Result<Vec<VulnerabilityFinding>, String> {
+            if !self.config.enabled {
+                return Ok(Vec::new());
+            }
+
+            // Simplified: return empty findings for now
+            // Full implementation would run 7 parallel prompts
+            Ok(Vec::new())
+        }
+    }
+}
+
+/// Validate phase: adversarial self-check
+mod validate {
+    use crate::findings::VulnerabilityFinding;
+    use crate::llm::LlmClient;
+
+    #[derive(Debug, Clone, Default)]
+    #[allow(dead_code)]
+    pub struct OrchestrationConfig {
+        pub enabled: bool,
+        pub hunt_classes: Vec<String>,
+        pub validate_batch_size: usize,
+        pub independent_verify: bool,
+    }
+
+    #[allow(dead_code)]
+    pub struct ValidatePhase {
+        llm: LlmClient,
+        config: OrchestrationConfig,
+    }
+
+    impl ValidatePhase {
+        #[allow(dead_code)]
+        pub fn new(llm: LlmClient, config: OrchestrationConfig) -> Self {
+            Self { llm, config }
+        }
+
+        #[allow(dead_code)]
+        pub async fn run(
+            &self,
+            findings: &[VulnerabilityFinding],
+            _source: &str,
+        ) -> Result<Vec<VulnerabilityFinding>, String> {
+            if !self.config.enabled {
+                return Ok(findings.to_vec());
+            }
+
+            // Simplified: return findings unchanged for now
+            Ok(findings.to_vec())
+        }
+    }
+}
+
+/// IndependentVerify phase: fresh LLM call with no prior context
+mod independent_verify {
+    use crate::findings::VulnerabilityFinding;
+    use crate::llm::LlmClient;
+    use std::path::Path;
+
+    #[derive(Debug, Clone, Default)]
+    #[allow(dead_code)]
+    pub struct OrchestrationConfig {
+        pub enabled: bool,
+        pub hunt_classes: Vec<String>,
+        pub validate_batch_size: usize,
+        pub independent_verify: bool,
+    }
+
+    #[allow(dead_code)]
+    pub struct IndependentVerifyPhase {
+        llm: LlmClient,
+        config: OrchestrationConfig,
+    }
+
+    impl IndependentVerifyPhase {
+        #[allow(dead_code)]
+        pub fn new(llm: LlmClient, config: OrchestrationConfig) -> Self {
+            Self { llm, config }
+        }
+
+        #[allow(dead_code)]
+        pub async fn run(
+            &self,
+            _file: &Path,
+            _source: &str,
+        ) -> Result<Vec<VulnerabilityFinding>, String> {
+            if !self.config.enabled {
+                return Ok(Vec::new());
+            }
+
+            // Simplified: return empty findings for now
+            Ok(Vec::new())
+        }
     }
 }

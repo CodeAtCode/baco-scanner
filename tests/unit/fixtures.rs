@@ -96,6 +96,7 @@ pub fn create_test_finding(
         poc_format: None,
         llm_model: None,
         agent_mode: false,
+        statement_range: None,
     }
 }
 
@@ -150,6 +151,7 @@ pub fn create_finding_with_params(
         poc_format: None,
         llm_model: None,
         agent_mode: false,
+        statement_range: None,
     }
 }
 
@@ -195,6 +197,7 @@ pub fn create_minimal_finding() -> VulnerabilityFinding {
         poc_format: None,
         llm_model: None,
         agent_mode: false,
+        statement_range: None,
     }
 }
 
@@ -233,6 +236,7 @@ pub fn create_complete_finding() -> VulnerabilityFinding {
         poc_format: None,
         llm_model: Some("llama3.1".to_string()),
         agent_mode: false,
+        statement_range: None,
     }
 }
 
@@ -338,6 +342,7 @@ pub fn create_test_config() -> ScannerConfig {
                 indexing: Default::default(),
                 prompt_overrides: Default::default(),
             },
+            tgi: baco::config::TgiConfig::default(),
         },
         tickets: TicketConfig::default(),
         agent: AgentConfig {
@@ -346,6 +351,10 @@ pub fn create_test_config() -> ScannerConfig {
         },
         router: Default::default(),
         aggregation: Default::default(),
+        rulesynth: Default::default(),
+        orchestration: Default::default(),
+        normalization: Default::default(),
+        cpg: Default::default(),
     }
 }
 
@@ -387,6 +396,10 @@ pub fn create_minimal_config() -> ScannerConfig {
         tickets: TicketConfig::default(),
         router: Default::default(),
         aggregation: Default::default(),
+        rulesynth: Default::default(),
+        orchestration: Default::default(),
+        normalization: Default::default(),
+        cpg: Default::default(),
     }
 }
 

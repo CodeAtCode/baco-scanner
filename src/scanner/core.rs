@@ -186,11 +186,16 @@ mod tests {
                 retry_backoff_ms: 1000,
                 max_concurrent: 4,
                 phases: LlmPhasesConfig::default(),
+                tgi: crate::config::TgiConfig::default(),
             },
             tickets: crate::config::TicketConfig::default(),
             agent: crate::config::AgentConfig::default(),
             router: crate::config::RouterConfig::default(),
             aggregation: crate::config::AggregationConfig::default(),
+            rulesynth: crate::config::RuleSynthConfig::default(),
+            orchestration: crate::config::OrchestrationConfig::default(),
+            normalization: crate::config::NormalizationConfig::default(),
+            cpg: crate::config::CpgConfig::default(),
         }
     }
 
@@ -241,6 +246,7 @@ mod tests {
             poc_format: None,
             llm_model: None,
             agent_mode: false,
+            statement_range: None,
         }];
 
         let scanner =
@@ -298,6 +304,7 @@ mod tests {
             poc_format: None,
             llm_model: None,
             agent_mode: false,
+            statement_range: None,
         });
 
         assert_eq!(scanner.findings().len(), 1);
@@ -338,6 +345,7 @@ mod tests {
             poc_format: None,
             llm_model: None,
             agent_mode: false,
+            statement_range: None,
         });
 
         let findings = scanner.findings_mut();
@@ -380,6 +388,7 @@ mod tests {
             poc_format: None,
             llm_model: None,
             agent_mode: false,
+            statement_range: None,
         });
 
         assert_eq!(scanner.findings().len(), 1);
@@ -414,6 +423,7 @@ mod tests {
             poc_format: None,
             llm_model: None,
             agent_mode: false,
+            statement_range: None,
         }];
 
         scanner.update_findings(new_findings.clone());
@@ -529,6 +539,7 @@ mod tests {
             poc_format: None,
             llm_model: None,
             agent_mode: false,
+            statement_range: None,
         }];
 
         let multi_progress = MultiProgress::new();
@@ -580,6 +591,7 @@ mod tests {
                 poc_format: None,
                 llm_model: None,
                 agent_mode: false,
+                statement_range: None,
             })
             .collect();
 
@@ -632,6 +644,7 @@ mod tests {
                 poc_format: None,
                 llm_model: None,
                 agent_mode: false,
+                statement_range: None,
             })
             .collect();
 

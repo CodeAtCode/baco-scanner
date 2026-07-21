@@ -588,6 +588,7 @@ mod tests {
             poc_format: None,
             llm_model: None,
             agent_mode: false,
+            statement_range: None,
         }
     }
 
@@ -866,6 +867,7 @@ mod tests {
             mitigation_code: None,
             poc_code: None,
             poc_format: None,
+            statement_range: None,
         };
 
         // Create aggregation phase with mock LLM (will fail, triggering fallback)
@@ -921,6 +923,7 @@ mod tests {
             mitigation_code: None,
             poc_code: None,
             poc_format: None,
+            statement_range: None,
         };
 
         // Create aggregation phase with invalid LLM config (will fail, triggering fallback)

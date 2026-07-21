@@ -25,8 +25,9 @@ pub mod checkpoint;
 pub mod confidence;
 pub mod confidence_refinement;
 pub mod config;
+pub mod exploit;
 pub mod context; // Context extraction module
-
+pub mod cpg; // CPG-guided slicing (T3.1)
 pub mod crossfile;
 pub mod cve_bootstrap;
 pub mod cve_client;
@@ -52,6 +53,7 @@ pub mod report;
 pub mod retrieval;
 pub mod root_cause_dedup;
 pub mod router;
+pub mod rulesynth;
 pub mod scanner;
 pub mod scanner_types;
 pub mod semgrep;

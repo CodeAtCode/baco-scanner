@@ -316,6 +316,7 @@ fn test_finding_json_roundtrip_with_fixture_context() {
         poc_format: None,
         llm_model: Some("mock-model".to_string()),
         agent_mode: false,
+        statement_range: None,
     };
 
     let json = serde_json::to_string(&finding).unwrap();

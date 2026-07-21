@@ -61,6 +61,13 @@ thiserror = "1.0"
 tempfile = "3"
 regex = "1"
 
+# Tree-sitter for AST parsing
+tree-sitter = "0.26"
+tree-sitter-c = "0.23"
+tree-sitter-rust = "0.23"
+tree-sitter-python = "0.23"
+tree-sitter-javascript = "0.23"
+
 [dev-dependencies]
 mockall = "0.13"
 serial_test = "3"

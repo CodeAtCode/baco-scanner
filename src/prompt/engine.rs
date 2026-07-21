@@ -113,6 +113,10 @@ impl PromptEngine {
             BacoPhase::ConfidenceScoring => self.defaults.confidence_scoring.clone(),
             BacoPhase::AiAggregation => self.defaults.ai_aggregation.clone(),
             BacoPhase::Reporting => self.defaults.reporting.clone(),
+            // T2.5 six-phase orchestration - use discovery/verification defaults
+            BacoPhase::Hunt => self.defaults.llm_discovery.clone(),
+            BacoPhase::Validate => self.defaults.llm_verification.clone(),
+            BacoPhase::IndependentVerify => self.defaults.llm_discovery.clone(),
         };
 
         self.render(default_prompt)

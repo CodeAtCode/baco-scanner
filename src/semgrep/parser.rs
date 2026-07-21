@@ -186,6 +186,7 @@ pub fn parse_json_output(
                 poc_format: None,
                 llm_model: Some("semgrep".to_string()),
                 agent_mode: false,
+                statement_range: None,
             });
         } else {
             let first = &raw_findings[0];
@@ -257,6 +258,7 @@ pub fn parse_json_output(
                 poc_format: None,
                 llm_model: Some("semgrep".to_string()),
                 agent_mode: false,
+                statement_range: None,
             });
         }
     }

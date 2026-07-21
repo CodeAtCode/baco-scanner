@@ -95,6 +95,7 @@ mod tests {
             poc_format: None,
             llm_model: None,
             agent_mode: false,
+            statement_range: None,
         };
 
         let score = ConfidenceCalculator::calculate_composite(&mut finding);
@@ -133,6 +134,7 @@ mod tests {
             poc_format: None,
             llm_model: None,
             agent_mode: false,
+            statement_range: None,
         };
 
         let score = ConfidenceCalculator::calculate_composite(&mut finding);
@@ -170,6 +172,7 @@ mod tests {
             poc_format: None,
             llm_model: None,
             agent_mode: false,
+            statement_range: None,
         };
 
         ConfidenceCalculator::recalculate_priority(&mut finding);

@@ -48,6 +48,7 @@ fn create_test_finding(cwe_id: &str, severity: Severity) -> VulnerabilityFinding
         poc_format: None,
         llm_model: None,
         agent_mode: false,
+        statement_range: None,
     }
 }
 
@@ -91,6 +92,7 @@ fn create_test_finding_with_category(
         poc_format: None,
         llm_model: None,
         agent_mode: false,
+        statement_range: None,
     }
 }
 

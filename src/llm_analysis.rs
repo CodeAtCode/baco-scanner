@@ -520,6 +520,20 @@ impl LlmAnalyzer {
                             }
                         });
 
+                    // Parse statement_range from JSON: [start_line, end_line]
+                    let statement_range = item
+                        .get("statement_range")
+                        .and_then(|v| v.as_array())
+                        .and_then(|arr| {
+                            if arr.len() == 2 {
+                                let start = arr[0].as_i64()? as u32;
+                                let end = arr[1].as_i64()? as u32;
+                                Some((start, end))
+                            } else {
+                                None
+                            }
+                        });
+
                     // Generate recommendation based on vulnerability type
                     let recommendation = generate_recommendation(title, &description);
 
@@ -580,6 +594,7 @@ impl LlmAnalyzer {
                             Some(model_name.to_string())
                         },
                         agent_mode: false,
+                        statement_range,
                     });
                 }
             }

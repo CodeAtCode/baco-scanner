@@ -327,6 +327,7 @@ mod tests {
                 poc_format: None,
                 llm_model: None,
                 agent_mode: false,
+                statement_range: None,
             },
             VulnerabilityFinding {
                 id: "test-2".to_string(),
@@ -357,6 +358,7 @@ mod tests {
                 poc_format: None,
                 llm_model: None,
                 agent_mode: false,
+                statement_range: None,
             },
         ]
     }

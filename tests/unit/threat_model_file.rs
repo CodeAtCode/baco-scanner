@@ -60,6 +60,7 @@ fn create_mock_findings() -> Vec<VulnerabilityFinding> {
             poc_format: None,
             llm_model: None,
             agent_mode: false,
+            statement_range: None,
         },
         VulnerabilityFinding {
             id: "finding-2".to_string(),
@@ -90,6 +91,7 @@ fn create_mock_findings() -> Vec<VulnerabilityFinding> {
             poc_format: None,
             llm_model: None,
             agent_mode: false,
+            statement_range: None,
         },
         VulnerabilityFinding {
             id: "finding-3".to_string(),
@@ -120,6 +122,7 @@ fn create_mock_findings() -> Vec<VulnerabilityFinding> {
             poc_format: None,
             llm_model: None,
             agent_mode: false,
+            statement_range: None,
         },
         VulnerabilityFinding {
             id: "finding-4".to_string(),
@@ -150,6 +153,7 @@ fn create_mock_findings() -> Vec<VulnerabilityFinding> {
             poc_format: None,
             llm_model: None,
             agent_mode: false,
+            statement_range: None,
         },
     ]
 }
@@ -184,6 +188,7 @@ fn create_single_finding(severity: Severity, file_path: &str) -> Vec<Vulnerabili
         poc_format: None,
         llm_model: None,
         agent_mode: false,
+        statement_range: None,
     }]
 }
 
@@ -862,6 +867,7 @@ fn test_generate_with_special_characters_in_file_paths() {
         poc_format: None,
         llm_model: None,
         agent_mode: false,
+        statement_range: None,
     }];
 
     let tm = ThreatModelFile::generate(&ctx, &findings);
@@ -968,6 +974,7 @@ fn test_performance_generate_many_findings() {
             poc_format: None,
             llm_model: None,
             agent_mode: false,
+            statement_range: None,
         });
     }
 

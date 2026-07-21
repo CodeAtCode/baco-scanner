@@ -451,6 +451,7 @@ mod tests {
             poc_code: None,
             mitigation_code: None,
             poc_format: None,
+            statement_range: None,
         }
     }
 

@@ -108,6 +108,7 @@ fn make_seeded_finding(title: &str, file: &str) -> VulnerabilityFinding {
         poc_format: None,
         llm_model: None,
         agent_mode: false,
+        statement_range: None,
     }
 }
 

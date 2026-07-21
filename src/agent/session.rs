@@ -235,6 +235,7 @@ impl AgentSession {
                                     }
                                 },
                                 agent_mode: true,
+                                statement_range: None,
                             },
                             compile_path,
                             test_source_path,
@@ -635,6 +636,7 @@ mod tests {
             poc_format: None,
             llm_model: None,
             agent_mode: true,
+            statement_range: None,
         };
 
         let result = session.verify_finding("test.rs", &finding).await;
@@ -697,6 +699,7 @@ mod tests {
             poc_format: None,
             llm_model: None,
             agent_mode: true,
+            statement_range: None,
         };
 
         let result = session.verify_finding("test.rs", &finding).await;
@@ -917,6 +920,7 @@ mod tests {
             poc_format: None,
             llm_model: None,
             agent_mode: true,
+            statement_range: None,
         };
 
         let result = session.verify_finding("test.rs", &finding).await;
@@ -979,6 +983,7 @@ mod tests {
             poc_format: None,
             llm_model: None,
             agent_mode: true,
+            statement_range: None,
         };
 
         let result = session.verify_finding("test.rs", &finding).await;

@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-/// All 11 BACO phases
+/// All 11 BACO phases plus T2.5 six-phase orchestration
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum BacoPhase {
     Indexing,
@@ -17,6 +17,10 @@ pub enum BacoPhase {
     ConfidenceScoring,
     AiAggregation,
     Reporting,
+    // T2.5 six-phase orchestration
+    Hunt,
+    Validate,
+    IndependentVerify,
 }
 
 /// All project type categories
@@ -44,6 +48,10 @@ impl std::fmt::Display for BacoPhase {
             BacoPhase::ConfidenceScoring => write!(f, "confidence_scoring"),
             BacoPhase::AiAggregation => write!(f, "ai_aggregation"),
             BacoPhase::Reporting => write!(f, "reporting"),
+            // T2.5 six-phase orchestration
+            BacoPhase::Hunt => write!(f, "hunt"),
+            BacoPhase::Validate => write!(f, "validate"),
+            BacoPhase::IndependentVerify => write!(f, "independent_verify"),
         }
     }
 }
@@ -198,6 +206,7 @@ Return JSON array with format:
     "title": "short vulnerable code title",
     "description": "detailed vulnerability explanation",
     "line": line_number,
+    "statement_range": [start_line, end_line] - OPTIONAL: inclusive range of vulnerable statements, omit for function-level only
     "cwe_id": "MUST BE ONE OF: CWE-22 (path traversal), CWE-79 (XSS), CWE-89 (SQL injection), CWE-94 (code injection), CWE-476 (NULL pointer), CWE-611 (XXE), CWE-798 (hardcoded credentials)",
     "fix_code": "SECURE version of the vulnerable code - show how the code SHOULD be written",
     "recommendation": "fix suggestion"
@@ -493,12 +502,230 @@ pub fn get_default_prompt(phase: &BacoPhase, _project_type: &ProjectType) -> Str
         BacoPhase::ConfidenceScoring => defaults.confidence_scoring,
         BacoPhase::AiAggregation => defaults.ai_aggregation,
         BacoPhase::Reporting => defaults.reporting,
+        // T2.5 six-phase orchestration - use generic prompts
+        BacoPhase::Hunt => defaults.llm_discovery,
+        BacoPhase::Validate => defaults.llm_verification,
+        BacoPhase::IndependentVerify => defaults.llm_discovery,
     }
 }
 
 /// Get all default prompts
 pub fn get_all_defaults() -> DefaultPrompts {
     DefaultPrompts::default()
+}
+
+// ============================================================================
+// T2.5 Six-Phase Hunt Templates (Cloudflare pattern)
+// ============================================================================
+
+/// Injection hunt prompt (SQL, command, LDAP)
+pub fn injection_hunt_prompt(source: &str) -> String {
+    format!(
+        r#"HUNT FOR INJECTION VULNERABILITIES ONLY.
+
+Attack class: Injection (SQL injection, command injection, LDAP injection, etc.)
+Task: Analyze this code and report ONLY injection vulnerabilities.
+
+Return JSON array with format:
+[
+  {{
+    "severity": "critical|high|medium|low",
+    "title": "injection vulnerability title",
+    "description": "detailed explanation of the injection flaw",
+    "line": line_number,
+    "cwe_id": "CWE-XXX",
+    "confidence": 0.0-1.0
+  }}
+]
+
+CRITICAL: ONLY report injection vulnerabilities. Ignore all other attack classes.
+
+Code:
+```
+{}
+```"#,
+        source
+    )
+}
+
+/// Authentication/Authorization hunt prompt
+pub fn auth_hunt_prompt(source: &str) -> String {
+    format!(
+        r#"HUNT FOR AUTHENTICATION/AUTHORIZATION VULNERABILITIES ONLY.
+
+Attack class: Authentication/Authorization (bypass, privilege escalation, etc.)
+Task: Analyze this code and report ONLY auth-related vulnerabilities.
+
+Return JSON array with format:
+[
+  {{
+    "severity": "critical|high|medium|low",
+    "title": "auth vulnerability title",
+    "description": "detailed explanation of the auth flaw",
+    "line": line_number,
+    "cwe_id": "CWE-XXX",
+    "confidence": 0.0-1.0
+  }}
+]
+
+CRITICAL: ONLY report authentication/authorization vulnerabilities. Ignore all other attack classes.
+
+Code:
+```
+{}
+```"#,
+        source
+    )
+}
+
+/// XSS hunt prompt
+pub fn xss_hunt_prompt(source: &str) -> String {
+    format!(
+        r#"HUNT FOR XSS VULNERABILITIES ONLY.
+
+Attack class: Cross-Site Scripting (reflected, stored, DOM-based)
+Task: Analyze this code and report ONLY XSS vulnerabilities.
+
+Return JSON array with format:
+[
+  {{
+    "severity": "critical|high|medium|low",
+    "title": "XSS vulnerability title",
+    "description": "detailed explanation of the XSS flaw",
+    "line": line_number,
+    "cwe_id": "CWE-79",
+    "confidence": 0.0-1.0
+  }}
+]
+
+CRITICAL: ONLY report XSS vulnerabilities. Ignore all other attack classes.
+
+Code:
+```
+{}
+```"#,
+        source
+    )
+}
+
+/// Path traversal/SSRF hunt prompt
+pub fn path_traversal_hunt_prompt(source: &str) -> String {
+    format!(
+        r#"HUNT FOR PATH TRAVERSAL/SSRF VULNERABILITIES ONLY.
+
+Attack class: Path Traversal / Server-Side Request Forgery
+Task: Analyze this code and report ONLY path traversal or SSRF vulnerabilities.
+
+Return JSON array with format:
+[
+  {{
+    "severity": "critical|high|medium|low",
+    "title": "path traversal/SSRF vulnerability title",
+    "description": "detailed explanation of the flaw",
+    "line": line_number,
+    "cwe_id": "CWE-22",
+    "confidence": 0.0-1.0
+  }}
+]
+
+CRITICAL: ONLY report path traversal or SSRF vulnerabilities. Ignore all other attack classes.
+
+Code:
+```
+{}
+```"#,
+        source
+    )
+}
+
+/// Cryptographic weakness hunt prompt
+pub fn crypto_hunt_prompt(source: &str) -> String {
+    format!(
+        r#"HUNT FOR CRYPTOGRAPHIC VULNERABILITIES ONLY.
+
+Attack class: Cryptographic Weakness (weak algo, hardcoded keys, predictable randomness)
+Task: Analyze this code and report ONLY cryptographic vulnerabilities.
+
+Return JSON array with format:
+[
+  {{
+    "severity": "critical|high|medium|low",
+    "title": "crypto vulnerability title",
+    "description": "detailed explanation of the crypto flaw",
+    "line": line_number,
+    "cwe_id": "CWE-XXX",
+    "confidence": 0.0-1.0
+  }}
+]
+
+CRITICAL: ONLY report cryptographic vulnerabilities. Ignore all other attack classes.
+
+Code:
+```
+{}
+```"#,
+        source
+    )
+}
+
+/// Resource handling hunt prompt
+pub fn resource_hunt_prompt(source: &str) -> String {
+    format!(
+        r#"HUNT FOR RESOURCE HANDLING VULNERABILITIES ONLY.
+
+Attack class: Resource Handling (memory safety, integer overflow, DoS)
+Task: Analyze this code and report ONLY resource handling vulnerabilities.
+
+Return JSON array with format:
+[
+  {{
+    "severity": "critical|high|medium|low",
+    "title": "resource handling vulnerability title",
+    "description": "detailed explanation of the flaw",
+    "line": line_number,
+    "cwe_id": "CWE-XXX",
+    "confidence": 0.0-1.0
+  }}
+]
+
+CRITICAL: ONLY report resource handling vulnerabilities. Ignore all other attack classes.
+
+Code:
+```
+{}
+```"#,
+        source
+    )
+}
+
+/// Deserialization/config hunt prompt
+pub fn deserialization_hunt_prompt(source: &str) -> String {
+    format!(
+        r#"HUNT FOR INSECURE DESERIALIZATION/CONFIG VULNERABILITIES ONLY.
+
+Attack class: Insecure Deserialization / Configuration
+Task: Analyze this code and report ONLY deserialization or config vulnerabilities.
+
+Return JSON array with format:
+[
+  {{
+    "severity": "critical|high|medium|low",
+    "title": "deserialization/config vulnerability title",
+    "description": "detailed explanation of the flaw",
+    "line": line_number,
+    "cwe_id": "CWE-XXX",
+    "confidence": 0.0-1.0
+  }}
+]
+
+CRITICAL: ONLY report deserialization or configuration vulnerabilities. Ignore all other attack classes.
+
+Code:
+```
+{}
+```"#,
+        source
+    )
 }
 
 #[cfg(test)]

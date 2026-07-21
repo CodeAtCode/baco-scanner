@@ -386,6 +386,7 @@ fn format_phase(phase: &baco::checkpoint::ScanPhase) -> String {
         baco::checkpoint::ScanPhase::TicketCrossRef => ("Ticket Cross-Ref 🎫", 5),
         baco::checkpoint::ScanPhase::GitAnalysis => ("Git Analysis 📊", 6),
         baco::checkpoint::ScanPhase::CrossFileAnalysis => ("Cross-File Analysis 🔗", 7),
+        baco::checkpoint::ScanPhase::CpgSlice => ("CPG Slicing ✂️", 7),
         baco::checkpoint::ScanPhase::ConfidenceScoring => ("Confidence Scoring ⚖️", 8),
         baco::checkpoint::ScanPhase::AiAggregation => ("AI Aggregation 🤖", 9),
         baco::checkpoint::ScanPhase::Reporting => ("Reporting 📝", 10),
@@ -399,6 +400,10 @@ fn format_phase(phase: &baco::checkpoint::ScanPhase) -> String {
         baco::checkpoint::ScanPhase::SecurityAgentVerification => {
             ("SecurityAgent Verification 🤖", 20)
         }
+        baco::checkpoint::ScanPhase::RuleSynthesis => ("Rule Synthesis ⚗️", 21),
+        baco::checkpoint::ScanPhase::Hunt => ("Hunt 🏹", 22),
+        baco::checkpoint::ScanPhase::Validate => ("Validate 🛡️", 23),
+        baco::checkpoint::ScanPhase::IndependentVerify => ("Independent Verify 🔍", 24),
         baco::checkpoint::ScanPhase::Complete => ("Complete ✨", 15),
         baco::checkpoint::ScanPhase::Error => ("Error ❌", 16),
     };

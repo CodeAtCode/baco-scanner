@@ -125,6 +125,7 @@ mod tests {
             poc_format: None,
             llm_model: None,
             agent_mode: false,
+            statement_range: None,
         }
     }
 
@@ -156,6 +157,10 @@ mod tests {
             tickets: crate::config::TicketConfig { systems: vec![] },
             router: crate::config::RouterConfig::default(),
             aggregation: crate::config::AggregationConfig::default(),
+            rulesynth: crate::config::RuleSynthConfig::default(),
+            orchestration: crate::config::OrchestrationConfig::default(),
+            normalization: crate::config::NormalizationConfig::default(),
+            cpg: crate::config::CpgConfig::default(),
         }
     }
 
@@ -181,11 +186,15 @@ mod tests {
             ScanPhase::PocCompiler,
             ScanPhase::VariantSearch,
             ScanPhase::SecurityAgentVerification,
+            ScanPhase::RuleSynthesis,
+            ScanPhase::Hunt,
+            ScanPhase::Validate,
+            ScanPhase::IndependentVerify,
             ScanPhase::Complete,
             ScanPhase::Error,
         ];
 
-        assert_eq!(phases.len(), 21);
+        assert_eq!(phases.len(), 25);
     }
 
     #[test]

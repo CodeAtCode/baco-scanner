@@ -23,6 +23,16 @@ pub struct ScannerConfig {
     pub router: RouterConfig,
     #[serde(default)]
     pub aggregation: AggregationConfig,
+    #[serde(default)]
+    pub rulesynth: RuleSynthConfig,
+    #[serde(default)]
+    pub orchestration: OrchestrationConfig,
+    #[serde(default)]
+    pub normalization: NormalizationConfig,
+    #[serde(default)]
+    pub cpg: CpgConfig,
+    #[serde(default)]
+    pub exploit: ExploitConfig,
 }
 
 /// Config error with field path and TOML location information
@@ -291,6 +301,8 @@ pub struct LlmConfig {
     pub max_concurrent: usize,
     #[serde(default)]
     pub phases: LlmPhasesConfig,
+    #[serde(default)]
+    pub tgi: TgiConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -460,8 +472,44 @@ pub struct AggregationConfig {
     pub fp_store_path: Option<PathBuf>,
 }
 
+/// Rule synthesis configuration (MoCQ: LLM→semgrep rule generation)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RuleSynthConfig {
+    /// Whether rule synthesis is enabled
+    #[serde(default = "default_false")]
+    pub enabled: bool,
+    /// Output directory for generated rules
+    #[serde(default = "default_rulesynth_output_dir")]
+    pub output_dir: PathBuf,
+    /// Maximum rules to generate per CWE
+    #[serde(default = "default_max_rules_per_cwe")]
+    pub max_rules_per_cwe: usize,
+}
+
+impl Default for RuleSynthConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            output_dir: default_rulesynth_output_dir(),
+            max_rules_per_cwe: default_max_rules_per_cwe(),
+        }
+    }
+}
+
 fn default_max_parallel_tasks() -> usize {
     4
+}
+
+fn default_false() -> bool {
+    false
+}
+
+fn default_rulesynth_output_dir() -> PathBuf {
+    PathBuf::from("./output/generated_rules")
+}
+
+fn default_max_rules_per_cwe() -> usize {
+    5
 }
 
 fn default_enable_file_filtering() -> bool {
@@ -506,6 +554,158 @@ fn default_enable_cve_bootstrap() -> bool {
 
 fn default_enable_variant_search() -> bool {
     true
+}
+
+/// Orchestration configuration for T2.5 six-phase pipeline
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OrchestrationConfig {
+    /// Whether orchestration is enabled
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// Hunt classes to run (default: all 7 Cloudflare classes)
+    #[serde(default)]
+    pub hunt_classes: Vec<String>,
+    /// Batch size for validation phase
+    #[serde(default = "default_validate_batch_size")]
+    pub validate_batch_size: usize,
+    /// Whether independent verification is enabled
+    #[serde(default = "default_true")]
+    pub independent_verify: bool,
+}
+
+impl Default for OrchestrationConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            hunt_classes: vec![
+                "injection".into(),
+                "auth".into(),
+                "xss".into(),
+                "path_traversal".into(),
+                "crypto".into(),
+                "resource".into(),
+                "deserialization".into(),
+            ],
+            validate_batch_size: 10,
+            independent_verify: true,
+        }
+    }
+}
+
+fn default_validate_batch_size() -> usize {
+    10
+}
+
+/// Normalization tier for confidence calibration.
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, PartialEq, Default)]
+pub enum NormalizationTier {
+    /// No normalization — raw confidence scores.
+    #[default]
+    None,
+    /// Normalize relative to project's historical FP rate.
+    ProjectRelative,
+    /// Normalize using isotonic regression on past triage outcomes.
+    Isotonic,
+}
+
+/// Configuration for confidence normalization.
+/// TGI (Text Generation Inference) configuration for specialized reasoning LLMs
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct TgiConfig {
+    /// Whether TGI is enabled
+    pub enabled: bool,
+    /// TGI server endpoint URL
+    pub endpoint: String,
+    /// Model name to serve
+    pub model: String,
+    /// Maximum new tokens to generate
+    pub max_new_tokens: usize,
+    /// Sampling temperature
+    pub temperature: f32,
+    /// Request timeout in seconds
+    pub timeout_secs: u64,
+    /// Whether to use sampling (vs greedy decoding)
+    pub do_sample: bool,
+}
+
+impl Default for TgiConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            endpoint: "http://localhost:8080".to_string(),
+            model: String::new(),
+            max_new_tokens: 2048,
+            temperature: 0.1,
+            timeout_secs: 120,
+            do_sample: true,
+        }
+    }
+}
+
+/// Configuration for confidence normalization.
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct NormalizationConfig {
+    /// Whether normalization is enabled.
+    pub enabled: bool,
+    /// Normalization tier to use.
+    pub normalization_tier: NormalizationTier,
+    /// Path to project baseline file.
+    pub project_baseline_path: Option<PathBuf>,
+}
+
+impl Default for NormalizationConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            normalization_tier: NormalizationTier::None,
+            project_baseline_path: None,
+        }
+    }
+}
+
+/// Configuration for CPG-guided slicing (T3.1)
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct CpgConfig {
+    /// Whether CPG slicing is enabled
+    pub enabled: bool,
+    /// Path to Joern binary (None = search PATH)
+    pub joern_path: Option<PathBuf>,
+    /// Maximum lines to include in a slice
+    pub slice_budget_lines: usize,
+}
+
+impl Default for CpgConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            joern_path: None,
+            slice_budget_lines: 200,
+        }
+    }
+}
+
+/// Configuration for exploit synthesis (T3.2)
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct ExploitConfig {
+    /// Whether exploit synthesis is enabled
+    pub enabled: bool,
+    /// Docker image for sandboxed exploit execution
+    pub sandbox_image: String,
+    /// Timeout for exploit execution in seconds
+    pub timeout_secs: u64,
+    /// Maximum number of exploit attempts per finding
+    pub max_exploits_per_finding: usize,
+}
+
+impl Default for ExploitConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            sandbox_image: "python:3.11-slim".to_string(),
+            timeout_secs: 30,
+            max_exploits_per_finding: 1,
+        }
+    }
 }
 
 fn load_env_api_keys() -> HashMap<String, Option<String>> {

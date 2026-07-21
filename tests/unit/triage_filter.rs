@@ -61,6 +61,7 @@ fn create_test_finding(title: &str, code: Option<&str>) -> VulnerabilityFinding 
         poc_format: None,
         llm_model: None,
         agent_mode: false,
+        statement_range: None,
     }
 }
 

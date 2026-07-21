@@ -5,6 +5,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
+mod tgi;
+pub use tgi::{CompletionOptions, TgiClient};
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LlmConfig {
     pub base_url: String,
@@ -122,6 +125,7 @@ pub struct LlmClient {
     config: LlmConfig,
     model_selector: Option<Arc<ModelSelector>>,
     metrics_tracker: Option<LlmMetricsTracker>,
+    tgi_client: Option<TgiClient>,
 }
 
 impl LlmClient {
@@ -146,7 +150,27 @@ impl LlmClient {
             config,
             model_selector,
             metrics_tracker: tracker,
+            tgi_client: None,
         }
+    }
+
+    /// Attach a TGI client for specialized reasoning tasks
+    pub fn with_tgi(mut self, config: &crate::config::TgiConfig) -> Result<Self, String> {
+        if config.enabled {
+            self.tgi_client = Some(TgiClient::new(config)?);
+        }
+        Ok(self)
+    }
+
+    /// Complete a prompt via TGI if available
+    pub async fn complete_via_tgi(&self, prompt: &str) -> Option<Result<String, String>> {
+        let client = self.tgi_client.as_ref()?;
+        Some(client.complete(prompt).await)
+    }
+
+    /// Check if TGI client is available and healthy
+    pub fn tgi_is_available(&self) -> bool {
+        self.tgi_client.as_ref().is_some_and(|c| c.is_available())
     }
 
     /// Get current model (uses round-robin if multiple models configured)

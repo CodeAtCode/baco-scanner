@@ -5,6 +5,17 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::time::{Duration, Instant};
 
+/// Error type for sandbox operations
+#[derive(Debug, thiserror::Error)]
+pub enum SandboxError {
+    #[error("Docker unavailable: {0}")]
+    DockerUnavailable(String),
+    #[error("Runtime error: {0}")]
+    RuntimeError(String),
+    #[error("Timeout after {0}s")]
+    Timeout(u64),
+}
+
 pub struct ToolSandbox {
     temp_dir: PathBuf,
     timeout_secs: u64,

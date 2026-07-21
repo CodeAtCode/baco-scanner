@@ -166,6 +166,10 @@ pub struct VulnerabilityFinding {
     /// Whether agent mode was used for this finding
     #[serde(default)]
     pub agent_mode: bool,
+    /// Statement-level localization: (start_line, end_line) of vulnerable statements
+    /// None means function-level only (backward compatible)
+    #[serde(default)]
+    pub statement_range: Option<(u32, u32)>,
 }
 
 impl VulnerabilityFinding {
@@ -279,6 +283,7 @@ mod tests {
             poc_format: Some("python".to_string()),
             llm_model: None,
             agent_mode: false,
+            statement_range: None,
         };
 
         let json = serde_json::to_string(&finding).unwrap();
@@ -323,6 +328,7 @@ mod tests {
             poc_format: None,
             llm_model: None,
             agent_mode: false,
+            statement_range: None,
         };
 
         let finding2 = VulnerabilityFinding {
@@ -354,6 +360,7 @@ mod tests {
             poc_format: None,
             llm_model: None,
             agent_mode: false,
+            statement_range: None,
         };
 
         merger.merge(vec![finding1]);
