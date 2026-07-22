@@ -502,4 +502,55 @@ This is the body content.
         let result = ThreatModelFile::parse(content);
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_parse_empty_content() {
+        let result = ThreatModelFile::parse("");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_with_empty_body() {
+        let content = r#"---
+version: "1.0"
+generated_at: "2024-01-01T00:00:00Z"
+project_type: web
+total_threats: 0
+high_risk_areas: []
+---
+
+"#;
+
+        let tm = ThreatModelFile::parse(content).unwrap();
+        assert_eq!(tm.frontmatter.total_threats, 0);
+        assert!(tm.body.is_empty());
+    }
+
+    #[test]
+    fn test_generate_markdown_empty_findings() {
+        let ctx = mock_context();
+        let findings: Vec<crate::findings::VulnerabilityFinding> = vec![];
+
+        let tm = ThreatModelFile::generate(&ctx, &findings);
+
+        assert!(tm.body.contains("Findings Summary"));
+        assert!(tm.body.contains("Total findings: 0"));
+        assert!(tm.body.contains("Recommendations"));
+    }
+
+    #[test]
+    fn test_baco_dir_path() {
+        use tempfile::tempdir;
+        let tmp_dir = tempdir().unwrap();
+        let baco = ThreatModelFile::baco_dir(tmp_dir.path()).unwrap();
+        assert!(baco.ends_with(".baco"));
+    }
+
+    #[test]
+    fn test_threat_model_path() {
+        use tempfile::tempdir;
+        let tmp_dir = tempdir().unwrap();
+        let tm_path = ThreatModelFile::threat_model_path(tmp_dir.path()).unwrap();
+        assert!(tm_path.ends_with(".baco/threat_model.md"));
+    }
 }

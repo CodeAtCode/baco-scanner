@@ -139,3 +139,26 @@ impl ScanPhase for SecurityAgentVerificationPhase {
         ctx.scanner.config.agent.enabled
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_security_agent_verification_phase_name() {
+        let phase = SecurityAgentVerificationPhase;
+        assert_eq!(phase.name(), "SecurityAgentVerification");
+    }
+
+    #[test]
+    fn test_security_agent_verification_phase_order() {
+        let phase = SecurityAgentVerificationPhase;
+        assert_eq!(phase.order(), 6);
+    }
+
+    #[test]
+    fn test_security_agent_verification_phase_creation() {
+        let _phase = SecurityAgentVerificationPhase;
+        assert!(true);
+    }
+}

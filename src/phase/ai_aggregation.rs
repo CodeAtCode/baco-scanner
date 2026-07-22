@@ -102,3 +102,101 @@ impl ScanPhase for AiAggregationPhase {
         true
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::ScannerConfig;
+    use crate::findings::Severity;
+    use crate::scanner::Scanner;
+    use tempfile::TempDir;
+
+    fn create_test_scanner() -> (Scanner, TempDir) {
+        let temp_dir = TempDir::new().unwrap();
+        let config = ScannerConfig::default();
+        let scanner = Scanner::new(config, temp_dir.path().to_path_buf(), false);
+        (scanner, temp_dir)
+    }
+
+    #[test]
+    fn test_ai_aggregation_phase_creation() {
+        let phase = AiAggregationPhase;
+        assert_eq!(phase.name(), "AiAggregation");
+        assert_eq!(phase.order(), 10);
+    }
+
+    #[test]
+    fn test_is_enabled_always_true() {
+        let (scanner, _temp) = create_test_scanner();
+        let analyzed_files = Vec::new();
+        let ctx = PhaseContext {
+            scanner: Box::leak(Box::new(scanner)),
+            analyzed_files: Box::leak(Box::new(analyzed_files)),
+        };
+        let phase = AiAggregationPhase;
+        assert!(phase.is_enabled(&ctx));
+    }
+
+    #[tokio::test]
+    async fn test_execute_with_empty_findings() {
+        let (scanner, _temp) = create_test_scanner();
+        let analyzed_files = Vec::new();
+        let mut ctx = PhaseContext {
+            scanner: Box::leak(Box::new(scanner)),
+            analyzed_files: Box::leak(Box::new(analyzed_files)),
+        };
+        let phase = AiAggregationPhase;
+        let result = phase.execute(&mut ctx).await;
+        assert!(result.is_ok());
+        let findings = result.unwrap();
+        assert!(findings.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_execute_without_api_key() {
+        let (scanner, _temp) = create_test_scanner();
+        scanner.state.send_modify(|s| {
+            s.findings.push(VulnerabilityFinding {
+                id: "test-1".to_string(),
+                title: "Test vulnerability".to_string(),
+                description: "Test description".to_string(),
+                severity: Severity::High,
+                confidence_score: 0.5,
+                cwe_id: Some("CWE-79".to_string()),
+                file_path: "test.c".to_string(),
+                line_number: Some(10),
+                code_snippet: None,
+                diff_hunk: None,
+                recommendation: None,
+                code_location: None,
+                already_reported: false,
+                sources: vec!["test".to_string()],
+                commit_reference: None,
+                ticket_reference: None,
+                priority_score: None,
+                cross_file_references: None,
+                verification_status: None,
+                verification_notes: None,
+                verification_error: None,
+                agent_evidence_path: None,
+                security_issue: None,
+                poc_code: None,
+                mitigation_code: None,
+                poc_format: None,
+                llm_model: None,
+                agent_mode: false,
+                statement_range: None,
+            });
+        });
+        let analyzed_files = Vec::new();
+        let mut ctx = PhaseContext {
+            scanner: Box::leak(Box::new(scanner)),
+            analyzed_files: Box::leak(Box::new(analyzed_files)),
+        };
+        let phase = AiAggregationPhase;
+        let result = phase.execute(&mut ctx).await;
+        assert!(result.is_ok());
+        let findings = result.unwrap();
+        assert_eq!(findings.len(), 1);
+    }
+}

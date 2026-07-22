@@ -451,13 +451,22 @@ pub struct RouterConfig {
 }
 
 /// Prompt specification for router overrides
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PromptSpec {
     /// The prompt template name to use
     #[serde(default = "default_llm_static_analysis")]
     pub prompt_template: String,
     /// Optional model override for this prompt
     pub model_override: Option<String>,
+}
+
+impl Default for PromptSpec {
+    fn default() -> Self {
+        Self {
+            prompt_template: default_llm_static_analysis(),
+            model_override: None,
+        }
+    }
 }
 
 fn default_llm_static_analysis() -> String {

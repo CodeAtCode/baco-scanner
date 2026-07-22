@@ -169,3 +169,187 @@ impl From<&str> for ScanError {
 
 /// Type alias for Result with ScanError
 pub type ScanResult<T> = Result<T, ScanError>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_scan_error_missing_env_var() {
+        let err = ScanError::MissingEnvVar("API_KEY".to_string());
+        let display = format!("{}", err);
+        assert!(display.contains("Missing required environment variable"));
+        assert!(display.contains("API_KEY"));
+    }
+
+    #[test]
+    fn test_scan_error_config_error() {
+        let err = ScanError::ConfigError("invalid config".to_string());
+        let display = format!("{}", err);
+        assert!(display.contains("Configuration error"));
+        assert!(display.contains("invalid config"));
+    }
+
+    #[test]
+    fn test_scan_error_llm_error() {
+        let err = ScanError::Llm(LlmError::ApiCall("connection failed".to_string()));
+        let display = format!("{}", err);
+        assert!(display.contains("LLM error"));
+    }
+
+    #[test]
+    fn test_scan_error_semgrep_error() {
+        let err = ScanError::Semgrep(SemgrepError::NotFound("semgrep not in PATH".to_string()));
+        let display = format!("{}", err);
+        assert!(display.contains("Semgrep error"));
+    }
+
+    #[test]
+    fn test_scan_error_phase_error() {
+        let phase_err = PhaseError::Indexing("failed to index".to_string());
+        let err = ScanError::Phase {
+            phase: "Indexing".to_string(),
+            source: phase_err,
+        };
+        let display = format!("{}", err);
+        assert!(display.contains("Phase execution failed"));
+        assert!(display.contains("Indexing"));
+    }
+
+    #[test]
+    fn test_scan_error_from_string() {
+        let err: ScanError = "something went wrong".into();
+        match err {
+            ScanError::Unknown(msg) => assert_eq!(msg, "something went wrong"),
+            _ => panic!("Expected Unknown variant"),
+        }
+    }
+
+    #[test]
+    fn test_scan_error_from_str() {
+        let err: ScanError = "error message".into();
+        match err {
+            ScanError::Unknown(msg) => assert_eq!(msg, "error message"),
+            _ => panic!("Expected Unknown variant"),
+        }
+    }
+
+    #[test]
+    fn test_llm_error_display() {
+        let err = LlmError::Timeout("request timed out".to_string());
+        let display = format!("{}", err);
+        assert!(display.contains("Timeout"));
+        assert!(display.contains("request timed out"));
+    }
+
+    #[test]
+    fn test_llm_error_authentication() {
+        let err = LlmError::Authentication("invalid API key".to_string());
+        let display = format!("{}", err);
+        assert!(display.contains("Authentication failed"));
+    }
+
+    #[test]
+    fn test_semgrep_error_execution() {
+        let err = SemgrepError::Execution("semgrep exited with error".to_string());
+        let display = format!("{}", err);
+        assert!(display.contains("Semgrep execution failed"));
+    }
+
+    #[test]
+    fn test_semgrep_error_json_parse() {
+        let err = SemgrepError::JsonParse("invalid JSON".to_string());
+        let display = format!("{}", err);
+        assert!(display.contains("JSON parse error"));
+    }
+
+    #[test]
+    fn test_phase_error_indexing() {
+        let err = PhaseError::Indexing("indexing failed".to_string());
+        let display = format!("{}", err);
+        assert!(display.contains("Indexing failed"));
+    }
+
+    #[test]
+    fn test_phase_error_llm_analysis() {
+        let err = PhaseError::LlmAnalysis("LLM analysis failed".to_string());
+        let display = format!("{}", err);
+        assert!(display.contains("LLM analysis failed"));
+    }
+
+    #[test]
+    fn test_phase_error_git_analysis() {
+        let err = PhaseError::GitAnalysis("git operation failed".to_string());
+        let display = format!("{}", err);
+        assert!(display.contains("Git analysis failed"));
+    }
+
+    #[test]
+    fn test_phase_error_confidence_scoring() {
+        let err = PhaseError::ConfidenceScoring("calculation failed".to_string());
+        let display = format!("{}", err);
+        assert!(display.contains("Confidence scoring failed"));
+    }
+
+    #[test]
+    fn test_phase_error_from() {
+        let phase_err = PhaseError::Reporting("report failed".to_string());
+        let scan_err: ScanError = phase_err.into();
+        match scan_err {
+            ScanError::Phase { phase, source } => {
+                assert!(phase.is_empty());
+                match source {
+                    PhaseError::Reporting(msg) => assert_eq!(msg, "report failed"),
+                    _ => panic!("Expected Reporting variant"),
+                }
+            }
+            _ => panic!("Expected Phase variant"),
+        }
+    }
+
+    #[test]
+    fn test_scan_error_debug() {
+        let err = ScanError::Validation("invalid value".to_string());
+        let debug = format!("{:?}", err);
+        assert!(debug.contains("Validation"));
+    }
+
+    #[test]
+    fn test_scan_error_is_error() {
+        let err = ScanError::Unknown("test".to_string());
+        let _: &dyn std::error::Error = &err;
+    }
+
+    #[test]
+    fn test_phase_error_is_error() {
+        let err = PhaseError::Context("context error".to_string());
+        let _: &dyn std::error::Error = &err;
+    }
+
+    #[test]
+    fn test_llm_error_is_error() {
+        let err = LlmError::Model("model not found".to_string());
+        let _: &dyn std::error::Error = &err;
+    }
+
+    #[test]
+    fn test_semgrep_error_is_error() {
+        let err = SemgrepError::Cache("cache error".to_string());
+        let _: &dyn std::error::Error = &err;
+    }
+
+    #[test]
+    fn test_scan_result_type_alias() {
+        let result: ScanResult<String> = Ok("success".to_string());
+        match result {
+            Ok(s) => assert_eq!(s, "success"),
+            Err(_) => panic!("Expected Ok"),
+        }
+
+        let result: ScanResult<String> = Err(ScanError::Unknown("error".to_string()));
+        match result {
+            Ok(_) => panic!("Expected Err"),
+            Err(e) => assert_eq!(e.to_string(), "Unknown error: error"),
+        }
+    }
+}

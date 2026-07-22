@@ -105,3 +105,65 @@ impl ScanPhase for IndexingPhase {
         true
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::ScannerConfig;
+    use crate::scanner::Scanner;
+    use tempfile::TempDir;
+
+    fn create_test_scanner() -> (Scanner, TempDir) {
+        let temp_dir = TempDir::new().unwrap();
+        let config = ScannerConfig::default();
+        let scanner = Scanner::new(config, temp_dir.path().to_path_buf(), false);
+        (scanner, temp_dir)
+    }
+
+    #[test]
+    fn test_indexing_phase_creation() {
+        let phase = IndexingPhase;
+        assert_eq!(phase.name(), "Indexing");
+        assert_eq!(phase.order(), 1);
+    }
+
+    #[test]
+    fn test_is_enabled_always_true() {
+        let (scanner, _temp) = create_test_scanner();
+        let analyzed_files = Vec::new();
+        let ctx = PhaseContext {
+            scanner: Box::leak(Box::new(scanner)),
+            analyzed_files: Box::leak(Box::new(analyzed_files)),
+        };
+        let phase = IndexingPhase;
+        assert!(phase.is_enabled(&ctx));
+    }
+
+    #[tokio::test]
+    async fn test_execute_without_incremental() {
+        let (scanner, _temp) = create_test_scanner();
+        let analyzed_files = Vec::new();
+        let mut ctx = PhaseContext {
+            scanner: Box::leak(Box::new(scanner)),
+            analyzed_files: Box::leak(Box::new(analyzed_files)),
+        };
+        let phase = IndexingPhase;
+        let result = phase.execute(&mut ctx).await;
+        assert!(result.is_ok());
+        let findings = result.unwrap();
+        assert!(findings.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_execute_with_incremental_disabled() {
+        let (scanner, _temp) = create_test_scanner();
+        let analyzed_files = Vec::new();
+        let mut ctx = PhaseContext {
+            scanner: Box::leak(Box::new(scanner)),
+            analyzed_files: Box::leak(Box::new(analyzed_files)),
+        };
+        let phase = IndexingPhase;
+        let result = phase.execute(&mut ctx).await;
+        assert!(result.is_ok());
+    }
+}

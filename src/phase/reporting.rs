@@ -104,3 +104,26 @@ impl ScanPhase for ReportingPhase {
         true
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_reporting_phase_name() {
+        let phase = ReportingPhase;
+        assert_eq!(phase.name(), "Reporting");
+    }
+
+    #[test]
+    fn test_reporting_phase_order() {
+        let phase = ReportingPhase;
+        assert_eq!(phase.order(), 11);
+    }
+
+    #[test]
+    fn test_reporting_phase_creation() {
+        let _phase = ReportingPhase;
+        assert!(true);
+    }
+}

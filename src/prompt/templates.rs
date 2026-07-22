@@ -731,6 +731,7 @@ Code:
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::PromptSpec;
 
     // Test BacoPhase Display implementation
     #[test]
@@ -1114,5 +1115,168 @@ mod tests {
         sorted.sort();
 
         assert_eq!(types, sorted);
+    }
+
+    // Test hunt prompt functions
+    #[test]
+    fn test_injection_hunt_prompt() {
+        let source = "SELECT * FROM users WHERE id = $input";
+        let prompt = injection_hunt_prompt(source);
+
+        assert!(prompt.contains("INJECTION VULNERABILITIES"));
+        assert!(prompt.contains(source));
+        assert!(prompt.contains("CWE-XXX"));
+    }
+
+    #[test]
+    fn test_auth_hunt_prompt() {
+        let source = "if (user.isAdmin) { grantAccess() }";
+        let prompt = auth_hunt_prompt(source);
+
+        assert!(prompt.contains("AUTHENTICATION/AUTHORIZATION"));
+        assert!(prompt.contains(source));
+    }
+
+    #[test]
+    fn test_xss_hunt_prompt() {
+        let source = "<div>{{ user_input }}</div>";
+        let prompt = xss_hunt_prompt(source);
+
+        assert!(prompt.contains("XSS VULNERABILITIES"));
+        assert!(prompt.contains("CWE-79"));
+        assert!(prompt.contains(source));
+    }
+
+    #[test]
+    fn test_path_traversal_hunt_prompt() {
+        let source = "fs.open(user_path)";
+        let prompt = path_traversal_hunt_prompt(source);
+
+        assert!(prompt.contains("PATH TRAVERSAL/SSRF"));
+        assert!(prompt.contains("CWE-22"));
+        assert!(prompt.contains(source));
+    }
+
+    #[test]
+    fn test_crypto_hunt_prompt() {
+        let source = "MD5(password)";
+        let prompt = crypto_hunt_prompt(source);
+
+        assert!(prompt.contains("CRYPTOGRAPHIC VULNERABILITIES"));
+        assert!(prompt.contains(source));
+    }
+
+    #[test]
+    fn test_resource_hunt_prompt() {
+        let source = "malloc(size)";
+        let prompt = resource_hunt_prompt(source);
+
+        assert!(prompt.contains("RESOURCE HANDLING"));
+        assert!(prompt.contains(source));
+    }
+
+    #[test]
+    fn test_deserialization_hunt_prompt() {
+        let source = "yaml.load(user_input)";
+        let prompt = deserialization_hunt_prompt(source);
+
+        assert!(prompt.contains("DESERIALIZATION/CONFIG"));
+        assert!(prompt.contains(source));
+    }
+
+    // Test edge cases
+    #[test]
+    fn test_hunt_prompts_with_empty_source() {
+        let prompt = injection_hunt_prompt("");
+        assert!(prompt.contains("INJECTION VULNERABILITIES"));
+    }
+
+    #[test]
+    fn test_all_baco_phase_variants() {
+        let phases = vec![
+            BacoPhase::Indexing,
+            BacoPhase::Semgrep,
+            BacoPhase::LlmStaticAnalysis,
+            BacoPhase::LlmDiscovery,
+            BacoPhase::LlmVerification,
+            BacoPhase::TicketCrossRef,
+            BacoPhase::GitAnalysis,
+            BacoPhase::CrossFileAnalysis,
+            BacoPhase::ConfidenceScoring,
+            BacoPhase::AiAggregation,
+            BacoPhase::Reporting,
+            BacoPhase::Hunt,
+            BacoPhase::Validate,
+            BacoPhase::IndependentVerify,
+        ];
+
+        for phase in phases {
+            let s = phase.to_string();
+            assert!(!s.is_empty());
+        }
+    }
+
+    #[test]
+    fn test_all_project_type_variants() {
+        let types = vec![
+            ProjectType::CLI,
+            ProjectType::Web,
+            ProjectType::Library,
+            ProjectType::Embedded,
+            ProjectType::Firmware,
+            ProjectType::Desktop,
+        ];
+
+        for t in types {
+            let s = t.to_string();
+            assert!(!s.is_empty());
+        }
+    }
+
+    #[test]
+    fn test_template_variables_operations() {
+        let mut vars = TemplateVariables::new();
+
+        vars.insert("KEY1".to_string(), "value1".to_string());
+        assert_eq!(vars.len(), 1);
+
+        assert_eq!(vars.get("KEY1"), Some(&"value1".to_string()));
+        assert_eq!(vars.get("NONEXISTENT"), None);
+
+        vars.insert("KEY2".to_string(), "value2".to_string());
+        vars.insert("KEY3".to_string(), "value3".to_string());
+        assert_eq!(vars.len(), 3);
+    }
+
+    #[test]
+    fn test_get_default_prompt_t25_phases() {
+        let project_type = ProjectType::Web;
+
+        let hunt_prompt = get_default_prompt(&BacoPhase::Hunt, &project_type);
+        assert!(!hunt_prompt.is_empty());
+
+        let validate_prompt = get_default_prompt(&BacoPhase::Validate, &project_type);
+        assert!(!validate_prompt.is_empty());
+
+        let independent_verify_prompt =
+            get_default_prompt(&BacoPhase::IndependentVerify, &project_type);
+        assert!(!independent_verify_prompt.is_empty());
+    }
+
+    #[test]
+    fn test_default_prompts_debug_output() {
+        let prompts = get_all_defaults();
+        let debug_str = format!("{:?}", prompts);
+
+        assert!(debug_str.contains("indexing"));
+        assert!(debug_str.contains("semgrep"));
+        assert!(debug_str.contains("llm_static_analysis"));
+    }
+
+    #[test]
+    fn test_prompt_spec_default() {
+        let spec = PromptSpec::default();
+        assert_eq!(spec.prompt_template, "llm_static_analysis");
+        assert!(spec.model_override.is_none());
     }
 }

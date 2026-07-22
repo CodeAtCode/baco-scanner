@@ -246,16 +246,13 @@ mod tests {
     #[test]
     fn test_generate_patch_placeholder() {
         let patcher = AutoPatcher::new(PathBuf::from("/tmp/test-repo"));
-        
-        let result = patcher.generate_patch(
-            "test vulnerability",
-            "unsafe code here",
-            "src/test.rs",
-        );
-        
+
+        let result =
+            patcher.generate_patch("test vulnerability", "unsafe code here", "src/test.rs");
+
         assert!(result.is_ok());
         let patch = result.unwrap();
-        
+
         // Verify the patch contains expected unified diff format
         assert!(patch.diff.contains("--- a/src/test.rs"));
         assert!(patch.diff.contains("+++ b/src/test.rs"));
@@ -265,18 +262,18 @@ mod tests {
     #[test]
     fn test_generate_patch_file_path() {
         let patcher = AutoPatcher::new(PathBuf::from("/tmp/test-repo"));
-        
+
         let result = patcher.generate_patch("desc", "code", "lib/utils.rs");
         assert!(result.is_ok());
         let patch = result.unwrap();
-        
+
         assert_eq!(patch.file_path, "lib/utils.rs");
     }
 
     #[test]
     fn test_format_patch_report_validated() {
         let patcher = AutoPatcher::new(PathBuf::from("/tmp/test-repo"));
-        
+
         let candidate = PatchCandidate::new("test diff", "src/test.rs");
         let validation = PatchValidationResult {
             compiles: true,
@@ -284,9 +281,9 @@ mod tests {
             warnings: 0,
             error_message: None,
         };
-        
+
         let report = patcher.format_patch_report(&candidate, &validation);
-        
+
         assert!(report.contains("Patch Report"));
         assert!(report.contains("src/test.rs"));
         assert!(report.contains("✅ VALIDATED"));
@@ -296,7 +293,7 @@ mod tests {
     #[test]
     fn test_format_patch_report_compiles_but_tests_failed() {
         let patcher = AutoPatcher::new(PathBuf::from("/tmp/test-repo"));
-        
+
         let candidate = PatchCandidate::new("test diff", "src/test.rs");
         let validation = PatchValidationResult {
             compiles: true,
@@ -304,16 +301,16 @@ mod tests {
             warnings: 0,
             error_message: Some("test failed".to_string()),
         };
-        
+
         let report = patcher.format_patch_report(&candidate, &validation);
-        
+
         assert!(report.contains("⚠️ COMPILES BUT TESTS FAILED"));
     }
 
     #[test]
     fn test_format_patch_report_failed() {
         let patcher = AutoPatcher::new(PathBuf::from("/tmp/test-repo"));
-        
+
         let candidate = PatchCandidate::new("test diff", "src/test.rs");
         let validation = PatchValidationResult {
             compiles: false,
@@ -321,9 +318,9 @@ mod tests {
             warnings: 0,
             error_message: Some("build failed".to_string()),
         };
-        
+
         let report = patcher.format_patch_report(&candidate, &validation);
-        
+
         assert!(report.contains("❌ FAILED"));
         assert!(report.contains("Build Errors:"));
         assert!(report.contains("build failed"));
@@ -332,7 +329,7 @@ mod tests {
     #[test]
     fn test_format_patch_report_with_warnings() {
         let patcher = AutoPatcher::new(PathBuf::from("/tmp/test-repo"));
-        
+
         let candidate = PatchCandidate::new("test diff", "src/test.rs");
         let validation = PatchValidationResult {
             compiles: true,
@@ -340,9 +337,9 @@ mod tests {
             warnings: 5,
             error_message: None,
         };
-        
+
         let report = patcher.format_patch_report(&candidate, &validation);
-        
+
         assert!(report.contains("Warnings: 5"));
     }
 
@@ -353,7 +350,7 @@ mod tests {
     #[test]
     fn test_patching_config_default() {
         let config = PatchingConfig::default();
-        
+
         assert!(!config.dry_run);
         assert!(!config.allow_network_access);
         assert_eq!(config.max_auto_patches, 5);
@@ -368,9 +365,9 @@ mod tests {
             max_auto_patches: 10,
             staging_prefix: Some("custom-".to_string()),
         };
-        
+
         let config2 = config1.clone();
-        
+
         assert_eq!(config1.dry_run, config2.dry_run);
         assert_eq!(config1.allow_network_access, config2.allow_network_access);
         assert_eq!(config1.max_auto_patches, config2.max_auto_patches);
@@ -381,7 +378,7 @@ mod tests {
     fn test_patching_config_debug() {
         let config = PatchingConfig::default();
         let debug_output = format!("{:?}", config);
-        
+
         assert!(debug_output.contains("dry_run"));
         assert!(debug_output.contains("allow_network_access"));
         assert!(debug_output.contains("max_auto_patches"));

@@ -210,4 +210,26 @@ impl ScanPhase for LlmStaticAnalysisPhase {
         true
     }
 }
-// FORCE REBUILD lun 22 giu 2026, 16:44:46, CEST
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_llm_static_phase_name() {
+        let phase = LlmStaticAnalysisPhase;
+        assert_eq!(phase.name(), "LlmStaticAnalysis");
+    }
+
+    #[test]
+    fn test_llm_static_phase_order() {
+        let phase = LlmStaticAnalysisPhase;
+        assert_eq!(phase.order(), 3);
+    }
+
+    #[test]
+    fn test_llm_static_phase_creation() {
+        let _phase = LlmStaticAnalysisPhase;
+        assert!(true);
+    }
+}

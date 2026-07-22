@@ -230,4 +230,18 @@ mod tests {
         let router = CweRouter::from_config(&config);
         assert_eq!(router.default_prompt(), "custom_default");
     }
+
+    #[test]
+    fn test_router_construction() {
+        let router = CweRouter::default();
+        assert!(router.registry.cwe_overrides.is_empty());
+        assert!(router.registry.language_overrides.is_empty());
+    }
+
+    #[test]
+    fn test_router_fallback_unknown_cwe() {
+        let router = CweRouter::default();
+        // Unknown CWE should return None
+        assert!(router.route_by_cwe("CWE-999").is_none());
+    }
 }

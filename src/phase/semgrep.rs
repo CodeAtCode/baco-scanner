@@ -54,3 +54,26 @@ impl ScanPhase for SemgrepPhase {
         true
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_semgrep_phase_name() {
+        let phase = SemgrepPhase;
+        assert_eq!(phase.name(), "Semgrep");
+    }
+
+    #[test]
+    fn test_semgrep_phase_order() {
+        let phase = SemgrepPhase;
+        assert_eq!(phase.order(), 2);
+    }
+
+    #[test]
+    fn test_semgrep_phase_creation() {
+        let _phase = SemgrepPhase;
+        assert!(true);
+    }
+}

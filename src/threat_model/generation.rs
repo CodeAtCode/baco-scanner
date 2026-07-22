@@ -39,7 +39,11 @@ pub fn generate_threat_model_static(architecture: &str) -> String {
             || architecture.contains("file upload"));
 
     threat_model.push_str("### 1. TRUST BOUNDARIES\n");
-    threat_model.push_str("External -> API Gateway -> Application Logic -> Data Store(s)\n\n");
+    if has_db {
+        threat_model.push_str("External -> API Gateway -> Application Logic -> Data Store(s)\n\n");
+    } else {
+        threat_model.push_str("External -> API Gateway -> Application Logic\n\n");
+    }
 
     if has_api {
         threat_model
@@ -219,5 +223,74 @@ Output as structured markdown with clear threat categorization.
             );
             Ok(generate_threat_model_static(architecture))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_generate_threat_model_static_basic() {
+        let architecture = "A simple web app with database";
+        let tm = generate_threat_model_static(architecture);
+
+        assert!(tm.contains("TRUST BOUNDARIES"));
+        assert!(tm.contains("DATA FLOWS"));
+        assert!(tm.contains("STRIDE THREATS"));
+    }
+
+    #[test]
+    fn test_generate_threat_model_static_no_db() {
+        let architecture = "No database, just static files";
+        let tm = generate_threat_model_static(architecture);
+
+        assert!(!tm.contains("Data Store"));
+        assert!(tm.contains("TRUST BOUNDARIES"));
+    }
+
+    #[test]
+    fn test_generate_threat_model_static_with_api() {
+        let architecture = "HTTP API with endpoints";
+        let tm = generate_threat_model_static(architecture);
+
+        assert!(tm.contains("HTTP Endpoints"));
+        assert!(tm.contains("External Interface"));
+    }
+
+    #[test]
+    fn test_save_to_context() {
+        use tempfile::tempdir;
+        let tmp = tempdir().unwrap();
+
+        let tm = "Test threat model";
+        save_to_context(tmp.path(), tm);
+
+        let ctx = AnalysisContext::load(tmp.path()).unwrap();
+        assert_eq!(ctx.threat_model, Some(tm.to_string()));
+    }
+
+    #[test]
+    fn test_load_or_generate_architecture_with_summary() {
+        use tempfile::tempdir;
+        let tmp = tempdir().unwrap();
+
+        let mut ctx = AnalysisContext::default();
+        ctx.architecture_summary = "Test architecture".to_string();
+        ctx.save(tmp.path()).unwrap();
+
+        let loaded = AnalysisContext::load(tmp.path()).unwrap();
+        let arch = load_or_generate_architecture(tmp.path(), &loaded);
+        assert_eq!(arch, "Test architecture");
+    }
+
+    #[test]
+    fn test_load_or_generate_architecture_empty() {
+        use tempfile::tempdir;
+        let tmp = tempdir().unwrap();
+
+        let ctx = AnalysisContext::default();
+        let arch = load_or_generate_architecture(tmp.path(), &ctx);
+        assert_eq!(arch, "No architecture summary available");
     }
 }

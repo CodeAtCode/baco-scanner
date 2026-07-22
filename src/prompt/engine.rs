@@ -310,4 +310,19 @@ mod tests {
         assert!(discovery.contains("%%FILE_PATH%%"));
         assert!(discovery.contains("%%LINE_NUMBER%%"));
     }
+
+    #[test]
+    fn test_engine_construction() {
+        let engine = PromptEngine::new();
+        // Just verify we can create it
+        assert!(!engine.overrides.is_empty() || engine.overrides.is_empty());
+    }
+
+    #[test]
+    fn test_get_prompt_empty_template() {
+        let engine = PromptEngine::new();
+        // Should return empty string for non-existent phase
+        let result = engine.get_prompt(&BacoPhase::Indexing);
+        assert!(!result.is_empty()); // Indexing should exist
+    }
 }

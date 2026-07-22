@@ -80,9 +80,28 @@ mod phase_trait_tests {
     }
 
     #[test]
+    fn test_phase_error_debug() {
+        let err = PhaseError {
+            phase_name: "TestPhase",
+            message: "Test error".to_string(),
+        };
+        let debug = format!("{:?}", err);
+        assert!(debug.contains("TestPhase"));
+    }
+
+    #[test]
     fn test_phase_context_creation() {
         // Just verify the struct exists and can be referenced
         // Full testing requires a real Scanner instance
         assert!(true);
+    }
+
+    #[test]
+    fn test_phase_error_is_error() {
+        let err = PhaseError {
+            phase_name: "TestPhase",
+            message: "Test error".to_string(),
+        };
+        let _: &dyn std::error::Error = &err;
     }
 }
