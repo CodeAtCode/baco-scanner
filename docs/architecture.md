@@ -51,54 +51,41 @@ BACO uses a **data-driven PhaseGraph** (`src/scanner/pipeline/orchestrator.rs`) 
 ## Data Flow
 
 ```mermaid
-flowchart TD
-    subgraph Detection
-        A[Indexing] --> B[Semgrep]
-        B --> C[CWE Routing]
-        C --> D[CPG Slicing]
-        D --> E[LLM Static Analysis]
-        E --> F[Hunt]
-        F --> G[Validate]
-        G --> H[Independent Verify]
-        H --> I[Exploit Synthesis]
-        I --> J[LLM Discovery]
-        J --> K[LLM Verification]
+flowchart LR
+    subgraph Detection["Detection"]
+        direction TB
+        A1[Indexing] --> A2[Semgrep] --> A3[CWE Routing] --> A4[CPG Slicing]
+        A4 --> A5[LLM Static] --> A6[Hunt] --> A7[Validate]
+        A7 --> A8[Independent Verify] --> A9[Exploit Syn] --> A10[LLM Discovery]
+        A10 --> A11[LLM Verify]
     end
 
-    subgraph Triage
-        K --> L[SecurityAgent Verification]
-        L --> M[Ticket Cross-Ref]
-        M --> N[Git Analysis]
-        N --> O[Cross-File Analysis]
-        O --> P[Confidence Scoring]
+    subgraph Triage["Triage"]
+        direction TB
+        B1[SecurityAgent Verify] --> B2[Ticket Cross-Ref] --> B3[Git Analysis]
+        B3 --> B4[Cross-File] --> B5[Confidence]
     end
 
-    subgraph Aggregation
-        P --> Q[AI Aggregation]
-        Q --> R[Reporting]
+    subgraph Aggregation["Aggregation"]
+        direction TB
+        C1[AI Aggregation] --> C2[Reporting]
     end
 
-    subgraph Output
-        R --> S[Threat Modeling]
-        S --> T[Root Cause Dedup]
-        T --> U[Multi-Verifier]
-        U --> V[Auto-Patching]
-        V --> W[CVE Bootstrap]
-        W --> X[PoC Compiler]
-        X --> Y[Variant Search]
-        Y --> Z[SecurityAgent Verification]
-        Z --> AA[Rule Synthesis]
-        AA --> AB[Complete]
+    subgraph Output["Output"]
+        direction TB
+        D1[Threat Model] --> D2[Root Cause Dedup] --> D3[Multi-Verifier]
+        D3 --> D4[Auto-Patch] --> D5[CVE Bootstrap]
+        D5 --> D6[PoC Compiler] --> D7[Variant Search]
+        D7 --> D8[Rule Synthesis] --> D9[Complete]
     end
+
+    Detection --> Triage --> Aggregation --> Output
 
     classDef detection fill:#e1f5fe
     classDef triage fill:#fff3e0
     classDef aggregation fill:#f3e5f5
     classDef output fill:#e8f5e9
-    class A,B,C,D,E,F,G,H,I,J,K detection
-    class L,M,N,O,P triage
-    class Q,R aggregation
-    class S,T,U,V,W,X,Y,Z,AA,AB output
+    class Detection,Triage,Aggregation,Output detection
 ```
 
 **Checkpoint markers**: Checkpoints are saved after each major phase, enabling resume from any point in the pipeline.

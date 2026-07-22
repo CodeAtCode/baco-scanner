@@ -1,20 +1,21 @@
 # BACO - Bug Analysis & Cross-reference Orchestrator
 [![License](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](http://www.gnu.org/licenses/gpl-3.0)
 
-A CLI-based security vulnerability scanner that combines static analysis, LLM-powered discovery, and ticket system cross-referencing (generated with Regolo.AI).
-[Example Report](example-report.html) generated with [Regolo.AI](https://regolo.ai/) models on [ins1gn1a/VulnServer-Linux](https://github.com/ins1gn1a/VulnServer-Linux).
+A CLI-based security vulnerability scanner combining static analysis, LLM-powered discovery, and ticket cross-referencing (generated with Regolo.AI).
+[Example Report](example-report.html) | [Regolo.AI](https://regolo.ai/)
 
 ## Features
 
-- **Multi-phase scanning**: 25+ phases including Indexing → Semgrep → LLM Static Analysis → LLM Discovery → LLM Verification → **SecurityAgent Verification** → Ticket Cross-Ref → Git Analysis → Cross-File Analysis → Confidence Scoring → AI Aggregation → Reporting → Advanced V3 features (Threat Modeling, CVE Bootstrap, PoC Compilation, Variant Search)
-- **Parallel execution**: Semgrep and LLM discovery run concurrently; verification, ticket cross-ref, and git analysis run in parallel
-- **Checkpoint/resume**: Automatically saves state after each phase for crash recovery
-- **Multiple output formats**: JSON, HTML, SARIF
-- **Config-driven**: TOML configuration with environment variable overrides
-- **Prompt customization**: Override default LLM prompts per phase via config
-- **Ticket integration**: GitHub, GitLab, Bugzilla, Jira support
-- **Cross-file analysis**: Traces data flow between files to identify exploitable chains
-- **Composite confidence scoring**: Combines multiple signals into a single reliability score
+- **27+ scanning phases**: Indexing → Semgrep → **CWE MoE Routing** → **CPG-guided slicing** → LLM Static Analysis → **Hunt/Validate/IndependentVerify** → Exploit Synthesis → LLM Discovery → Verification → Rule Synthesis → Ticket Cross-Ref → Git Analysis → Cross-File Analysis → Confidence Scoring → AI Aggregation → Reporting
+- **Parallel execution**: Semgrep + LLM discovery concurrent; verification phases run in parallel
+- **CWE-aware MoE**: BM25 RAG retrieval from CWE knowledge base, routes to specialized analysis paths
+- **CPG-guided slicing**: Precise data-flow extraction via code property graphs
+- **Exploit synthesis**: Auto-generates PoC payloads with sandbox validation
+- **Rule synthesis**: LLM→semgrep rule generation (MoCQ pattern)
+- **Checkpoint/resume**: Crash recovery after each phase
+- **Multiple outputs**: JSON, HTML, SARIF
+- **Config-driven**: TOML config with env var overrides
+- **Ticket integration**: GitHub, GitLab, Bugzilla, Jira
 
 ## Installation
 
@@ -27,15 +28,13 @@ cargo build --release
 
 ```bash
 cp config.example.toml myproject.toml
-# Edit myproject.toml to configure project path and LLM API keys
 baco scan --config myproject.toml
-output/report.html
 ```
 
 ## Documentation
 
-- [Architecture](docs/architecture.md) - PhaseGraph pipeline and data flow
-- [Configuration](docs/configuration.md) - Project settings, LLM config, agent mode, prompts
-- [Research Integration](docs/research-integration.md) - Research-backed design decisions
+- [Architecture](docs/architecture.md) - PhaseGraph pipeline
+- [Configuration](docs/configuration.md) - Settings, LLM config, prompts
+- [Research Integration](docs/research-integration.md) - Design decisions
 
 Codecov: [![Codecov](https://codecov.io/gh/CodeAtCode/baco-scanner/branch/master/graph/badge.svg)](https://app.codecov.io/gh/CodeAtCode/baco-scanner/tree/master)

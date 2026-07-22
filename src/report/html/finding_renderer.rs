@@ -52,7 +52,7 @@ pub fn render_finding(finding: &VulnerabilityFinding, finding_id: usize) -> Stri
         <p>{}</p>
 "#,
         severity_class,
-        &finding_div_id,
+        finding_div_id,
         encode_text(&finding.title),
         severity_class,
         encode_text(&finding.severity.to_string()),

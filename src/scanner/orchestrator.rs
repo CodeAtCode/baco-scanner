@@ -138,8 +138,8 @@ async fn run_parallel_phases(
         }
         findings.append(&mut llm_findings);
         analyzed_files = new_files;
-    } else {
-        tracing::warn!("[SCANNER] LLM static analysis result was None or Err");
+    } else if let Some(Err(e)) = &llm_static_result {
+        tracing::warn!("[SCANNER] LLM static analysis failed: {}", e);
     }
 
     tracing::info!("After parallel phases: {} findings total", findings.len());

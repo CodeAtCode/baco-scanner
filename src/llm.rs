@@ -542,13 +542,21 @@ impl LlmClient {
         tools: &[ToolSchema],
     ) -> Result<ChatResponse, String> {
         let model = self.get_current_model();
-        let payload = serde_json::json!({
-            "model": model,
-            "messages": messages,
-            "tools": tools,
-            "tool_choice": "auto",
-            "temperature": 0.7
-        });
+        let payload = if tools.is_empty() {
+            serde_json::json!({
+                "model": model,
+                "messages": messages,
+                "temperature": 0.7
+            })
+        } else {
+            serde_json::json!({
+                "model": model,
+                "messages": messages,
+                "tools": tools,
+                "tool_choice": "auto",
+                "temperature": 0.7
+            })
+        };
 
         let chat_url = format!("{}/v1/chat/completions", self.config.base_url);
         tracing::info!("Trying LLM API (with tools) at: {}", chat_url);
