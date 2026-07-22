@@ -404,6 +404,7 @@ fn format_phase(phase: &baco::checkpoint::ScanPhase) -> String {
         baco::checkpoint::ScanPhase::Hunt => ("Hunt 🏹", 22),
         baco::checkpoint::ScanPhase::Validate => ("Validate 🛡️", 23),
         baco::checkpoint::ScanPhase::IndependentVerify => ("Independent Verify 🔍", 24),
+        baco::checkpoint::ScanPhase::ExploitSynth => ("Exploit Synthesis 💉", 25),
         baco::checkpoint::ScanPhase::Complete => ("Complete ✨", 15),
         baco::checkpoint::ScanPhase::Error => ("Error ❌", 16),
     };

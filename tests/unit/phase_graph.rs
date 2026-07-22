@@ -15,6 +15,7 @@ fn test_phase_ordering_complete_sequence() {
         ScanPhase::Hunt,
         ScanPhase::Validate,
         ScanPhase::IndependentVerify,
+        ScanPhase::ExploitSynth,
         ScanPhase::LlmDiscovery,
         ScanPhase::LlmVerification,
         ScanPhase::TicketCrossRef,
@@ -37,7 +38,7 @@ fn test_phase_ordering_complete_sequence() {
 
     assert_eq!(
         expected_order.len(),
-        26,
+        27,
         "Phase ordering must include all phases"
     );
 }

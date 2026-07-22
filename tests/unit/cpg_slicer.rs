@@ -118,7 +118,8 @@ fn test_slice_picks_correct_cpgql_for_cwe89() {
 #[test]
 fn test_slice_falls_back_for_unknown_cwe() {
     let cpgql = baco::cpg::queries::get_query_for_cwe("CWE-999", "my_function");
-    assert!(cpgql.contains("my_function")); // Should use default with entry point
+    assert!(cpgql.contains("my_function")); // Should use default method query with entry point
+    assert!(cpgql.contains("cpg.method.name")); // Fallback uses method name search
 }
 
 #[test]

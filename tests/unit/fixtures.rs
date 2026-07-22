@@ -355,6 +355,7 @@ pub fn create_test_config() -> ScannerConfig {
         orchestration: Default::default(),
         normalization: Default::default(),
         cpg: Default::default(),
+        exploit: Default::default(),
     }
 }
 
@@ -400,6 +401,7 @@ pub fn create_minimal_config() -> ScannerConfig {
         orchestration: Default::default(),
         normalization: Default::default(),
         cpg: Default::default(),
+        exploit: Default::default(),
     }
 }
 

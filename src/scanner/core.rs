@@ -196,6 +196,7 @@ mod tests {
             orchestration: crate::config::OrchestrationConfig::default(),
             normalization: crate::config::NormalizationConfig::default(),
             cpg: crate::config::CpgConfig::default(),
+            exploit: crate::config::ExploitConfig::default(),
         }
     }
 
