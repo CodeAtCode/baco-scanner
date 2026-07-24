@@ -87,13 +87,13 @@ impl HuntPhase {
             })
             .collect();
 
-        let results = futures::future::join_all(tasks).await;
+        let results: Vec<Result<(String, Vec<VulnerabilityFinding>), ()>> = futures::future::join_all(tasks).await;
 
         // Deduplicate findings by (line, rule_id) and boost confidence for duplicates
         let mut finding_map: std::collections::HashMap<(u32, String), (VulnerabilityFinding, usize)> =
             std::collections::HashMap::new();
 
-        for (_class, class_findings) in results.into_iter().flat_map(|r| r.unwrap_or_default()) {
+        for (_class, class_findings) in results.into_iter().filter_map(|r| r.ok()) {
             for finding in class_findings {
                 let key = (
                     finding.line_number.unwrap_or(0),
@@ -178,6 +178,8 @@ fn parse_findings(json: &str, file_path: &str) -> Vec<VulnerabilityFinding> {
                     poc_format: None,
                     llm_model: None,
                     agent_mode: false,
+                    statement_range: None,
+                    triage_verdict: None,
                 });
             }
         }

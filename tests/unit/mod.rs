@@ -65,6 +65,9 @@ mod global_fp;
 // MoE router tests
 mod cwe_router;
 
+// Router unit tests
+mod router_tests;
+
 // Rule synthesis tests (T2.3)
 mod rule_validator;
 
@@ -86,3 +89,15 @@ mod confidence_normalization;
 
 // T3.1: CPG-guided slicing tests
 mod cpg_slicer;
+
+// Report module tests (non-aggregation)
+mod report_tests;
+
+// Tools module tests
+mod tools_tests;
+
+// Additional coverage: scanner_types, cpg, retrieval, exploit
+mod cpg_tests;
+mod exploit_tests;
+mod retrieval_tests;
+mod scanner_types_tests;

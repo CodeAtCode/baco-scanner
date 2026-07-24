@@ -35,6 +35,7 @@ fn create_test_finding(id: &str, title: &str, file_path: &str, line: u32) -> Vul
         llm_model: None,
         agent_mode: false,
         statement_range: None,
+        triage_verdict: None,
     }
 }
 

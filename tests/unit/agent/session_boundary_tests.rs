@@ -336,6 +336,7 @@ async fn test_verify_finding_max_turns_boundary() {
         llm_model: None,
         agent_mode: true,
         statement_range: None,
+        triage_verdict: None,
     };
 
     let result = session.verify_finding("test.rs", &finding).await;

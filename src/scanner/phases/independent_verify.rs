@@ -174,6 +174,8 @@ fn parse_findings(json: &str, file_path: &str) -> Vec<VulnerabilityFinding> {
                     poc_format: None,
                     llm_model: None,
                     agent_mode: false,
+                    statement_range: None,
+                    triage_verdict: None,
                 });
             }
         }
@@ -235,6 +237,7 @@ mod tests {
             poc_format: None,
             llm_model: None,
             agent_mode: false,
+            triage_verdict: None,
         };
 
         let prior_finding = VulnerabilityFinding {
@@ -266,6 +269,7 @@ mod tests {
             poc_format: None,
             llm_model: None,
             agent_mode: false,
+            triage_verdict: None,
         };
 
         boost_independent_confidence(&mut [ind_finding.clone()], &[prior_finding]);

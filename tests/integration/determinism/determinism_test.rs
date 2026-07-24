@@ -109,6 +109,7 @@ fn make_seeded_finding(title: &str, file: &str) -> VulnerabilityFinding {
         llm_model: None,
         agent_mode: false,
         statement_range: None,
+        triage_verdict: None,
     }
 }
 

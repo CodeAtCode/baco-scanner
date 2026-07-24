@@ -66,6 +66,7 @@ fn create_finding(title: &str, code: Option<&str>) -> VulnerabilityFinding {
         llm_model: None,
         agent_mode: false,
         statement_range: None,
+        triage_verdict: None,
     }
 }
 

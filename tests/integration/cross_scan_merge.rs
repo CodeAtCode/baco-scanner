@@ -33,6 +33,7 @@ fn create_finding(id: &str, title: &str, file_path: &str, line: u32) -> Vulnerab
         llm_model: None,
         agent_mode: false,
         statement_range: None,
+        triage_verdict: None,
     }
 }
 

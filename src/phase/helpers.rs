@@ -1,7 +1,7 @@
 //! Shared test helpers for phase tests.
 //!
 //! Note: For new tests in the `tests/` directory, use the fixtures module instead:
-//! ```rust,ignore
+//! ```text
 //! use tests::fixtures::{create_test_finding, create_finding_with_params, create_test_scanner};
 //! ```
 //!
@@ -51,6 +51,7 @@ pub fn create_test_finding(
         llm_model: None,
         agent_mode: false,
         statement_range: None,
+        triage_verdict: None,
     }
 }
 
@@ -92,6 +93,7 @@ pub fn create_finding_with_params(
         llm_model: None,
         agent_mode: false,
         statement_range: None,
+        triage_verdict: None,
     }
 }
 

@@ -51,11 +51,20 @@ impl<'a> CpgSlicer<'a> {
             return Ok(CodeSlice::empty());
         }
 
-        // Extract line numbers and code from nodes
+        // Extract line numbers, code, and filename from nodes
         let mut lines: Vec<(u32, String, String)> = Vec::new();
         let mut functions: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let mut filename: Option<String> = None;
 
         for node in &result.nodes {
+            // Extract filename from first node that has it
+            if filename.is_none() {
+                filename = node
+                    .get("filename")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+            }
+
             // Extract line number
             if let Some(line_val) = node.get("lineNumber").and_then(|v| v.as_i64()) {
                 let line = line_val as u32;
@@ -94,8 +103,8 @@ impl<'a> CpgSlicer<'a> {
         let min_line = lines.first().map(|(l, _, _)| *l).unwrap_or(0);
         let max_line = lines.last().map(|(l, _, _)| *l).unwrap_or(0);
 
-        // Read source file - TODO: determine file path from CPG
-        let source = self.read_source_from_cpg(cpg, min_line, max_line)?;
+        // Read source file using the extracted filename
+        let source = self.read_source_from_cpg(cpg, filename.as_deref(), min_line, max_line)?;
 
         // Build data flow nodes
         let data_flow: Vec<DataFlowNode> = lines
@@ -118,13 +127,64 @@ impl<'a> CpgSlicer<'a> {
     /// Read source code from CPG workspace
     fn read_source_from_cpg(
         &self,
-        _cpg: &super::CpgHandle,
-        _min_line: u32,
-        _max_line: u32,
+        cpg: &super::CpgHandle,
+        filename: Option<&str>,
+        min_line: u32,
+        max_line: u32,
     ) -> Result<String, CpgError> {
-        // TODO: implement proper source extraction from CPG
-        // For now, return empty source - this needs the actual file path from CPG metadata
-        Ok(String::new())
+        // Get filename from parameter or try to derive from CPG workspace
+        let file_path = match filename {
+            Some(name) if !name.is_empty() => {
+                // Try absolute path first, then relative to workspace parent
+                let path = std::path::Path::new(name);
+                if path.is_absolute() && path.exists() {
+                    path.to_path_buf()
+                } else {
+                    // Try relative to workspace parent (project root)
+                    cpg.workspace
+                        .parent()
+                        .map(|p| p.join(name))
+                        .ok_or_else(|| {
+                            CpgError::QueryFailed("Workspace has no parent directory".to_string())
+                        })?
+                }
+            }
+            _ => {
+                // No filename available, return empty source gracefully
+                return Ok(String::new());
+            }
+        };
+
+        // Check if file exists
+        if !file_path.exists() {
+            // File not found - return empty string gracefully
+            return Ok(String::new());
+        }
+
+        // Read the source file
+        let content = std::fs::read_to_string(&file_path).map_err(|e| {
+            CpgError::Io(std::io::Error::new(
+                e.kind(),
+                format!("Failed to read source file {:?}: {}", file_path, e),
+            ))
+        })?;
+
+        // Extract lines from min_line to max_line (1-indexed)
+        let lines: Vec<&str> = content.lines().collect();
+
+        // Clamp line range to actual file bounds
+        let start_idx = (min_line as usize).saturating_sub(1).min(lines.len());
+        let end_idx = (max_line as usize).min(lines.len());
+
+        if start_idx >= lines.len() || start_idx > end_idx {
+            // Line range out of bounds - return empty gracefully
+            return Ok(String::new());
+        }
+
+        // Extract the requested lines
+        let extracted = lines[start_idx..end_idx].join("\n");
+
+        Ok(extracted)
     }
 }
 

@@ -35,6 +35,6 @@ baco scan --config myproject.toml
 
 - [Architecture](docs/architecture.md) - PhaseGraph pipeline
 - [Configuration](docs/configuration.md) - Settings, LLM config, prompts
-- [Research Integration](docs/research-integration.md) - Design decisions
+- [Research Integration](docs/research-integration.md) - Design decisions based on 30 academic papers plus triage patterns inspired by [Claude-BugHunter](https://github.com/elementalsouls/Claude-BugHunter)
 
 Codecov: [![Codecov](https://codecov.io/gh/CodeAtCode/baco-scanner/branch/master/graph/badge.svg)](https://app.codecov.io/gh/CodeAtCode/baco-scanner/tree/master)

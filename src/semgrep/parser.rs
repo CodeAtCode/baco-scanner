@@ -128,9 +128,17 @@ pub fn parse_json_output(
             .and_then(|m| m.as_str())
             .map(|s| s.to_string());
 
+        // Extract end line for statement range
+        let end = result
+            .get("end")
+            .and_then(|v| v.get("line"))
+            .and_then(|v| v.as_u64())
+            .unwrap_or(start);
+
         let raw_finding = RawFinding {
             path: path.to_string(),
             line: start as u32,
+            end_line: end as u32,
             severity,
             cwe_id,
             message,
@@ -186,7 +194,8 @@ pub fn parse_json_output(
                 poc_format: None,
                 llm_model: Some("semgrep".to_string()),
                 agent_mode: false,
-                statement_range: None,
+                statement_range: Some((rf.line, rf.end_line)),
+                triage_verdict: None,
             });
         } else {
             let first = &raw_findings[0];
@@ -259,6 +268,7 @@ pub fn parse_json_output(
                 llm_model: Some("semgrep".to_string()),
                 agent_mode: false,
                 statement_range: None,
+                triage_verdict: None,
             });
         }
     }

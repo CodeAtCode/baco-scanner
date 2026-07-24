@@ -40,6 +40,7 @@ fn test_statement_range_in_finding_struct() {
         llm_model: None,
         agent_mode: false,
         statement_range: Some((40, 45)),
+        triage_verdict: None,
     };
 
     assert_eq!(finding_with_range.statement_range, Some((40, 45)));
@@ -75,6 +76,7 @@ fn test_statement_range_in_finding_struct() {
         llm_model: None,
         agent_mode: false,
         statement_range: None,
+        triage_verdict: None,
     };
 
     assert_eq!(finding_without_range.statement_range, None);
@@ -113,6 +115,7 @@ fn test_statement_range_json_serialization() {
         llm_model: None,
         agent_mode: false,
         statement_range: Some((10, 15)),
+        triage_verdict: None,
     };
 
     let json = serde_json::to_string(&finding).unwrap();

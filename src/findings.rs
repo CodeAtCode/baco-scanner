@@ -31,6 +31,20 @@ pub enum Severity {
     Info,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum TriageVerdict {
+    #[default]
+    Pass,
+    Kill,
+    Downgrade {
+        adjusted_severity: Severity,
+    },
+    ChainRequired {
+        chain_partner_ids: Vec<String>,
+    },
+}
+
 impl Severity {
     pub const fn is_high_or_critical(&self) -> bool {
         matches!(self, Severity::High | Severity::Critical)
@@ -170,6 +184,8 @@ pub struct VulnerabilityFinding {
     /// None means function-level only (backward compatible)
     #[serde(default)]
     pub statement_range: Option<(u32, u32)>,
+    #[serde(default)]
+    pub triage_verdict: Option<TriageVerdict>,
 }
 
 impl VulnerabilityFinding {
@@ -284,6 +300,7 @@ mod tests {
             llm_model: None,
             agent_mode: false,
             statement_range: None,
+            triage_verdict: None,
         };
 
         let json = serde_json::to_string(&finding).unwrap();
@@ -329,6 +346,7 @@ mod tests {
             llm_model: None,
             agent_mode: false,
             statement_range: None,
+            triage_verdict: None,
         };
 
         let finding2 = VulnerabilityFinding {
@@ -361,6 +379,7 @@ mod tests {
             llm_model: None,
             agent_mode: false,
             statement_range: None,
+            triage_verdict: None,
         };
 
         merger.merge(vec![finding1]);

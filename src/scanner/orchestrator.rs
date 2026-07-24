@@ -213,6 +213,7 @@ async fn run_sequential_phases(
     start_position: u64,
 ) -> Result<(Vec<VulnerabilityFinding>, Vec<String>), String> {
     let sequential_phases = [
+        ScanPhase::CweRouting,
         ScanPhase::LlmDiscovery,
         ScanPhase::LlmVerification,
         ScanPhase::SecurityAgentVerification,
@@ -247,6 +248,11 @@ async fn run_sequential_phases(
         }
 
         let phase_msg = match phase {
+            ScanPhase::CweRouting => format!(
+                "Phase {}/{}: CWE routing (routing findings to specialized models)...",
+                phase_num,
+                sequential_phases.len() + 3
+            ),
             ScanPhase::LlmDiscovery => format!(
                 "Phase {}/{}: LLM discovery (enriching findings with context)...",
                 phase_num,
@@ -537,6 +543,7 @@ mod tests {
             llm_model: None,
             agent_mode: false,
             statement_range: None,
+            triage_verdict: None,
         }];
 
         let has_valid = findings.iter().all(|f| f.description.is_empty());
@@ -576,6 +583,7 @@ mod tests {
             llm_model: None,
             agent_mode: false,
             statement_range: None,
+            triage_verdict: None,
         };
 
         let checkpoint_findings = vec![valid_finding];
@@ -620,6 +628,7 @@ mod tests {
                 llm_model: None,
                 agent_mode: false,
                 statement_range: None,
+                triage_verdict: None,
             },
             VulnerabilityFinding {
                 id: "test-2".to_string(),
@@ -651,6 +660,7 @@ mod tests {
                 llm_model: None,
                 agent_mode: false,
                 statement_range: None,
+                triage_verdict: None,
             },
         ];
 
@@ -944,6 +954,7 @@ mod tests {
             llm_model: None,
             agent_mode: false,
             statement_range: None,
+            triage_verdict: None,
         }];
 
         findings.append(&mut indexing_findings.clone());
@@ -979,6 +990,7 @@ mod tests {
             llm_model: None,
             agent_mode: false,
             statement_range: None,
+            triage_verdict: None,
         }];
 
         findings.append(&mut semgrep_findings.clone());
@@ -1123,6 +1135,7 @@ mod tests {
                 llm_model: None,
                 agent_mode: false,
                 statement_range: None,
+                triage_verdict: None,
             }],
             vec!["file.rs".to_string()],
         ));
@@ -1175,6 +1188,7 @@ mod tests {
             llm_model: None,
             agent_mode: false,
             statement_range: None,
+            triage_verdict: None,
         }];
         let has_valid_single = !single_empty_desc.is_empty()
             && single_empty_desc.iter().any(|f| !f.description.is_empty());

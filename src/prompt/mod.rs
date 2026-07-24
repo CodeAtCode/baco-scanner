@@ -11,8 +11,16 @@
 
 pub mod engine;
 pub mod loader;
+pub mod sanitize;
 pub mod templates;
 
 pub use engine::{PromptEngine, PromptOverrides};
-pub use loader::load_phase_prompts;
-pub use templates::{BacoPhase, DefaultPrompts, ProjectType};
+pub use loader::{get_prompt, load_phase_prompts};
+pub use sanitize::{
+    sanitize_prompt_override, validate_prompt_override, MAX_PROMPT_OVERRIDE_LENGTH,
+};
+pub use templates::{
+    auth_hunt_prompt, crypto_hunt_prompt, deserialization_hunt_prompt, get_all_defaults,
+    get_default_prompt, injection_hunt_prompt, path_traversal_hunt_prompt, resource_hunt_prompt,
+    xss_hunt_prompt, BacoPhase, DefaultPrompts, ProjectType, TemplateVariables,
+};

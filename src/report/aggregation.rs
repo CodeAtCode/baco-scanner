@@ -452,6 +452,7 @@ mod tests {
             mitigation_code: None,
             poc_format: None,
             statement_range: None,
+            triage_verdict: None,
         }
     }
 

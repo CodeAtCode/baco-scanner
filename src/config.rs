@@ -265,6 +265,8 @@ pub struct PerformanceSettings {
     pub enable_cve_bootstrap: bool,
     #[serde(default = "default_enable_variant_search")]
     pub enable_variant_search: bool,
+    #[serde(default = "default_true")]
+    pub never_submit_filter: bool,
 }
 
 impl Default for PerformanceSettings {
@@ -288,6 +290,7 @@ impl Default for PerformanceSettings {
             enable_confidence_refinement: default_enable_confidence_refinement(),
             enable_cve_bootstrap: default_enable_cve_bootstrap(),
             enable_variant_search: default_enable_variant_search(),
+            never_submit_filter: default_true(),
         }
     }
 }
@@ -434,7 +437,7 @@ fn default_trusted_paths() -> Vec<String> {
 }
 
 /// Router configuration for MoE per-CWE / per-language routing
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RouterConfig {
     /// Whether the router is enabled
     #[serde(default)]
@@ -450,8 +453,19 @@ pub struct RouterConfig {
     pub language_overrides: HashMap<String, PromptSpec>,
 }
 
+impl Default for RouterConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            default_prompt: default_llm_static_analysis(),
+            cwe_overrides: HashMap::new(),
+            language_overrides: HashMap::new(),
+        }
+    }
+}
+
 /// Prompt specification for router overrides
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PromptSpec {
     /// The prompt template name to use
     #[serde(default = "default_llm_static_analysis")]
@@ -471,6 +485,20 @@ impl Default for PromptSpec {
 
 fn default_llm_static_analysis() -> String {
     "llm_static_analysis".to_string()
+}
+
+impl RouterConfig {
+    /// Create a RouterRegistry from this config
+    pub fn to_registry(&self) -> crate::router::RouterRegistry {
+        let mut registry = crate::router::RouterRegistry::new();
+        for (cwe_id, spec) in &self.cwe_overrides {
+            registry.add_cwe_override(cwe_id.clone(), spec.clone());
+        }
+        for (language, spec) in &self.language_overrides {
+            registry.add_language_override(language.clone(), spec.clone());
+        }
+        registry
+    }
 }
 
 /// Aggregation configuration including false positive store settings

@@ -38,7 +38,7 @@ pub fn validate_prompt_override(input: &str) -> Result<(), String> {
 
     // Check for common injection patterns (case-insensitive)
     let lower = input.to_lowercase();
-    
+
     // SQL injection patterns - but allow legitimate security analysis
     // We check for actual SQL commands in suspicious contexts, not just mentions
     let suspicious_sql_patterns = [
@@ -51,10 +51,13 @@ pub fn validate_prompt_override(input: &str) -> Result<(), String> {
         "'; UPDATE",
         "\"; UPDATE",
     ];
-    
+
     for pattern in suspicious_sql_patterns {
         if lower.contains(&pattern.to_lowercase()) {
-            return Err(format!("Potential SQL injection pattern detected: {}", pattern));
+            return Err(format!(
+                "Potential SQL injection pattern detected: {}",
+                pattern
+            ));
         }
     }
 
@@ -67,7 +70,10 @@ pub fn validate_prompt_override(input: &str) -> Result<(), String> {
     let shell_patterns = ["; rm -rf", "| rm -rf", "&& rm -rf", "`rm -rf`", "$(rm -rf)"];
     for pattern in shell_patterns {
         if lower.contains(pattern) {
-            return Err(format!("Potential shell injection pattern detected: {}", pattern));
+            return Err(format!(
+                "Potential shell injection pattern detected: {}",
+                pattern
+            ));
         }
     }
 
@@ -98,7 +104,7 @@ mod tests {
         // Safe prompts
         assert!(validate_prompt_override("Analyze for SQL injection vulnerabilities").is_ok());
         assert!(validate_prompt_override("Check XSS patterns").is_ok());
-        
+
         // Unsafe prompts
         assert!(validate_prompt_override("'; DROP TABLE users").is_err());
         assert!(validate_prompt_override("<script>alert('xss')</script>").is_err());

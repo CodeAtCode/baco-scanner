@@ -83,6 +83,7 @@ mod tests {
             llm_model: None,
             agent_mode: false,
             statement_range: None,
+            triage_verdict: None,
         }];
 
         let result = CrossFileAnalyzer::analyze_cross_file_references(&findings);

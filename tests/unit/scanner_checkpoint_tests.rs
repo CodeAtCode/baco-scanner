@@ -47,6 +47,7 @@ fn create_test_finding() -> VulnerabilityFinding {
         llm_model: None,
         agent_mode: false,
         statement_range: None,
+        triage_verdict: None,
     }
 }
 

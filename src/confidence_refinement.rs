@@ -10,13 +10,10 @@
 
 use crate::analysis_context::AnalysisContext;
 use crate::config::{NormalizationConfig, NormalizationTier};
-use crate::findings::{VerificationStatus, VulnerabilityFinding};
+use crate::findings::{Severity, TriageVerdict, VerificationStatus, VulnerabilityFinding};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
-
-#[cfg(test)]
-use crate::findings::Severity;
 
 /// Result of confidence refinement for a single finding.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -64,6 +61,13 @@ pub enum ConfidenceFactor {
     TriageFalsePositive,
     /// Rationale validated by LLM-as-judge
     RationaleValidated,
+    /// Never-submit pattern matched - finding should not be reported
+    NeverSubmitMatch { pattern: String },
+    /// Pre-severity downgrade gate - theoretical impact rather than demonstrated
+    SeverityDowngrade {
+        original_severity: Severity,
+        reason: String,
+    },
 }
 
 /// Historical data for confidence refinement.
@@ -75,6 +79,8 @@ pub struct HistoricalData {
     high_confidence_patterns: HashMap<String, Vec<String>>,
     /// Verification history statistics.
     verification_stats: HashMap<String, VerificationStats>,
+    /// Never-submit patterns: (CWE-or-keyword, regex-pattern) for findings that should never be reported.
+    never_submit_patterns: Vec<(String, String)>,
 }
 
 /// Statistics for a specific CWE verification history.
@@ -163,6 +169,23 @@ impl HistoricalData {
             ],
         );
 
+        // Never-submit patterns: findings matching these should be heavily penalized
+        data.never_submit_patterns = vec![
+            (
+                "CWE-693".to_string(),
+                r"missing.*header|content\.security\.policy|X-Frame-Options|HSTS".to_string(),
+            ),
+            ("CWE-601".to_string(), r"open.redirect".to_string()),
+            (
+                "self-xss".to_string(),
+                r"self.xss|reflected.*same.origin".to_string(),
+            ),
+            (
+                "CWE-918".to_string(),
+                r"ssrf.*dns.*callback|ssrf.*without.*oob".to_string(),
+            ),
+        ];
+
         data
     }
 
@@ -174,6 +197,32 @@ impl HistoricalData {
     /// Check if a code snippet matches high confidence patterns.
     pub fn matches_high_confidence_pattern(&self, cwe_id: &str, code: &str) -> bool {
         matches_pattern_collection(&self.high_confidence_patterns, cwe_id, code)
+    }
+
+    /// Check if a finding matches a never-submit pattern.
+    /// Returns Some(description) if matched, None otherwise.
+    pub fn check_never_submit_pattern(
+        &self,
+        title: &str,
+        description: &str,
+        cwe_id: Option<&String>,
+    ) -> Option<String> {
+        let text = format!(
+            "{} {} {}",
+            title,
+            description,
+            cwe_id.map_or("", |s| s.as_str())
+        )
+        .to_lowercase();
+
+        for (cwe_or_keyword, pattern) in &self.never_submit_patterns {
+            if let Ok(re) = regex::Regex::new(pattern) {
+                if re.is_match(&text) {
+                    return Some(format!("Never-submit pattern matched: {}", cwe_or_keyword));
+                }
+            }
+        }
+        None
     }
 
     /// Get verification statistics for a CWE.
@@ -397,6 +446,43 @@ impl ConfidenceRefinementPhase {
                     factors.push(ConfidenceFactor::RationaleValidated);
                     explanations.push("Rationale identified as flawed by LLM judge".to_string());
                 }
+            }
+        }
+
+        // Factor 11: Never-submit pattern filter
+        // Findings matching these patterns are heavily penalized as they should never be reported
+        // Note: config is not available in AnalysisContext, so we always enable this filter
+        let never_submit_config_enabled = true;
+
+        if never_submit_config_enabled {
+            let title = finding.title.as_str();
+            let description = finding.description.as_str();
+            let cwe_id = finding.cwe_id.as_ref();
+
+            if let Some(match_desc) =
+                self.historical_data
+                    .check_never_submit_pattern(title, description, cwe_id)
+            {
+                refined_score = (refined_score * 0.1).max(0.0);
+                factors.push(ConfidenceFactor::NeverSubmitMatch {
+                    pattern: match_desc,
+                });
+                explanations
+                    .push("Never-submit pattern matched - finding heavily penalized".to_string());
+            }
+        }
+
+        // Factor 12: Pre-severity downgrade gate
+        // Lower confidence when concrete impact proof is theoretical rather than demonstrated
+        if let Some(triage_verdict) = &finding.triage_verdict {
+            if matches!(triage_verdict, TriageVerdict::Downgrade { .. }) {
+                refined_score = (refined_score - 0.15).max(0.0);
+                factors.push(ConfidenceFactor::SeverityDowngrade {
+                    original_severity: finding.severity,
+                    reason: "Impact assessment is theoretical rather than demonstrated".to_string(),
+                });
+                explanations
+                    .push("Pre-severity downgrade gate applied - theoretical impact".to_string());
             }
         }
 
@@ -1198,5 +1284,111 @@ mod tests {
 
         // 0.1 - 0.3 = -0.2, clamped to 0.0
         assert!((refined.refined_score - 0.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_never_submit_pattern_cwe_693() {
+        let phase = ConfidenceRefinementPhase::new();
+        let context = AnalysisContext::default();
+
+        let mut finding =
+            create_finding_with_params("f1", "Missing security headers", Severity::Medium);
+        finding.file_path = "src/main.rs".to_string();
+        finding.description = "Application is missing HSTS header".to_string();
+        finding.cwe_id = Some("CWE-693".to_string());
+
+        let refinements = phase.run(vec![finding], &context);
+        let refined = refinements.get("f1").unwrap();
+
+        // Should be penalized by never-submit filter (0.8 * 0.1 = 0.08)
+        assert!((refined.refined_score - 0.08).abs() < 0.01);
+        assert!(refined
+            .factors
+            .iter()
+            .any(|f| matches!(f, ConfidenceFactor::NeverSubmitMatch { .. })));
+    }
+
+    #[test]
+    fn test_never_submit_pattern_open_redirect() {
+        let phase = ConfidenceRefinementPhase::new();
+        let context = AnalysisContext::default();
+
+        let mut finding =
+            create_finding_with_params("f2", "Open redirect vulnerability", Severity::Medium);
+        finding.file_path = "src/main.rs".to_string();
+        finding.description = "Potential open redirect without credential leak".to_string();
+        finding.cwe_id = Some("CWE-601".to_string());
+
+        let refinements = phase.run(vec![finding], &context);
+        let refined = refinements.get("f2").unwrap();
+
+        // Should be penalized by never-submit filter
+        assert!((refined.refined_score - 0.08).abs() < 0.01);
+        assert!(refined
+            .factors
+            .iter()
+            .any(|f| matches!(f, ConfidenceFactor::NeverSubmitMatch { .. })));
+    }
+
+    #[test]
+    fn test_never_submit_pattern_self_xss() {
+        let phase = ConfidenceRefinementPhase::new();
+        let context = AnalysisContext::default();
+
+        let mut finding = create_finding_with_params("f3", "Reflected XSS", Severity::Medium);
+        finding.file_path = "src/main.rs".to_string();
+        finding.description = "Reflected XSS on same origin - self-XSS".to_string();
+        finding.cwe_id = Some("CWE-79".to_string());
+
+        let refinements = phase.run(vec![finding], &context);
+        let refined = refinements.get("f3").unwrap();
+
+        // Should be penalized by never-submit filter
+        assert!((refined.refined_score - 0.08).abs() < 0.01);
+        assert!(refined
+            .factors
+            .iter()
+            .any(|f| matches!(f, ConfidenceFactor::NeverSubmitMatch { .. })));
+    }
+
+    #[test]
+    fn test_never_submit_pattern_ssrf() {
+        let phase = ConfidenceRefinementPhase::new();
+        let context = AnalysisContext::default();
+
+        let mut finding = create_finding_with_params("f4", "SSRF vulnerability", Severity::Medium);
+        finding.file_path = "src/main.rs".to_string();
+        finding.description = "SSRF via DNS callback without OOB confirmation".to_string();
+        finding.cwe_id = Some("CWE-918".to_string());
+
+        let refinements = phase.run(vec![finding], &context);
+        let refined = refinements.get("f4").unwrap();
+
+        // Should be penalized by never-submit filter
+        assert!((refined.refined_score - 0.08).abs() < 0.01);
+        assert!(refined
+            .factors
+            .iter()
+            .any(|f| matches!(f, ConfidenceFactor::NeverSubmitMatch { .. })));
+    }
+
+    #[test]
+    fn test_never_submit_pattern_no_match() {
+        let phase = ConfidenceRefinementPhase::new();
+        let context = AnalysisContext::default();
+
+        let mut finding = create_finding_with_params("f5", "SQL injection", Severity::High);
+        finding.file_path = "src/main.rs".to_string();
+        finding.description = "Direct SQL concatenation with user input".to_string();
+        finding.cwe_id = Some("CWE-89".to_string());
+
+        let refinements = phase.run(vec![finding], &context);
+        let refined = refinements.get("f5").unwrap();
+
+        // Should NOT be penalized by never-submit filter
+        assert!(!refined
+            .factors
+            .iter()
+            .any(|f| matches!(f, ConfidenceFactor::NeverSubmitMatch { .. })));
     }
 }

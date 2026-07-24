@@ -3,17 +3,10 @@
 //! Implements the MoEVD pattern: route findings to specialized prompts based on
 //! CWE ID or language, falling back to a default prompt.
 
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+// Re-export types from config to avoid duplication
+pub use crate::config::{PromptSpec, RouterConfig};
 
-/// Prompt specification for a routing rule
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct PromptSpec {
-    /// The prompt template name to use
-    pub prompt_template: String,
-    /// Optional model override for this prompt
-    pub model_override: Option<String>,
-}
+use std::collections::HashMap;
 
 /// Registry of CWE and language overrides
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -54,46 +47,6 @@ impl RouterRegistry {
     }
 }
 
-/// Configuration for the router
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RouterConfig {
-    /// Whether the router is enabled
-    pub enabled: bool,
-    /// Default prompt template name
-    pub default_prompt: String,
-    /// CWE ID -> PromptSpec overrides
-    #[serde(default)]
-    pub cwe_overrides: HashMap<String, PromptSpec>,
-    /// Language -> PromptSpec overrides
-    #[serde(default)]
-    pub language_overrides: HashMap<String, PromptSpec>,
-}
-
-impl Default for RouterConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            default_prompt: "llm_static_analysis".to_string(),
-            cwe_overrides: HashMap::new(),
-            language_overrides: HashMap::new(),
-        }
-    }
-}
-
-impl RouterConfig {
-    /// Create a RouterRegistry from this config
-    pub fn to_registry(&self) -> RouterRegistry {
-        let mut registry = RouterRegistry::new();
-        for (cwe_id, spec) in &self.cwe_overrides {
-            registry.add_cwe_override(cwe_id.clone(), spec.clone());
-        }
-        for (language, spec) in &self.language_overrides {
-            registry.add_language_override(language.clone(), spec.clone());
-        }
-        registry
-    }
-}
-
 /// Router that dispatches findings to specialized prompts
 #[derive(Debug, Clone)]
 pub struct CweRouter {
@@ -113,6 +66,14 @@ impl Default for CweRouter {
 impl CweRouter {
     /// Create a router from config
     pub fn from_config(config: &RouterConfig) -> Self {
+        Self {
+            registry: config.to_registry(),
+            default_prompt: config.default_prompt.clone(),
+        }
+    }
+
+    /// Create a router from the scanner config's RouterConfig
+    pub fn from_scanner_config(config: &crate::config::RouterConfig) -> Self {
         Self {
             registry: config.to_registry(),
             default_prompt: config.default_prompt.clone(),

@@ -49,6 +49,7 @@ fn create_test_finding(cwe_id: &str, severity: Severity) -> VulnerabilityFinding
         llm_model: None,
         agent_mode: false,
         statement_range: None,
+        triage_verdict: None,
     }
 }
 
@@ -93,6 +94,7 @@ fn create_test_finding_with_category(
         llm_model: None,
         agent_mode: false,
         statement_range: None,
+        triage_verdict: None,
     }
 }
 

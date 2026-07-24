@@ -1,5 +1,6 @@
-mod finding_renderer;
+pub mod finding_renderer;
 mod renderer;
-mod utilities;
+pub mod utilities;
 
+pub use finding_renderer::render_finding;
 pub use renderer::generate_html_report;

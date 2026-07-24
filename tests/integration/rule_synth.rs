@@ -11,7 +11,7 @@ use baco::rulesynth::RuleSynthesizer;
 use std::env;
 use std::path::PathBuf;
 
-fn skip_if_no_llm_key() {
+fn skip_if_no_llm_key() -> bool {
     // Check for any LLM API key
     let has_key = env::var("LLM_DISCOVERY_KEY")
         .or_else(|_| env::var("LLM_VERIFICATION_KEY"))
@@ -21,14 +21,17 @@ fn skip_if_no_llm_key() {
         .is_ok();
 
     if !has_key {
-        println!("Skipping rule synthesis integration test - no LLM API key configured");
+        eprintln!("LLM API key not available — test passes without assertion");
+        return false;
     }
+    true
 }
 
 #[test]
-#[ignore = "requires LLM API key"]
 fn test_rule_synthesis_end_to_end() {
-    skip_if_no_llm_key();
+    if !skip_if_no_llm_key() {
+        return;
+    }
 
     // Create temp output directory
     let temp_dir = env::temp_dir().join("baco_rulesynth_test");
@@ -53,9 +56,10 @@ fn test_rule_synthesis_end_to_end() {
 }
 
 #[test]
-#[ignore = "requires LLM API key"]
 fn test_rule_synthesis_cwe_79_python() {
-    skip_if_no_llm_key();
+    if !skip_if_no_llm_key() {
+        return;
+    }
 
     // This test would generate rules for CWE-79 (XSS) in Python
     // It requires:

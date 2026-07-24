@@ -1081,6 +1081,7 @@ fn test_autopatcher_execute_batch_respects_max_patches() {
         llm_model: None,
         agent_mode: false,
         statement_range: None,
+        triage_verdict: None,
     };
 
     let finding2 = baco::findings::VulnerabilityFinding {
@@ -1113,6 +1114,7 @@ fn test_autopatcher_execute_batch_respects_max_patches() {
         llm_model: None,
         agent_mode: false,
         statement_range: None,
+        triage_verdict: None,
     };
 
     let findings = vec![finding1, finding2];
@@ -1163,6 +1165,7 @@ fn test_autopatcher_execute_batch_skips_missing_code_snippet() {
         llm_model: None,
         agent_mode: false,
         statement_range: None,
+        triage_verdict: None,
     };
 
     let findings = vec![finding];
@@ -1211,6 +1214,7 @@ fn test_autopatcher_execute_batch_with_multiple_findings() {
         llm_model: None,
         agent_mode: false,
         statement_range: None,
+        triage_verdict: None,
     };
 
     let finding2 = baco::findings::VulnerabilityFinding {
@@ -1243,6 +1247,7 @@ fn test_autopatcher_execute_batch_with_multiple_findings() {
         llm_model: None,
         agent_mode: false,
         statement_range: None,
+        triage_verdict: None,
     };
 
     let finding3 = baco::findings::VulnerabilityFinding {
@@ -1275,6 +1280,7 @@ fn test_autopatcher_execute_batch_with_multiple_findings() {
         llm_model: None,
         agent_mode: false,
         statement_range: None,
+        triage_verdict: None,
     };
 
     let findings = vec![finding1, finding2, finding3];
@@ -2449,6 +2455,7 @@ fn test_autopatcher_execute_batch_max_patches() {
         llm_model: None,
         agent_mode: false,
         statement_range: None,
+        triage_verdict: None,
     };
     let finding2 = baco::findings::VulnerabilityFinding {
         id: "f2".into(),
@@ -2480,6 +2487,7 @@ fn test_autopatcher_execute_batch_max_patches() {
         llm_model: None,
         agent_mode: false,
         statement_range: None,
+        triage_verdict: None,
     };
 
     let result = autopatcher.execute_batch(&[finding1, finding2], &config);

@@ -963,12 +963,12 @@ mod tests {
 
     // Mockito-based tests for HTTP response handling
     #[tokio::test]
-    #[ignore]
     async fn test_search_github_with_successful_response() {
         let mut server = Server::new_async().await;
 
         let mock = server
             .mock("GET", "/search/issues")
+            .match_query(mockito::Matcher::Any)
             .with_status(200)
             .with_header("content-type", "application/json")
             .with_body(r#"{"total_count": 1, "items": [{"number": 123, "html_url": "https://github.com/owner/repo/issues/123", "state": "open", "title": "Test issue"}]}"#)
@@ -996,12 +996,12 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn test_search_github_with_empty_response() {
         let mut server = Server::new_async().await;
 
         let mock = server
             .mock("GET", "/search/issues")
+            .match_query(mockito::Matcher::Any)
             .with_status(200)
             .with_header("content-type", "application/json")
             .with_body(r#"{"total_count": 0, "items": []}"#)

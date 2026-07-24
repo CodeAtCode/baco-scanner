@@ -43,7 +43,6 @@ fn test_orchestration_config_hunt_classes() {
 }
 
 #[tokio::test]
-#[ignore = "Pipeline integration test - requires full scanner setup"]
 async fn test_six_phase_pipeline_compiles() {
     // This test verifies that the six-phase pipeline can be constructed
     // Actual phase execution is tested in unit tests

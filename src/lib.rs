@@ -21,6 +21,7 @@
 
 pub mod agent;
 pub mod analysis_context; // AnalysisContext persistence (renamed from context.rs)
+pub mod chain_analysis;
 pub mod checkpoint;
 pub mod confidence;
 pub mod confidence_refinement;
@@ -61,5 +62,6 @@ pub mod severity_rubric;
 pub mod staging;
 pub mod threat_model;
 pub mod tickets;
+pub mod tools;
 pub mod validation;
 pub mod variant_search;

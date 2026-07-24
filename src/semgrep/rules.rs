@@ -43,6 +43,7 @@ impl SemgrepRunner {
 pub(crate) struct RawFinding {
     pub path: String,
     pub line: u32,
+    pub end_line: u32,
     pub severity: Severity,
     pub cwe_id: Option<String>,
     pub message: Option<String>,

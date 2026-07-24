@@ -779,6 +779,7 @@ mod tests {
         let raw = RawFinding {
             path: "test.rs".into(),
             line: 42,
+            end_line: 45,
             severity: Severity::High,
             cwe_id: Some("CWE-79".into()),
             message: Some("Test message".into()),
@@ -786,6 +787,7 @@ mod tests {
 
         assert_eq!(raw.path, "test.rs");
         assert_eq!(raw.line, 42);
+        assert_eq!(raw.end_line, 45);
         assert_eq!(raw.severity, Severity::High);
         assert_eq!(raw.cwe_id, Some("CWE-79".into()));
         assert_eq!(raw.message, Some("Test message".into()));
@@ -797,11 +799,13 @@ mod tests {
         let raw = RawFinding {
             path: "test.rs".into(),
             line: 1,
+            end_line: 5,
             severity: Severity::Info,
             cwe_id: None,
             message: None,
         };
 
+        assert_eq!(raw.end_line, 5);
         assert!(raw.cwe_id.is_none());
         assert!(raw.message.is_none());
     }

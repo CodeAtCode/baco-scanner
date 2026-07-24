@@ -248,6 +248,7 @@ mod tests {
             llm_model: None,
             agent_mode: false,
             statement_range: None,
+            triage_verdict: None,
         }];
 
         let scanner =
@@ -306,6 +307,7 @@ mod tests {
             llm_model: None,
             agent_mode: false,
             statement_range: None,
+            triage_verdict: None,
         });
 
         assert_eq!(scanner.findings().len(), 1);
@@ -347,6 +349,7 @@ mod tests {
             llm_model: None,
             agent_mode: false,
             statement_range: None,
+            triage_verdict: None,
         });
 
         let findings = scanner.findings_mut();
@@ -390,6 +393,7 @@ mod tests {
             llm_model: None,
             agent_mode: false,
             statement_range: None,
+            triage_verdict: None,
         });
 
         assert_eq!(scanner.findings().len(), 1);
@@ -425,6 +429,7 @@ mod tests {
             llm_model: None,
             agent_mode: false,
             statement_range: None,
+            triage_verdict: None,
         }];
 
         scanner.update_findings(new_findings.clone());
@@ -541,6 +546,7 @@ mod tests {
             llm_model: None,
             agent_mode: false,
             statement_range: None,
+            triage_verdict: None,
         }];
 
         let multi_progress = MultiProgress::new();
@@ -593,6 +599,7 @@ mod tests {
                 llm_model: None,
                 agent_mode: false,
                 statement_range: None,
+                triage_verdict: None,
             })
             .collect();
 
@@ -646,6 +653,7 @@ mod tests {
                 llm_model: None,
                 agent_mode: false,
                 statement_range: None,
+                triage_verdict: None,
             })
             .collect();
 

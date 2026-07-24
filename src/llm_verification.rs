@@ -473,6 +473,7 @@ mod tests {
             llm_model: None,
             agent_mode: false,
             statement_range: None,
+            triage_verdict: None,
         }
     }
 
@@ -1342,7 +1343,8 @@ pub fn rationale_check_template(finding: &VulnerabilityFinding) -> String {
 
 /// Triage filter for LLM-based false positive detection
 pub struct TriageFilter {
-    _llm_client: Option<LlmClient>,
+    #[allow(dead_code)]
+    llm_client: Option<LlmClient>,
 }
 
 /// Triage prompt template for false positive detection
@@ -1357,8 +1359,8 @@ const TRIAGE_PROMPT_TEMPLATE: &str = concat!(
 
 impl TriageFilter {
     /// Create a new TriageFilter
-    pub fn new(_llm_client: Option<LlmClient>) -> Self {
-        Self { _llm_client }
+    pub fn new(llm_client: Option<LlmClient>) -> Self {
+        Self { llm_client }
     }
 
     /// Triage a single finding using LLM
@@ -1429,6 +1431,50 @@ impl TriageFilter {
             confidence: parsed.confidence.clamp(0.0, 1.0),
             reasoning: parsed.reasoning,
         })
+    }
+
+    /// Filter out false positives from a batch of findings
+    /// Returns filtered findings and the number of removed false positives
+    pub async fn filter<C>(
+        &self,
+        findings: Vec<VulnerabilityFinding>,
+        client: &C,
+    ) -> Result<(Vec<VulnerabilityFinding>, usize), String>
+    where
+        C: AsyncLlmClient,
+    {
+        use crate::findings::TriageVerdict as FindingsTriageVerdict;
+
+        let mut filtered = Vec::new();
+        let mut removed_count = 0;
+
+        for finding in findings {
+            match self.triage_finding(&finding, client).await {
+                Ok(triage_result) => {
+                    if triage_result.verdict == TriageVerdict::FalsePositive {
+                        removed_count += 1;
+                        tracing::debug!(
+                            "TriageFilter: filtered out {} (confidence: {:.2}) - {}",
+                            finding.id,
+                            triage_result.confidence,
+                            triage_result.reasoning
+                        );
+                    } else {
+                        // Add triage verdict to finding using findings::TriageVerdict
+                        let mut updated_finding = finding.clone();
+                        updated_finding.triage_verdict = Some(FindingsTriageVerdict::Pass);
+                        filtered.push(updated_finding);
+                    }
+                }
+                Err(e) => {
+                    // On error, keep the finding but log warning
+                    tracing::warn!("TriageFilter: failed to triage {}: {}", finding.id, e);
+                    filtered.push(finding);
+                }
+            }
+        }
+
+        Ok((filtered, removed_count))
     }
 }
 

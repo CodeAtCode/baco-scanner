@@ -595,6 +595,7 @@ impl LlmAnalyzer {
                         },
                         agent_mode: false,
                         statement_range,
+                        triage_verdict: None,
                     });
                 }
             }

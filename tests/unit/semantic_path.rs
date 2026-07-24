@@ -66,7 +66,6 @@ fn test_to_prompt_section_format() {
 
 /// Integration test with real LLM - requires API key
 #[test]
-#[ignore]
 fn test_summarize_with_real_llm() {
     // This test requires LLM_API_KEY environment variable
     // Run with: LLM_API_KEY=xxx cargo test test_summarize_with_real_llm -- --ignored

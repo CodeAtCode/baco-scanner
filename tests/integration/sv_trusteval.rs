@@ -62,6 +62,24 @@ async fn test_vulnerable_fixtures_detect_cwe() {
         ("cwe120_vuln.c", "CWE-120", "Buffer Overflow"),
         ("cwe022_vuln.c", "CWE-22", "Path Traversal"),
         ("cwe416_vuln.c", "CWE-416", "Use After Free"),
+        ("cwe078_vuln.c", "CWE-78", "OS Command Injection"),
+        ("cwe190_vuln.c", "CWE-190", "Integer Overflow"),
+        ("cwe352_vuln.c", "CWE-352", "CSRF Vulnerability"),
+        (
+            "cwe400_vuln.c",
+            "CWE-400",
+            "Uncontrolled Resource Consumption",
+        ),
+        (
+            "cwe502_vuln.c",
+            "CWE-502",
+            "Deserialization of Untrusted Data",
+        ),
+        ("cwe125_vuln.c", "CWE-125", "Out-of-bounds Read"),
+        ("cwe416_dup_vuln.c", "CWE-416", "Use After Free (Alt)"),
+        ("cwe476_vuln.c", "CWE-476", "NULL Pointer Dereference"),
+        ("cwe134_vuln.c", "CWE-134", "Uncontrolled Format String"),
+        ("cwe676_vuln.c", "CWE-676", "Use of Dangerous Function"),
     ];
 
     for (filename, expected_cwe, title) in test_cases {
@@ -111,6 +129,16 @@ async fn test_safe_fixtures_no_findings() {
         "cwe120_safe.c",
         "cwe022_safe.c",
         "cwe416_safe.c",
+        "cwe078_safe.c",
+        "cwe190_safe.c",
+        "cwe352_safe.c",
+        "cwe400_safe.c",
+        "cwe502_safe.c",
+        "cwe125_safe.c",
+        "cwe416_dup_safe.c",
+        "cwe476_safe.c",
+        "cwe134_safe.c",
+        "cwe676_safe.c",
     ];
 
     let scanner_config = baco::config::ScannerConfig::default();
@@ -156,6 +184,66 @@ async fn test_paired_confidence_comparison() {
             "cwe416_safe.c",
             "CWE-416",
             "Use After Free",
+        ),
+        (
+            "cwe078_vuln.c",
+            "cwe078_safe.c",
+            "CWE-78",
+            "OS Command Injection",
+        ),
+        (
+            "cwe190_vuln.c",
+            "cwe190_safe.c",
+            "CWE-190",
+            "Integer Overflow",
+        ),
+        (
+            "cwe352_vuln.c",
+            "cwe352_safe.c",
+            "CWE-352",
+            "CSRF Vulnerability",
+        ),
+        (
+            "cwe400_vuln.c",
+            "cwe400_safe.c",
+            "CWE-400",
+            "Uncontrolled Resource Consumption",
+        ),
+        (
+            "cwe502_vuln.c",
+            "cwe502_safe.c",
+            "CWE-502",
+            "Deserialization of Untrusted Data",
+        ),
+        (
+            "cwe125_vuln.c",
+            "cwe125_safe.c",
+            "CWE-125",
+            "Out-of-bounds Read",
+        ),
+        (
+            "cwe416_dup_vuln.c",
+            "cwe416_dup_safe.c",
+            "CWE-416",
+            "Use After Free (Alt)",
+        ),
+        (
+            "cwe476_vuln.c",
+            "cwe476_safe.c",
+            "CWE-476",
+            "NULL Pointer Dereference",
+        ),
+        (
+            "cwe134_vuln.c",
+            "cwe134_safe.c",
+            "CWE-134",
+            "Uncontrolled Format String",
+        ),
+        (
+            "cwe676_vuln.c",
+            "cwe676_safe.c",
+            "CWE-676",
+            "Use of Dangerous Function",
         ),
     ];
 
@@ -212,6 +300,26 @@ fn test_fixtures_exist() {
         "cwe022_safe.c",
         "cwe416_vuln.c",
         "cwe416_safe.c",
+        "cwe078_vuln.c",
+        "cwe078_safe.c",
+        "cwe190_vuln.c",
+        "cwe190_safe.c",
+        "cwe352_vuln.c",
+        "cwe352_safe.c",
+        "cwe400_vuln.c",
+        "cwe400_safe.c",
+        "cwe502_vuln.c",
+        "cwe502_safe.c",
+        "cwe125_vuln.c",
+        "cwe125_safe.c",
+        "cwe416_dup_vuln.c",
+        "cwe416_dup_safe.c",
+        "cwe476_vuln.c",
+        "cwe476_safe.c",
+        "cwe134_vuln.c",
+        "cwe134_safe.c",
+        "cwe676_vuln.c",
+        "cwe676_safe.c",
     ];
 
     for filename in all_fixtures {
@@ -245,6 +353,16 @@ fn test_vulnerable_fixtures_have_vulnerabilities() {
         ("cwe120_vuln.c", "strcpy"),
         ("cwe022_vuln.c", ".."),
         ("cwe416_vuln.c", "free"),
+        ("cwe078_vuln.c", "system"),
+        ("cwe190_vuln.c", "count *"),
+        ("cwe352_vuln.c", "transfer"),
+        ("cwe400_vuln.c", "recursive"),
+        ("cwe502_vuln.c", "memcpy"),
+        ("cwe125_vuln.c", "offset"),
+        ("cwe416_dup_vuln.c", "callback"),
+        ("cwe476_vuln.c", "malloc"),
+        ("cwe134_vuln.c", "printf(user_input)"),
+        ("cwe676_vuln.c", "gets"),
     ];
 
     for (filename, pattern) in vuln_patterns {
@@ -264,11 +382,21 @@ fn test_vulnerable_fixtures_have_vulnerabilities() {
 #[test]
 fn test_safe_fixtures_have_mitigations() {
     let safe_patterns = vec![
-        ("cwe089_safe.c", "?"),       // Parameterized query placeholder
-        ("cwe079_safe.c", "escape"),  // HTML escaping
-        ("cwe120_safe.c", "strncpy"), // Bounds-checked copy
-        ("cwe022_safe.c", ".."),      // Path validation checks for ..
-        ("cwe416_safe.c", "NULL"),    // Nullification after free
+        ("cwe089_safe.c", "?"),             // Parameterized query placeholder
+        ("cwe079_safe.c", "escape"),        // HTML escaping
+        ("cwe120_safe.c", "strncpy"),       // Bounds-checked copy
+        ("cwe022_safe.c", ".."),            // Path validation checks for ..
+        ("cwe416_safe.c", "NULL"),          // Nullification after free
+        ("cwe078_safe.c", "is_valid"),      // Input validation
+        ("cwe190_safe.c", "SIZE_MAX"),      // Overflow check
+        ("cwe352_safe.c", "csrf"),          // CSRF token validation
+        ("cwe400_safe.c", "MAX_RECURSION"), // Resource limit
+        ("cwe502_safe.c", "validate"),      // Validation before processing
+        ("cwe125_safe.c", "bounds"),        // Bounds checking
+        ("cwe416_dup_safe.c", "strdup"),    // Safe copy before free
+        ("cwe476_safe.c", "NULL"),          // NULL check
+        ("cwe134_safe.c", "%s"),            // Format specifier
+        ("cwe676_safe.c", "fgets"),         // Safe alternative to gets
     ];
 
     for (filename, pattern) in safe_patterns {
@@ -317,6 +445,7 @@ fn test_finding_json_roundtrip_with_fixture_context() {
         llm_model: Some("mock-model".to_string()),
         agent_mode: false,
         statement_range: None,
+        triage_verdict: None,
     };
 
     let json = serde_json::to_string(&finding).unwrap();

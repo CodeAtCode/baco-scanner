@@ -97,6 +97,7 @@ pub fn create_test_finding(
         llm_model: None,
         agent_mode: false,
         statement_range: None,
+        triage_verdict: None,
     }
 }
 
@@ -152,6 +153,7 @@ pub fn create_finding_with_params(
         llm_model: None,
         agent_mode: false,
         statement_range: None,
+        triage_verdict: None,
     }
 }
 
@@ -198,6 +200,7 @@ pub fn create_minimal_finding() -> VulnerabilityFinding {
         llm_model: None,
         agent_mode: false,
         statement_range: None,
+        triage_verdict: None,
     }
 }
 
@@ -237,6 +240,7 @@ pub fn create_complete_finding() -> VulnerabilityFinding {
         llm_model: Some("llama3.1".to_string()),
         agent_mode: false,
         statement_range: None,
+        triage_verdict: None,
     }
 }
 
