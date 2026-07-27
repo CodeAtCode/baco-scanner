@@ -4,7 +4,7 @@ pub mod checkpoint;
 mod core;
 mod env;
 mod orchestrator;
-mod parallel;
+pub(crate) mod parallel;
 #[cfg(test)]
 pub(crate) mod phases;
 #[cfg(not(test))]
@@ -27,6 +27,12 @@ pub use phases::{run_phase, PhaseConfig};
 pub use env::{
     compute_checkpoint_path, compute_findings_json_path, extract_owner_repo_from_url,
     get_git_remote_url,
+};
+
+// Re-export parallel module types for testing
+pub use parallel::{
+    combine_parallel_results, has_valid_checkpoint_findings, run_indexing_phase,
+    run_llm_static_phase, run_semgrep_phase, ParallelPhaseConfig, ParallelPhaseResult,
 };
 
 // Use the checkpoint module for save/load

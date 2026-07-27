@@ -163,7 +163,7 @@ impl VariantSearcher {
         Ok(())
     }
 
-    fn should_skip_file(path: &Path) -> bool {
+    pub fn should_skip_file(path: &Path) -> bool {
         let ext = path
             .extension()
             .map(|e| e.to_string_lossy().to_lowercase())
@@ -193,15 +193,22 @@ impl VariantSearcher {
         )
     }
 
-    fn extract_snippet(content: &str, line_num: usize) -> String {
+    pub fn extract_snippet(content: &str, line_num: usize) -> String {
         let lines: Vec<&str> = content.lines().collect();
-        let start = line_num.saturating_sub(1);
+        if lines.is_empty() {
+            return String::new();
+        }
+        let start = line_num
+            .saturating_sub(1)
+            .min(lines.len().saturating_sub(1));
         let end = (line_num + 2).min(lines.len());
-
+        if start >= end {
+            return String::new();
+        }
         lines[start..end].join("\n")
     }
 
-    fn calculate_similarity(&self, line: &str, pattern: &SearchPattern) -> f32 {
+    pub fn calculate_similarity(&self, line: &str, pattern: &SearchPattern) -> f32 {
         let mut score: f32 = 0.0;
 
         if line.contains(&pattern.vulnerability_type) {

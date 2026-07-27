@@ -73,7 +73,7 @@ fn run_diff(
     })
 }
 
-fn parse_diff(diff_output: &str) -> (u32, u32, u32) {
+pub fn parse_diff(diff_output: &str) -> (u32, u32, u32) {
     let lines: Vec<&str> = diff_output.lines().collect();
 
     let mut files_changed = 1u32;

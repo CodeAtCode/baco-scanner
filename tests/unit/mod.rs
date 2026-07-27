@@ -15,6 +15,7 @@ mod agent;
 // mod tgi_client;
 
 // Validation function tests
+mod validation_success_path_tests;
 mod validation_tests;
 // Include centralized fixtures - copy from tests/fixtures.rs
 mod agent_executor;
@@ -112,3 +113,34 @@ mod agent_sandbox_tests;
 mod chain_analysis_tests;
 mod core_utils_tests;
 mod cve_misc_tests;
+
+// Additional coverage: prompt templates, context summary, report aggregation, rulesynth
+mod context_summary_tests;
+mod prompt_templates_tests;
+mod report_aggregation_tests;
+mod rulesynth_tests;
+
+// Additional coverage: worktree staging, cve_client, scanner/sequential
+mod cve_client_tests;
+mod scanner_sequential_tests;
+mod worktree_staging_tests;
+
+// Additional coverage: enrichment, exploit harness, tgi, parallel
+mod ai_aggregation_enrichment_tests;
+mod exploit_harness_tests;
+mod html_report_dir_creation_tests;
+mod llm_tgi_tests;
+mod scanner_parallel_tests;
+
+// Final coverage push: cve_client deep coverage
+mod cve_client_deep_tests;
+
+// Deep rulesynth tests - comprehensive coverage for rulesynth module
+mod rulesynth_deep_tests;
+
+// Free function tests for rulesynth
+mod rulesynth_free_fns_tests;
+
+// Coverage gap closure — variant_search and diff_analysis edge cases
+mod diff_analysis_edge_tests;
+mod variant_search_edge_tests;

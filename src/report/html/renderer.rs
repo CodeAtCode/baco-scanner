@@ -517,6 +517,12 @@ pub fn generate_html_report(
         findings.len()
     ));
 
+    // Create parent directory if it doesn't exist
+    if let Some(parent) = std::path::Path::new(output_path).parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create output directory: {}", e))?;
+    }
+
     fs::write(output_path, html).map_err(|e| format!("Failed to write HTML report: {}", e))?;
     Ok(())
 }

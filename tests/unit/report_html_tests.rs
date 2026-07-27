@@ -599,7 +599,7 @@ fn test_generate_html_report_creates_parent_dirs() {
     let temp_dir = TempDir::new().unwrap();
     let output_path = temp_dir.path().join("nested").join("report.html");
 
-    // Parent dir doesn't exist yet — function should either create it or return error
+    // Parent dir doesn't exist yet — function should create it
     let result = baco::report::html::generate_html_report(
         &findings,
         output_path.to_str().unwrap(),
@@ -607,8 +607,9 @@ fn test_generate_html_report_creates_parent_dirs() {
         None,
     );
 
-    // Function doesn't create parent dirs; verify it returns an error gracefully
-    assert!(result.is_err());
+    // After fix: function creates parent dirs and succeeds
+    assert!(result.is_ok());
+    assert!(output_path.exists());
 
     // Clean up
     let _ = fs::remove_dir_all(temp_dir.path());

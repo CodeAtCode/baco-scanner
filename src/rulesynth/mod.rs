@@ -50,7 +50,7 @@ impl<'a> RuleSynthesizer<'a> {
 
         // Parse YAML rules from response
         let yaml_content = response.content;
-        let rules = self.parse_yaml_rules(&yaml_content, language)?;
+        let rules = parse_yaml_rules(&yaml_content, language)?;
 
         // Validate each rule and collect valid ones
         let mut valid_rules = Vec::new();
@@ -75,82 +75,83 @@ impl<'a> RuleSynthesizer<'a> {
 
         // Persist valid rules
         if !valid_rules.is_empty() {
-            self.persist_rules(&valid_rules, cwe, language)?;
+            persist_rules(
+                &valid_rules,
+                cwe,
+                language,
+                self.config.output_dir.to_string_lossy().as_ref(),
+            )?;
         }
 
         Ok(valid_rules)
     }
+}
 
-    /// Parse YAML rules from LLM response
-    fn parse_yaml_rules(
-        &self,
-        yaml_content: &str,
-        _language: &str,
-    ) -> Result<Vec<String>, RuleError> {
-        let mut rules = Vec::new();
-        let mut current_rule = String::new();
-        let mut in_rule = false;
+/// Parse YAML rules from LLM response
+pub fn parse_yaml_rules(yaml_content: &str, _language: &str) -> Result<Vec<String>, RuleError> {
+    let mut rules = Vec::new();
+    let mut current_rule = String::new();
+    let mut in_rule = false;
 
-        for line in yaml_content.lines() {
-            if line.trim() == "---" {
-                if !current_rule.is_empty() {
-                    rules.push(current_rule.trim().to_string());
-                    current_rule = String::new();
-                }
-                in_rule = true;
-                continue;
+    for line in yaml_content.lines() {
+        if line.trim() == "---" {
+            if !current_rule.is_empty() {
+                rules.push(current_rule.trim().to_string());
+                current_rule = String::new();
             }
+            in_rule = true;
+            continue;
+        }
 
-            if in_rule || line.trim().starts_with("rules:") {
-                let should_add = !current_rule.is_empty() || !line.trim().is_empty();
-                if should_add {
-                    current_rule.push_str(line);
-                    current_rule.push('\n');
-                }
+        if in_rule || line.trim().starts_with("rules:") {
+            let should_add = !current_rule.is_empty() || !line.trim().is_empty();
+            if should_add {
+                current_rule.push_str(line);
+                current_rule.push('\n');
             }
         }
-
-        // Push last rule
-        if !current_rule.is_empty() {
-            rules.push(current_rule.trim().to_string());
-        }
-
-        // If no rules found, try to parse as single rule
-        if rules.is_empty() && !yaml_content.trim().is_empty() {
-            rules.push(yaml_content.trim().to_string());
-        }
-
-        Ok(rules)
     }
 
-    /// Persist valid rules to output directory
-    fn persist_rules(
-        &self,
-        rules: &[SemgrepRule],
-        cwe: &str,
-        language: &str,
-    ) -> Result<(), RuleError> {
-        let output_dir = PathBuf::from(&self.config.output_dir);
-        std::fs::create_dir_all(&output_dir)
-            .map_err(|e| RuleError::IoError(format!("Failed to create output directory: {}", e)))?;
-
-        for (i, rule) in rules.iter().enumerate() {
-            let filename = format!("{}_{}_{}.yml", cwe, language, i);
-            let filepath = output_dir.join(&filename);
-
-            std::fs::write(&filepath, &rule.yaml).map_err(|e| {
-                RuleError::IoError(format!(
-                    "Failed to write rule to {}: {}",
-                    filepath.display(),
-                    e
-                ))
-            })?;
-
-            tracing::info!("Persisted rule: {}", filepath.display());
-        }
-
-        Ok(())
+    // Push last rule
+    if !current_rule.is_empty() {
+        rules.push(current_rule.trim().to_string());
     }
+
+    // If no rules found, try to parse as single rule
+    if rules.is_empty() && !yaml_content.trim().is_empty() {
+        rules.push(yaml_content.trim().to_string());
+    }
+
+    Ok(rules)
+}
+
+/// Persist valid rules to output directory
+pub fn persist_rules(
+    rules: &[SemgrepRule],
+    cwe: &str,
+    language: &str,
+    output_dir: &str,
+) -> Result<(), RuleError> {
+    let output_dir = PathBuf::from(output_dir);
+    std::fs::create_dir_all(&output_dir)
+        .map_err(|e| RuleError::IoError(format!("Failed to create output directory: {}", e)))?;
+
+    for (i, rule) in rules.iter().enumerate() {
+        let filename = format!("{}_{}_{}.yml", cwe, language, i);
+        let filepath = output_dir.join(&filename);
+
+        std::fs::write(&filepath, &rule.yaml).map_err(|e| {
+            RuleError::IoError(format!(
+                "Failed to write rule to {}: {}",
+                filepath.display(),
+                e
+            ))
+        })?;
+
+        tracing::info!("Persisted rule: {}", filepath.display());
+    }
+
+    Ok(())
 }
 
 /// Extract rule ID from YAML content
