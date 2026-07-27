@@ -7,7 +7,7 @@ use baco::checkpoint::ScanPhase;
 use baco::config::ScannerConfig;
 use baco::findings::{Severity, VulnerabilityFinding};
 use baco::llm_metrics::LlmMetricsTracker;
-use baco::scanner::{CheckpointManager, Orchestrator, PhaseGraph};
+use baco::scanner::{CheckpointManager, Orchestrator, PhaseGraph, ScanCheckpoint};
 use std::path::PathBuf;
 use tempfile::TempDir;
 
@@ -291,9 +291,7 @@ async fn test_checkpoint_manager_save_creates_file() {
     let manager = CheckpointManager::new(path.clone());
     let metrics = LlmMetricsTracker::new();
 
-    let _: Result<(), String> = manager
-        .save(&ScanPhase::Indexing, &[], &[], &metrics)
-        .await;
+    let _: Result<(), String> = manager.save(&ScanPhase::Indexing, &[], &[], &metrics).await;
 
     assert!(manager.exists());
 }
@@ -320,7 +318,10 @@ async fn test_checkpoint_manager_save_and_load_roundtrip() {
         .save(&ScanPhase::Semgrep, &[finding], &files, &metrics)
         .await;
 
-    let loaded = { let x: Option<ScanCheckpoint> = manager.load().await; x.unwrap() };
+    let loaded = {
+        let x: Option<ScanCheckpoint> = manager.load().await;
+        x.unwrap()
+    };
 
     assert_eq!(loaded.last_completed_phase, ScanPhase::Semgrep);
     assert_eq!(loaded.findings.len(), 1);
@@ -350,9 +351,7 @@ async fn test_checkpoint_manager_delete() {
     let manager = CheckpointManager::new(path.clone());
     let metrics = LlmMetricsTracker::new();
 
-    let _: Result<(), String> = manager
-        .save(&ScanPhase::Indexing, &[], &[], &metrics)
-        .await;
+    let _: Result<(), String> = manager.save(&ScanPhase::Indexing, &[], &[], &metrics).await;
     assert!(manager.exists());
 
     let result: Result<(), String> = manager.delete();
@@ -378,9 +377,7 @@ async fn test_checkpoint_manager_save_creates_parent_directory() {
     let manager = CheckpointManager::new(nested_path.clone());
     let metrics = LlmMetricsTracker::new();
 
-    let _: Result<(), String> = manager
-        .save(&ScanPhase::Indexing, &[], &[], &metrics)
-        .await;
+    let _: Result<(), String> = manager.save(&ScanPhase::Indexing, &[], &[], &metrics).await;
 
     assert!(nested_path.exists());
 }
@@ -397,14 +394,18 @@ async fn test_checkpoint_manager_save_with_empty_findings() {
         .save(&ScanPhase::Indexing, &findings, &files, &metrics)
         .await;
 
-    let loaded = { let x: Option<ScanCheckpoint> = manager.load().await; x.unwrap() };
+    let loaded = {
+        let x: Option<ScanCheckpoint> = manager.load().await;
+        x.unwrap()
+    };
     assert!(loaded.findings.is_empty());
     assert!(loaded.analyzed_files.is_empty());
 }
 
 #[tokio::test]
 async fn test_checkpoint_manager_load_invalid_json_returns_none() {
-    let path = get_temp_checkpoint_path("test_invalid.json");
+    let temp_dir = TempDir::new().unwrap();
+    let path = temp_dir.path().join("test_invalid.json");
     std::fs::write(&path, "not valid json").unwrap();
     let manager = CheckpointManager::new(path);
 
@@ -453,7 +454,7 @@ async fn test_checkpoint_manager_save_all_phases() {
     ];
 
     for phase in phases {
-        let path = get_temp_checkpoint_path(&format!("test_{}.json", format!("{:?}", phase)));
+        let path = get_temp_checkpoint_path(&format!("test_{:?}.json", phase));
         let manager = CheckpointManager::new(path.clone());
         let metrics = LlmMetricsTracker::new();
 
@@ -461,7 +462,10 @@ async fn test_checkpoint_manager_save_all_phases() {
 
         assert!(manager.exists());
 
-        let loaded = { let x: Option<ScanCheckpoint> = manager.load().await; x.unwrap() };
+        let loaded = {
+            let x: Option<ScanCheckpoint> = manager.load().await;
+            x.unwrap()
+        };
         assert_eq!(loaded.last_completed_phase, phase);
     }
 }
@@ -499,10 +503,16 @@ async fn test_checkpoint_manager_multiple_saves_overwrite() {
     let metrics = LlmMetricsTracker::new();
 
     let _: Result<(), String> = manager.save(&ScanPhase::Indexing, &[], &[], &metrics).await;
-    let first = { let x: Option<ScanCheckpoint> = manager.load().await; x.unwrap() };
+    let first = {
+        let x: Option<ScanCheckpoint> = manager.load().await;
+        x.unwrap()
+    };
 
     let _: Result<(), String> = manager.save(&ScanPhase::Semgrep, &[], &[], &metrics).await;
-    let second = { let x: Option<ScanCheckpoint> = manager.load().await; x.unwrap() };
+    let second = {
+        let x: Option<ScanCheckpoint> = manager.load().await;
+        x.unwrap()
+    };
 
     assert_eq!(first.last_completed_phase, ScanPhase::Indexing);
     assert_eq!(second.last_completed_phase, ScanPhase::Semgrep);

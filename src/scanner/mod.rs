@@ -17,7 +17,7 @@ pub use core::{Scanner, ScannerState};
 
 // Re-export pipeline orchestration
 pub use pipeline::orchestrator::{Orchestrator, PhaseGraph};
-pub use pipeline::resumption::CheckpointManager;
+pub use pipeline::resumption::{CheckpointManager, ScanCheckpoint};
 
 // Re-export phases for testing
 #[cfg(test)]

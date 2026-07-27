@@ -44,7 +44,10 @@ impl WorktreeManager {
     /// Create a new worktree manager
     pub fn new(repo_path: PathBuf) -> Self {
         let temp_dir = repo_path.join(".baco-temp").join("worktrees");
-        Self { repo_path, temp_dir }
+        Self {
+            repo_path,
+            temp_dir,
+        }
     }
 
     /// Create a new isolated worktree for patch staging
@@ -65,20 +68,26 @@ impl WorktreeManager {
 
         // Check if worktree already exists
         if worktree_path.exists() {
-            warn!("Worktree already exists at {:?}, removing first", worktree_path);
+            warn!(
+                "Worktree already exists at {:?}, removing first",
+                worktree_path
+            );
             self.remove_worktree(&worktree_name)?;
         }
 
-        info!("Creating staging worktree '{}' from '{}'", worktree_name, base_branch);
+        info!(
+            "Creating staging worktree '{}' from '{}'",
+            worktree_name, base_branch
+        );
 
         let output = Command::new("git")
             .current_dir(&self.repo_path)
             .args([
                 "worktree",
                 "add",
-                worktree_path.to_str().ok_or_else(|| {
-                    WorktreeError::GitCommandFailed("Invalid path".to_string())
-                })?,
+                worktree_path
+                    .to_str()
+                    .ok_or_else(|| WorktreeError::GitCommandFailed("Invalid path".to_string()))?,
                 "-b",
                 &worktree_name,
                 base_branch,
@@ -100,11 +109,7 @@ impl WorktreeManager {
     /// # Arguments
     /// * `worktree_path` - Path to the worktree
     /// * `patch_content` - Git diff content to apply
-    pub fn apply_patch(
-        &self,
-        worktree_path: &Path,
-        patch_content: &str,
-    ) -> WorktreeResult<()> {
+    pub fn apply_patch(&self, worktree_path: &Path, patch_content: &str) -> WorktreeResult<()> {
         info!("Applying patch to worktree at {:?}", worktree_path);
 
         let mut output = Command::new("git")
@@ -251,7 +256,9 @@ mod tests {
         let temp_dir = std::env::temp_dir().join(format!("baco-test-cleanup-{}", timestamp));
         let manager = WorktreeManager::new(temp_dir.clone());
 
-        let cleaned = manager.cleanup_stale_worktrees(Duration::from_secs(0)).unwrap();
+        let cleaned = manager
+            .cleanup_stale_worktrees(Duration::from_secs(0))
+            .unwrap();
         assert_eq!(cleaned, 0);
     }
 

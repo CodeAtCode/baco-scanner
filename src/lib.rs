@@ -65,3 +65,4 @@ pub mod tickets;
 pub mod tools;
 pub mod validation;
 pub mod variant_search;
+pub mod worktree_staging;

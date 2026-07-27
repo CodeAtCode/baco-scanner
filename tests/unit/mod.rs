@@ -103,7 +103,12 @@ mod retrieval_tests;
 mod scanner_types_tests;
 
 // Additional coverage: scanner phases, pipeline, report/html
-// Pipeline tests - temporarily disabled due to compilation issues
-// mod pipeline_tests;
+mod pipeline_tests;
 mod report_html_tests;
 mod scanner_phases_tests;
+
+// Additional coverage: agent sandbox/session/tools, cve+misc, chain analysis, core utilities
+mod agent_sandbox_tests;
+mod chain_analysis_tests;
+mod core_utils_tests;
+mod cve_misc_tests;
