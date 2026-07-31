@@ -20,8 +20,5 @@ mod tgi_integration;
 // Triple path context integration tests (T2.2)
 mod triple_path;
 
-// T2.5 six-phase orchestration integration tests
-mod six_phase;
-
 // T3.1: CPG-guided slicing integration tests
 mod cpg_pipeline;

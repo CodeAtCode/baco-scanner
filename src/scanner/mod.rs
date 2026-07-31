@@ -165,7 +165,6 @@ mod tests {
             router: crate::config::RouterConfig::default(),
             aggregation: crate::config::AggregationConfig::default(),
             rulesynth: crate::config::RuleSynthConfig::default(),
-            orchestration: crate::config::OrchestrationConfig::default(),
             normalization: crate::config::NormalizationConfig::default(),
             cpg: crate::config::CpgConfig::default(),
             exploit: crate::config::ExploitConfig::default(),

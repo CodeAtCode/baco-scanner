@@ -66,8 +66,6 @@ fn test_default_config() {
     assert_eq!(config.scanner.commit_lookback_days, 0);
     assert_eq!(config.scanner.max_file_size_kb, 0);
     assert!(config.scanner.exclude_paths.is_empty());
-    assert!(config.scanner.semgrep.enabled); // default_true
-    assert!(!config.scanner.performance.enable_parallel_phases);
 }
 
 #[test]
@@ -97,7 +95,6 @@ fn test_parse_minimal_config() {
     assert_eq!(config.output.dir, "./output");
     assert_eq!(config.scanner.commit_lookback_days, 30);
     assert_eq!(config.llm.max_retries, 2);
-    assert!(config.scanner.semgrep.enabled);
 }
 
 #[test]
@@ -123,16 +120,8 @@ fn test_parse_full_config() {
         exclude_rules = ["rust-security.insecure-crypto"]
 
         [scanner.performance]
-        enable_parallel_phases = true
-        max_parallel_tasks = 8
-        enable_llm_cache = true
         enable_incremental_scan = true
-        llm_cache_dir = "/tmp/llm-cache"
-        enable_file_filtering = true
-        enable_batch_llm = true
-        batch_size = 16
         early_termination_threshold = 500.0
-        enable_v3_features = true
         enable_threat_modeling = true
         enable_root_cause_dedup = true
         enable_multi_verifier = true
@@ -188,13 +177,7 @@ fn test_parse_full_config() {
     assert_eq!(config.project.languages.len(), 3);
     assert_eq!(config.output.format.len(), 3);
     assert_eq!(config.scanner.exclude_paths.len(), 3);
-    assert_eq!(
-        config.scanner.semgrep.cache_dir,
-        Some("/tmp/semgrep-cache".to_string())
-    );
     assert_eq!(config.scanner.semgrep.exclude_rules.len(), 1);
-    assert_eq!(config.scanner.performance.max_parallel_tasks, 8);
-    assert_eq!(config.scanner.performance.batch_size, 16);
     assert!(config.scanner.performance.enable_threat_modeling);
     assert_eq!(config.llm.max_concurrent, 8);
     assert_eq!(config.llm.phases.discovery.model, "gpt-4");
@@ -745,17 +728,10 @@ fn test_from_file_invalid_toml() {
 fn test_performance_settings_defaults() {
     let settings = PerformanceSettings::default();
 
-    assert!(!settings.enable_parallel_phases);
-    assert_eq!(settings.max_parallel_tasks, 4);
-    assert!(!settings.enable_llm_cache);
     assert!(!settings.enable_incremental_scan);
-    assert!(settings.enable_file_filtering);
-    assert!(!settings.enable_batch_llm);
-    assert_eq!(settings.batch_size, 8);
-    assert!(!settings.enable_v3_features);
-    assert!(!settings.enable_threat_modeling);
-    assert!(!settings.enable_root_cause_dedup);
-    assert!(!settings.enable_multi_verifier);
+    assert!(settings.enable_threat_modeling);
+    assert!(settings.enable_root_cause_dedup);
+    assert!(settings.enable_multi_verifier);
     assert!(!settings.enable_auto_patching);
     assert!(!settings.enable_poc_compilation);
     assert!(settings.enable_confidence_refinement);
@@ -778,11 +754,6 @@ fn test_performance_settings_custom() {
         max_file_size_kb = 100
 
         [scanner.performance]
-        enable_parallel_phases = true
-        max_parallel_tasks = 16
-        enable_llm_cache = true
-        enable_file_filtering = false
-        batch_size = 32
         early_termination_threshold = 100.0
 
         [llm]
@@ -806,11 +777,6 @@ fn test_performance_settings_custom() {
     let config: ScannerConfig = toml::from_str(toml_str).unwrap();
     let perf = &config.scanner.performance;
 
-    assert!(perf.enable_parallel_phases);
-    assert_eq!(perf.max_parallel_tasks, 16);
-    assert!(perf.enable_llm_cache);
-    assert!(!perf.enable_file_filtering);
-    assert_eq!(perf.batch_size, 32);
     assert_eq!(perf.early_termination_threshold, 100.0);
 }
 

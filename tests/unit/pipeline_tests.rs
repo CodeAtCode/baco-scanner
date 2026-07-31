@@ -76,11 +76,11 @@ fn test_phase_graph_first_phase_is_indexing() {
 }
 
 #[test]
-fn test_phase_graph_last_phase_is_variant_search() {
+fn test_phase_graph_last_phase_is_reporting() {
     let graph = PhaseGraph::new();
     let phases = graph.phases();
 
-    assert_eq!(phases[phases.len() - 1], ScanPhase::VariantSearch);
+    assert_eq!(phases[phases.len() - 1], ScanPhase::Reporting);
 }
 
 #[test]
@@ -141,7 +141,7 @@ fn test_all_phases_have_metadata() {
 #[test]
 fn test_next_phase_returns_none_for_last_phase() {
     let graph = PhaseGraph::new();
-    let result = graph.next_phase(&ScanPhase::VariantSearch);
+    let result = graph.next_phase(&ScanPhase::Reporting);
 
     assert!(result.is_none());
 }
@@ -183,43 +183,6 @@ fn test_previous_phase_chain_from_variant_search() {
 // ============================================================================
 // Phase Enablement Tests
 // ============================================================================
-
-#[test]
-fn test_core_phases_are_always_enabled() {
-    let config = ScannerConfig::default();
-    let graph = PhaseGraph::new();
-
-    assert!(graph.is_phase_enabled(&ScanPhase::Indexing, &config));
-    assert!(graph.is_phase_enabled(&ScanPhase::Semgrep, &config));
-    assert!(graph.is_phase_enabled(&ScanPhase::LlmDiscovery, &config));
-}
-
-#[test]
-fn test_confidence_scoring_respects_config() {
-    let mut config = ScannerConfig::default();
-    config.scanner.performance.enable_confidence_refinement = false;
-    let graph = PhaseGraph::new();
-
-    assert!(!graph.is_phase_enabled(&ScanPhase::ConfidenceScoring, &config));
-}
-
-#[test]
-fn test_threat_modeling_respects_config() {
-    let mut config = ScannerConfig::default();
-    config.scanner.performance.enable_threat_modeling = true;
-    let graph = PhaseGraph::new();
-
-    assert!(graph.is_phase_enabled(&ScanPhase::ThreatModeling, &config));
-}
-
-#[test]
-fn test_auto_patching_respects_config() {
-    let mut config = ScannerConfig::default();
-    config.scanner.performance.enable_auto_patching = false;
-    let graph = PhaseGraph::new();
-
-    assert!(!graph.is_phase_enabled(&ScanPhase::AutoPatching, &config));
-}
 
 // ============================================================================
 // Orchestrator Tests

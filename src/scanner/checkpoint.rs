@@ -102,31 +102,34 @@ impl Checkpoint {
         let checkpoint = Self::load(path)?;
 
         Ok(match checkpoint.current_phase {
+            // Parallel phases (run concurrently: Indexing, Semgrep, LlmStaticAnalysis)
             ScanPhase::Indexing => ScanPhase::Semgrep,
-            ScanPhase::Semgrep => ScanPhase::CweRouting,
-            ScanPhase::CweRouting => ScanPhase::CpgSlice,
-            ScanPhase::CpgSlice => ScanPhase::LlmStaticAnalysis,
-            ScanPhase::LlmStaticAnalysis => ScanPhase::Hunt,
-            ScanPhase::Hunt => ScanPhase::Validate,
-            ScanPhase::Validate => ScanPhase::IndependentVerify,
-            ScanPhase::IndependentVerify => ScanPhase::ExploitSynth,
-            ScanPhase::ExploitSynth => ScanPhase::LlmDiscovery,
+            ScanPhase::Semgrep => ScanPhase::LlmStaticAnalysis,
+            ScanPhase::LlmStaticAnalysis => ScanPhase::CweRouting,
+            // Sequential phases (match sequential_phases array in orchestrator.rs lines 215-234)
+            ScanPhase::CweRouting => ScanPhase::LlmDiscovery,
             ScanPhase::LlmDiscovery => ScanPhase::LlmVerification,
-            ScanPhase::LlmVerification => ScanPhase::TicketCrossRef,
+            ScanPhase::LlmVerification => ScanPhase::SecurityAgentVerification,
+            ScanPhase::SecurityAgentVerification => ScanPhase::TicketCrossRef,
             ScanPhase::TicketCrossRef => ScanPhase::GitAnalysis,
             ScanPhase::GitAnalysis => ScanPhase::CrossFileAnalysis,
             ScanPhase::CrossFileAnalysis => ScanPhase::ConfidenceScoring,
             ScanPhase::ConfidenceScoring => ScanPhase::AiAggregation,
-            ScanPhase::AiAggregation => ScanPhase::Reporting,
-            ScanPhase::Reporting => ScanPhase::ThreatModeling,
+            ScanPhase::AiAggregation => ScanPhase::ThreatModeling,
             ScanPhase::ThreatModeling => ScanPhase::RootCauseDedup,
             ScanPhase::RootCauseDedup => ScanPhase::MultiVerifier,
             ScanPhase::MultiVerifier => ScanPhase::AutoPatching,
             ScanPhase::AutoPatching => ScanPhase::CveBootstrap,
             ScanPhase::CveBootstrap => ScanPhase::PocCompiler,
             ScanPhase::PocCompiler => ScanPhase::VariantSearch,
-            ScanPhase::VariantSearch => ScanPhase::SecurityAgentVerification,
-            ScanPhase::SecurityAgentVerification => ScanPhase::RuleSynthesis,
+            ScanPhase::VariantSearch => ScanPhase::Reporting,
+            ScanPhase::Reporting => ScanPhase::Complete,
+            // Orphaned phases (never executed, fallback routing for old checkpoints)
+            ScanPhase::CpgSlice => ScanPhase::CweRouting,
+            ScanPhase::Hunt => ScanPhase::LlmDiscovery,
+            ScanPhase::Validate => ScanPhase::LlmDiscovery,
+            ScanPhase::IndependentVerify => ScanPhase::LlmDiscovery,
+            ScanPhase::ExploitSynth => ScanPhase::LlmDiscovery,
             ScanPhase::RuleSynthesis => ScanPhase::Complete,
             ScanPhase::Complete | ScanPhase::Error => ScanPhase::Indexing,
         })
@@ -197,20 +200,20 @@ pub async fn save_checkpoint(
     }
 
     // Get completed phases (all phases up to and including current)
+    // Must match the pipeline order: 3 parallel + 17 sequential, Reporting last
     let all_phases = [
         ScanPhase::Indexing,
         ScanPhase::Semgrep,
-        ScanPhase::CweRouting,
-        ScanPhase::CpgSlice,
         ScanPhase::LlmStaticAnalysis,
+        ScanPhase::CweRouting,
         ScanPhase::LlmDiscovery,
         ScanPhase::LlmVerification,
+        ScanPhase::SecurityAgentVerification,
         ScanPhase::TicketCrossRef,
         ScanPhase::GitAnalysis,
         ScanPhase::CrossFileAnalysis,
         ScanPhase::ConfidenceScoring,
         ScanPhase::AiAggregation,
-        ScanPhase::Reporting,
         ScanPhase::ThreatModeling,
         ScanPhase::RootCauseDedup,
         ScanPhase::MultiVerifier,
@@ -218,8 +221,7 @@ pub async fn save_checkpoint(
         ScanPhase::CveBootstrap,
         ScanPhase::PocCompiler,
         ScanPhase::VariantSearch,
-        ScanPhase::SecurityAgentVerification,
-        ScanPhase::RuleSynthesis,
+        ScanPhase::Reporting,
     ];
 
     if let Some(pos) = all_phases.iter().position(|p| p == phase) {
@@ -494,38 +496,42 @@ mod tests {
     fn test_resume_from_all_phase_transitions() {
         // Test all phase transitions explicitly
         let test_cases = vec![
+            // Parallel phases
             (ScanPhase::Indexing, ScanPhase::Semgrep),
-            (ScanPhase::Semgrep, ScanPhase::CweRouting),
-            (ScanPhase::CweRouting, ScanPhase::CpgSlice),
-            (ScanPhase::CpgSlice, ScanPhase::LlmStaticAnalysis),
-            (ScanPhase::LlmStaticAnalysis, ScanPhase::Hunt),
-            (ScanPhase::Hunt, ScanPhase::Validate),
-            (ScanPhase::Validate, ScanPhase::IndependentVerify),
-            (ScanPhase::IndependentVerify, ScanPhase::ExploitSynth),
-            (ScanPhase::ExploitSynth, ScanPhase::LlmDiscovery),
+            (ScanPhase::Semgrep, ScanPhase::LlmStaticAnalysis),
+            (ScanPhase::LlmStaticAnalysis, ScanPhase::CweRouting),
+            // Sequential phases (matches sequential_phases array in orchestrator.rs)
+            (ScanPhase::CweRouting, ScanPhase::LlmDiscovery),
             (ScanPhase::LlmDiscovery, ScanPhase::LlmVerification),
-            (ScanPhase::LlmVerification, ScanPhase::TicketCrossRef),
+            (
+                ScanPhase::LlmVerification,
+                ScanPhase::SecurityAgentVerification,
+            ),
+            (
+                ScanPhase::SecurityAgentVerification,
+                ScanPhase::TicketCrossRef,
+            ),
             (ScanPhase::TicketCrossRef, ScanPhase::GitAnalysis),
             (ScanPhase::GitAnalysis, ScanPhase::CrossFileAnalysis),
             (ScanPhase::CrossFileAnalysis, ScanPhase::ConfidenceScoring),
             (ScanPhase::ConfidenceScoring, ScanPhase::AiAggregation),
-            (ScanPhase::AiAggregation, ScanPhase::Reporting),
-            (ScanPhase::Reporting, ScanPhase::ThreatModeling),
+            (ScanPhase::AiAggregation, ScanPhase::ThreatModeling),
             (ScanPhase::ThreatModeling, ScanPhase::RootCauseDedup),
             (ScanPhase::RootCauseDedup, ScanPhase::MultiVerifier),
             (ScanPhase::MultiVerifier, ScanPhase::AutoPatching),
             (ScanPhase::AutoPatching, ScanPhase::CveBootstrap),
             (ScanPhase::CveBootstrap, ScanPhase::PocCompiler),
             (ScanPhase::PocCompiler, ScanPhase::VariantSearch),
-            (
-                ScanPhase::VariantSearch,
-                ScanPhase::SecurityAgentVerification,
-            ),
-            (
-                ScanPhase::SecurityAgentVerification,
-                ScanPhase::RuleSynthesis,
-            ),
+            (ScanPhase::VariantSearch, ScanPhase::Reporting),
+            (ScanPhase::Reporting, ScanPhase::Complete),
+            // Orphaned phases (fallback routing)
+            (ScanPhase::CpgSlice, ScanPhase::CweRouting),
+            (ScanPhase::Hunt, ScanPhase::LlmDiscovery),
+            (ScanPhase::Validate, ScanPhase::LlmDiscovery),
+            (ScanPhase::IndependentVerify, ScanPhase::LlmDiscovery),
+            (ScanPhase::ExploitSynth, ScanPhase::LlmDiscovery),
             (ScanPhase::RuleSynthesis, ScanPhase::Complete),
+            // Terminal states
             (ScanPhase::Complete, ScanPhase::Indexing),
             (ScanPhase::Error, ScanPhase::Indexing),
         ];

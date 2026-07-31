@@ -6,12 +6,12 @@ A CLI-based security vulnerability scanner combining static analysis, LLM-powere
 
 ## Features
 
-- **27+ scanning phases**: Indexing → Semgrep → **CWE MoE Routing** → **CPG-guided slicing** → LLM Static Analysis → **Hunt/Validate/IndependentVerify** → Exploit Synthesis → LLM Discovery → Verification → Rule Synthesis → Ticket Cross-Ref → Git Analysis → Cross-File Analysis → Confidence Scoring → AI Aggregation → Reporting
-- **Parallel execution**: Semgrep + LLM discovery concurrent; verification phases run in parallel
+- **20 scanning phases**: Indexing → Semgrep → LLM Static Analysis → CWE Routing → LLM Discovery → LLM Verification → SecurityAgent Verification → Ticket Cross-Ref → Git Analysis → Cross-File Analysis → Confidence Scoring → AI Aggregation → Threat Modeling → Root Cause Dedup → Multi-Verifier → Auto-Patching → CVE Bootstrap → PoC Compiler → Variant Search → Reporting
+- **Parallel execution**: Indexing, Semgrep, and LLM Static Analysis run concurrently; 17 sequential phases follow
 - **CWE-aware MoE**: BM25 RAG retrieval from CWE knowledge base, routes to specialized analysis paths
-- **CPG-guided slicing**: Precise data-flow extraction via code property graphs
-- **Exploit synthesis**: Auto-generates PoC payloads with sandbox validation
-- **Rule synthesis**: LLM→semgrep rule generation (MoCQ pattern)
+- **CPG-guided slicing**: Precise data-flow extraction via code property graphs (module exists, not yet wired to pipeline)
+- **Exploit synthesis**: Auto-generates PoC payloads with sandbox validation (module exists, not yet wired to pipeline)
+- **Rule synthesis**: LLM→semgrep rule generation (MoCQ pattern) (module exists, not yet wired to pipeline)
 - **Checkpoint/resume**: Crash recovery after each phase
 - **Multiple outputs**: JSON, HTML, SARIF
 - **Config-driven**: TOML config with env var overrides
@@ -34,7 +34,7 @@ baco scan --config myproject.toml
 ## Documentation
 
 - [Architecture](docs/architecture.md) - PhaseGraph pipeline
-- [Configuration](docs/configuration.md) - Settings, LLM config, prompts
+- [Configuration](docs/configuration.md) - Settings, LLM config, scanner phase flags, prompts
 - [Research Integration](docs/research-integration.md) - Design decisions based on 30 academic papers plus triage patterns inspired by [Claude-BugHunter](https://github.com/elementalsouls/Claude-BugHunter)
 
 Codecov: [![Codecov](https://codecov.io/gh/CodeAtCode/baco-scanner/branch/master/graph/badge.svg)](https://app.codecov.io/gh/CodeAtCode/baco-scanner/tree/master)

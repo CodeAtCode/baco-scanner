@@ -48,6 +48,37 @@ enable_llm_cache = false
 # Enable file filtering to reduce false positives
 enable_file_filtering = true
 
+# --- Phase enable flags ---
+# Each flag controls whether a specific analysis phase runs during the scan.
+# Phases marked "enabled" run by default; set to false to skip them.
+
+# Threat modeling using STRIDE analysis (adds LLM-based threat identification)
+# Default: true
+enable_threat_modeling = true
+# Root-cause deduplication (collapses findings that share the same root cause)
+# Default: true
+enable_root_cause_dedup = true
+# Multi-verifier cross-checking (runs additional LLM verification passes)
+# Default: true
+enable_multi_verifier = true
+# Auto-patching (generates and validates fix patches in a staging worktree)
+# Writes code files and runs git commands — opt-in for safety
+# Default: false
+enable_auto_patching = false
+# PoC compilation (compiles proof-of-concept exploits to verify findings)
+# Spawns external compilers — opt-in for safety
+# Default: false
+enable_poc_compilation = false
+# Confidence refinement (re-calibrates finding confidence based on multi-source/cross-file signals)
+# Default: true
+enable_confidence_refinement = true
+# CVE bootstrap (enriches findings with CVE data from external sources)
+# Default: true
+enable_cve_bootstrap = true
+# Variant search (searches for variant instances of the same vulnerability pattern)
+# Default: true
+enable_variant_search = true
+
 # LLM configuration with per-phase settings
 [llm]
 # Timeout in seconds for LLM API requests

@@ -83,7 +83,6 @@ fn create_test_config() -> baco::config::ScannerConfig {
         router: baco::config::RouterConfig::default(),
         aggregation: baco::config::AggregationConfig::default(),
         rulesynth: baco::config::RuleSynthConfig::default(),
-        orchestration: baco::config::OrchestrationConfig::default(),
         normalization: baco::config::NormalizationConfig::default(),
         cpg: baco::config::CpgConfig::default(),
         exploit: baco::config::ExploitConfig::default(),

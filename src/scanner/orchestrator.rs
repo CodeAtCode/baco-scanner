@@ -222,7 +222,6 @@ async fn run_sequential_phases(
         ScanPhase::CrossFileAnalysis,
         ScanPhase::ConfidenceScoring,
         ScanPhase::AiAggregation,
-        ScanPhase::Reporting,
         // v3 features
         ScanPhase::ThreatModeling,
         ScanPhase::RootCauseDedup,
@@ -231,6 +230,7 @@ async fn run_sequential_phases(
         ScanPhase::CveBootstrap,
         ScanPhase::PocCompiler,
         ScanPhase::VariantSearch,
+        ScanPhase::Reporting,
     ];
 
     let is_phase_completed = |phase: &ScanPhase| completed_phases.contains(phase);
@@ -421,11 +421,25 @@ pub(super) async fn run_scanner(
         use crate::checkpoint::Checkpoint;
         match Checkpoint::load(&scanner.checkpoint_path.to_string_lossy()) {
             Ok(cp) => {
+                if cp.completed_phases.contains(&ScanPhase::Reporting) {
+                    eprintln!(
+                        "\u{1B}[32m[SCANNER] Scan already complete: {} phases finished, {} findings loaded.\n         Use --force to start a fresh scan.\u{1B}[0m",
+                        cp.completed_phases.len(),
+                        cp.findings_so_far.len()
+                    );
+                    return Ok(cp.findings_so_far);
+                }
+                eprintln!(
+                    "\u{1B}[33m[SCANNER] Resuming from checkpoint: {} phases already completed, {} findings loaded.\n         Use --force to start a fresh scan.\u{1B}[0m",
+                    cp.completed_phases.len(),
+                    cp.findings_so_far.len()
+                );
                 tracing::info!(
-                    "Loaded checkpoint from phase {:?} with {} findings, {} analyzed files",
+                    "Loaded checkpoint from phase {:?} with {} findings, {} analyzed files, completed phases: {:?}",
                     cp.current_phase,
                     cp.findings_so_far.len(),
-                    cp.analyzed_files.len()
+                    cp.analyzed_files.len(),
+                    cp.completed_phases
                 );
                 (cp.findings_so_far, cp.completed_phases, cp.analyzed_files)
             }
@@ -439,8 +453,8 @@ pub(super) async fn run_scanner(
     };
 
     let enable_parallel = true;
-    let sequential_phase_count = 16; // Including v3 features
-    let total_phases = 3 + sequential_phase_count;
+    let sequential_phase_count = 17; // Including v3 features (17 sequential phases)
+    let total_phases = 3 + sequential_phase_count; // 3 parallel + 17 sequential = 20
 
     let pb = scanner
         .progress
@@ -672,6 +686,7 @@ mod tests {
     #[test]
     fn test_sequential_phases_array_length() {
         let sequential_phases = [
+            ScanPhase::CweRouting,
             ScanPhase::LlmDiscovery,
             ScanPhase::LlmVerification,
             ScanPhase::SecurityAgentVerification,
@@ -680,7 +695,6 @@ mod tests {
             ScanPhase::CrossFileAnalysis,
             ScanPhase::ConfidenceScoring,
             ScanPhase::AiAggregation,
-            ScanPhase::Reporting,
             ScanPhase::ThreatModeling,
             ScanPhase::RootCauseDedup,
             ScanPhase::MultiVerifier,
@@ -688,14 +702,16 @@ mod tests {
             ScanPhase::CveBootstrap,
             ScanPhase::PocCompiler,
             ScanPhase::VariantSearch,
+            ScanPhase::Reporting,
         ];
 
-        assert_eq!(sequential_phases.len(), 16);
+        assert_eq!(sequential_phases.len(), 17);
     }
 
     #[test]
     fn test_sequential_phases_contains_expected_phases() {
         let sequential_phases = [
+            ScanPhase::CweRouting,
             ScanPhase::LlmDiscovery,
             ScanPhase::LlmVerification,
             ScanPhase::SecurityAgentVerification,
@@ -704,7 +720,6 @@ mod tests {
             ScanPhase::CrossFileAnalysis,
             ScanPhase::ConfidenceScoring,
             ScanPhase::AiAggregation,
-            ScanPhase::Reporting,
             ScanPhase::ThreatModeling,
             ScanPhase::RootCauseDedup,
             ScanPhase::MultiVerifier,
@@ -712,6 +727,7 @@ mod tests {
             ScanPhase::CveBootstrap,
             ScanPhase::PocCompiler,
             ScanPhase::VariantSearch,
+            ScanPhase::Reporting,
         ];
 
         assert!(sequential_phases.contains(&ScanPhase::LlmDiscovery));
@@ -724,6 +740,7 @@ mod tests {
     #[test]
     fn test_phase_ordering_first_phase() {
         let sequential_phases = [
+            ScanPhase::CweRouting,
             ScanPhase::LlmDiscovery,
             ScanPhase::LlmVerification,
             ScanPhase::SecurityAgentVerification,
@@ -732,7 +749,6 @@ mod tests {
             ScanPhase::CrossFileAnalysis,
             ScanPhase::ConfidenceScoring,
             ScanPhase::AiAggregation,
-            ScanPhase::Reporting,
             ScanPhase::ThreatModeling,
             ScanPhase::RootCauseDedup,
             ScanPhase::MultiVerifier,
@@ -740,22 +756,23 @@ mod tests {
             ScanPhase::CveBootstrap,
             ScanPhase::PocCompiler,
             ScanPhase::VariantSearch,
+            ScanPhase::Reporting,
         ];
 
-        assert_eq!(sequential_phases[0], ScanPhase::LlmDiscovery);
+        assert_eq!(sequential_phases[0], ScanPhase::CweRouting);
         assert_eq!(
             sequential_phases[sequential_phases.len() - 1],
-            ScanPhase::VariantSearch
+            ScanPhase::Reporting
         );
     }
 
     #[test]
     fn test_total_phases_calculation() {
         let enable_parallel = true;
-        let sequential_phase_count = 16;
+        let sequential_phase_count = 17;
         let total_phases = 3 + sequential_phase_count;
 
-        assert_eq!(total_phases, 19);
+        assert_eq!(total_phases, 20);
         assert!(enable_parallel);
     }
 
@@ -773,9 +790,9 @@ mod tests {
     #[test]
     fn test_phase_num_calculation() {
         let sequential_phases = [
+            ScanPhase::CweRouting,
             ScanPhase::LlmDiscovery,
             ScanPhase::LlmVerification,
-            ScanPhase::SecurityAgentVerification,
         ];
 
         for (i, phase) in sequential_phases.iter().enumerate() {
@@ -788,6 +805,7 @@ mod tests {
     #[test]
     fn test_phase_message_formatting() {
         let sequential_phases = [
+            ScanPhase::CweRouting,
             ScanPhase::LlmDiscovery,
             ScanPhase::LlmVerification,
             ScanPhase::SecurityAgentVerification,
@@ -796,7 +814,6 @@ mod tests {
             ScanPhase::CrossFileAnalysis,
             ScanPhase::ConfidenceScoring,
             ScanPhase::AiAggregation,
-            ScanPhase::Reporting,
             ScanPhase::ThreatModeling,
             ScanPhase::RootCauseDedup,
             ScanPhase::MultiVerifier,
@@ -804,6 +821,7 @@ mod tests {
             ScanPhase::CveBootstrap,
             ScanPhase::PocCompiler,
             ScanPhase::VariantSearch,
+            ScanPhase::Reporting,
         ];
 
         for (i, phase) in sequential_phases.iter().enumerate() {
@@ -811,6 +829,10 @@ mod tests {
             let total = sequential_phases.len() + 3;
 
             let phase_msg = match phase {
+                ScanPhase::CweRouting => format!(
+                    "Phase {}/{}: CWE routing (routing findings to specialized models)...",
+                    phase_num, total
+                ),
                 ScanPhase::LlmDiscovery => format!(
                     "Phase {}/{}: LLM discovery (enriching findings with context)...",
                     phase_num, total
@@ -843,10 +865,6 @@ mod tests {
                     "Phase {}/{}: AI aggregation (generating executive summary)...",
                     phase_num, total
                 ),
-                ScanPhase::Reporting => format!(
-                    "Phase {}/{}: Generating reports (JSON/HTML/SARIF)...",
-                    phase_num, total
-                ),
                 ScanPhase::ThreatModeling => format!(
                     "Phase {}/{}: Threat modeling (STRIDE analysis)...",
                     phase_num, total
@@ -870,6 +888,10 @@ mod tests {
                 ScanPhase::VariantSearch => {
                     format!("Phase {}/{}: Variant search...", phase_num, total)
                 }
+                ScanPhase::Reporting => format!(
+                    "Phase {}/{}: Generating reports (JSON/HTML/SARIF)...",
+                    phase_num, total
+                ),
                 _ => format!("Phase {}/{}: {:?}", phase_num, total, phase),
             };
 
@@ -1029,12 +1051,12 @@ mod tests {
     #[test]
     fn test_progress_bar_position_updates() {
         let start_position = 300;
-        let phase_count = 16;
+        let phase_count = 17;
 
         for i in 0..phase_count {
             let position = start_position + (i as u64) * 100;
             assert!(position >= 300);
-            assert!(position <= 1800);
+            assert!(position <= 2000);
         }
     }
 
@@ -1213,6 +1235,7 @@ mod tests {
     #[test]
     fn test_phase_message_for_all_sequential_phases() {
         let phases = [
+            (ScanPhase::CweRouting, "CWE routing"),
             (ScanPhase::LlmDiscovery, "LLM discovery"),
             (ScanPhase::LlmVerification, "LLM verification"),
             (
@@ -1227,7 +1250,6 @@ mod tests {
                 "Calculating confidence scores",
             ),
             (ScanPhase::AiAggregation, "AI aggregation"),
-            (ScanPhase::Reporting, "Generating reports"),
             (ScanPhase::ThreatModeling, "Threat modeling"),
             (ScanPhase::RootCauseDedup, "Root cause deduplication"),
             (ScanPhase::MultiVerifier, "Multi-verifier voting"),
@@ -1235,10 +1257,12 @@ mod tests {
             (ScanPhase::CveBootstrap, "CVE bootstrap"),
             (ScanPhase::PocCompiler, "PoC compilation"),
             (ScanPhase::VariantSearch, "Variant search"),
+            (ScanPhase::Reporting, "Generating reports"),
         ];
 
         for (phase, expected_text) in phases.iter() {
             let msg = match phase {
+                ScanPhase::CweRouting => "CWE routing (routing findings to specialized models)...",
                 ScanPhase::LlmDiscovery => "LLM discovery (enriching findings with context)...",
                 ScanPhase::LlmVerification => "LLM verification (validating findings)...",
                 ScanPhase::SecurityAgentVerification => {
@@ -1249,7 +1273,6 @@ mod tests {
                 ScanPhase::CrossFileAnalysis => "Cross-file dependency analysis...",
                 ScanPhase::ConfidenceScoring => "Calculating confidence scores...",
                 ScanPhase::AiAggregation => "AI aggregation (generating executive summary)...",
-                ScanPhase::Reporting => "Generating reports (JSON/HTML/SARIF)...",
                 ScanPhase::ThreatModeling => "Threat modeling (STRIDE analysis)...",
                 ScanPhase::RootCauseDedup => "Root cause deduplication...",
                 ScanPhase::MultiVerifier => "Multi-verifier voting...",
@@ -1257,6 +1280,7 @@ mod tests {
                 ScanPhase::CveBootstrap => "CVE bootstrap...",
                 ScanPhase::PocCompiler => "PoC compilation check...",
                 ScanPhase::VariantSearch => "Variant search...",
+                ScanPhase::Reporting => "Generating reports (JSON/HTML/SARIF)...",
                 _ => "unknown",
             };
 

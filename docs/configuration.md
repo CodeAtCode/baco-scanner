@@ -9,6 +9,57 @@ path = "/path/to/target"
 languages = ["c", "cpp", "python"]
 ```
 
+## Scanner Performance & Phase Flags
+
+The `[scanner.performance]` section controls incremental scanning and which optional analysis phases run. Each phase flag defaults to a safe value; side-effect-heavy phases (auto-patching, PoC compilation) are opt-in.
+
+```toml
+[scanner.performance]
+# Skip unchanged files based on SHA256 hash comparison (hashes persisted to output dir)
+enable_incremental_scan = false
+# Maximum number of parallel tasks for scanning operations
+max_parallel_tasks = 4
+# Enable LLM response caching to avoid redundant API calls
+enable_llm_cache = false
+# Enable file filtering to reduce false positives
+enable_file_filtering = true
+
+# --- Phase enable flags ---
+# Each flag controls whether a specific analysis phase runs during the scan.
+
+# Threat modeling using STRIDE analysis (adds LLM-based threat identification)
+enable_threat_modeling = true
+# Root-cause deduplication (collapses findings that share the same root cause)
+enable_root_cause_dedup = true
+# Multi-verifier cross-checking (runs additional LLM verification passes)
+enable_multi_verifier = true
+# Auto-patching (generates and validates fix patches in a staging worktree)
+# Writes code files and runs git commands — opt-in for safety
+enable_auto_patching = false
+# PoC compilation (compiles proof-of-concept exploits to verify findings)
+# Spawns external compilers — opt-in for safety
+enable_poc_compilation = false
+# Confidence refinement (re-calibrates finding confidence based on multi-source/cross-file signals)
+enable_confidence_refinement = true
+# CVE bootstrap (enriches findings with CVE data from external sources)
+enable_cve_bootstrap = true
+# Variant search (searches for variant instances of the same vulnerability pattern)
+enable_variant_search = true
+```
+
+| Flag | Default | Side effects |
+| --- | --- | --- |
+| `enable_threat_modeling` | `true` | None (read-only analysis) |
+| `enable_root_cause_dedup` | `true` | None |
+| `enable_multi_verifier` | `true` | Additional LLM API calls |
+| `enable_auto_patching` | `false` | Writes code files, runs git commands in a staging worktree |
+| `enable_poc_compilation` | `false` | Spawns external compilers |
+| `enable_confidence_refinement` | `true` | None |
+| `enable_cve_bootstrap` | `true` | External network requests to NVD/CISA |
+| `enable_variant_search` | `true` | Additional LLM API calls |
+
+See [`docs/architecture.md`](architecture.md) for the full 20-phase pipeline description.
+
 ## LLM Configuration
 
 BACO supports single or multiple models per phase. When multiple models are configured, they are used in round-robin fashion to distribute load across different models/providers.
@@ -64,7 +115,7 @@ keep_artifacts = false   # Keep generated test files
 - Uses tools (file_read, pattern_search) for deeper analysis
 - Provides more accurate vulnerability descriptions with context
 
-### 2. SecurityAgent Verification (Phase 6)
+### 2. SecurityAgent Verification (Phase 7)
 A **separate verification phase** that uses an embedded security agent with tools to **prove or disprove** findings:
 
 - **file_read**: Examine vulnerable code in context

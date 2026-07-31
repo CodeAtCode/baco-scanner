@@ -300,7 +300,6 @@ pub fn create_test_config() -> ScannerConfig {
             max_file_size_kb: 1024,
             exclude_paths: vec![],
             semgrep: SemgrepSettings {
-                enabled: false, // Disable semgrep in tests
                 ..Default::default()
             },
             performance: PerformanceSettings {
@@ -356,7 +355,6 @@ pub fn create_test_config() -> ScannerConfig {
         router: Default::default(),
         aggregation: Default::default(),
         rulesynth: Default::default(),
-        orchestration: Default::default(),
         normalization: Default::default(),
         cpg: Default::default(),
         exploit: Default::default(),
@@ -402,7 +400,6 @@ pub fn create_minimal_config() -> ScannerConfig {
         router: Default::default(),
         aggregation: Default::default(),
         rulesynth: Default::default(),
-        orchestration: Default::default(),
         normalization: Default::default(),
         cpg: Default::default(),
         exploit: Default::default(),
@@ -686,7 +683,6 @@ mod tests {
         let config = create_test_config();
 
         assert_eq!(config.project.name, "test-project");
-        assert!(!config.scanner.semgrep.enabled);
     }
 
     #[test]

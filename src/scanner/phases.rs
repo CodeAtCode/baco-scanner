@@ -123,7 +123,7 @@ pub async fn run_phase(
         ScanPhase::Semgrep => {
             tracing::info!("Running Semgrep phase on {:?}", target_path);
             let runner = SemgrepRunner::new(None, config.scanner.semgrep.exclude_rules.clone());
-            pb.set_message("Phase 2/26: Running Semgrep static analysis (scanning for known vulnerability patterns)...");
+            pb.set_message("Phase 2/20: Running Semgrep static analysis (scanning for known vulnerability patterns)...");
 
             // Enable steady tick for progress bar timer
             pb.enable_steady_tick(std::time::Duration::from_millis(100));
@@ -136,7 +136,7 @@ pub async fn run_phase(
                     let semgrep_count = semgrep_findings.len();
                     findings.extend(semgrep_findings);
                     pb.set_message(format!(
-                        "Phase 2/26: Semgrep complete - {} findings discovered",
+                        "Phase 2/20: Semgrep complete - {} findings discovered",
                         semgrep_count
                     ));
                     pb.set_position(pb.position() + 100);
@@ -145,7 +145,7 @@ pub async fn run_phase(
                 }
                 Err(e) => {
                     tracing::warn!("Semgrep failed: {}. Skipping phase.", e);
-                    pb.set_message("Phase 2/26: Semgrep failed - skipping phase");
+                    pb.set_message("Phase 2/20: Semgrep failed - skipping phase");
                     pb.set_position(pb.position() + 100);
 
                     Ok((findings, analyzed_files.to_vec()))
@@ -155,11 +155,10 @@ pub async fn run_phase(
         ScanPhase::LlmStaticAnalysis => {
             tracing::info!("Running LLM static analysis on {:?}", target_path);
 
-            // Reset progress bar to 0-100 for this phase
-            pb.set_length(100);
-            pb.set_position(0);
+            // Capture base position for intra-phase progress
+            let base = pb.position();
             pb.set_message(
-                "Phase 3/26: LLM static analysis (analyzing files for vulnerabilities)...",
+                "Phase 3/20: LLM static analysis (analyzing files for vulnerabilities)...",
             );
 
             let index = FileIndex::index_project(
@@ -221,9 +220,9 @@ pub async fn run_phase(
                     let file_path_str = file_info.path.to_string_lossy().to_string();
                     if analyzed_files.contains(&file_path_str) {
                         let progress_pct = ((i as f64 / file_count as f64) * 100.0) as u64;
-                        pb.set_position(progress_pct);
+                        pb.set_position(base + progress_pct);
                         pb.set_message(format!(
-                            "Phase 3/26: Skipping already analyzed [{}]: {}",
+                            "Phase 3/20: Skipping already analyzed [{}]: {}",
                             i + 1,
                             file_info.path.display()
                         ));
@@ -232,14 +231,14 @@ pub async fn run_phase(
                     let progress_pct = ((i as f64 / file_count as f64) * 100.0) as u64;
                     let pb_msg = pb.clone();
                     let msg = format!(
-                        "Phase 3/26: LLM analyzing [{}/{}] ({:.0}%): {}",
+                        "Phase 3/20: LLM analyzing [{}/{}] ({:.0}%): {}",
                         i + 1,
                         file_count,
                         progress_pct,
                         file_info.path.display()
                     );
                     pb_msg.set_message(msg);
-                    pb_msg.set_position(progress_pct);
+                    pb_msg.set_position(base + progress_pct);
 
                     match analyzer.analyze_file(&file_info.path).await {
                         Ok(file_findings) => {
@@ -247,7 +246,7 @@ pub async fn run_phase(
                             new_analyzed_files.push(file_path_str);
                             let pb_msg2 = pb.clone();
                             let msg = format!(
-                                "Phase 3/26: LLM analyzing [{}/{}] ({:.0}%): {} - {} findings total",
+                                "Phase 3/20: LLM analyzing [{}/{}] ({:.0}%): {} - {} findings total",
                                 i + 1, file_count, progress_pct,
                                 file_info.path.display(),
                                 llm_findings.len()
@@ -264,7 +263,7 @@ pub async fn run_phase(
                             let error_lines: Vec<&str> = e.lines().take(3).collect();
                             let error_summary = error_lines.join(" | ");
                             let msg = format!(
-                                "Phase 3/26: {} - {} - FAILED: {}",
+                                "Phase 3/20: {} - {} - FAILED: {}",
                                 file_info.path.display(),
                                 error_summary,
                                 if i + 1 < file_count {
@@ -281,18 +280,14 @@ pub async fn run_phase(
                     tokio::task::yield_now().await;
                 }
 
-                // Set position to 100 when complete
-                pb.set_position(100);
+                // Set position to base + 100 when complete
+                pb.set_position(base + 100);
 
                 findings.extend(llm_findings.clone());
                 pb.set_message(format!(
-                    "Phase 3/26: LLM static analysis complete - {} findings discovered",
+                    "Phase 3/20: LLM static analysis complete - {} findings discovered",
                     llm_findings.len()
                 ));
-
-                // Reset for next phase: set length back to show total progress
-                pb.set_length(1100);
-                pb.set_position(300); // End of phase 3 (3/26 * 100)
             } else {
                 tracing::debug!("No API key for LLM analysis, skipping static analysis");
             }
@@ -301,12 +296,11 @@ pub async fn run_phase(
         }
         ScanPhase::LlmDiscovery => {
             tracing::info!("Running LLM discovery phase...");
-            pb.set_length(100);
-            pb.set_position(0);
-            pb.set_message("Phase 4/26: LLM discovery (enriching vulnerability descriptions with AI context)...");
+            let base = pb.position();
+            pb.set_message("Phase 4/20: LLM discovery (enriching vulnerability descriptions with AI context)...");
 
             // Step 1: Detect project stack and fetch CVEs for threat intelligence
-            pb.set_message("Phase 4/26: Detecting project stack and fetching CVE data...");
+            pb.set_message("Phase 4/20: Detecting project stack and fetching CVE data...");
             let target_path_str = target_path.to_string_lossy().to_string();
             let bootstrapper = CveBootstrapper::new(target_path_str.clone());
 
@@ -408,9 +402,9 @@ pub async fn run_phase(
                     } else {
                         100
                     };
-                    pb.set_position(progress_pct);
+                    pb.set_position(base + progress_pct);
                     pb.set_message(format!(
-                        "Phase 4/26: Enriching findings [{}/{}] - {}",
+                        "Phase 4/20: Enriching findings [{}/{}] - {}",
                         i + 1,
                         total_findings,
                         finding.title
@@ -490,29 +484,23 @@ Respond with ONLY JSON:
                         }
                     }
                 }
-                pb.set_position(100);
+                pb.set_position(base + 100);
                 pb.set_message(format!(
-                    "Phase 4/26: Discovery complete - enriched {} findings",
+                    "Phase 4/20: Discovery complete - enriched {} findings",
                     total_findings
                 ));
-
-                // Reset for next phase
-                pb.set_length(1100);
-                pb.set_position(400); // End of phase 4 (4/26 * 100)
             } else {
                 tracing::debug!("No API key for discovery, skipping LLM enrichment");
-                pb.set_message("Phase 4/26: No API key configured - skipping discovery");
-                pb.set_length(1100);
-                pb.set_position(400);
+                pb.set_message("Phase 4/20: No API key configured - skipping discovery");
+                pb.set_position(base + 100);
             }
             Ok((findings, analyzed_files.to_vec()))
         }
         ScanPhase::LlmVerification => {
             tracing::info!("Running LLM verification phase...");
-            pb.set_length(100);
-            pb.set_position(0);
+            let base = pb.position();
             pb.set_message(
-                "Phase 5/26: LLM verification (validating findings with AI analysis)...",
+                "Phase 5/20: LLM verification (validating findings with AI analysis)...",
             );
 
             let total_findings = findings.len();
@@ -537,9 +525,9 @@ Respond with ONLY JSON:
                         } else {
                             100
                         };
-                        pb.set_position(progress_pct);
+                        pb.set_position(base + progress_pct);
                         pb.set_message(format!(
-                            "Phase 5/26: Agent verifying [{}/{}] - {}",
+                            "Phase 5/20: Agent verifying [{}/{}] - {}",
                             i + 1,
                             total_findings,
                             finding.title
@@ -581,9 +569,9 @@ Respond with ONLY JSON:
                         } else {
                             100
                         };
-                        pb.set_position(progress_pct);
+                        pb.set_position(base + progress_pct);
                         pb.set_message(format!(
-                            "Phase 5/26: Verifying findings [{}/{}] - {}",
+                            "Phase 5/20: Verifying findings [{}/{}] - {}",
                             i + 1,
                             total_findings,
                             finding.title
@@ -622,18 +610,18 @@ Respond with ONLY JSON:
                         }
                     }
                 }
-                pb.set_position(100);
+                pb.set_position(base + 100);
                 pb.set_message(format!(
-                    "Phase 5/26: Verification complete - verified {} findings",
+                    "Phase 5/20: Verification complete - verified {} findings",
                     total_findings
                 ));
             } else {
                 tracing::debug!("No API key for verification, skipping LLM verification");
-                pb.set_message("Phase 5/26: No API key configured - skipping verification");
+                pb.set_message("Phase 5/20: No API key configured - skipping verification");
             }
 
             // Step 2: Generate PoCs for high-severity confirmed findings
-            pb.set_message("Phase 5/26: Generating PoCs for high-severity findings...");
+            pb.set_message("Phase 5/20: Generating PoCs for high-severity findings...");
 
             let context = crate::analysis_context::AnalysisContext::default();
             let poc_engine = PoCGenerationEngine::new();
@@ -732,25 +720,23 @@ Respond with ONLY JSON:
         ScanPhase::SecurityAgentVerification => {
             tracing::info!("Running SecurityAgent verification phase...");
 
+            let base = pb.position();
+
             if !config.agent.enabled {
                 tracing::debug!("Agent mode disabled, skipping SecurityAgent verification");
-                pb.set_message("Phase 6/26: Agent mode disabled - skipping");
-                pb.set_length(100);
-                pb.set_position(100);
+                pb.set_message("Phase 6/20: Agent mode disabled - skipping");
+                pb.set_position(base + 100);
                 return Ok((findings, analyzed_files.to_vec()));
             }
 
             let Some(_api_key) = &config.llm.phases.discovery.api_key else {
                 tracing::debug!("No API key for agent, skipping SecurityAgent verification");
-                pb.set_message("Phase 6/26: No API key - skipping");
-                pb.set_length(100);
-                pb.set_position(100);
+                pb.set_message("Phase 6/20: No API key - skipping");
+                pb.set_position(base + 100);
                 return Ok((findings, analyzed_files.to_vec()));
             };
 
-            pb.set_length(100);
-            pb.set_position(0);
-            pb.set_message("Phase 6/26: SecurityAgent verification (tool-based analysis)...");
+            pb.set_message("Phase 6/20: SecurityAgent verification (tool-based analysis)...");
 
             let total_findings = findings.len();
 
@@ -763,9 +749,9 @@ Respond with ONLY JSON:
                 } else {
                     100
                 };
-                pb.set_position(progress_pct);
+                pb.set_position(base + progress_pct);
                 pb.set_message(format!(
-                    "Phase 6/26: SecurityAgent verifying [{}/{}] - {}",
+                    "Phase 6/20: SecurityAgent verifying [{}/{}] - {}",
                     i + 1,
                     total_findings,
                     finding.title
@@ -821,7 +807,7 @@ Respond with ONLY JSON:
                 }
             }
 
-            pb.set_position(100);
+            pb.set_position(base + 100);
             tracing::info!(
                 "SecurityAgent verification complete - {} findings",
                 total_findings
@@ -1244,6 +1230,35 @@ Respond with ONLY JSON:
                 }
             }
         }
+        ScanPhase::CweRouting => {
+            if !config.router.enabled {
+                tracing::info!("CWE router disabled via config, skipping CWE routing phase");
+                return Ok((findings, analyzed_files.to_vec()));
+            }
+
+            tracing::info!("Running CWE routing phase (routing findings to specialized models)");
+
+            let router = crate::router::CweRouter::from_config(&config.router);
+            let mut routed_count = 0usize;
+
+            for finding in &mut findings {
+                let language = crate::report::html::utilities::detect_language(&finding.file_path);
+                let spec = router.route(&finding.cwe_id, language);
+
+                if let Some(ref model) = spec.model_override {
+                    finding.llm_model = Some(model.clone());
+                    routed_count += 1;
+                }
+            }
+
+            tracing::info!(
+                "CWE routing complete: {} of {} findings routed to specialized models",
+                routed_count,
+                findings.len()
+            );
+
+            Ok((findings, analyzed_files.to_vec()))
+        }
         _ => {
             tracing::warn!("Unknown phase: {:?}. Skipping.", phase);
             Ok((findings, analyzed_files.to_vec()))
@@ -1324,7 +1339,6 @@ mod tests {
             router: crate::config::RouterConfig::default(),
             aggregation: crate::config::AggregationConfig::default(),
             rulesynth: crate::config::RuleSynthConfig::default(),
-            orchestration: crate::config::OrchestrationConfig::default(),
             normalization: crate::config::NormalizationConfig::default(),
             cpg: crate::config::CpgConfig::default(),
             exploit: crate::config::ExploitConfig::default(),
@@ -1913,7 +1927,9 @@ mod tests {
     #[tokio::test]
     async fn test_threat_modeling_phase_basic() {
         let scanner = create_test_scanner();
-        let config = create_test_config();
+        let mut config = create_test_config();
+        // Disable threat modeling to test the phase logic without LLM calls
+        config.scanner.performance.enable_threat_modeling = false;
         let pb = ProgressBar::hidden();
         let metrics_tracker = LlmMetricsTracker::new();
         let analyzed_files: Vec<String> = vec![];

@@ -26,8 +26,6 @@ pub struct ScannerConfig {
     #[serde(default)]
     pub rulesynth: RuleSynthConfig,
     #[serde(default)]
-    pub orchestration: OrchestrationConfig,
-    #[serde(default)]
     pub normalization: NormalizationConfig,
     #[serde(default)]
     pub cpg: CpgConfig,
@@ -202,52 +200,17 @@ pub struct ScannerSettings {
     pub performance: PerformanceSettings,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SemgrepSettings {
-    #[serde(default = "default_true")]
-    pub enabled: bool,
-    #[serde(default)]
-    pub cache_dir: Option<String>,
-    #[serde(default)]
     pub exclude_rules: Vec<String>,
-}
-
-impl Default for SemgrepSettings {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            cache_dir: None,
-            exclude_rules: Vec::new(),
-        }
-    }
-}
-
-fn default_true() -> bool {
-    true
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PerformanceSettings {
     #[serde(default)]
-    pub enable_parallel_phases: bool,
-    #[serde(default = "default_max_parallel_tasks")]
-    pub max_parallel_tasks: usize,
-    #[serde(default)]
-    pub enable_llm_cache: bool,
-    #[serde(default)]
     pub enable_incremental_scan: bool,
     #[serde(default)]
-    pub llm_cache_dir: Option<String>,
-    #[serde(default = "default_enable_file_filtering")]
-    pub enable_file_filtering: bool,
-    #[serde(default)]
-    pub enable_batch_llm: bool,
-    #[serde(default = "default_batch_size")]
-    pub batch_size: usize,
-    #[serde(default)]
     pub early_termination_threshold: f32,
-    #[serde(default = "default_enable_v3_features")]
-    pub enable_v3_features: bool,
     // v3 feature flags
     #[serde(default = "default_enable_threat_modeling")]
     pub enable_threat_modeling: bool,
@@ -265,23 +228,13 @@ pub struct PerformanceSettings {
     pub enable_cve_bootstrap: bool,
     #[serde(default = "default_enable_variant_search")]
     pub enable_variant_search: bool,
-    #[serde(default = "default_true")]
-    pub never_submit_filter: bool,
 }
 
 impl Default for PerformanceSettings {
     fn default() -> Self {
         Self {
-            enable_parallel_phases: false,
-            max_parallel_tasks: default_max_parallel_tasks(),
-            enable_llm_cache: false,
             enable_incremental_scan: false,
-            llm_cache_dir: None,
-            enable_file_filtering: default_enable_file_filtering(),
-            enable_batch_llm: false,
-            batch_size: default_batch_size(),
             early_termination_threshold: 1000.0,
-            enable_v3_features: default_enable_v3_features(),
             enable_threat_modeling: default_enable_threat_modeling(),
             enable_root_cause_dedup: default_enable_root_cause_dedup(),
             enable_multi_verifier: default_enable_multi_verifier(),
@@ -290,7 +243,6 @@ impl Default for PerformanceSettings {
             enable_confidence_refinement: default_enable_confidence_refinement(),
             enable_cve_bootstrap: default_enable_cve_bootstrap(),
             enable_variant_search: default_enable_variant_search(),
-            never_submit_filter: default_true(),
         }
     }
 }
@@ -513,7 +465,7 @@ pub struct AggregationConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RuleSynthConfig {
     /// Whether rule synthesis is enabled
-    #[serde(default = "default_false")]
+    #[serde(default)]
     pub enabled: bool,
     /// Output directory for generated rules
     #[serde(default = "default_rulesynth_output_dir")]
@@ -533,14 +485,6 @@ impl Default for RuleSynthConfig {
     }
 }
 
-fn default_max_parallel_tasks() -> usize {
-    4
-}
-
-fn default_false() -> bool {
-    false
-}
-
 fn default_rulesynth_output_dir() -> PathBuf {
     PathBuf::from("./output/generated_rules")
 }
@@ -549,28 +493,16 @@ fn default_max_rules_per_cwe() -> usize {
     5
 }
 
-fn default_enable_file_filtering() -> bool {
+fn default_enable_threat_modeling() -> bool {
     true
 }
 
-fn default_batch_size() -> usize {
-    8
-}
-
-fn default_enable_v3_features() -> bool {
-    false
-}
-
-fn default_enable_threat_modeling() -> bool {
-    false
-}
-
 fn default_enable_root_cause_dedup() -> bool {
-    false
+    true
 }
 
 fn default_enable_multi_verifier() -> bool {
-    false
+    true
 }
 
 fn default_enable_auto_patching() -> bool {
@@ -591,46 +523,6 @@ fn default_enable_cve_bootstrap() -> bool {
 
 fn default_enable_variant_search() -> bool {
     true
-}
-
-/// Orchestration configuration for T2.5 six-phase pipeline
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OrchestrationConfig {
-    /// Whether orchestration is enabled
-    #[serde(default = "default_true")]
-    pub enabled: bool,
-    /// Hunt classes to run (default: all 7 Cloudflare classes)
-    #[serde(default)]
-    pub hunt_classes: Vec<String>,
-    /// Batch size for validation phase
-    #[serde(default = "default_validate_batch_size")]
-    pub validate_batch_size: usize,
-    /// Whether independent verification is enabled
-    #[serde(default = "default_true")]
-    pub independent_verify: bool,
-}
-
-impl Default for OrchestrationConfig {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            hunt_classes: vec![
-                "injection".into(),
-                "auth".into(),
-                "xss".into(),
-                "path_traversal".into(),
-                "crypto".into(),
-                "resource".into(),
-                "deserialization".into(),
-            ],
-            validate_batch_size: 10,
-            independent_verify: true,
-        }
-    }
-}
-
-fn default_validate_batch_size() -> usize {
-    10
 }
 
 /// Normalization tier for confidence calibration.

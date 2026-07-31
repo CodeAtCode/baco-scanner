@@ -40,6 +40,9 @@ mod error_tests;
 // Checkpoint save/load tests
 mod scanner_checkpoint_tests;
 
+// Checkpoint resume functionality tests
+mod checkpoint_resume_tests;
+
 // Scanner core tests
 mod scanner_core_tests;
 
@@ -65,6 +68,12 @@ mod global_fp;
 
 // MoE router tests
 mod cwe_router;
+
+// CWE Routing phase tests
+mod cwe_routing_tests;
+
+// CWE Routing phase integration tests
+mod cwe_routing_phase_tests;
 
 // Router unit tests
 mod router_tests;
@@ -106,7 +115,7 @@ mod scanner_types_tests;
 // Additional coverage: scanner phases, pipeline, report/html
 mod pipeline_tests;
 mod report_html_tests;
-mod scanner_phases_tests;
+mod root_cause_dedup_phase_tests;
 
 // Additional coverage: agent sandbox/session/tools, cve+misc, chain analysis, core utilities
 mod agent_sandbox_tests;
@@ -141,6 +150,12 @@ mod rulesynth_deep_tests;
 // Free function tests for rulesynth
 mod rulesynth_free_fns_tests;
 
+// Phase dispatch tests - verify all ScanPhase variants have match arms
+mod phase_dispatch_tests;
+
 // Coverage gap closure — variant_search and diff_analysis edge cases
 mod diff_analysis_edge_tests;
 mod variant_search_edge_tests;
+
+// Pipeline ordering and phase sequence tests
+mod pipeline_ordering_tests;

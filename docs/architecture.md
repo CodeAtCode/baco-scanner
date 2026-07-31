@@ -11,81 +11,89 @@ BACO uses a **data-driven PhaseGraph** (`src/scanner/pipeline/orchestrator.rs`) 
 
 ## Pipeline Phases
 
-**Core Pipeline (29 phases):**
+**Core Pipeline (20 phases):**
 
-### Detection
+### Parallel Detection (3 phases)
 1. **Indexing**: Build file list and call graph
 2. **Semgrep**: Static analysis with predefined rules
-3. **CWE Routing**: Mixture-of-experts routing to appropriate analyzers
-4. **CPG Slicing**: CPG-guided code slicing for precise analysis
-5. **LLM Static Analysis**: Independent LLM-based code analysis
-6. **Hunt**: Targeted vulnerability hunting
-7. **Validate**: Validate findings with context
-8. **Independent Verify**: Independent verification pass
-9. **Exploit Synthesis**: Generate exploit proofs
-10. **LLM Discovery**: Multi-model vulnerability detection with CVE enrichment
-11. **LLM Verification**: Validation with PoC generation and mitigation code
+3. **LLM Static Analysis**: Independent LLM-based code analysis
 
-### Triage
-12. **SecurityAgent Verification**: Tool-based agent verification using file_read, pattern_search, file_write, run_test
-13. **Ticket Cross-Ref**: Search GitHub/GitLab for existing reports
-14. **Git Analysis**: Check commit history for related fixes
-15. **Cross-File Analysis**: Trace data flow between files
-16. **Confidence Scoring**: Calculate composite reliability score
+### Sequential Discovery (3 phases)
+4. **CWE Routing**: Mixture-of-experts routing to appropriate analyzers
+5. **LLM Discovery**: Multi-model vulnerability detection with CVE enrichment
+6. **LLM Verification**: Validation with PoC generation and mitigation code
 
-### Aggregation
-17. **AI Aggregation**: Generate executive summary, semantic deduplication, and LLM-enriched descriptions
-18. **Reporting**: Generate JSON, HTML, and SARIF outputs
+### Triage (5 phases)
+7. **SecurityAgent Verification**: Tool-based agent verification using file_read, pattern_search, file_write, run_test
+8. **Ticket Cross-Ref**: Search GitHub/GitLab for existing reports
+9. **Git Analysis**: Check commit history for related fixes
+10. **Cross-File Analysis**: Trace data flow between files
+11. **Confidence Scoring**: Calculate composite reliability score
 
-### Output
-19. **Threat Modeling**: Generate THREAT_MODEL.md with attack surface analysis
-20. **Root Cause Dedup**: Deduplicate findings by root cause instead of location
-21. **Multi-Verifier**: Multiple verification methods with majority voting
-22. **Auto-Patching**: Generate and validate patches with staging
-23. **CVE Bootstrap**: Enrich findings with NVD/CISA KEV data
-24. **PoC Compiler**: Verify PoC code compiles successfully
-25. **Variant Search**: Search for related vulnerability variants
-26. **Rule Synthesis**: MOCQ LLM→semgrep rule synthesis
-27. **Complete**: Final phase marker
+### Aggregation (2 phases)
+12. **AI Aggregation**: Generate executive summary, semantic deduplication, and LLM-enriched descriptions
+13. **Threat Modeling**: Generate THREAT_MODEL.md with attack surface analysis
+
+### Post-Processing (6 phases)
+14. **Root Cause Dedup**: Deduplicate findings by root cause instead of location
+15. **Multi-Verifier**: Multiple verification methods with majority voting
+16. **Auto-Patching**: Generate and validate patches with staging
+17. **CVE Bootstrap**: Enrich findings with NVD/CISA KEV data
+18. **PoC Compiler**: Verify PoC code compiles successfully
+19. **Variant Search**: Search for related vulnerability variants
+
+### Output (1 phase)
+20. **Reporting**: Generate JSON, HTML, and SARIF outputs
 
 ## Data Flow
 
 ```mermaid
 flowchart LR
-    subgraph Detection["Detection"]
+    subgraph Parallel["Parallel Detection"]
         direction TB
-        A1[Indexing] --> A2[Semgrep] --> A3[CWE Routing] --> A4[CPG Slicing]
-        A4 --> A5[LLM Static] --> A6[Hunt] --> A7[Validate]
-        A7 --> A8[Independent Verify] --> A9[Exploit Syn] --> A10[LLM Discovery]
-        A10 --> A11[LLM Verify]
+        A1[Indexing] --> A2[Semgrep] --> A3[LLM Static]
+    end
+
+    subgraph Discovery["Sequential Discovery"]
+        direction TB
+        B1[CWE Routing] --> B2[LLM Discovery] --> B3[LLM Verification]
     end
 
     subgraph Triage["Triage"]
         direction TB
-        B1[SecurityAgent Verify] --> B2[Ticket Cross-Ref] --> B3[Git Analysis]
-        B3 --> B4[Cross-File] --> B5[Confidence]
+        C1[SecurityAgent Verify] --> C2[Ticket Cross-Ref] --> C3[Git Analysis] --> C4[Cross-File] --> C5[Confidence]
     end
 
     subgraph Aggregation["Aggregation"]
         direction TB
-        C1[AI Aggregation] --> C2[Reporting]
+        D1[AI Aggregation] --> D2[Threat Modeling]
+    end
+
+    subgraph PostProcessing["Post-Processing"]
+        direction TB
+        E1[Root Cause Dedup] --> E2[Multi-Verifier] --> E3[Auto-Patch] --> E4[CVE Bootstrap] --> E5[PoC Compiler] --> E6[Variant Search]
     end
 
     subgraph Output["Output"]
         direction TB
-        D1[Threat Model] --> D2[Root Cause Dedup] --> D3[Multi-Verifier]
-        D3 --> D4[Auto-Patch] --> D5[CVE Bootstrap]
-        D5 --> D6[PoC Compiler] --> D7[Variant Search]
-        D7 --> D8[Rule Synthesis] --> D9[Complete]
+        F1[Reporting]
     end
 
-    Detection --> Triage --> Aggregation --> Output
+    A3 --> B1
+    B3 --> C1
+    C5 --> D1
+    D2 --> E1
+    E6 --> F1
 
-    classDef detection fill:#e1f5fe
-    classDef triage fill:#fff3e0
-    classDef aggregation fill:#f3e5f5
-    classDef output fill:#e8f5e9
-    class Detection,Triage,Aggregation,Output detection
+    classDef parallel fill:#e1f5fe
+    classDef discovery fill:#fff3e0
+    classDef triage fill:#f3e5f5
+    classDef aggregation fill:#e8f5e9
+    classDef postproc fill:#fce4ec
+    classDef output fill:#eceff1
+    class Parallel,Discovery,Triage,Aggregation,PostProcessing,Output parallel
 ```
 
 **Checkpoint markers**: Checkpoints are saved after each major phase, enabling resume from any point in the pipeline.
+
+**Orphaned phases**: The following modules exist but are NOT wired into the pipeline and do NOT run: CpgSlice, Hunt, Validate, IndependentVerify, ExploitSynth, RuleSynthesis.

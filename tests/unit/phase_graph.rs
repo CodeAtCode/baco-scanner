@@ -1,146 +1,218 @@
-//! T2.5 phase graph tests - verify correct phase ordering
+//! PhaseGraph tests — verify the 20-phase pipeline ordering and navigation.
+//!
+//! The PhaseGraph must mirror the real orchestrator pipeline exactly:
+//! Indexing → Semgrep → CweRouting → LlmStaticAnalysis → … → VariantSearch → Reporting.
 
-use baco::checkpoint::Checkpoint;
 use baco::checkpoint::ScanPhase;
+use baco::config::ScannerConfig;
+use baco::scanner::{Orchestrator, PhaseGraph};
+
+const EXPECTED_PHASES: [ScanPhase; 20] = [
+    ScanPhase::Indexing,
+    ScanPhase::Semgrep,
+    ScanPhase::CweRouting,
+    ScanPhase::LlmStaticAnalysis,
+    ScanPhase::LlmDiscovery,
+    ScanPhase::LlmVerification,
+    ScanPhase::SecurityAgentVerification,
+    ScanPhase::TicketCrossRef,
+    ScanPhase::GitAnalysis,
+    ScanPhase::CrossFileAnalysis,
+    ScanPhase::ConfidenceScoring,
+    ScanPhase::AiAggregation,
+    ScanPhase::ThreatModeling,
+    ScanPhase::RootCauseDedup,
+    ScanPhase::MultiVerifier,
+    ScanPhase::AutoPatching,
+    ScanPhase::CveBootstrap,
+    ScanPhase::PocCompiler,
+    ScanPhase::VariantSearch,
+    ScanPhase::Reporting,
+];
 
 #[test]
-fn test_phase_ordering_complete_sequence() {
-    // Verify the complete phase sequence including T2.5 phases
-    let expected_order = vec![
-        ScanPhase::Indexing,
-        ScanPhase::Semgrep,
-        ScanPhase::CweRouting,
-        ScanPhase::CpgSlice,
-        ScanPhase::LlmStaticAnalysis,
-        ScanPhase::Hunt,
-        ScanPhase::Validate,
-        ScanPhase::IndependentVerify,
-        ScanPhase::ExploitSynth,
-        ScanPhase::LlmDiscovery,
-        ScanPhase::LlmVerification,
-        ScanPhase::TicketCrossRef,
-        ScanPhase::GitAnalysis,
-        ScanPhase::CrossFileAnalysis,
-        ScanPhase::ConfidenceScoring,
-        ScanPhase::AiAggregation,
-        ScanPhase::Reporting,
-        ScanPhase::ThreatModeling,
-        ScanPhase::RootCauseDedup,
-        ScanPhase::MultiVerifier,
-        ScanPhase::AutoPatching,
-        ScanPhase::CveBootstrap,
-        ScanPhase::PocCompiler,
-        ScanPhase::VariantSearch,
-        ScanPhase::SecurityAgentVerification,
-        ScanPhase::RuleSynthesis,
-        ScanPhase::Complete,
-    ];
+fn test_phase_count_is_20() {
+    let graph = PhaseGraph::new();
+    assert_eq!(graph.phases().len(), 20);
+}
 
+#[test]
+fn test_first_phase_is_indexing() {
+    let graph = PhaseGraph::new();
+    assert_eq!(graph.phases()[0], ScanPhase::Indexing);
+}
+
+#[test]
+fn test_last_phase_is_reporting() {
+    let graph = PhaseGraph::new();
+    let phases = graph.phases();
+    assert_eq!(phases[phases.len() - 1], ScanPhase::Reporting);
+}
+
+#[test]
+fn test_cwe_routing_at_index_2() {
+    let graph = PhaseGraph::new();
+    assert_eq!(graph.phases()[2], ScanPhase::CweRouting);
+}
+
+#[test]
+fn test_full_phase_ordering() {
+    let graph = PhaseGraph::new();
+    let phases = graph.phases();
+
+    for (i, expected) in EXPECTED_PHASES.iter().enumerate() {
+        assert_eq!(
+            phases[i], *expected,
+            "Phase mismatch at index {i}: expected {expected:?}, got {:?}",
+            phases[i]
+        );
+    }
+}
+
+#[test]
+fn test_no_duplicate_phases() {
+    let graph = PhaseGraph::new();
+    let phases = graph.phases();
+    let unique_count: std::collections::HashSet<_> = phases.iter().collect();
     assert_eq!(
-        expected_order.len(),
-        27,
-        "Phase ordering must include all phases"
+        unique_count.len(),
+        phases.len(),
+        "Duplicate phases detected"
     );
 }
 
 #[test]
-fn test_t21_cwe_routing_present() {
-    // T2.1 added CweRouting - verify it's still present
-    let _cwe_routing_exists = ScanPhase::CweRouting;
+fn test_next_phase_semgrep_to_cwe_routing() {
+    let graph = PhaseGraph::new();
+    assert_eq!(
+        graph.next_phase(&ScanPhase::Semgrep),
+        Some(&ScanPhase::CweRouting)
+    );
 }
 
 #[test]
-fn test_t31_cpg_slice_present() {
-    // T3.1 added CpgSlice - verify it's present
-    assert_eq!(ScanPhase::CpgSlice, ScanPhase::CpgSlice);
+fn test_next_phase_cwe_routing_to_llm_static() {
+    let graph = PhaseGraph::new();
+    assert_eq!(
+        graph.next_phase(&ScanPhase::CweRouting),
+        Some(&ScanPhase::LlmStaticAnalysis)
+    );
 }
 
 #[test]
-fn test_t23_rule_synthesis_present() {
-    // T2.3 added RuleSynthesis - verify it's still present
-    assert!(ScanPhase::RuleSynthesis == ScanPhase::RuleSynthesis);
+fn test_next_phase_variant_search_to_reporting() {
+    let graph = PhaseGraph::new();
+    assert_eq!(
+        graph.next_phase(&ScanPhase::VariantSearch),
+        Some(&ScanPhase::Reporting)
+    );
 }
 
 #[test]
-fn test_t25_hunt_phase_present() {
-    // T2.5 added Hunt phase
-    assert_eq!(ScanPhase::Hunt, ScanPhase::Hunt);
+fn test_next_phase_reporting_is_none() {
+    let graph = PhaseGraph::new();
+    assert_eq!(graph.next_phase(&ScanPhase::Reporting), None);
 }
 
 #[test]
-fn test_t25_validate_phase_present() {
-    // T2.5 added Validate phase
-    assert_eq!(ScanPhase::Validate, ScanPhase::Validate);
+fn test_next_phase_complete_is_none() {
+    let graph = PhaseGraph::new();
+    assert_eq!(graph.next_phase(&ScanPhase::Complete), None);
 }
 
 #[test]
-fn test_t25_independent_verify_phase_present() {
-    // T2.5 added IndependentVerify phase
-    assert_eq!(ScanPhase::IndependentVerify, ScanPhase::IndependentVerify);
+fn test_previous_phase_indexing_is_none() {
+    let graph = PhaseGraph::new();
+    assert_eq!(graph.previous_phase(&ScanPhase::Indexing), None);
 }
 
 #[test]
-fn test_resume_from_transitions() {
-    // Verify resume_from transitions for T2.5 phases
-    // Note: We can't actually test resume_from without a checkpoint file,
-    // but we can verify the enum variants exist and are distinct
-    let hunt = ScanPhase::Hunt;
-    let validate = ScanPhase::Validate;
-    let independent_verify = ScanPhase::IndependentVerify;
-
-    assert_ne!(hunt, validate);
-    assert_ne!(validate, independent_verify);
-    assert_ne!(hunt, independent_verify);
+fn test_previous_phase_reporting_to_variant_search() {
+    let graph = PhaseGraph::new();
+    assert_eq!(
+        graph.previous_phase(&ScanPhase::Reporting),
+        Some(&ScanPhase::VariantSearch)
+    );
 }
 
 #[test]
-fn test_phase_labels_exist() {
-    // Create a checkpoint and verify labels can be formatted
-    use chrono::Utc;
-
-    let checkpoint = Checkpoint::new("test", "/tmp", Utc::now());
-
-    // Test all T2.5 phase labels
-    let hunt_label = {
-        let mut cp = checkpoint.clone();
-        cp.current_phase = ScanPhase::Hunt;
-        cp.format_phase()
-    };
-    assert!(hunt_label.contains("Hunt"));
-
-    let validate_label = {
-        let mut cp = checkpoint.clone();
-        cp.current_phase = ScanPhase::Validate;
-        cp.format_phase()
-    };
-    assert!(validate_label.contains("Validate"));
-
-    let independent_label = {
-        let mut cp = checkpoint;
-        cp.current_phase = ScanPhase::IndependentVerify;
-        cp.format_phase()
-    };
-    assert!(independent_label.contains("Independent"));
+fn test_previous_phase_cwe_routing_to_semgrep() {
+    let graph = PhaseGraph::new();
+    assert_eq!(
+        graph.previous_phase(&ScanPhase::CweRouting),
+        Some(&ScanPhase::Semgrep)
+    );
 }
 
 #[test]
-fn test_phase_graph_wiring() {
-    // Verify that the phase graph can be constructed with all phases
-    // This is a basic sanity check - actual wiring is tested in integration tests
-    let phases = vec![
-        ScanPhase::Indexing,
-        ScanPhase::Semgrep,
-        ScanPhase::CweRouting,
-        ScanPhase::CpgSlice,
-        ScanPhase::LlmStaticAnalysis,
-        ScanPhase::Hunt,
-        ScanPhase::Validate,
-        ScanPhase::IndependentVerify,
-        ScanPhase::LlmDiscovery,
-        ScanPhase::Complete,
-    ];
+fn test_metadata_total_phases_is_20() {
+    let graph = PhaseGraph::new();
+    for phase in graph.phases() {
+        let meta = graph.get_metadata(phase).unwrap();
+        assert_eq!(meta.total_phases, 20, "total_phases mismatch for {phase:?}");
+    }
+}
 
-    // Verify no duplicates
-    let unique: Vec<_> = phases.iter().collect();
-    assert_eq!(unique.len(), phases.len());
+#[test]
+fn test_metadata_phase_numbers_sequential() {
+    let graph = PhaseGraph::new();
+    for (i, phase) in graph.phases().iter().enumerate() {
+        let meta = graph.get_metadata(phase).unwrap();
+        assert_eq!(
+            meta.phase_number,
+            (i + 1) as u8,
+            "Phase number mismatch for {phase:?}: expected {}, got {}",
+            i + 1,
+            meta.phase_number
+        );
+    }
+}
+
+#[test]
+fn test_metadata_display_names() {
+    let graph = PhaseGraph::new();
+
+    let indexing_meta = graph.get_metadata(&ScanPhase::Indexing).unwrap();
+    assert_eq!(indexing_meta.display_name, "Indexing");
+
+    let cwe_meta = graph.get_metadata(&ScanPhase::CweRouting).unwrap();
+    assert_eq!(cwe_meta.display_name, "CWE Routing");
+
+    let reporting_meta = graph.get_metadata(&ScanPhase::Reporting).unwrap();
+    assert_eq!(reporting_meta.display_name, "Reporting");
+    assert_eq!(reporting_meta.phase_number, 20);
+}
+
+#[test]
+fn test_default_equals_new() {
+    let default_graph = PhaseGraph::default();
+    let new_graph = PhaseGraph::new();
+
+    assert_eq!(default_graph.phases().len(), new_graph.phases().len());
+
+    for (default_phase, new_phase) in default_graph.phases().iter().zip(new_graph.phases().iter()) {
+        assert_eq!(default_phase, new_phase);
+    }
+}
+
+#[test]
+fn test_orchestrator_phase_graph_has_20_phases() {
+    let config = ScannerConfig::default();
+    let orchestrator = Orchestrator::new(&config);
+    let phase_graph = orchestrator.phase_graph();
+
+    assert_eq!(phase_graph.phases().len(), 20);
+    assert_eq!(phase_graph.phases()[0], ScanPhase::Indexing);
+    assert_eq!(phase_graph.phases()[19], ScanPhase::Reporting);
+}
+
+#[test]
+fn test_orchestrator_metadata_accessible() {
+    let config = ScannerConfig::default();
+    let orchestrator = Orchestrator::new(&config);
+    let phase_graph = orchestrator.phase_graph();
+
+    let indexing_meta = phase_graph.get_metadata(&ScanPhase::Indexing);
+    assert!(indexing_meta.is_some());
+    assert_eq!(indexing_meta.unwrap().display_name, "Indexing");
 }
