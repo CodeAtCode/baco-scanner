@@ -55,6 +55,13 @@ pub fn create_test_finding(
     }
 }
 
+/// Convenience wrapper creating a test finding with default file/line.
+///
+/// For tests in `tests/` directory, prefer `tests::fixtures::create_test_finding`.
+pub fn create_test_finding_simple(title: &str, severity: Severity) -> VulnerabilityFinding {
+    create_test_finding(title, "src/test.rs", 42, severity)
+}
+
 /// Create a test vulnerability finding with customizable ID, title, and severity.
 ///
 /// For tests in `tests/` directory, prefer `tests::fixtures::create_finding_with_params`.

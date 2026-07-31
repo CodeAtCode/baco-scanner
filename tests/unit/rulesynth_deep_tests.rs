@@ -9,27 +9,8 @@
 //! 6. Edge cases - empty input, boundary values, special characters
 
 use baco::config::RuleSynthConfig;
-use baco::rulesynth::{parse_yaml_rules, RuleError, SemgrepRule};
+use baco::rulesynth::{extract_rule_id, parse_yaml_rules, RuleError, SemgrepRule};
 use std::path::PathBuf;
-
-fn extract_rule_id(yaml: &str) -> Option<String> {
-    for line in yaml.lines() {
-        let trimmed = line.trim();
-        if trimmed.contains("id:") {
-            // Find the "id:" position and extract the value
-            if let Some(idx) = trimmed.find("id:") {
-                let after_id = &trimmed[idx + 3..];
-                let id = after_id.trim();
-                // Remove quotes if present
-                let id = id.trim_matches('"').trim_matches('\'');
-                if !id.is_empty() {
-                    return Some(id.to_string());
-                }
-            }
-        }
-    }
-    None
-}
 
 // Local copy of build_prompt for testing (mirrors src/rulesynth/prompt.rs)
 fn build_prompt(cwe: &str, language: &str, max_rules: usize) -> String {

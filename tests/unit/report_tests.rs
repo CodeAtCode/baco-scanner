@@ -18,46 +18,7 @@ use baco::report::html::{render_finding, utilities};
 use baco::report::json::write_findings_json;
 use std::collections::HashMap;
 
-/// Helper to create a test finding with minimal fields.
-fn make_finding(
-    id: &str,
-    severity: Severity,
-    file: &str,
-    line: Option<u32>,
-) -> VulnerabilityFinding {
-    VulnerabilityFinding {
-        id: id.to_string(),
-        title: format!("Finding {}", id),
-        description: "Test description".to_string(),
-        severity,
-        confidence_score: 0.8,
-        cwe_id: Some("CWE-79".to_string()),
-        file_path: file.to_string(),
-        line_number: line,
-        code_snippet: Some("test code".to_string()),
-        diff_hunk: None,
-        recommendation: Some("Fix this".to_string()),
-        code_location: None,
-        already_reported: false,
-        sources: vec!["test".to_string()],
-        commit_reference: None,
-        ticket_reference: None,
-        priority_score: None,
-        cross_file_references: None,
-        verification_status: None,
-        verification_notes: None,
-        verification_error: None,
-        agent_evidence_path: None,
-        security_issue: None,
-        poc_code: None,
-        mitigation_code: None,
-        poc_format: None,
-        llm_model: None,
-        agent_mode: false,
-        statement_range: None,
-        triage_verdict: None,
-    }
-}
+use super::report_fixtures::make_finding;
 
 // ============================================================================
 // JSON Report Tests

@@ -4,7 +4,7 @@
 //! the CWE-89 specification is retrieved and included in the prompt sent to the LLM.
 
 use baco::llm::LlmConfig;
-use baco::llm_analysis::LlmAnalyzer;
+use baco::llm_analysis::{format_cwe_specs, LlmAnalyzer};
 use baco::prompt::loader;
 use baco::retrieval::CweKnowledgeBase;
 use std::fs;
@@ -75,7 +75,14 @@ int main() {
     );
 
     // Retrieve CWE specs
-    let cwe_specs = retrieve_cwe_specs_for_test(&file_path, &file_content);
+    let kb = CweKnowledgeBase::load_embedded().unwrap();
+    let query_parts: Vec<String> = vec![
+        file_path.to_string(),
+        file_content.lines().take(20).collect::<Vec<_>>().join(" "),
+    ];
+    let query = query_parts.join(" ");
+    let results = kb.search(&query, 3);
+    let cwe_specs = format_cwe_specs(&results);
 
     // Substitute variables including CWE_SPECS
     let prompt = prompt_template
@@ -150,54 +157,11 @@ fn main() {
 
     // The retrieval should not panic even if no matches found
     // (it will return empty string)
-    let _ = retrieve_cwe_specs_safe(&file_path, content);
+    let _ = retrieve_cwe_specs_for_test(&file_path, content);
 }
 
-// Helper function to access retrieval logic for testing
+// Helper function to safely retrieve CWE specs for testing
 fn retrieve_cwe_specs_for_test(file_path: &str, code_content: &str) -> String {
-    // Directly use the retrieval logic
-    let kb = match CweKnowledgeBase::load_embedded() {
-        Ok(kb) => kb,
-        Err(_) => return String::new(),
-    };
-
-    // Build query from file path and first 20 lines of code
-    let query_parts: Vec<String> = vec![
-        file_path.to_string(),
-        code_content.lines().take(20).collect::<Vec<_>>().join(" "),
-    ];
-    let query = query_parts.join(" ");
-
-    // Search for top-3 relevant CWE specifications
-    let results = kb.search(&query, 3);
-
-    if results.is_empty() {
-        return String::new();
-    }
-
-    // Format CWE specs
-    let mut formatted = String::new();
-    for (i, doc) in results.iter().enumerate() {
-        if i > 0 {
-            formatted.push_str("\n\n");
-        }
-        formatted.push_str(&format!("{}: {}\n", doc.cwe_id, doc.name));
-        formatted.push_str(&format!("Description: {}\n", doc.description));
-        if !doc.examples.is_empty() {
-            formatted.push_str("Examples:\n");
-            for example in &doc.examples {
-                formatted.push_str(&format!("  - {}\n", example));
-            }
-        }
-        formatted.push_str(&format!("Mitigation: {}\n", doc.mitigation));
-    }
-
-    formatted
-}
-
-// Safe retrieval that doesn't require analyzer instance
-#[allow(dead_code)]
-fn retrieve_cwe_specs_safe(file_path: &str, code_content: &str) -> String {
     let kb = match CweKnowledgeBase::load_embedded() {
         Ok(kb) => kb,
         Err(_) => return String::new(),
@@ -208,28 +172,7 @@ fn retrieve_cwe_specs_safe(file_path: &str, code_content: &str) -> String {
         code_content.lines().take(20).collect::<Vec<_>>().join(" "),
     ];
     let query = query_parts.join(" ");
-
     let results = kb.search(&query, 3);
 
-    if results.is_empty() {
-        return String::new();
-    }
-
-    let mut formatted = String::new();
-    for (i, doc) in results.iter().enumerate() {
-        if i > 0 {
-            formatted.push_str("\n\n");
-        }
-        formatted.push_str(&format!("{}: {}\n", doc.cwe_id, doc.name));
-        formatted.push_str(&format!("Description: {}\n", doc.description));
-        if !doc.examples.is_empty() {
-            formatted.push_str("Examples:\n");
-            for example in &doc.examples {
-                formatted.push_str(&format!("  - {}\n", example));
-            }
-        }
-        formatted.push_str(&format!("Mitigation: {}\n", doc.mitigation));
-    }
-
-    formatted
+    format_cwe_specs(&results)
 }

@@ -5,6 +5,7 @@
 
 use baco::checkpoint::ScanPhase;
 use baco::findings::{Severity, VulnerabilityFinding};
+use baco::phase::helpers::create_test_finding_simple;
 use baco::scanner::{
     combine_parallel_results, has_valid_checkpoint_findings, run_indexing_phase,
     run_llm_static_phase, run_semgrep_phase, ParallelPhaseConfig, ParallelPhaseResult, Scanner,
@@ -16,41 +17,6 @@ use std::time::Duration;
 // ============================================================================
 // Test Fixtures
 // ============================================================================
-
-fn create_test_finding(title: &str, severity: Severity) -> VulnerabilityFinding {
-    VulnerabilityFinding {
-        id: format!("test-{}", title.to_lowercase().replace(' ', "-")),
-        title: title.to_string(),
-        severity,
-        confidence_score: 0.8,
-        file_path: "src/test.rs".to_string(),
-        line_number: Some(42),
-        code_snippet: Some("let x = 5;".to_string()),
-        description: format!("Test vulnerability: {}", title),
-        cwe_id: Some("CWE-79".to_string()),
-        verification_status: None,
-        sources: vec!["test".to_string()],
-        cross_file_references: None,
-        diff_hunk: None,
-        recommendation: None,
-        code_location: None,
-        already_reported: false,
-        commit_reference: None,
-        ticket_reference: None,
-        priority_score: None,
-        verification_notes: None,
-        verification_error: None,
-        agent_evidence_path: None,
-        security_issue: None,
-        poc_code: None,
-        mitigation_code: None,
-        poc_format: None,
-        llm_model: None,
-        agent_mode: false,
-        statement_range: None,
-        triage_verdict: None,
-    }
-}
 
 fn create_test_config() -> baco::config::ScannerConfig {
     use baco::config::{AgentConfig, LlmPhasesConfig, PerformanceSettings, ScannerSettings};
@@ -173,9 +139,9 @@ fn test_parallel_phase_config_empty_completed_phases() {
 
 #[test]
 fn test_parallel_phase_result_all_findings() {
-    let indexing_findings = vec![create_test_finding("Indexing", Severity::Medium)];
-    let semgrep_findings = vec![create_test_finding("Semgrep", Severity::High)];
-    let llm_findings = vec![create_test_finding("LLM", Severity::Critical)];
+    let indexing_findings = vec![create_test_finding_simple("Indexing", Severity::Medium)];
+    let semgrep_findings = vec![create_test_finding_simple("Semgrep", Severity::High)];
+    let llm_findings = vec![create_test_finding_simple("LLM", Severity::Critical)];
     let analyzed_files = vec!["file1.rs".to_string(), "file2.rs".to_string()];
     let duration = Duration::from_secs(42);
 
@@ -215,7 +181,7 @@ fn test_parallel_phase_result_empty_findings() {
 
 #[test]
 fn test_parallel_phase_result_only_indexing() {
-    let indexing_findings = vec![create_test_finding("Indexing", Severity::Low)];
+    let indexing_findings = vec![create_test_finding_simple("Indexing", Severity::Low)];
     let duration = Duration::from_millis(500);
 
     let result = ParallelPhaseResult {
@@ -234,11 +200,11 @@ fn test_parallel_phase_result_only_indexing() {
 #[test]
 fn test_parallel_phase_result_mixed_severities() {
     let indexing_findings = vec![
-        create_test_finding("Low", Severity::Low),
-        create_test_finding("Medium", Severity::Medium),
+        create_test_finding_simple("Low", Severity::Low),
+        create_test_finding_simple("Medium", Severity::Medium),
     ];
-    let semgrep_findings = vec![create_test_finding("High", Severity::High)];
-    let llm_findings = vec![create_test_finding("Critical", Severity::Critical)];
+    let semgrep_findings = vec![create_test_finding_simple("High", Severity::High)];
+    let llm_findings = vec![create_test_finding_simple("Critical", Severity::Critical)];
     let duration = Duration::from_secs(120);
 
     let result = ParallelPhaseResult {
@@ -261,20 +227,20 @@ fn test_parallel_phase_result_mixed_severities() {
 
 #[test]
 fn test_combine_parallel_results_all_success() {
-    let initial_findings = vec![create_test_finding("Initial", Severity::Low)];
+    let initial_findings = vec![create_test_finding_simple("Initial", Severity::Low)];
 
     let indexing_result = Ok((
-        vec![create_test_finding("Indexing", Severity::Medium)],
+        vec![create_test_finding_simple("Indexing", Severity::Medium)],
         vec!["file1.rs".to_string()],
     ));
 
     let semgrep_result = Ok((
-        vec![create_test_finding("Semgrep", Severity::High)],
+        vec![create_test_finding_simple("Semgrep", Severity::High)],
         vec!["file2.rs".to_string()],
     ));
 
     let llm_static_result = Ok((
-        vec![create_test_finding("LLM", Severity::Critical)],
+        vec![create_test_finding_simple("LLM", Severity::Critical)],
         vec!["file3.rs".to_string()],
     ));
 
@@ -292,7 +258,7 @@ fn test_combine_parallel_results_all_success() {
 
 #[test]
 fn test_combine_parallel_results_all_none() {
-    let initial_findings = vec![create_test_finding("Initial", Severity::Low)];
+    let initial_findings = vec![create_test_finding_simple("Initial", Severity::Low)];
 
     let (combined_findings, analyzed_files) =
         combine_parallel_results(initial_findings.clone(), None, None, None);
@@ -304,7 +270,7 @@ fn test_combine_parallel_results_all_none() {
 
 #[test]
 fn test_combine_parallel_results_all_errors() {
-    let initial_findings = vec![create_test_finding("Initial", Severity::Low)];
+    let initial_findings = vec![create_test_finding_simple("Initial", Severity::Low)];
 
     let indexing_result = Err("Indexing failed".to_string());
     let semgrep_result = Err("Semgrep failed".to_string());
@@ -323,10 +289,10 @@ fn test_combine_parallel_results_all_errors() {
 
 #[test]
 fn test_combine_parallel_results_partial_success_indexing_only() {
-    let initial_findings = vec![create_test_finding("Initial", Severity::Low)];
+    let initial_findings = vec![create_test_finding_simple("Initial", Severity::Low)];
 
     let indexing_result = Ok((
-        vec![create_test_finding("Indexing", Severity::Medium)],
+        vec![create_test_finding_simple("Indexing", Severity::Medium)],
         vec!["file1.rs".to_string()],
     ));
 
@@ -346,12 +312,12 @@ fn test_combine_parallel_results_partial_success_indexing_only() {
 
 #[test]
 fn test_combine_parallel_results_partial_success_llm_only() {
-    let initial_findings = vec![create_test_finding("Initial", Severity::Low)];
+    let initial_findings = vec![create_test_finding_simple("Initial", Severity::Low)];
 
     let indexing_result = Err("Indexing failed".to_string());
     let semgrep_result = Err("Semgrep failed".to_string());
     let llm_static_result = Ok((
-        vec![create_test_finding("LLM", Severity::Critical)],
+        vec![create_test_finding_simple("LLM", Severity::Critical)],
         vec!["file3.rs".to_string()],
     ));
 
@@ -369,15 +335,15 @@ fn test_combine_parallel_results_partial_success_llm_only() {
 
 #[test]
 fn test_combine_parallel_results_indexing_and_semgrep_success() {
-    let initial_findings = vec![create_test_finding("Initial", Severity::Low)];
+    let initial_findings = vec![create_test_finding_simple("Initial", Severity::Low)];
 
     let indexing_result = Ok((
-        vec![create_test_finding("Indexing", Severity::Medium)],
+        vec![create_test_finding_simple("Indexing", Severity::Medium)],
         vec!["file1.rs".to_string()],
     ));
 
     let semgrep_result = Ok((
-        vec![create_test_finding("Semgrep", Severity::High)],
+        vec![create_test_finding_simple("Semgrep", Severity::High)],
         vec!["file2.rs".to_string()],
     ));
 
@@ -399,17 +365,17 @@ fn test_combine_parallel_results_empty_initial_findings() {
     let initial_findings: Vec<VulnerabilityFinding> = vec![];
 
     let indexing_result = Ok((
-        vec![create_test_finding("Indexing", Severity::Medium)],
+        vec![create_test_finding_simple("Indexing", Severity::Medium)],
         vec!["file1.rs".to_string()],
     ));
 
     let semgrep_result = Ok((
-        vec![create_test_finding("Semgrep", Severity::High)],
+        vec![create_test_finding_simple("Semgrep", Severity::High)],
         vec!["file2.rs".to_string()],
     ));
 
     let llm_static_result = Ok((
-        vec![create_test_finding("LLM", Severity::Critical)],
+        vec![create_test_finding_simple("LLM", Severity::Critical)],
         vec!["file3.rs".to_string()],
     ));
 
@@ -426,7 +392,7 @@ fn test_combine_parallel_results_empty_initial_findings() {
 
 #[test]
 fn test_combine_parallel_results_empty_phase_findings() {
-    let initial_findings = vec![create_test_finding("Initial", Severity::Low)];
+    let initial_findings = vec![create_test_finding_simple("Initial", Severity::Low)];
 
     let indexing_result = Ok((vec![], vec!["file1.rs".to_string()]));
     let semgrep_result = Ok((vec![], vec!["file2.rs".to_string()]));
@@ -447,16 +413,16 @@ fn test_combine_parallel_results_empty_phase_findings() {
 #[test]
 fn test_combine_parallel_results_only_initial_and_llm() {
     let initial_findings = vec![
-        create_test_finding("Initial1", Severity::Low),
-        create_test_finding("Initial2", Severity::Medium),
+        create_test_finding_simple("Initial1", Severity::Low),
+        create_test_finding_simple("Initial2", Severity::Medium),
     ];
 
     let indexing_result = Err("Indexing failed".to_string());
     let semgrep_result = Err("Semgrep failed".to_string());
     let llm_static_result = Ok((
         vec![
-            create_test_finding("LLM1", Severity::High),
-            create_test_finding("LLM2", Severity::Critical),
+            create_test_finding_simple("LLM1", Severity::High),
+            create_test_finding_simple("LLM2", Severity::Critical),
         ],
         vec!["file3.rs".to_string(), "file4.rs".to_string()],
     ));
@@ -528,7 +494,7 @@ async fn test_run_indexing_phase_with_initial_findings() {
     let scanner = Scanner::new(config, target_path, false);
     let pb = ProgressBar::hidden();
 
-    let initial_findings = vec![create_test_finding("Initial", Severity::High)];
+    let initial_findings = vec![create_test_finding_simple("Initial", Severity::High)];
 
     let result = run_indexing_phase(&scanner, &pb, initial_findings).await;
 
@@ -544,7 +510,7 @@ async fn test_run_semgrep_phase_with_initial_findings() {
     let scanner = Scanner::new(config, target_path, false);
     let pb = ProgressBar::hidden();
 
-    let initial_findings = vec![create_test_finding("Initial", Severity::Medium)];
+    let initial_findings = vec![create_test_finding_simple("Initial", Severity::Medium)];
 
     let result = run_semgrep_phase(&scanner, &pb, initial_findings).await;
 
@@ -604,21 +570,21 @@ fn test_parallel_phase_config_with_single_completed_phase() {
 #[test]
 fn test_combine_results_with_many_findings() {
     let initial_findings: Vec<VulnerabilityFinding> = (0..10)
-        .map(|i| create_test_finding(&format!("Initial{}", i), Severity::Low))
+        .map(|i| create_test_finding_simple(&format!("Initial{}", i), Severity::Low))
         .collect();
 
     let indexing_result = Ok((
-        vec![create_test_finding("Indexing", Severity::Medium)],
+        vec![create_test_finding_simple("Indexing", Severity::Medium)],
         vec!["file1.rs".to_string()],
     ));
 
     let semgrep_result = Ok((
-        vec![create_test_finding("Semgrep", Severity::High)],
+        vec![create_test_finding_simple("Semgrep", Severity::High)],
         vec!["file2.rs".to_string()],
     ));
 
     let llm_static_result = Ok((
-        vec![create_test_finding("LLM", Severity::Critical)],
+        vec![create_test_finding_simple("LLM", Severity::Critical)],
         vec!["file3.rs".to_string()],
     ));
 
@@ -650,12 +616,12 @@ fn test_parallel_phase_result_with_zero_duration() {
 #[test]
 fn test_combine_parallel_results_preserves_initial_findings_order() {
     let initial_findings = vec![
-        create_test_finding("First", Severity::Low),
-        create_test_finding("Second", Severity::Low),
+        create_test_finding_simple("First", Severity::Low),
+        create_test_finding_simple("Second", Severity::Low),
     ];
 
     let indexing_result = Ok((
-        vec![create_test_finding("Indexing", Severity::Medium)],
+        vec![create_test_finding_simple("Indexing", Severity::Medium)],
         vec![],
     ));
 

@@ -98,43 +98,9 @@ mod tests {
     use super::*;
     use crate::config::{AgentConfig, LlmPhasesConfig, PerformanceSettings, ScannerSettings};
     use crate::findings::Severity;
+    use crate::phase::helpers::create_test_finding_simple;
     use indicatif::ProgressBar;
     use std::path::PathBuf;
-
-    fn create_test_finding(title: &str, severity: Severity) -> VulnerabilityFinding {
-        VulnerabilityFinding {
-            id: format!("test-{}", title.to_lowercase().replace(' ', "-")),
-            title: title.to_string(),
-            severity,
-            confidence_score: 0.8,
-            file_path: "src/test.rs".to_string(),
-            line_number: Some(42),
-            code_snippet: Some("let x = 5;".to_string()),
-            description: format!("Test vulnerability: {}", title),
-            cwe_id: Some("CWE-79".to_string()),
-            verification_status: None,
-            sources: vec!["test".to_string()],
-            cross_file_references: None,
-            diff_hunk: None,
-            recommendation: None,
-            code_location: None,
-            already_reported: false,
-            commit_reference: None,
-            ticket_reference: None,
-            priority_score: None,
-            verification_notes: None,
-            verification_error: None,
-            agent_evidence_path: None,
-            security_issue: None,
-            poc_code: None,
-            mitigation_code: None,
-            poc_format: None,
-            llm_model: None,
-            agent_mode: false,
-            statement_range: None,
-            triage_verdict: None,
-        }
-    }
 
     fn create_test_config() -> crate::config::ScannerConfig {
         crate::config::ScannerConfig {
@@ -240,8 +206,8 @@ mod tests {
         let target_path = PathBuf::from(".");
 
         let findings = vec![
-            create_test_finding("Cross File 1", Severity::Medium),
-            create_test_finding("Cross File 2", Severity::Medium),
+            create_test_finding_simple("Cross File 1", Severity::Medium),
+            create_test_finding_simple("Cross File 2", Severity::Medium),
         ];
 
         let scanner = Scanner::new(config.clone(), target_path.clone(), false);
@@ -261,9 +227,9 @@ mod tests {
         let target_path = PathBuf::from(".");
 
         let findings = vec![
-            create_test_finding("Report 1", Severity::Critical),
-            create_test_finding("Report 2", Severity::High),
-            create_test_finding("Report 3", Severity::Medium),
+            create_test_finding_simple("Report 1", Severity::Critical),
+            create_test_finding_simple("Report 2", Severity::High),
+            create_test_finding_simple("Report 3", Severity::Medium),
         ];
 
         let scanner = Scanner::new(config.clone(), target_path.clone(), false);
@@ -283,10 +249,10 @@ mod tests {
         let target_path = PathBuf::from(".");
 
         let findings = vec![
-            create_test_finding("Critical Issue", Severity::Critical),
-            create_test_finding("High Issue", Severity::High),
-            create_test_finding("Medium Issue", Severity::Medium),
-            create_test_finding("Low Issue", Severity::Low),
+            create_test_finding_simple("Critical Issue", Severity::Critical),
+            create_test_finding_simple("High Issue", Severity::High),
+            create_test_finding_simple("Medium Issue", Severity::Medium),
+            create_test_finding_simple("Low Issue", Severity::Low),
         ];
 
         let scanner = Scanner::new(config.clone(), target_path.clone(), false);

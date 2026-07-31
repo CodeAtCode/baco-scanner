@@ -2,6 +2,8 @@
 //!
 //! These tests verify interactions between multiple components.
 
+pub mod common;
+
 mod agent;
 mod cli;
 mod context_in_prompt;

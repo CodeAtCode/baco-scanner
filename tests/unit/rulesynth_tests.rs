@@ -357,26 +357,11 @@ Generate {max_rules} rules for CWE-{cwe} in {language}:"#
 }
 
 // ============================================================================
-// Test 19: extract_rule_id tests (inline module with local copy)
+// Test 19: extract_rule_id tests - using public function from rulesynth module
 // ============================================================================
 
 mod extract_rule_id_tests {
-    fn extract_rule_id(yaml: &str) -> Option<String> {
-        for line in yaml.lines() {
-            let trimmed = line.trim();
-            if trimmed.contains("id:") {
-                if let Some(idx) = trimmed.find("id:") {
-                    let after_id = &trimmed[idx + 3..];
-                    let id = after_id.trim();
-                    let id = id.trim_matches('"').trim_matches('\'');
-                    if !id.is_empty() {
-                        return Some(id.to_string());
-                    }
-                }
-            }
-        }
-        None
-    }
+    use baco::rulesynth::extract_rule_id;
 
     #[test]
     fn test_standard_format() {

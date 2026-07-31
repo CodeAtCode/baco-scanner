@@ -1,47 +1,13 @@
 //! Unit tests for GlobalFpStore and cross-scan merge functionality
 
-use baco::findings::{FindingsMerger, Severity, VulnerabilityFinding};
+use crate::common::create_test_finding;
+use baco::findings::FindingsMerger;
 use baco::root_cause_dedup::GlobalFpStore;
-use tempfile::tempdir;
-
-fn create_test_finding(id: &str, title: &str, file_path: &str, line: u32) -> VulnerabilityFinding {
-    VulnerabilityFinding {
-        id: id.to_string(),
-        title: title.to_string(),
-        description: "Test finding".to_string(),
-        severity: Severity::High,
-        confidence_score: 0.8,
-        cwe_id: Some("CWE-79".to_string()),
-        file_path: file_path.to_string(),
-        line_number: Some(line),
-        code_snippet: Some("test code".to_string()),
-        diff_hunk: None,
-        recommendation: None,
-        code_location: None,
-        already_reported: false,
-        sources: vec![],
-        commit_reference: None,
-        ticket_reference: None,
-        priority_score: None,
-        cross_file_references: None,
-        verification_status: None,
-        verification_notes: None,
-        verification_error: None,
-        agent_evidence_path: None,
-        security_issue: None,
-        poc_code: None,
-        mitigation_code: None,
-        poc_format: None,
-        llm_model: None,
-        agent_mode: false,
-        statement_range: None,
-        triage_verdict: None,
-    }
-}
 
 #[test]
 fn test_global_fp_store_load_missing_file() {
-    let temp_dir = tempdir().unwrap();
+    use crate::common::create_temp_scan_dir;
+    let temp_dir = create_temp_scan_dir();
     let missing_path = temp_dir.path().join("nonexistent.json");
 
     let store = GlobalFpStore::load(&missing_path);
@@ -52,7 +18,8 @@ fn test_global_fp_store_load_missing_file() {
 
 #[test]
 fn test_global_fp_store_mark_and_check() {
-    let temp_dir = tempdir().unwrap();
+    use crate::common::create_temp_scan_dir;
+    let temp_dir = create_temp_scan_dir();
     let fp_path = temp_dir.path().join("fp_store.json");
 
     let mut store = GlobalFpStore::with_path(&fp_path);
@@ -66,7 +33,8 @@ fn test_global_fp_store_mark_and_check() {
 
 #[test]
 fn test_global_fp_store_remove() {
-    let temp_dir = tempdir().unwrap();
+    use crate::common::create_temp_scan_dir;
+    let temp_dir = create_temp_scan_dir();
     let fp_path = temp_dir.path().join("fp_store.json");
 
     let mut store = GlobalFpStore::with_path(&fp_path);
@@ -82,7 +50,8 @@ fn test_global_fp_store_remove() {
 
 #[test]
 fn test_global_fp_store_save_and_reload() {
-    let temp_dir = tempdir().unwrap();
+    use crate::common::create_temp_scan_dir;
+    let temp_dir = create_temp_scan_dir();
     let fp_path = temp_dir.path().join("fp_store.json");
 
     // Create and populate store

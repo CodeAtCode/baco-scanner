@@ -155,7 +155,7 @@ pub fn persist_rules(
 }
 
 /// Extract rule ID from YAML content
-fn extract_rule_id(yaml: &str) -> Option<String> {
+pub fn extract_rule_id(yaml: &str) -> Option<String> {
     for line in yaml.lines() {
         let trimmed = line.trim();
         if trimmed.contains("id:") {

@@ -2,7 +2,7 @@
 //!
 //! Tests cover diff_analysis functionality including analyze_diff and parse_diff.
 
-use baco::tools::diff_analysis::{analyze_diff, DiffAnalysisInput, DiffAnalysisOutput};
+use baco::tools::diff_analysis::{analyze_diff, parse_diff, DiffAnalysisInput, DiffAnalysisOutput};
 
 #[cfg(test)]
 mod tests {
@@ -285,30 +285,5 @@ mod tests {
                 let _ = output.deletions;
             }
         }
-    }
-
-    // Helper function for testing parse_diff
-    fn parse_diff(diff_output: &str) -> (u32, u32, u32) {
-        let lines: Vec<&str> = diff_output.lines().collect();
-
-        let mut files_changed = 1u32;
-        let mut insertions = 0u32;
-        let mut deletions = 0u32;
-
-        for line in &lines {
-            if line.starts_with("+++ ") && !line.starts_with("+++++") {
-                files_changed += 1;
-            } else if line.starts_with("+") && !line.starts_with("+++") {
-                insertions += 1;
-            } else if line.starts_with("-") && !line.starts_with("---") {
-                deletions += 1;
-            }
-        }
-
-        if lines.is_empty() {
-            return (0, 0, 0);
-        }
-
-        (files_changed, insertions, deletions)
     }
 }

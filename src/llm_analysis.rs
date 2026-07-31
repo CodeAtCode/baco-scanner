@@ -1,11 +1,36 @@
 use crate::findings::{Severity, VulnerabilityFinding};
 use crate::llm::LlmClient;
 use crate::prompt::loader;
-use crate::retrieval::CweKnowledgeBase;
+use crate::retrieval::{CweDocument, CweKnowledgeBase};
 use regex::Regex;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
+
+/// Format CWE specifications into a human-readable string
+pub fn format_cwe_specs(results: &[&CweDocument]) -> String {
+    if results.is_empty() {
+        return String::new();
+    }
+
+    let mut formatted = String::new();
+    for (i, doc) in results.iter().enumerate() {
+        if i > 0 {
+            formatted.push_str("\n\n");
+        }
+        formatted.push_str(&format!("{}: {}\n", doc.cwe_id, doc.name));
+        formatted.push_str(&format!("Description: {}\n", doc.description));
+        if !doc.examples.is_empty() {
+            formatted.push_str("Examples:\n");
+            for example in &doc.examples {
+                formatted.push_str(&format!("  - {}\n", example));
+            }
+        }
+        formatted.push_str(&format!("Mitigation: {}\n", doc.mitigation));
+    }
+
+    formatted
+}
 
 /// Extract CWE ID from description text
 pub fn extract_cwe_id(description: &str) -> Option<String> {
@@ -363,24 +388,31 @@ impl LlmAnalyzer {
             return String::new();
         }
 
-        // Format CWE specs as multi-line string
-        let mut formatted = String::new();
-        for (i, doc) in results.iter().enumerate() {
-            if i > 0 {
-                formatted.push_str("\n\n");
-            }
-            formatted.push_str(&format!("{}: {}\n", doc.cwe_id, doc.name));
-            formatted.push_str(&format!("Description: {}\n", doc.description));
-            if !doc.examples.is_empty() {
-                formatted.push_str("Examples:\n");
-                for example in &doc.examples {
-                    formatted.push_str(&format!("  - {}\n", example));
-                }
-            }
-            formatted.push_str(&format!("Mitigation: {}\n", doc.mitigation));
+        format_cwe_specs(&results)
+    }
+
+    /// Retrieve relevant CWE specifications based on file path and code content
+    pub fn retrieve_cwe_specs_public(&self, file_path: &str, code_content: &str) -> String {
+        let kb = match &self.cwe_kb {
+            Some(kb) => kb,
+            None => return String::new(),
+        };
+
+        // Build query from file path and first 20 lines of code
+        let query_parts: Vec<String> = vec![
+            file_path.to_string(),
+            code_content.lines().take(20).collect::<Vec<_>>().join(" "),
+        ];
+        let query = query_parts.join(" ");
+
+        // Search for top-3 relevant CWE specifications
+        let results = kb.search(&query, 3);
+
+        if results.is_empty() {
+            return String::new();
         }
 
-        formatted
+        format_cwe_specs(&results)
     }
 
     /// Truncate code to fit in context window

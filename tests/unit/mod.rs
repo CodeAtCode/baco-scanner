@@ -2,11 +2,16 @@
 //!
 //! These tests focus on isolated functionality without external dependencies.
 
+pub mod common;
+
 // Include git_analysis module tests
 mod git_analysis;
 
 // Include centralized fixtures
 mod fixtures;
+
+// Report test fixtures
+mod report_fixtures;
 
 // Include agent module tests
 mod agent;
