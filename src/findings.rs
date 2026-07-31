@@ -120,7 +120,7 @@ impl std::fmt::Display for IssueCategory {
     }
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct SecurityIssue {
     pub category: IssueCategory,
     #[serde(default)]
@@ -133,7 +133,7 @@ pub struct SecurityIssue {
     pub custom_tags: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct VulnerabilityFinding {
     pub id: String,
     pub title: String,

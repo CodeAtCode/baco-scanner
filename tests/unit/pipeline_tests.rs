@@ -11,43 +11,9 @@ use baco::scanner::{CheckpointManager, Orchestrator, PhaseGraph, ScanCheckpoint}
 use std::path::PathBuf;
 use tempfile::TempDir;
 
-// ============================================================================
-// Test Fixtures
-// ============================================================================
-
+// Wrapper for fixtures::create_test_finding with simpler signature
 fn create_test_finding(title: &str) -> VulnerabilityFinding {
-    VulnerabilityFinding {
-        id: format!("test-{}", title.to_lowercase().replace(' ', "-")),
-        title: title.to_string(),
-        description: format!("Test finding: {}", title),
-        severity: Severity::Medium,
-        confidence_score: 0.7,
-        file_path: "src/test.rs".to_string(),
-        line_number: Some(42),
-        code_snippet: Some("test code".to_string()),
-        cwe_id: Some("CWE-79".to_string()),
-        verification_status: None,
-        sources: vec!["test".to_string()],
-        cross_file_references: None,
-        diff_hunk: None,
-        recommendation: None,
-        code_location: None,
-        already_reported: false,
-        commit_reference: None,
-        ticket_reference: None,
-        priority_score: None,
-        verification_notes: None,
-        verification_error: None,
-        agent_evidence_path: None,
-        security_issue: None,
-        poc_code: None,
-        mitigation_code: None,
-        poc_format: None,
-        llm_model: None,
-        agent_mode: false,
-        statement_range: None,
-        triage_verdict: None,
-    }
+    crate::fixtures::create_test_finding(title, "src/test.rs", 42, Severity::Medium)
 }
 
 fn get_temp_checkpoint_path(suffix: &str) -> PathBuf {

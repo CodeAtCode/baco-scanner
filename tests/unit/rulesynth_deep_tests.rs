@@ -9,46 +9,8 @@
 //! 6. Edge cases - empty input, boundary values, special characters
 
 use baco::config::RuleSynthConfig;
-use baco::rulesynth::{RuleError, SemgrepRule};
+use baco::rulesynth::{parse_yaml_rules, RuleError, SemgrepRule};
 use std::path::PathBuf;
-
-// Local copies of private functions for testing (mirrors src/rulesynth/mod.rs)
-fn parse_yaml_rules(yaml_content: &str, _language: &str) -> Result<Vec<String>, RuleError> {
-    let mut rules = Vec::new();
-    let mut current_rule = String::new();
-    let mut in_rule = false;
-
-    for line in yaml_content.lines() {
-        if line.trim() == "---" {
-            if !current_rule.is_empty() {
-                rules.push(current_rule.trim().to_string());
-                current_rule = String::new();
-            }
-            in_rule = true;
-            continue;
-        }
-
-        if in_rule || line.trim().starts_with("rules:") {
-            let should_add = !current_rule.is_empty() || !line.trim().is_empty();
-            if should_add {
-                current_rule.push_str(line);
-                current_rule.push('\n');
-            }
-        }
-    }
-
-    // Push last rule
-    if !current_rule.is_empty() {
-        rules.push(current_rule.trim().to_string());
-    }
-
-    // If no rules found, try to parse as single rule
-    if rules.is_empty() && !yaml_content.trim().is_empty() {
-        rules.push(yaml_content.trim().to_string());
-    }
-
-    Ok(rules)
-}
 
 fn extract_rule_id(yaml: &str) -> Option<String> {
     for line in yaml.lines() {

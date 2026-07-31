@@ -159,3 +159,9 @@ mod variant_search_edge_tests;
 
 // Pipeline ordering and phase sequence tests
 mod pipeline_ordering_tests;
+
+// Findings module tests
+mod findings_tests;
+
+// LLM verification phase tests
+mod llm_verification_phase_tests;
