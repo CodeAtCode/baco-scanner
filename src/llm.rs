@@ -801,11 +801,7 @@ pub fn create_llm_client_with_metrics(
 }
 
 /// Helper to record failure metrics for failed LLM requests
-async fn record_failure_metrics(
-    client: &LlmClient,
-    model: String,
-    latency_ms: u64,
-) {
+async fn record_failure_metrics(client: &LlmClient, model: String, latency_ms: u64) {
     client
         .record_metrics(RecordMetricsParams {
             model,

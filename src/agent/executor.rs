@@ -193,7 +193,12 @@ mod tests {
         messages: Vec<ChatMessage>,
         progress_cb: &ProgressCallback,
         tmpdir_path: &std::path::Path,
-    ) -> (Vec<String>, Option<std::path::PathBuf>, Option<std::path::PathBuf>, Vec<ChatMessage>) {
+    ) -> (
+        Vec<String>,
+        Option<std::path::PathBuf>,
+        Option<std::path::PathBuf>,
+        Vec<ChatMessage>,
+    ) {
         execute_tool_calls(
             registry,
             sandbox,
@@ -300,7 +305,8 @@ mod tests {
             messages,
             &progress_cb,
             tmpdir.path(),
-        ).await;
+        )
+        .await;
 
         assert_eq!(tools_used, vec!["file_read".to_string()]);
         assert!(test_path.is_none());
@@ -585,7 +591,8 @@ mod tests {
             messages,
             &progress_cb,
             tmpdir.path(),
-        ).await;
+        )
+        .await;
 
         assert!(tools_used.is_empty());
         assert!(test_path.is_none());
