@@ -559,6 +559,42 @@ mod tests {
         assert!(!result.unwrap()); // Should NOT terminate (1 finding < 1000 threshold)
     }
 
+    /// Test helper: Create a test VulnerabilityFinding
+    fn create_test_finding(id: &str) -> VulnerabilityFinding {
+        VulnerabilityFinding {
+            id: id.to_string(),
+            title: "Test".to_string(),
+            description: "Test desc".to_string(),
+            severity: Severity::Medium,
+            confidence_score: 0.5,
+            cwe_id: None,
+            file_path: "test.rs".to_string(),
+            line_number: None,
+            code_snippet: None,
+            diff_hunk: None,
+            recommendation: None,
+            code_location: None,
+            already_reported: false,
+            sources: vec![],
+            commit_reference: None,
+            ticket_reference: None,
+            priority_score: None,
+            cross_file_references: None,
+            verification_status: None,
+            verification_notes: None,
+            verification_error: None,
+            agent_evidence_path: None,
+            security_issue: None,
+            poc_code: None,
+            mitigation_code: None,
+            poc_format: None,
+            llm_model: None,
+            agent_mode: false,
+            statement_range: None,
+            triage_verdict: None,
+        }
+    }
+
     #[tokio::test]
     async fn test_check_early_termination_above_threshold() {
         let mut config = create_test_config();
@@ -568,38 +604,7 @@ mod tests {
 
         // Create 5 findings (above threshold of 2)
         let findings: Vec<VulnerabilityFinding> = (0..5)
-            .map(|i| VulnerabilityFinding {
-                id: format!("test-{}", i),
-                title: "Test".to_string(),
-                description: "Test desc".to_string(),
-                severity: Severity::Medium,
-                confidence_score: 0.5,
-                cwe_id: None,
-                file_path: "test.rs".to_string(),
-                line_number: None,
-                code_snippet: None,
-                diff_hunk: None,
-                recommendation: None,
-                code_location: None,
-                already_reported: false,
-                sources: vec![],
-                commit_reference: None,
-                ticket_reference: None,
-                priority_score: None,
-                cross_file_references: None,
-                verification_status: None,
-                verification_notes: None,
-                verification_error: None,
-                agent_evidence_path: None,
-                security_issue: None,
-                poc_code: None,
-                mitigation_code: None,
-                poc_format: None,
-                llm_model: None,
-                agent_mode: false,
-                statement_range: None,
-                triage_verdict: None,
-            })
+            .map(|i| create_test_finding(&format!("test-{}", i)))
             .collect();
 
         let multi_progress = MultiProgress::new();
@@ -622,38 +627,7 @@ mod tests {
 
         // Create many findings but threshold is 0 (disabled)
         let findings: Vec<VulnerabilityFinding> = (0..10000)
-            .map(|i| VulnerabilityFinding {
-                id: format!("test-{}", i),
-                title: "Test".to_string(),
-                description: "Test desc".to_string(),
-                severity: Severity::Medium,
-                confidence_score: 0.5,
-                cwe_id: None,
-                file_path: "test.rs".to_string(),
-                line_number: None,
-                code_snippet: None,
-                diff_hunk: None,
-                recommendation: None,
-                code_location: None,
-                already_reported: false,
-                sources: vec![],
-                commit_reference: None,
-                ticket_reference: None,
-                priority_score: None,
-                cross_file_references: None,
-                verification_status: None,
-                verification_notes: None,
-                verification_error: None,
-                agent_evidence_path: None,
-                security_issue: None,
-                poc_code: None,
-                mitigation_code: None,
-                poc_format: None,
-                llm_model: None,
-                agent_mode: false,
-                statement_range: None,
-                triage_verdict: None,
-            })
+            .map(|i| create_test_finding(&format!("test-{}", i)))
             .collect();
 
         let multi_progress = MultiProgress::new();

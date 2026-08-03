@@ -1,38 +1,7 @@
 use baco::checkpoint::ScanPhase;
 use baco::scanner::PhaseGraph;
 
-/// The actual phases executed by the hard-coded orchestrator (parallel + sequential).
-/// Parallel: Indexing, Semgrep, LlmStaticAnalysis
-/// Sequential: CweRouting, LlmDiscovery, LlmVerification, SecurityAgentVerification,
-///             TicketCrossRef, GitAnalysis, CrossFileAnalysis, ConfidenceScoring,
-///             AiAggregation, ThreatModeling, RootCauseDedup, MultiVerifier,
-///             AutoPatching, CveBootstrap, PocCompiler, VariantSearch, Reporting
-fn actual_pipeline_phases() -> Vec<ScanPhase> {
-    vec![
-        // Parallel
-        ScanPhase::Indexing,
-        ScanPhase::Semgrep,
-        ScanPhase::LlmStaticAnalysis,
-        // Sequential
-        ScanPhase::CweRouting,
-        ScanPhase::LlmDiscovery,
-        ScanPhase::LlmVerification,
-        ScanPhase::SecurityAgentVerification,
-        ScanPhase::TicketCrossRef,
-        ScanPhase::GitAnalysis,
-        ScanPhase::CrossFileAnalysis,
-        ScanPhase::ConfidenceScoring,
-        ScanPhase::AiAggregation,
-        ScanPhase::ThreatModeling,
-        ScanPhase::RootCauseDedup,
-        ScanPhase::MultiVerifier,
-        ScanPhase::AutoPatching,
-        ScanPhase::CveBootstrap,
-        ScanPhase::PocCompiler,
-        ScanPhase::VariantSearch,
-        ScanPhase::Reporting,
-    ]
-}
+use crate::pipeline_test_helpers::{actual_pipeline_phases, sequential_pipeline_phases};
 
 #[test]
 fn test_pipeline_has_expected_phase_count() {
@@ -54,7 +23,7 @@ fn test_pipeline_ends_with_reporting() {
 }
 
 #[test]
-fn test_pipeline_cwe_routing_after_llm_static() {
+fn test_pipeline_cwe_routing_before_llm_static() {
     let phases = actual_pipeline_phases();
     let llm_static_idx = phases
         .iter()
@@ -65,8 +34,8 @@ fn test_pipeline_cwe_routing_after_llm_static() {
         .position(|p| *p == ScanPhase::CweRouting)
         .unwrap();
     assert!(
-        cwe_routing_idx > llm_static_idx,
-        "CweRouting must come after LlmStaticAnalysis"
+        cwe_routing_idx < llm_static_idx,
+        "CweRouting must come before LlmStaticAnalysis"
     );
 }
 
@@ -170,25 +139,7 @@ fn test_resume_from_covers_all_sequential_phases() {
     // Every sequential phase must have a resume_from entry that routes to
     // the next phase in the pipeline
     let tmp = tempfile::tempdir().unwrap();
-    let sequential_phases = vec![
-        ScanPhase::CweRouting,
-        ScanPhase::LlmDiscovery,
-        ScanPhase::LlmVerification,
-        ScanPhase::SecurityAgentVerification,
-        ScanPhase::TicketCrossRef,
-        ScanPhase::GitAnalysis,
-        ScanPhase::CrossFileAnalysis,
-        ScanPhase::ConfidenceScoring,
-        ScanPhase::AiAggregation,
-        ScanPhase::ThreatModeling,
-        ScanPhase::RootCauseDedup,
-        ScanPhase::MultiVerifier,
-        ScanPhase::AutoPatching,
-        ScanPhase::CveBootstrap,
-        ScanPhase::PocCompiler,
-        ScanPhase::VariantSearch,
-        ScanPhase::Reporting,
-    ];
+    let sequential_phases = sequential_pipeline_phases();
 
     let expected_next = vec![
         ScanPhase::LlmDiscovery,

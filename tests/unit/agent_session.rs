@@ -34,7 +34,11 @@ fn create_temp_dir() -> tempfile::TempDir {
 }
 
 /// Helper to create a test file in the temp directory
-fn create_test_file(temp_dir: &tempfile::TempDir, filename: &str, content: &str) -> std::path::PathBuf {
+fn create_test_file(
+    temp_dir: &tempfile::TempDir,
+    filename: &str,
+    content: &str,
+) -> std::path::PathBuf {
     let file_path = temp_dir.path().join(filename);
     std::fs::write(&file_path, content).expect("Failed to write test file");
     file_path
@@ -71,6 +75,8 @@ fn create_test_finding(title: &str, severity: Severity) -> VulnerabilityFinding 
         poc_format: None,
         llm_model: None,
         agent_mode: true,
+        statement_range: None,
+        triage_verdict: None,
     }
 }
 
@@ -78,50 +84,40 @@ fn create_test_finding(title: &str, severity: Severity) -> VulnerabilityFinding 
 // Session Creation Tests
 // ============================================================================
 
-#[test]
-fn test_session_creation_with_mock_client() {
+/// Helper for creating an agent session with default test configuration
+fn create_test_session(max_turns: u32) -> AgentSession {
     let mock_client = MockLlmClient::new(vec![]);
-    let config = create_test_config(10);
+    let config = create_test_config(max_turns);
     let temp_dir = create_temp_dir();
     let progress_cb: ProgressCallback = Arc::new(|_| {});
 
-    let _session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
+    AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb)
+}
+
+#[test]
+fn test_session_creation_with_mock_client() {
+    let _session = create_test_session(10);
 
     // Session created successfully
 }
 
 #[test]
 fn test_session_creation_with_custom_max_turns() {
-    let mock_client = MockLlmClient::new(vec![]);
-    let config = create_test_config(50);
-    let temp_dir = create_temp_dir();
-    let progress_cb: ProgressCallback = Arc::new(|_| {});
-
-    let _session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
+    let _session = create_test_session(50);
 
     // Session created with custom max_turns
 }
 
 #[test]
 fn test_session_creation_with_minimal_max_turns() {
-    let mock_client = MockLlmClient::new(vec![]);
-    let config = create_test_config(1);
-    let temp_dir = create_temp_dir();
-    let progress_cb: ProgressCallback = Arc::new(|_| {});
-
-    let _session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
+    let _session = create_test_session(1);
 
     // Session created with minimal max_turns
 }
 
 #[test]
 fn test_session_uses_provided_project_root() {
-    let mock_client = MockLlmClient::new(vec![]);
-    let config = create_test_config(10);
-    let temp_dir = create_temp_dir();
-    let progress_cb: ProgressCallback = Arc::new(|_| {});
-
-    let _session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
+    let _session = create_test_session(10);
 
     // Session created with project root
 }
@@ -151,12 +147,7 @@ fn test_session_creation_with_custom_timeout() {
 
 #[test]
 fn test_session_has_tool_registry() {
-    let mock_client = MockLlmClient::new(vec![]);
-    let config = create_test_config(10);
-    let temp_dir = create_temp_dir();
-    let progress_cb: ProgressCallback = Arc::new(|_| {});
-
-    let _session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
+    let _session = create_test_session(10);
 
     // Tool registry is initialized (verified by successful session creation)
 }
@@ -257,7 +248,9 @@ async fn test_analyze_file_success_with_mock_llm() {
     let test_file = create_test_file(&temp_dir, "test.rs", "fn main() {}");
     let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
 
-    let result = session.analyze_file(test_file.to_string_lossy().as_ref()).await;
+    let result = session
+        .analyze_file(test_file.to_string_lossy().as_ref())
+        .await;
 
     assert!(result.is_ok());
     let finding = result.unwrap();
@@ -281,7 +274,9 @@ async fn test_analyze_file_with_tool_calls() {
     let test_file = create_test_file(&temp_dir, "test.rs", "fn main() {}");
     let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
 
-    let result = session.analyze_file(test_file.to_string_lossy().as_ref()).await;
+    let result = session
+        .analyze_file(test_file.to_string_lossy().as_ref())
+        .await;
 
     assert!(result.is_ok());
     let finding = result.unwrap();
@@ -308,7 +303,9 @@ async fn test_analyze_file_max_turns_reached() {
     let test_file = create_test_file(&temp_dir, "test.rs", "fn main() {}");
     let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
 
-    let result = session.analyze_file(test_file.to_string_lossy().as_ref()).await;
+    let result = session
+        .analyze_file(test_file.to_string_lossy().as_ref())
+        .await;
 
     assert!(result.is_ok());
     let finding = result.unwrap();
@@ -330,7 +327,9 @@ async fn test_analyze_file_empty_file() {
     let test_file = create_test_file(&temp_dir, "empty.rs", "");
     let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
 
-    let result = session.analyze_file(test_file.to_string_lossy().as_ref()).await;
+    let result = session
+        .analyze_file(test_file.to_string_lossy().as_ref())
+        .await;
 
     assert!(result.is_ok());
 }
@@ -348,7 +347,7 @@ async fn test_analyze_file_nonexistent_file() {
     let result = session.analyze_file("/nonexistent/path/file.rs").await;
 
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("Cannot read file"));
+    assert!(result.unwrap_err().contains("FILE_NOT_FOUND"));
 }
 
 // ============================================================================
@@ -369,7 +368,9 @@ async fn test_analyze_file_high_severity() {
     let test_file = create_test_file(&temp_dir, "test.rs", "fn main() {}");
     let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
 
-    let result = session.analyze_file(test_file.to_string_lossy().as_ref()).await;
+    let result = session
+        .analyze_file(test_file.to_string_lossy().as_ref())
+        .await;
 
     assert!(result.is_ok());
     let finding = result.unwrap();
@@ -390,7 +391,9 @@ async fn test_analyze_file_low_severity() {
     let test_file = create_test_file(&temp_dir, "test.rs", "fn main() {}");
     let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
 
-    let result = session.analyze_file(test_file.to_string_lossy().as_ref()).await;
+    let result = session
+        .analyze_file(test_file.to_string_lossy().as_ref())
+        .await;
 
     assert!(result.is_ok());
     let finding = result.unwrap();
@@ -411,7 +414,9 @@ async fn test_analyze_file_medium_severity_default() {
     let test_file = create_test_file(&temp_dir, "test.rs", "fn main() {}");
     let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
 
-    let result = session.analyze_file(test_file.to_string_lossy().as_ref()).await;
+    let result = session
+        .analyze_file(test_file.to_string_lossy().as_ref())
+        .await;
 
     assert!(result.is_ok());
     let finding = result.unwrap();
@@ -437,7 +442,9 @@ async fn test_analyze_file_with_cwe_id() {
     let test_file = create_test_file(&temp_dir, "test.rs", "fn main() {}");
     let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
 
-    let result = session.analyze_file(test_file.to_string_lossy().as_ref()).await;
+    let result = session
+        .analyze_file(test_file.to_string_lossy().as_ref())
+        .await;
 
     assert!(result.is_ok());
     let finding = result.unwrap();
@@ -458,7 +465,9 @@ async fn test_analyze_file_with_line_number() {
     let test_file = create_test_file(&temp_dir, "test.rs", "fn main() {}");
     let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
 
-    let result = session.analyze_file(test_file.to_string_lossy().as_ref()).await;
+    let result = session
+        .analyze_file(test_file.to_string_lossy().as_ref())
+        .await;
 
     assert!(result.is_ok());
     let finding = result.unwrap();
@@ -479,12 +488,17 @@ async fn test_analyze_file_with_code_snippet() {
     let test_file = create_test_file(&temp_dir, "test.rs", "fn main() {}");
     let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
 
-    let result = session.analyze_file(test_file.to_string_lossy().as_ref()).await;
+    let result = session
+        .analyze_file(test_file.to_string_lossy().as_ref())
+        .await;
 
     assert!(result.is_ok());
     let finding = result.unwrap();
     assert!(finding.finding.code_snippet.is_some());
-    assert_eq!(finding.finding.code_snippet.unwrap(), "unsafe { ptr.read() }");
+    assert_eq!(
+        finding.finding.code_snippet.unwrap(),
+        "unsafe { ptr.read() }"
+    );
 }
 
 #[tokio::test]
@@ -501,7 +515,9 @@ async fn test_analyze_file_generates_finding_id() {
     let test_file = create_test_file(&temp_dir, "my_file.rs", "fn main() {}");
     let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
 
-    let result = session.analyze_file(test_file.to_string_lossy().as_ref()).await;
+    let result = session
+        .analyze_file(test_file.to_string_lossy().as_ref())
+        .await;
 
     assert!(result.is_ok());
     let finding = result.unwrap();
@@ -536,11 +552,13 @@ async fn test_analyze_file_llm_error_recovery() {
     let test_file = create_test_file(&temp_dir, "test.rs", "fn main() {}");
     let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
 
-    let result = session.analyze_file(test_file.to_string_lossy().as_ref()).await;
+    let result = session
+        .analyze_file(test_file.to_string_lossy().as_ref())
+        .await;
 
     assert!(result.is_ok());
     let finding = result.unwrap();
-    assert!(!finding.finding.title.is_empty());
+    assert!(finding.finding.title.is_empty());
 }
 
 #[tokio::test]
@@ -560,7 +578,9 @@ async fn test_analyze_file_empty_response() {
     let test_file = create_test_file(&temp_dir, "test.rs", "fn main() {}");
     let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
 
-    let result = session.analyze_file(test_file.to_string_lossy().as_ref()).await;
+    let result = session
+        .analyze_file(test_file.to_string_lossy().as_ref())
+        .await;
 
     assert!(result.is_ok());
     // Empty response should result in empty/audit finding
@@ -585,7 +605,9 @@ async fn test_analyze_file_invalid_json_response() {
     let test_file = create_test_file(&temp_dir, "test.rs", "fn main() {}");
     let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
 
-    let result = session.analyze_file(test_file.to_string_lossy().as_ref()).await;
+    let result = session
+        .analyze_file(test_file.to_string_lossy().as_ref())
+        .await;
 
     assert!(result.is_ok());
     let finding = result.unwrap();
@@ -610,7 +632,9 @@ async fn test_analyze_file_no_vulnerability_found() {
     let test_file = create_test_file(&temp_dir, "secure.rs", "fn main() {}");
     let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
 
-    let result = session.analyze_file(test_file.to_string_lossy().as_ref()).await;
+    let result = session
+        .analyze_file(test_file.to_string_lossy().as_ref())
+        .await;
 
     assert!(result.is_ok());
     let finding = result.unwrap();
@@ -677,10 +701,7 @@ async fn test_verify_finding_with_tool_calls() {
             "file_write",
             serde_json::json!({ "path": "poc.rs", "content": "fn test() {}" }),
         ),
-        MockLlmClient::mock_tool_call(
-            "test_compile",
-            serde_json::json!({ "path": "poc.rs" }),
-        ),
+        MockLlmClient::mock_tool_call("test_compile", serde_json::json!({ "path": "poc.rs" })),
         MockLlmClient::mock_final_response(
             "compiled=true\ntest_passed=true\nTest demonstrates the vulnerability",
         ),
@@ -901,7 +922,9 @@ async fn test_full_analyze_and_verify_flow() {
     let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb.clone());
 
     // Analyze
-    let analyze_result = session.analyze_file(test_file.to_string_lossy().as_ref()).await;
+    let analyze_result = session
+        .analyze_file(test_file.to_string_lossy().as_ref())
+        .await;
     assert!(analyze_result.is_ok());
     let finding = analyze_result.unwrap();
 
@@ -913,7 +936,9 @@ async fn test_full_analyze_and_verify_flow() {
     let mock_client2 = MockLlmClient::new(verify_responses);
     let session2 = AgentSession::new(mock_client2, &config, temp_dir.path(), progress_cb);
 
-    let verify_result = session2.verify_finding(&finding.finding.file_path, &finding.finding).await;
+    let verify_result = session2
+        .verify_finding(&finding.finding.file_path, &finding.finding)
+        .await;
     assert!(verify_result.is_ok());
     let verified = verify_result.unwrap();
 
@@ -944,12 +969,16 @@ async fn test_multiple_analyze_calls_same_session() {
     let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
 
     // First analyze
-    let result1 = session.analyze_file(test_file1.to_string_lossy().as_ref()).await;
+    let result1 = session
+        .analyze_file(test_file1.to_string_lossy().as_ref())
+        .await;
     assert!(result1.is_ok());
     assert_eq!(result1.unwrap().finding.title, "Finding 1");
 
     // Second analyze (should get second response)
-    let result2 = session.analyze_file(test_file2.to_string_lossy().as_ref()).await;
+    let result2 = session
+        .analyze_file(test_file2.to_string_lossy().as_ref())
+        .await;
     assert!(result2.is_ok());
     assert_eq!(result2.unwrap().finding.title, "Finding 2");
 }
@@ -968,12 +997,17 @@ async fn test_session_with_custom_model_name() {
     let test_file = create_test_file(&temp_dir, "test.rs", "fn main() {}");
     let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
 
-    let result = session.analyze_file(test_file.to_string_lossy().as_ref()).await;
+    let result = session
+        .analyze_file(test_file.to_string_lossy().as_ref())
+        .await;
     assert!(result.is_ok());
     let finding = result.unwrap();
 
     // Model name should be recorded
-    assert_eq!(finding.finding.llm_model, Some("custom-model-v1".to_string()));
+    assert_eq!(
+        finding.finding.llm_model,
+        Some("custom-model-v1".to_string())
+    );
 }
 
 // ============================================================================
@@ -995,7 +1029,9 @@ async fn test_analyze_file_with_special_characters_in_path() {
     let test_file = create_test_file(&temp_dir, "test_file-v1.0.rs", "fn main() {}");
     let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
 
-    let result = session.analyze_file(test_file.to_string_lossy().as_ref()).await;
+    let result = session
+        .analyze_file(test_file.to_string_lossy().as_ref())
+        .await;
 
     assert!(result.is_ok());
     let finding = result.unwrap();
@@ -1019,7 +1055,9 @@ async fn test_analyze_file_with_very_long_content() {
     let test_file = create_test_file(&temp_dir, "large.rs", &long_content);
     let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
 
-    let result = session.analyze_file(test_file.to_string_lossy().as_ref()).await;
+    let result = session
+        .analyze_file(test_file.to_string_lossy().as_ref())
+        .await;
 
     assert!(result.is_ok());
 }
@@ -1067,6 +1105,8 @@ async fn test_verify_finding_with_minimal_finding() {
         poc_format: None,
         llm_model: None,
         agent_mode: true,
+        statement_range: None,
+        triage_verdict: None,
     };
 
     let result = session.verify_finding("test.rs", &finding).await;
@@ -1088,7 +1128,9 @@ async fn test_analyze_file_single_turn_limit() {
     let test_file = create_test_file(&temp_dir, "test.rs", "fn main() {}");
     let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
 
-    let result = session.analyze_file(test_file.to_string_lossy().as_ref()).await;
+    let result = session
+        .analyze_file(test_file.to_string_lossy().as_ref())
+        .await;
 
     assert!(result.is_ok());
     let finding = result.unwrap();

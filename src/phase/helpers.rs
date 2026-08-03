@@ -9,6 +9,7 @@
 
 use crate::config::ScannerConfig;
 use crate::findings::{Severity, VerificationStatus, VulnerabilityFinding};
+use crate::phase::PhaseContext;
 use crate::scanner::Scanner;
 use tempfile::TempDir;
 
@@ -132,6 +133,34 @@ pub fn create_default_test_scanner() -> (Scanner, TempDir) {
     (scanner, temp_dir)
 }
 
+/// Internal helper to create a test PhaseContext with empty analyzed_files.
+/// Both create_test_phase_context and setup_test_phase_context use this.
+fn create_test_phase_context_impl() -> (TempDir, PhaseContext<'static>) {
+    let temp_dir = TempDir::new().unwrap();
+    let config = ScannerConfig::default();
+    let scanner = Scanner::new(config, temp_dir.path().to_path_buf(), false);
+    let analyzed_files: Vec<String> = Vec::new();
+
+    // Safety: We leak these boxes to make them 'static for the test context.
+    // This is acceptable in test code where the lifetime is bounded by the test execution.
+    let scanner_ref: &'static mut Scanner = Box::leak(Box::new(scanner));
+    let analyzed_files_ref: &'static mut Vec<String> = Box::leak(Box::new(analyzed_files));
+
+    let ctx = PhaseContext {
+        scanner: scanner_ref,
+        analyzed_files: analyzed_files_ref,
+    };
+
+    (temp_dir, ctx)
+}
+
+/// Create a test context for phase tests with empty analyzed_files.
+/// Used to eliminate duplication in phase test `is_enabled` tests.
+/// Returns (temp_dir, ctx) where ctx contains a leaked scanner and analyzed_files vec.
+pub fn create_test_phase_context() -> (TempDir, PhaseContext<'static>) {
+    create_test_phase_context_impl()
+}
+
 /// Macro to create a test context with scanner and empty analyzed_files.
 #[macro_export]
 macro_rules! create_ctx {
@@ -163,4 +192,10 @@ macro_rules! create_ctx_with_finding {
         };
         (temp_dir, ctx)
     }};
+}
+
+/// Create test phase context with empty analyzed_files for is_enabled tests.
+/// This eliminates duplication between confidence_scoring and indexing tests.
+pub fn setup_test_phase_context() -> (TempDir, PhaseContext<'static>) {
+    create_test_phase_context_impl()
 }

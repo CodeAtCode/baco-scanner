@@ -69,6 +69,19 @@ fn create_manager_with_repo() -> (WorktreeManager, tempfile::TempDir) {
     (manager, repo_dir)
 }
 
+fn create_stale_worktrees(temp_dir: &std::path::Path, names: &[&str]) {
+    for name in names {
+        let dir = temp_dir.join(name);
+        fs::create_dir_all(&dir).unwrap();
+        std::process::Command::new("touch")
+            .arg("-d")
+            .arg("2 hours ago")
+            .arg(&dir)
+            .output()
+            .ok();
+    }
+}
+
 // ============================================================================
 // WorktreeManager Creation Tests
 // ============================================================================
@@ -157,22 +170,11 @@ fn test_cleanup_stale_worktrees_old_worktree() {
 fn test_cleanup_stale_worktrees_multiple() {
     let (manager, repo_dir) = create_manager_with_repo();
 
-    // Create temp dir and multiple stale worktrees
     let repo_path = repo_dir.path().to_path_buf();
     let temp_dir = repo_path.join(".baco-temp").join("worktrees");
     fs::create_dir_all(&temp_dir).unwrap();
 
-    for name in &["worktree-1", "worktree-2", "worktree-3"] {
-        let dir = temp_dir.join(name);
-        fs::create_dir_all(&dir).unwrap();
-        // Set modification time to 2 hours ago
-        std::process::Command::new("touch")
-            .arg("-d")
-            .arg("2 hours ago")
-            .arg(&dir)
-            .output()
-            .ok();
-    }
+    create_stale_worktrees(&temp_dir, &["worktree-1", "worktree-2", "worktree-3"]);
 
     let cleaned = manager
         .cleanup_stale_worktrees(Duration::from_secs(3600))
@@ -800,34 +802,20 @@ fn test_multiple_worktrees_are_isolated() {
 fn test_cleanup_full_workflow() {
     let (manager, repo_dir) = create_manager_with_repo();
 
-    // Create temp dir with stale worktrees
     let repo_path = repo_dir.path().to_path_buf();
     let temp_dir = repo_path.join(".baco-temp").join("worktrees");
     fs::create_dir_all(&temp_dir).unwrap();
 
-    // Create old worktrees
-    for name in &["stale-1", "stale-2"] {
-        let dir = temp_dir.join(name);
-        fs::create_dir_all(&dir).unwrap();
-        std::process::Command::new("touch")
-            .arg("-d")
-            .arg("2 hours ago")
-            .arg(&dir)
-            .output()
-            .ok();
-    }
+    create_stale_worktrees(&temp_dir, &["stale-1", "stale-2"]);
 
-    // Create fresh worktree
     let fresh_dir = temp_dir.join("fresh");
     fs::create_dir_all(&fresh_dir).unwrap();
 
-    // Cleanup with 1 hour max age
     let cleaned = manager
         .cleanup_stale_worktrees(Duration::from_secs(3600))
         .unwrap();
     assert_eq!(cleaned, 2);
 
-    // Verify stale removed, fresh remains
     assert!(!temp_dir.join("stale-1").exists());
     assert!(!temp_dir.join("stale-2").exists());
     assert!(temp_dir.join("fresh").exists());

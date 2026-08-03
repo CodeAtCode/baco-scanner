@@ -3,6 +3,7 @@
 pub mod checkpoint;
 mod core;
 mod env;
+mod helpers;
 mod orchestrator;
 pub(crate) mod parallel;
 #[cfg(test)]

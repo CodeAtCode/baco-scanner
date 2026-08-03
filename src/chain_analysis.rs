@@ -138,148 +138,112 @@ impl ChainAnalyzer {
             .and_then(|s| s.find('-').map(|idx| &s[idx + 1..]))
     }
 
-    /// Check if two CWEs form an injection-to-execution pair
-    fn is_injection_exec_pair(cwe1: &Option<String>, cwe2: &Option<String>) -> bool {
+    /// Check if two CWEs form a pair against the given pairs table
+    fn is_cwe_pair(pairs: &[(&str, &str)], cwe1: &Option<String>, cwe2: &Option<String>) -> bool {
         let num1 = Self::extract_cwe_number(cwe1);
         let num2 = Self::extract_cwe_number(cwe2);
 
         if let (Some(n1), Some(n2)) = (num1, num2) {
-            Self::INJECTION_EXEC_PAIRS
+            pairs
                 .iter()
                 .any(|&(a, b)| (a == n1 && b == n2) || (a == n2 && b == n1))
         } else {
             false
         }
+    }
+
+    /// Find a chain in a group of findings using the given pair checker and chain type
+    fn find_chain<F>(
+        findings: &[&VulnerabilityFinding],
+        pair_checker: F,
+        chain_type: ChainType,
+    ) -> Option<ChainResult>
+    where
+        F: Fn(&Option<String>, &Option<String>) -> bool + Copy,
+    {
+        for (i, f1) in findings.iter().enumerate() {
+            for f2 in findings.iter().skip(i + 1) {
+                if pair_checker(&f1.cwe_id, &f2.cwe_id) {
+                    let description = match chain_type {
+                        ChainType::InjectionToExecution => {
+                            format!(
+                                "Injection-to-execution chain: {} ({} → {})",
+                                f1.file_path,
+                                f1.cwe_id.as_deref().unwrap_or("unknown"),
+                                f2.cwe_id.as_deref().unwrap_or("unknown")
+                            )
+                        }
+                        ChainType::AuthBypassToPrivilegeEscal => {
+                            format!(
+                                "Auth bypass to privilege escalation: {} ({} → {})",
+                                f1.file_path,
+                                f1.cwe_id.as_deref().unwrap_or("unknown"),
+                                f2.cwe_id.as_deref().unwrap_or("unknown")
+                            )
+                        }
+                        ChainType::FileAccessToRCE => {
+                            format!(
+                                "File access to RCE: {} ({} → {})",
+                                f1.file_path,
+                                f1.cwe_id.as_deref().unwrap_or("unknown"),
+                                f2.cwe_id.as_deref().unwrap_or("unknown")
+                            )
+                        }
+                        ChainType::DataExfilChain => {
+                            format!(
+                                "Data exfiltration chain: {} ({} → {})",
+                                f1.file_path,
+                                f1.cwe_id.as_deref().unwrap_or("unknown"),
+                                f2.cwe_id.as_deref().unwrap_or("unknown")
+                            )
+                        }
+                    };
+                    return Some(ChainResult {
+                        primary_finding_id: f1.id.clone(),
+                        partner_finding_ids: vec![f2.id.clone()],
+                        chain_description: description,
+                        chain_type,
+                    });
+                }
+            }
+        }
+        None
     }
 
     /// Find injection-to-execution chain in a group of findings
     fn find_injection_exec_chain(findings: &[&VulnerabilityFinding]) -> Option<ChainResult> {
-        for (i, f1) in findings.iter().enumerate() {
-            for f2 in findings.iter().skip(i + 1) {
-                if Self::is_injection_exec_pair(&f1.cwe_id, &f2.cwe_id) {
-                    return Some(ChainResult {
-                        primary_finding_id: f1.id.clone(),
-                        partner_finding_ids: vec![f2.id.clone()],
-                        chain_description: format!(
-                            "Injection-to-execution chain: {} ({} → {})",
-                            f1.file_path,
-                            f1.cwe_id.as_deref().unwrap_or("unknown"),
-                            f2.cwe_id.as_deref().unwrap_or("unknown")
-                        ),
-                        chain_type: ChainType::InjectionToExecution,
-                    });
-                }
-            }
-        }
-        None
-    }
-
-    /// Check if two CWEs form an auth bypass to privilege escalation pair
-    fn is_auth_privesc_pair(cwe1: &Option<String>, cwe2: &Option<String>) -> bool {
-        let num1 = Self::extract_cwe_number(cwe1);
-        let num2 = Self::extract_cwe_number(cwe2);
-
-        if let (Some(n1), Some(n2)) = (num1, num2) {
-            Self::AUTH_PRIVESC_PAIRS
-                .iter()
-                .any(|&(a, b)| (a == n1 && b == n2) || (a == n2 && b == n1))
-        } else {
-            false
-        }
+        Self::find_chain(
+            findings,
+            |cwe1, cwe2| Self::is_cwe_pair(Self::INJECTION_EXEC_PAIRS, cwe1, cwe2),
+            ChainType::InjectionToExecution,
+        )
     }
 
     /// Find auth bypass to privilege escalation chain
     fn find_auth_privesc_chain(findings: &[&VulnerabilityFinding]) -> Option<ChainResult> {
-        for (i, f1) in findings.iter().enumerate() {
-            for f2 in findings.iter().skip(i + 1) {
-                if Self::is_auth_privesc_pair(&f1.cwe_id, &f2.cwe_id) {
-                    return Some(ChainResult {
-                        primary_finding_id: f1.id.clone(),
-                        partner_finding_ids: vec![f2.id.clone()],
-                        chain_description: format!(
-                            "Auth bypass to privilege escalation: {} ({} → {})",
-                            f1.file_path,
-                            f1.cwe_id.as_deref().unwrap_or("unknown"),
-                            f2.cwe_id.as_deref().unwrap_or("unknown")
-                        ),
-                        chain_type: ChainType::AuthBypassToPrivilegeEscal,
-                    });
-                }
-            }
-        }
-        None
-    }
-
-    /// Check if two CWEs form a file access to RCE pair
-    fn is_file_rce_pair(cwe1: &Option<String>, cwe2: &Option<String>) -> bool {
-        let num1 = Self::extract_cwe_number(cwe1);
-        let num2 = Self::extract_cwe_number(cwe2);
-
-        if let (Some(n1), Some(n2)) = (num1, num2) {
-            Self::FILE_RCE_PAIRS
-                .iter()
-                .any(|&(a, b)| (a == n1 && b == n2) || (a == n2 && b == n1))
-        } else {
-            false
-        }
+        Self::find_chain(
+            findings,
+            |cwe1, cwe2| Self::is_cwe_pair(Self::AUTH_PRIVESC_PAIRS, cwe1, cwe2),
+            ChainType::AuthBypassToPrivilegeEscal,
+        )
     }
 
     /// Find file access to RCE chain
     fn find_file_rce_chain(findings: &[&VulnerabilityFinding]) -> Option<ChainResult> {
-        for (i, f1) in findings.iter().enumerate() {
-            for f2 in findings.iter().skip(i + 1) {
-                if Self::is_file_rce_pair(&f1.cwe_id, &f2.cwe_id) {
-                    return Some(ChainResult {
-                        primary_finding_id: f1.id.clone(),
-                        partner_finding_ids: vec![f2.id.clone()],
-                        chain_description: format!(
-                            "File access to RCE: {} ({} → {})",
-                            f1.file_path,
-                            f1.cwe_id.as_deref().unwrap_or("unknown"),
-                            f2.cwe_id.as_deref().unwrap_or("unknown")
-                        ),
-                        chain_type: ChainType::FileAccessToRCE,
-                    });
-                }
-            }
-        }
-        None
-    }
-
-    /// Check if two CWEs form a data exfiltration pair
-    fn is_data_exfil_pair(cwe1: &Option<String>, cwe2: &Option<String>) -> bool {
-        let num1 = Self::extract_cwe_number(cwe1);
-        let num2 = Self::extract_cwe_number(cwe2);
-
-        if let (Some(n1), Some(n2)) = (num1, num2) {
-            Self::DATA_EXFIL_PAIRS
-                .iter()
-                .any(|&(a, b)| (a == n1 && b == n2) || (a == n2 && b == n1))
-        } else {
-            false
-        }
+        Self::find_chain(
+            findings,
+            |cwe1, cwe2| Self::is_cwe_pair(Self::FILE_RCE_PAIRS, cwe1, cwe2),
+            ChainType::FileAccessToRCE,
+        )
     }
 
     /// Find data exfiltration chain
     fn find_data_exfil_chain(findings: &[&VulnerabilityFinding]) -> Option<ChainResult> {
-        for (i, f1) in findings.iter().enumerate() {
-            for f2 in findings.iter().skip(i + 1) {
-                if Self::is_data_exfil_pair(&f1.cwe_id, &f2.cwe_id) {
-                    return Some(ChainResult {
-                        primary_finding_id: f1.id.clone(),
-                        partner_finding_ids: vec![f2.id.clone()],
-                        chain_description: format!(
-                            "Data exfiltration chain: {} ({} → {})",
-                            f1.file_path,
-                            f1.cwe_id.as_deref().unwrap_or("unknown"),
-                            f2.cwe_id.as_deref().unwrap_or("unknown")
-                        ),
-                        chain_type: ChainType::DataExfilChain,
-                    });
-                }
-            }
-        }
-        None
+        Self::find_chain(
+            findings,
+            |cwe1, cwe2| Self::is_cwe_pair(Self::DATA_EXFIL_PAIRS, cwe1, cwe2),
+            ChainType::DataExfilChain,
+        )
     }
 }
 

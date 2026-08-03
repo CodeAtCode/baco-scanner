@@ -183,8 +183,30 @@ mod tests {
     use crate::agent::sandbox::ToolSandbox;
     use crate::agent::tool_schema::ToolRegistry;
     use crate::agent::ToolCall;
+    use crate::llm::{ChatMessage, ChatResponse};
     use std::sync::Arc;
 
+    async fn setup_tool_execution_test(
+        registry: &ToolRegistry,
+        sandbox: &ToolSandbox,
+        response: &ChatResponse,
+        messages: Vec<ChatMessage>,
+        progress_cb: &ProgressCallback,
+        tmpdir_path: &std::path::Path,
+    ) -> (Vec<String>, Option<std::path::PathBuf>, Option<std::path::PathBuf>, Vec<ChatMessage>) {
+        execute_tool_calls(
+            registry,
+            sandbox,
+            response,
+            messages,
+            progress_cb,
+            tmpdir_path,
+            1,
+            10,
+            "Turn",
+        )
+        .await
+    }
     #[test]
     fn test_create_empty_finding() {
         let finding = create_empty_finding(
@@ -271,18 +293,14 @@ mod tests {
 
         let messages = vec![ChatMessage::user("test")];
 
-        let (tools_used, test_path, compile_path, messages) = execute_tool_calls(
+        let (tools_used, test_path, compile_path, messages) = setup_tool_execution_test(
             &registry,
             &sandbox,
             &response,
             messages,
             &progress_cb,
             tmpdir.path(),
-            1,
-            10,
-            "Turn",
-        )
-        .await;
+        ).await;
 
         assert_eq!(tools_used, vec!["file_read".to_string()]);
         assert!(test_path.is_none());
@@ -560,18 +578,14 @@ mod tests {
 
         let messages = vec![ChatMessage::user("test")];
 
-        let (tools_used, test_path, compile_path, messages) = execute_tool_calls(
+        let (tools_used, test_path, compile_path, messages) = setup_tool_execution_test(
             &registry,
             &sandbox,
             &response,
             messages,
             &progress_cb,
             tmpdir.path(),
-            1,
-            10,
-            "Turn",
-        )
-        .await;
+        ).await;
 
         assert!(tools_used.is_empty());
         assert!(test_path.is_none());

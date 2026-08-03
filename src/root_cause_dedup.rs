@@ -265,6 +265,25 @@ mod tests {
         }
     }
 
+    fn make_sql_injection_findings() -> Vec<VulnerabilityFinding> {
+        vec![
+            make_finding(
+                "f1",
+                "SQL Injection",
+                "src/db.rs",
+                Some(42),
+                Some("SELECT * FROM users"),
+            ),
+            make_finding(
+                "f2",
+                "SQL Injection",
+                "src/db.rs",
+                Some(100),
+                Some("SELECT * FROM users"),
+            ),
+        ]
+    }
+
     #[test]
     fn test_compute_root_cause_id_same_inputs() {
         let finding1 = make_finding(
@@ -372,22 +391,7 @@ mod tests {
         let mut dedup = RootCauseDeduplicator::new();
 
         // Same title, same file, same snippet = same root cause
-        let findings = vec![
-            make_finding(
-                "f1",
-                "SQL Injection",
-                "src/db.rs",
-                Some(42),
-                Some("SELECT * FROM users"),
-            ),
-            make_finding(
-                "f2",
-                "SQL Injection",
-                "src/db.rs",
-                Some(100),
-                Some("SELECT * FROM users"),
-            ),
-        ];
+        let findings = make_sql_injection_findings();
 
         let groups = dedup.deduplicate(findings);
 
@@ -432,22 +436,7 @@ mod tests {
         let mut dedup = RootCauseDeduplicator::new();
 
         // Same file path, different line numbers - should group together
-        let findings = vec![
-            make_finding(
-                "f1",
-                "SQL Injection",
-                "src/db.rs",
-                Some(42),
-                Some("SELECT * FROM users"),
-            ),
-            make_finding(
-                "f2",
-                "SQL Injection",
-                "src/db.rs",
-                Some(100),
-                Some("SELECT * FROM users"),
-            ),
-        ];
+        let findings = make_sql_injection_findings();
 
         let groups = dedup.deduplicate(findings);
 

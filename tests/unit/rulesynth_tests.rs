@@ -12,6 +12,7 @@
 //! 9. Error paths - disabled config, invalid inputs
 //! 10. Edge cases - empty input, boundary values
 
+use crate::fixtures::make_rulesynth_config;
 use baco::config::RuleSynthConfig;
 use baco::rulesynth::{validate_rule, RuleError, SemgrepRule};
 use std::path::PathBuf;
@@ -127,11 +128,7 @@ fn test_rulesynth_config_custom_construction() {
 
 #[test]
 fn test_rulesynth_config_serialization() {
-    let config = RuleSynthConfig {
-        enabled: true,
-        output_dir: PathBuf::from("/tmp/rules"),
-        max_rules_per_cwe: 3,
-    };
+    let config = make_rulesynth_config();
 
     let json = serde_json::to_string(&config).unwrap();
     let deserialized: RuleSynthConfig = serde_json::from_str(&json).unwrap();

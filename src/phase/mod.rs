@@ -12,6 +12,7 @@ pub mod confidence_scoring;
 
 pub mod git_analysis;
 pub mod indexing;
+pub mod indexing_helpers;
 
 pub mod helpers;
 

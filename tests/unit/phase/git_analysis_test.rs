@@ -4,7 +4,7 @@ mod tests {
     use baco::create_ctx;
     use baco::findings::Severity;
     use baco::phase::git_analysis::GitAnalysisPhase;
-    use baco::phase::helpers::create_test_finding;
+    use baco::phase::helpers::{create_test_finding, create_test_phase_context};
     use baco::phase::{PhaseContext, ScanPhase};
     use baco::scanner::Scanner;
     use tempfile::TempDir;
@@ -178,15 +178,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_git_analysis_phase_is_enabled() {
-        let temp_dir = TempDir::new().unwrap();
-        let config = ScannerConfig::default();
-
-        let mut scanner = Scanner::new(config.clone(), temp_dir.path().to_path_buf(), false);
-
-        let ctx = PhaseContext {
-            scanner: &mut scanner,
-            analyzed_files: &mut vec![],
-        };
+        let (_temp_dir, ctx) = create_test_phase_context();
 
         let phase = GitAnalysisPhase;
         assert!(phase.is_enabled(&ctx));

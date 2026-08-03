@@ -11,14 +11,16 @@
 #![allow(clippy::too_many_lines)]
 
 use baco::prompt::{
-    BacoPhase, ProjectType, PromptEngine, PromptOverrides, TemplateVariables,
+    BacoPhase, ProjectType, PromptEngine, PromptOverrides,
     load_phase_prompts, get_prompt, sanitize_prompt_override, validate_prompt_override,
-    MAX_PROMPT_OVERRIDE_LENGTH, get_all_defaults, get_default_prompt,
+    MAX_PROMPT_OVERRIDE_LENGTH, get_default_prompt,
     injection_hunt_prompt, auth_hunt_prompt, xss_hunt_prompt,
     path_traversal_hunt_prompt, crypto_hunt_prompt, resource_hunt_prompt,
     deserialization_hunt_prompt,
 };
 use std::collections::HashMap;
+
+use crate::prompt_test_fixtures::{assert_all_prompts_non_empty, default_template_variables};
 
 // ============================================================================
 // PromptEngine Tests
@@ -491,9 +493,7 @@ fn test_template_variables_new_empty() {
 
 #[test]
 fn test_template_variables_insert_and_get() {
-    let mut vars = TemplateVariables::new();
-    vars.insert("KEY1".to_string(), "value1".to_string());
-    vars.insert("KEY2".to_string(), "value2".to_string());
+    let vars = default_template_variables();
     
     assert_eq!(vars.len(), 2);
     assert_eq!(vars.get("KEY1"), Some(&"value1".to_string()));
@@ -526,19 +526,7 @@ fn test_template_variables_is_empty_behavior() {
 
 #[test]
 fn test_default_prompts_all_fields_non_empty() {
-    let prompts = get_all_defaults();
-    
-    assert!(!prompts.indexing.is_empty());
-    assert!(!prompts.semgrep.is_empty());
-    assert!(!prompts.llm_static_analysis.is_empty());
-    assert!(!prompts.llm_discovery.is_empty());
-    assert!(!prompts.llm_verification.is_empty());
-    assert!(!prompts.ticket_crossref.is_empty());
-    assert!(!prompts.git_analysis.is_empty());
-    assert!(!prompts.cross_file_analysis.is_empty());
-    assert!(!prompts.confidence_scoring.is_empty());
-    assert!(!prompts.ai_aggregation.is_empty());
-    assert!(!prompts.reporting.is_empty());
+    assert_all_prompts_non_empty();
 }
 
 #[test]

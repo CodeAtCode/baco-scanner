@@ -534,29 +534,30 @@ fn test_generate_unknown_cwe() {
     assert!(!result.errors.is_empty());
 }
 
-#[test]
-fn test_generate_low_severity_filtered() {
+fn assert_severity_handling(severity: Severity, note: &str) {
     let engine = PoCGenerationEngine::new();
-    let finding = create_test_finding("CWE-89", Severity::Low);
+    let finding = create_test_finding("CWE-89", severity);
     let context = AnalysisContext::default();
 
     let result = engine.generate(&[finding], &context, &[PoCFormat::Python]);
 
-    // Low severity without confirmation may be filtered
-    // This test ensures graceful handling
-    let _ = result;
+    let _ = (result, note);
+}
+
+#[test]
+fn test_generate_low_severity_filtered() {
+    assert_severity_handling(
+        Severity::Low,
+        "Low severity without confirmation may be filtered",
+    );
 }
 
 #[test]
 fn test_generate_medium_severity() {
-    let engine = PoCGenerationEngine::new();
-    let finding = create_test_finding("CWE-89", Severity::Medium);
-    let context = AnalysisContext::default();
-
-    let result = engine.generate(&[finding], &context, &[PoCFormat::Python]);
-
-    // Medium severity may or may not be included depending on logic
-    let _ = result;
+    assert_severity_handling(
+        Severity::Medium,
+        "Medium severity may or may not be included",
+    );
 }
 
 // ============================================================================
@@ -684,28 +685,32 @@ fn test_result_serialization() {
 // Category-based Generation Tests
 // ============================================================================
 
-#[test]
-fn test_generate_from_category_injection() {
+fn assert_category_generation(category: IssueCategory, format: PoCFormat, note: &str) {
     let engine = PoCGenerationEngine::new();
-    let finding = create_test_finding_with_category(IssueCategory::Injection, Severity::High);
+    let finding = create_test_finding_with_category(category, Severity::High);
     let context = AnalysisContext::default();
 
-    let result = engine.generate(&[finding], &context, &[PoCFormat::Python]);
+    let result = engine.generate(&[finding], &context, &[format]);
 
-    // Category-based fallback should work
-    let _ = result;
+    let _ = (result, note);
+}
+
+#[test]
+fn test_generate_from_category_injection() {
+    assert_category_generation(
+        IssueCategory::Injection,
+        PoCFormat::Python,
+        "Category-based fallback should work",
+    );
 }
 
 #[test]
 fn test_generate_from_category_memory_corruption() {
-    let engine = PoCGenerationEngine::new();
-    let finding =
-        create_test_finding_with_category(IssueCategory::MemoryCorruption, Severity::High);
-    let context = AnalysisContext::default();
-
-    let result = engine.generate(&[finding], &context, &[PoCFormat::Rust]);
-
-    let _ = result;
+    assert_category_generation(
+        IssueCategory::MemoryCorruption,
+        PoCFormat::Rust,
+        "Memory corruption handling",
+    );
 }
 
 #[test]
@@ -804,6 +809,13 @@ fn test_poc_finding_id_reference() {
     }
 }
 
+fn assert_poc_has_result(result: &PoCGenerationResult, assertion: &dyn Fn(&ProofOfConcept)) {
+    if !result.proofs.is_empty() {
+        let poc = &result.proofs[0];
+        assertion(poc);
+    }
+}
+
 #[test]
 fn test_poc_has_description() {
     let engine = PoCGenerationEngine::new();
@@ -812,10 +824,7 @@ fn test_poc_has_description() {
 
     let result = engine.generate(&[finding], &context, &[PoCFormat::Python]);
 
-    if !result.proofs.is_empty() {
-        let poc = &result.proofs[0];
-        assert!(!poc.description.is_empty());
-    }
+    assert_poc_has_result(&result, &|poc| assert!(!poc.description.is_empty()));
 }
 
 #[test]
@@ -826,10 +835,7 @@ fn test_poc_code_not_empty() {
 
     let result = engine.generate(&[finding], &context, &[PoCFormat::Python]);
 
-    if !result.proofs.is_empty() {
-        let poc = &result.proofs[0];
-        assert!(!poc.code.is_empty());
-    }
+    assert_poc_has_result(&result, &|poc| assert!(!poc.code.is_empty()));
 }
 
 #[test]

@@ -368,7 +368,7 @@ impl LlmAnalyzer {
     }
 
     /// Retrieve relevant CWE specifications based on file path and code content
-    fn retrieve_cwe_specs(&self, file_path: &str, code_content: &str) -> String {
+    fn retrieve_cwe_specs_inner(&self, file_path: &str, code_content: &str) -> String {
         let kb = match &self.cwe_kb {
             Some(kb) => kb,
             None => return String::new(),
@@ -392,27 +392,13 @@ impl LlmAnalyzer {
     }
 
     /// Retrieve relevant CWE specifications based on file path and code content
+    fn retrieve_cwe_specs(&self, file_path: &str, code_content: &str) -> String {
+        self.retrieve_cwe_specs_inner(file_path, code_content)
+    }
+
+    /// Retrieve relevant CWE specifications based on file path and code content (public)
     pub fn retrieve_cwe_specs_public(&self, file_path: &str, code_content: &str) -> String {
-        let kb = match &self.cwe_kb {
-            Some(kb) => kb,
-            None => return String::new(),
-        };
-
-        // Build query from file path and first 20 lines of code
-        let query_parts: Vec<String> = vec![
-            file_path.to_string(),
-            code_content.lines().take(20).collect::<Vec<_>>().join(" "),
-        ];
-        let query = query_parts.join(" ");
-
-        // Search for top-3 relevant CWE specifications
-        let results = kb.search(&query, 3);
-
-        if results.is_empty() {
-            return String::new();
-        }
-
-        format_cwe_specs(&results)
+        self.retrieve_cwe_specs_inner(file_path, code_content)
     }
 
     /// Truncate code to fit in context window

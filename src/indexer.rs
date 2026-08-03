@@ -437,20 +437,7 @@ mod tests {
 
     #[test]
     fn test_get_files_returns_all_files() {
-        let files = vec![
-            FileInfo {
-                path: PathBuf::from("test1.c"),
-                size: 100,
-                language: "c".to_string(),
-                hash: None,
-            },
-            FileInfo {
-                path: PathBuf::from("test2.rs"),
-                size: 200,
-                language: "rust".to_string(),
-                hash: None,
-            },
-        ];
+        let files = create_test_files();
         let index = FileIndex {
             files: files.clone(),
             total_size: 300,
@@ -465,7 +452,21 @@ mod tests {
 
     #[test]
     fn test_iter_returns_correct_iterator() {
-        let files = vec![
+        let files = create_test_files();
+        let index = FileIndex {
+            files: files.clone(),
+            total_size: 300,
+            hash_store: None,
+        };
+
+        let collected: Vec<&FileInfo> = index.iter().collect();
+        assert_eq!(collected.len(), 2);
+        assert_eq!(collected[0].path, PathBuf::from("test1.c"));
+        assert_eq!(collected[1].path, PathBuf::from("test2.rs"));
+    }
+
+    fn create_test_files() -> Vec<FileInfo> {
+        vec![
             FileInfo {
                 path: PathBuf::from("test1.c"),
                 size: 100,
@@ -478,17 +479,7 @@ mod tests {
                 language: "rust".to_string(),
                 hash: None,
             },
-        ];
-        let index = FileIndex {
-            files: files.clone(),
-            total_size: 300,
-            hash_store: None,
-        };
-
-        let collected: Vec<&FileInfo> = index.iter().collect();
-        assert_eq!(collected.len(), 2);
-        assert_eq!(collected[0].path, PathBuf::from("test1.c"));
-        assert_eq!(collected[1].path, PathBuf::from("test2.rs"));
+        ]
     }
 
     #[test]

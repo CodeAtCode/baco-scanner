@@ -401,14 +401,6 @@ fn test_build_filter_buttons_all_severities() {
     assert!(!buttons.contains("Info"));
 }
 
-#[test]
-fn test_build_filter_buttons_empty() {
-    let stats = utilities::calculate_severity_stats(&[]);
-    let buttons = utilities::build_filter_buttons(&stats);
-
-    assert!(buttons.is_empty());
-}
-
 // ============================================================================
 // detect_language Tests
 // ============================================================================

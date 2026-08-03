@@ -12,41 +12,8 @@ use baco::checkpoint::ScanPhase;
 use baco::findings::{Severity, VulnerabilityFinding};
 
 // ============================================================================
-// ScanPhase variant tests - tests for all sequential phase variants
+// ScanPhase variant tests - tests for individual phase variants
 // ============================================================================
-
-#[test]
-fn test_scan_phase_all_variants_exist() {
-    let phases = vec![
-        ScanPhase::Indexing,
-        ScanPhase::Semgrep,
-        ScanPhase::LlmStaticAnalysis,
-        ScanPhase::LlmDiscovery,
-        ScanPhase::LlmVerification,
-        ScanPhase::SecurityAgentVerification,
-        ScanPhase::TicketCrossRef,
-        ScanPhase::GitAnalysis,
-        ScanPhase::CrossFileAnalysis,
-        ScanPhase::ConfidenceScoring,
-        ScanPhase::AiAggregation,
-        ScanPhase::Reporting,
-        ScanPhase::ThreatModeling,
-        ScanPhase::RootCauseDedup,
-        ScanPhase::MultiVerifier,
-        ScanPhase::AutoPatching,
-        ScanPhase::CveBootstrap,
-        ScanPhase::PocCompiler,
-        ScanPhase::VariantSearch,
-        ScanPhase::RuleSynthesis,
-        ScanPhase::Hunt,
-        ScanPhase::Validate,
-        ScanPhase::IndependentVerify,
-        ScanPhase::Complete,
-        ScanPhase::Error,
-    ];
-
-    assert_eq!(phases.len(), 25);
-}
 
 #[test]
 fn test_scan_phase_llm_discovery() {

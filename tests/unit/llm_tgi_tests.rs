@@ -7,6 +7,7 @@
 //! 4. Edge cases: empty input, disabled config, missing fields
 //! 5. All public API functionality
 
+use crate::fixtures::{make_tgi_config_missing_endpoint, make_tgi_config_missing_model};
 use baco::config::TgiConfig;
 use baco::llm::{CompletionOptions, TgiClient};
 
@@ -97,12 +98,7 @@ fn test_tgi_client_new_disabled() {
 
 #[test]
 fn test_tgi_client_new_missing_endpoint() {
-    let config = TgiConfig {
-        enabled: true,
-        endpoint: String::new(),
-        model: "test-model".to_string(),
-        ..Default::default()
-    };
+    let config = make_tgi_config_missing_endpoint();
     let result = TgiClient::new(&config);
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("endpoint"));
@@ -110,12 +106,7 @@ fn test_tgi_client_new_missing_endpoint() {
 
 #[test]
 fn test_tgi_client_new_missing_model() {
-    let config = TgiConfig {
-        enabled: true,
-        endpoint: "http://localhost:8080".to_string(),
-        model: String::new(),
-        ..Default::default()
-    };
+    let config = make_tgi_config_missing_model();
     let result = TgiClient::new(&config);
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("model"));

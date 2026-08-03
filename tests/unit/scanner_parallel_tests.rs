@@ -3,6 +3,10 @@
 //! Tests cover ParallelPhaseConfig, ParallelPhaseResult, phase execution functions,
 //! and the combine_parallel_results function for parallel phase orchestration.
 
+use crate::fixtures::{
+    make_indexing_result, make_llm_static_result, make_parallel_test_initial_findings,
+    make_semgrep_result,
+};
 use baco::checkpoint::ScanPhase;
 use baco::findings::{Severity, VulnerabilityFinding};
 use baco::phase::helpers::create_test_finding_simple;
@@ -227,22 +231,11 @@ fn test_parallel_phase_result_mixed_severities() {
 
 #[test]
 fn test_combine_parallel_results_all_success() {
-    let initial_findings = vec![create_test_finding_simple("Initial", Severity::Low)];
+    let initial_findings = make_parallel_test_initial_findings("Initial");
 
-    let indexing_result = Ok((
-        vec![create_test_finding_simple("Indexing", Severity::Medium)],
-        vec!["file1.rs".to_string()],
-    ));
-
-    let semgrep_result = Ok((
-        vec![create_test_finding_simple("Semgrep", Severity::High)],
-        vec!["file2.rs".to_string()],
-    ));
-
-    let llm_static_result = Ok((
-        vec![create_test_finding_simple("LLM", Severity::Critical)],
-        vec!["file3.rs".to_string()],
-    ));
+    let indexing_result = Ok(make_indexing_result("Indexing", "file1"));
+    let semgrep_result = Ok(make_semgrep_result("Semgrep", "file2"));
+    let llm_static_result = Ok(make_llm_static_result("LLM", "file3"));
 
     let (combined_findings, analyzed_files) = combine_parallel_results(
         initial_findings,
@@ -258,7 +251,7 @@ fn test_combine_parallel_results_all_success() {
 
 #[test]
 fn test_combine_parallel_results_all_none() {
-    let initial_findings = vec![create_test_finding_simple("Initial", Severity::Low)];
+    let initial_findings = make_parallel_test_initial_findings("Initial");
 
     let (combined_findings, analyzed_files) =
         combine_parallel_results(initial_findings.clone(), None, None, None);
@@ -270,7 +263,7 @@ fn test_combine_parallel_results_all_none() {
 
 #[test]
 fn test_combine_parallel_results_all_errors() {
-    let initial_findings = vec![create_test_finding_simple("Initial", Severity::Low)];
+    let initial_findings = make_parallel_test_initial_findings("Initial");
 
     let indexing_result = Err("Indexing failed".to_string());
     let semgrep_result = Err("Semgrep failed".to_string());

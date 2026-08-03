@@ -39,6 +39,19 @@ fn create_tool_registry_with_all_tools() -> ToolRegistry {
     registry
 }
 
+fn make_test_response(tool_name: &str, args: serde_json::Value) -> ChatResponse {
+    ChatResponse {
+        content: "".to_string(),
+        tool_calls: vec![ToolCall {
+            id: Some("call_1".to_string()),
+            name: tool_name.to_string(),
+            arguments: args,
+        }],
+        raw: serde_json::json!({}),
+        model_used: "test-model".to_string(),
+    }
+}
+
 fn setup_sandbox() -> (ToolSandbox, tempfile::TempDir) {
     let tmpdir = tempfile::tempdir().unwrap();
     let sandbox = ToolSandbox::new(tmpdir.path().to_path_buf(), 30);
@@ -130,17 +143,7 @@ async fn test_execute_single_file_read() {
     let registry = create_tool_registry_with_all_tools();
     let progress_cb = create_progress_callback();
 
-    let response = ChatResponse {
-        content: "".to_string(),
-        tool_calls: vec![ToolCall {
-            id: Some("call_1".to_string()),
-            name: "file_read".to_string(),
-            arguments: serde_json::json!({ "path": "test.txt" }),
-        }],
-        raw: serde_json::json!({}),
-        model_used: "test-model".to_string(),
-    };
-
+    let response = make_test_response("file_read", serde_json::json!({ "path": "test.txt" }));
     let messages = vec![ChatMessage::user("initial message")];
 
     let (tools_used, test_path, compile_path, messages) = execute_tool_calls(
@@ -638,20 +641,9 @@ async fn test_execute_with_many_turns_parameters() {
     let registry = create_tool_registry_with_all_tools();
     let progress_cb = create_progress_callback();
 
-    let response = ChatResponse {
-        content: "".to_string(),
-        tool_calls: vec![ToolCall {
-            id: Some("call_1".to_string()),
-            name: "file_read".to_string(),
-            arguments: serde_json::json!({ "path": "test.txt" }),
-        }],
-        raw: serde_json::json!({}),
-        model_used: "test-model".to_string(),
-    };
-
+    let response = make_test_response("file_read", serde_json::json!({ "path": "test.txt" }));
     let messages = vec![ChatMessage::user("test")];
 
-    // Test with different turn/max_turns values
     let (tools_used, _, _, messages) = execute_tool_calls(
         &registry,
         &sandbox,
@@ -659,8 +651,8 @@ async fn test_execute_with_many_turns_parameters() {
         messages,
         &progress_cb,
         tmpdir.path(),
-        15, // turn
-        50, // max_turns
+        15,
+        50,
         "Agent Turn",
     )
     .await;
@@ -830,18 +822,7 @@ async fn test_message_flow_preserves_initial_messages() {
     let registry = create_tool_registry_with_all_tools();
     let progress_cb = create_progress_callback();
 
-    let response = ChatResponse {
-        content: "".to_string(),
-        tool_calls: vec![ToolCall {
-            id: Some("call_1".to_string()),
-            name: "file_read".to_string(),
-            arguments: serde_json::json!({ "path": "test.txt" }),
-        }],
-        raw: serde_json::json!({}),
-        model_used: "test-model".to_string(),
-    };
-
-    // Multiple initial messages
+    let response = make_test_response("file_read", serde_json::json!({ "path": "test.txt" }));
     let messages = vec![
         ChatMessage::user("system prompt"),
         ChatMessage::assistant("assistant response"),
@@ -861,7 +842,6 @@ async fn test_message_flow_preserves_initial_messages() {
     )
     .await;
 
-    // Should preserve all 3 initial messages + add 2 more
     assert_eq!(result_messages.len(), 5);
     assert_eq!(result_messages[0].content, "system prompt");
 }
@@ -874,17 +854,7 @@ async fn test_message_content_formatting() {
     let registry = create_tool_registry_with_all_tools();
     let progress_cb = create_progress_callback();
 
-    let response = ChatResponse {
-        content: "".to_string(),
-        tool_calls: vec![ToolCall {
-            id: Some("call_1".to_string()),
-            name: "file_read".to_string(),
-            arguments: serde_json::json!({ "path": "test.txt" }),
-        }],
-        raw: serde_json::json!({}),
-        model_used: "test-model".to_string(),
-    };
-
+    let response = make_test_response("file_read", serde_json::json!({ "path": "test.txt" }));
     let messages = vec![ChatMessage::user("test")];
 
     let (_, _, _, messages) = execute_tool_calls(
@@ -900,7 +870,6 @@ async fn test_message_content_formatting() {
     )
     .await;
 
-    // Check assistant message contains tool call info
     assert!(messages[1].content.contains("Calling:"));
     assert!(messages[1].content.contains("file_read"));
     assert!(messages[1].content.contains("Args:"));

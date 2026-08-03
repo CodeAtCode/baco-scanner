@@ -90,107 +90,6 @@ fn test_write_findings_json_empty_findings() {
     let _ = std::fs::remove_file(output_path);
 }
 
-// ============================================================================
-// HTML Utilities Tests
-// ============================================================================
-
-#[test]
-fn test_calculate_severity_stats_all_severities() {
-    let findings = vec![
-        make_finding("c1", Severity::Critical, "src/a.rs", Some(1)),
-        make_finding("h1", Severity::High, "src/b.rs", Some(2)),
-        make_finding("m1", Severity::Medium, "src/c.rs", Some(3)),
-        make_finding("l1", Severity::Low, "src/d.rs", Some(4)),
-        make_finding("i1", Severity::Info, "src/e.rs", Some(5)),
-    ];
-
-    let stats = utilities::calculate_severity_stats(&findings);
-
-    assert_eq!(stats.critical, 1);
-    assert_eq!(stats.high, 1);
-    assert_eq!(stats.medium, 1);
-    assert_eq!(stats.low, 1);
-    assert_eq!(stats.info, 1);
-}
-
-#[test]
-fn test_calculate_severity_stats_empty() {
-    let findings: Vec<VulnerabilityFinding> = vec![];
-    let stats = utilities::calculate_severity_stats(&findings);
-
-    assert_eq!(stats.critical, 0);
-    assert_eq!(stats.high, 0);
-    assert_eq!(stats.medium, 0);
-    assert_eq!(stats.low, 0);
-    assert_eq!(stats.info, 0);
-}
-
-#[test]
-fn test_calculate_severity_stats_multiple_same_severity() {
-    let findings = vec![
-        make_finding("c1", Severity::Critical, "src/a.rs", Some(1)),
-        make_finding("c2", Severity::Critical, "src/b.rs", Some(2)),
-        make_finding("c3", Severity::Critical, "src/c.rs", Some(3)),
-    ];
-
-    let stats = utilities::calculate_severity_stats(&findings);
-
-    assert_eq!(stats.critical, 3);
-    assert_eq!(stats.high, 0);
-}
-
-#[test]
-fn test_build_summary_cards_all_severities() {
-    let stats = utilities::calculate_severity_stats(&[
-        make_finding("c1", Severity::Critical, "src/a.rs", Some(1)),
-        make_finding("h1", Severity::High, "src/b.rs", Some(2)),
-        make_finding("m1", Severity::Medium, "src/c.rs", Some(3)),
-        make_finding("l1", Severity::Low, "src/d.rs", Some(4)),
-        make_finding("i1", Severity::Info, "src/e.rs", Some(5)),
-    ]);
-
-    let cards = utilities::build_summary_cards(&stats);
-
-    assert!(cards.contains("critical"));
-    assert!(cards.contains("high"));
-    assert!(cards.contains("medium"));
-    assert!(cards.contains("low"));
-    assert!(cards.contains("info"));
-    assert!(cards.contains("1"));
-}
-
-#[test]
-fn test_build_summary_cards_empty() {
-    let stats = utilities::calculate_severity_stats(&[]);
-    let cards = utilities::build_summary_cards(&stats);
-
-    assert!(cards.is_empty());
-}
-
-#[test]
-fn test_build_filter_buttons_all_severities() {
-    let stats = utilities::calculate_severity_stats(&[
-        make_finding("c1", Severity::Critical, "src/a.rs", Some(1)),
-        make_finding("h1", Severity::High, "src/b.rs", Some(2)),
-    ]);
-
-    let buttons = utilities::build_filter_buttons(&stats);
-
-    assert!(buttons.contains("Critical (1)"));
-    assert!(buttons.contains("High (1)"));
-    assert!(!buttons.contains("Medium"));
-    assert!(!buttons.contains("Low"));
-    assert!(!buttons.contains("Info"));
-}
-
-#[test]
-fn test_build_empty_state_message() {
-    let message = utilities::build_empty_state_message();
-
-    assert!(message.contains("No Security Issues Found"));
-    assert!(message.contains("✅"));
-}
-
 #[test]
 fn test_detect_language_python() {
     assert_eq!(utilities::detect_language("src/main.py"), "python");
@@ -300,7 +199,10 @@ fn test_render_finding_critical_severity() {
 
 #[test]
 fn test_render_finding_with_cwe() {
-    let finding = make_finding("f1", Severity::High, "src/test.rs", Some(10));
+    let finding = VulnerabilityFinding {
+        cwe_id: Some("CWE-79".to_string()),
+        ..make_finding("f1", Severity::High, "src/test.rs", Some(10))
+    };
     let html = render_finding(&finding, 0);
 
     assert!(html.contains("CWE-79"));
@@ -317,7 +219,10 @@ fn test_render_finding_without_line_number() {
 
 #[test]
 fn test_render_finding_with_recommendation() {
-    let finding = make_finding("f1", Severity::Medium, "src/app.rs", Some(25));
+    let finding = VulnerabilityFinding {
+        recommendation: Some("Fix this issue".to_string()),
+        ..make_finding("f1", Severity::Medium, "src/app.rs", Some(25))
+    };
     let html = render_finding(&finding, 0);
 
     assert!(html.contains("Recommendation"));
@@ -478,36 +383,29 @@ fn test_detect_conflicts_empty_grouped() {
 // Deduplication Service Tests
 // ============================================================================
 
-#[test]
-fn test_deduplication_service_creation() {
-    let config = LlmConfig {
+/// Helper to create LlmConfig for tests
+fn make_llm_config(models: Vec<&str>) -> LlmConfig {
+    LlmConfig {
         base_url: "http://test".to_string(),
         api_key: "test-key".to_string(),
         model: "test-model".to_string(),
-        models: vec!["test-model".to_string()],
+        models: models.into_iter().map(String::from).collect(),
         timeout: 30,
         max_retries: 3,
         retry_backoff_ms: 1000,
-    };
+    }
+}
 
+#[test]
+fn test_deduplication_service_creation() {
+    let config = make_llm_config(vec!["test-model"]);
     let _service = DeduplicationService::new(&config);
-    // Service creation succeeds with valid config
 }
 
 #[test]
 fn test_deduplication_empty_findings() {
-    let config = LlmConfig {
-        base_url: "http://test".to_string(),
-        api_key: "test-key".to_string(),
-        model: "test-model".to_string(),
-        models: vec![],
-        timeout: 30,
-        max_retries: 3,
-        retry_backoff_ms: 1000,
-    };
-
+    let config = make_llm_config(vec![]);
     let _service = DeduplicationService::new(&config);
-    // Service creation succeeds - async deduplication requires tokio runtime
 }
 
 // ============================================================================
@@ -516,31 +414,13 @@ fn test_deduplication_empty_findings() {
 
 #[test]
 fn test_enrichment_service_creation_with_config() {
-    let config = LlmConfig {
-        base_url: "http://test".to_string(),
-        api_key: "test-key".to_string(),
-        model: "test-model".to_string(),
-        models: vec!["test-model".to_string()],
-        timeout: 30,
-        max_retries: 3,
-        retry_backoff_ms: 1000,
-    };
-
+    let config = make_llm_config(vec!["test-model"]);
     let _service = EnrichmentService::new(&config);
-    // Service creation succeeds with valid LLM config
 }
 
 #[test]
 fn test_enrichment_service_creation_without_config() {
-    let config = LlmConfig {
-        base_url: "".to_string(),
-        api_key: "".to_string(),
-        model: "".to_string(),
-        models: vec![],
-        timeout: 30,
-        max_retries: 3,
-        retry_backoff_ms: 1000,
-    };
+    let config = make_llm_config(vec![]);
 
     let _service = EnrichmentService::new(&config);
     // Service creation succeeds without LLM config

@@ -31,15 +31,23 @@
 // Finding Fixtures
 // ============================================================================
 
+use baco::analysis_context::AnalysisContext;
 use baco::config::{
     AgentConfig, LlmConfig, LlmPhaseConfig, OutputConfig, PerformanceSettings, ProjectConfig,
-    ScannerConfig, ScannerSettings, SemgrepSettings, TicketConfig,
+    RuleSynthConfig, ScannerConfig, ScannerSettings, SemgrepSettings, TgiConfig, TicketConfig,
 };
 use baco::findings::{Severity, VerificationStatus, VulnerabilityFinding};
-pub use baco::phase::helpers::{create_finding_with_params, create_test_finding};
+pub use baco::phase::helpers::{
+    create_finding_with_params, create_test_finding, create_test_finding_simple,
+};
 use baco::scanner::Scanner;
+use baco::scanner_types::cve::{CveEntry, CveSource};
 use baco::scanner_types::project::ProjectStack;
+use baco::scanner_types::severity::{
+    AccessType, BlastRadius, RubricScore, SeverityRubric, V3Severity,
+};
 use indicatif::ProgressBar;
+use std::path::PathBuf;
 use std::sync::LazyLock;
 use tempfile::TempDir;
 
@@ -497,12 +505,213 @@ pub fn create_test_progress_bar() -> ProgressBar {
     pb
 }
 
+// ============================================================================
+// Severity Rubric Test Helpers
+// ============================================================================
+
+/// Create a test SeverityRubric with specified blast radius
+pub fn create_rubric_with_blast_radius(blast_radius: BlastRadius) -> SeverityRubric {
+    SeverityRubric::new(0.5, 0.5, 0.5, false, AccessType::Read, blast_radius)
+}
+
+/// Test helper for blast_radius_weight verification
+pub fn verify_blast_radius_weights() {
+    let rubric_low = create_rubric_with_blast_radius(BlastRadius::Low);
+    let rubric_medium = create_rubric_with_blast_radius(BlastRadius::Medium);
+    let rubric_high = create_rubric_with_blast_radius(BlastRadius::High);
+    let rubric_critical = create_rubric_with_blast_radius(BlastRadius::Critical);
+
+    assert_eq!(rubric_low.blast_radius_weight(), 0.3);
+    assert_eq!(rubric_medium.blast_radius_weight(), 0.6);
+    assert_eq!(rubric_high.blast_radius_weight(), 0.85);
+    assert_eq!(rubric_critical.blast_radius_weight(), 1.0);
+}
+
+/// Test helper for access_weight verification
+pub fn verify_access_weights() {
+    let rubric_read = SeverityRubric::new(0.5, 0.5, 0.5, false, AccessType::Read, BlastRadius::Low);
+    let rubric_write =
+        SeverityRubric::new(0.5, 0.5, 0.5, false, AccessType::Write, BlastRadius::Low);
+    let rubric_both = SeverityRubric::new(0.5, 0.5, 0.5, false, AccessType::Both, BlastRadius::Low);
+
+    assert_eq!(rubric_read.access_weight(), 0.5);
+    assert_eq!(rubric_write.access_weight(), 0.8);
+    assert_eq!(rubric_both.access_weight(), 1.0);
+}
+
+/// Test helper for severity mapping boundaries
+pub fn verify_severity_mapping_boundaries() {
+    assert_eq!(RubricScore::map_to_severity(0.0), V3Severity::Low);
+    assert_eq!(RubricScore::map_to_severity(0.19), V3Severity::Low);
+    assert_eq!(RubricScore::map_to_severity(0.2), V3Severity::Medium);
+    assert_eq!(RubricScore::map_to_severity(0.49), V3Severity::Medium);
+    assert_eq!(RubricScore::map_to_severity(0.5), V3Severity::High);
+    assert_eq!(RubricScore::map_to_severity(0.79), V3Severity::High);
+    assert_eq!(RubricScore::map_to_severity(0.8), V3Severity::Critical);
+    assert_eq!(RubricScore::map_to_severity(1.0), V3Severity::Critical);
+}
+
 /// Ensure test output directory exists.
 pub fn ensure_test_output_dir() {
     use std::fs;
     use std::path::PathBuf;
     let output_dir = PathBuf::from("/tmp/baco-test-output");
     let _ = fs::create_dir_all(&output_dir);
+}
+
+// ============================================================================
+// Scanner Parallel Test Helpers
+// ============================================================================
+
+/// Create initial findings for parallel scanner tests.
+pub fn make_parallel_test_initial_findings(title: &str) -> Vec<VulnerabilityFinding> {
+    vec![create_test_finding_simple(title, Severity::Low)]
+}
+
+/// Create indexing result for parallel scanner tests.
+pub fn make_indexing_result(title: &str, file: &str) -> (Vec<VulnerabilityFinding>, Vec<String>) {
+    (
+        vec![create_test_finding_simple(title, Severity::Medium)],
+        vec![format!("{}.rs", file)],
+    )
+}
+
+/// Create semgrep result for parallel scanner tests.
+pub fn make_semgrep_result(title: &str, file: &str) -> (Vec<VulnerabilityFinding>, Vec<String>) {
+    (
+        vec![create_test_finding_simple(title, Severity::High)],
+        vec![format!("{}.rs", file)],
+    )
+}
+
+/// Create LLM static result for parallel scanner tests.
+pub fn make_llm_static_result(title: &str, file: &str) -> (Vec<VulnerabilityFinding>, Vec<String>) {
+    (
+        vec![create_test_finding_simple(title, Severity::Critical)],
+        vec![format!("{}.rs", file)],
+    )
+}
+
+// ============================================================================
+// CVE Client Test Helpers
+// ============================================================================
+
+/// Create a CVE entry for NVD-only tests.
+pub fn make_nvd_only_cve() -> CveEntry {
+    CveEntry {
+        cve_id: "CVE-2024-1111".to_string(),
+        description: "NVD only".to_string(),
+        severity: V3Severity::Medium,
+        source: CveSource::NVD,
+        affected_products: vec![],
+        published_date: None,
+    }
+}
+
+/// Create a CVE entry for KEV-only tests.
+pub fn make_kev_only_cve() -> CveEntry {
+    CveEntry {
+        cve_id: "CVE-2024-1111".to_string(),
+        description: "KEV only".to_string(),
+        severity: V3Severity::High,
+        source: CveSource::KEV,
+        affected_products: vec![],
+        published_date: None,
+    }
+}
+
+// ============================================================================
+// Threat Model Test Helpers
+// ============================================================================
+
+/// Create default analysis context for threat model tests.
+pub fn make_threat_model_test_context() -> AnalysisContext {
+    AnalysisContext::default()
+}
+
+// ============================================================================
+// RuleSynth Test Helpers
+// ============================================================================
+
+/// Create a test RuleSynthConfig.
+pub fn make_rulesynth_config() -> RuleSynthConfig {
+    RuleSynthConfig {
+        enabled: true,
+        output_dir: PathBuf::from("/tmp/rules"),
+        max_rules_per_cwe: 3,
+    }
+}
+
+// ============================================================================
+// Report AI Aggregation Test Helpers
+// ============================================================================
+
+/// Create a test VulnerabilityFinding for AI aggregation tests.
+pub fn make_aggregation_finding(
+    id: &str,
+    severity: Severity,
+    confidence: f32,
+    file: &str,
+    line: Option<u32>,
+    cwe: Option<&str>,
+    verification: Option<VerificationStatus>,
+) -> VulnerabilityFinding {
+    VulnerabilityFinding {
+        id: id.to_string(),
+        title: format!("Finding {}", id),
+        description: "Test description".to_string(),
+        severity,
+        confidence_score: confidence,
+        cwe_id: cwe.map(String::from),
+        file_path: file.to_string(),
+        line_number: line,
+        code_snippet: Some("test code".to_string()),
+        diff_hunk: None,
+        recommendation: Some("Fix this".to_string()),
+        code_location: None,
+        already_reported: false,
+        sources: vec!["test".to_string()],
+        commit_reference: None,
+        ticket_reference: None,
+        priority_score: None,
+        cross_file_references: None,
+        verification_status: verification,
+        verification_notes: None,
+        verification_error: None,
+        agent_evidence_path: None,
+        security_issue: None,
+        poc_code: None,
+        mitigation_code: None,
+        poc_format: None,
+        llm_model: None,
+        agent_mode: false,
+        statement_range: None,
+        triage_verdict: None,
+    }
+}
+
+// ============================================================================
+// LLM TGI Test Helpers
+// ============================================================================
+
+/// Create TGI config for missing endpoint test.
+pub fn make_tgi_config_missing_endpoint() -> TgiConfig {
+    TgiConfig {
+        enabled: true,
+        endpoint: String::new(),
+        model: "test-model".to_string(),
+        ..Default::default()
+    }
+}
+
+/// Create TGI config for missing model test.
+pub fn make_tgi_config_missing_model() -> TgiConfig {
+    TgiConfig {
+        enabled: true,
+        endpoint: "http://localhost:8080".to_string(),
+        model: String::new(),
+        ..Default::default()
+    }
 }
 
 // ============================================================================

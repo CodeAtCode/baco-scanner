@@ -1,15 +1,11 @@
-//! Shared utilities and imports for integration and unit tests
+//! Common utilities for integration tests
 
 use baco::findings::{Severity, VulnerabilityFinding};
-use baco::root_cause_dedup::GlobalFpStore;
-use tempfile::tempdir;
-
-/// Create a temporary directory for scan data
-pub fn create_temp_scan_dir() -> tempfile::TempDir {
-    tempdir().expect("Failed to create temporary directory")
-}
 
 /// Create a test finding with the specified parameters
+///
+/// Note: Integration tests cannot import from unit test binaries, so we maintain
+/// this minimal copy. For unit tests, use tests::fixtures::create_test_finding instead.
 pub fn create_test_finding(
     id: &str,
     title: &str,
@@ -48,11 +44,4 @@ pub fn create_test_finding(
         statement_range: None,
         triage_verdict: None,
     }
-}
-
-/// Create a test GlobalFpStore in a temporary directory
-pub fn create_test_fp_store() -> GlobalFpStore {
-    let temp_dir = create_temp_scan_dir();
-    let fp_path = temp_dir.path().join("fp_store.json");
-    GlobalFpStore::with_path(&fp_path)
 }

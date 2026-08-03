@@ -2,6 +2,7 @@
 
 use crate::checkpoint::ScanPhase;
 use crate::findings::VulnerabilityFinding;
+use crate::scanner::helpers::log_and_aggregate_llm_results;
 
 use indicatif::ProgressBar;
 
@@ -272,19 +273,7 @@ pub fn combine_parallel_results(
         findings.append(&mut semgrep_findings);
     }
 
-    if let Some(Ok((mut llm_findings, new_files))) = llm_static_result {
-        tracing::info!("[SCANNER] Added {} LLM findings", llm_findings.len());
-        if !llm_findings.is_empty() {
-            tracing::debug!(
-                "[SCANNER] First finding description length: {}",
-                llm_findings[0].description.len()
-            );
-        }
-        findings.append(&mut llm_findings);
-        analyzed_files = new_files;
-    } else if let Some(Err(e)) = &llm_static_result {
-        tracing::warn!("[SCANNER] LLM static analysis failed: {}", e);
-    }
+    log_and_aggregate_llm_results(&llm_static_result, &mut findings, &mut analyzed_files);
 
     (findings, analyzed_files)
 }

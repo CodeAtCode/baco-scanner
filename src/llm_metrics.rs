@@ -177,39 +177,9 @@ mod tests {
         let tracker = LlmMetricsTracker::new();
 
         // Simulate LLM calls
-        tracker
-            .record_request(RecordRequestParams {
-                model_name: "mistral-small".to_string(),
-                operation: "chat".to_string(),
-                phase: "LlmDiscovery".to_string(),
-                prompt_tokens: 100,
-                completion_tokens: 200,
-                latency_ms: 300,
-                success: true,
-            })
-            .await;
-        tracker
-            .record_request(RecordRequestParams {
-                model_name: "mistral-small".to_string(),
-                operation: "chat".to_string(),
-                phase: "LlmDiscovery".to_string(),
-                prompt_tokens: 100,
-                completion_tokens: 200,
-                latency_ms: 300,
-                success: true,
-            })
-            .await;
-        tracker
-            .record_request(RecordRequestParams {
-                model_name: "mistral-small".to_string(),
-                operation: "chat".to_string(),
-                phase: "LlmDiscovery".to_string(),
-                prompt_tokens: 100,
-                completion_tokens: 200,
-                latency_ms: 300,
-                success: false,
-            })
-            .await;
+        record_test_request(&tracker, true).await;
+        record_test_request(&tracker, true).await;
+        record_test_request(&tracker, false).await;
         tracker
             .record_cached_request("mistral-small", "chat", "LlmDiscovery", 100)
             .await;
@@ -313,10 +283,24 @@ mod tests {
         assert!(json.contains("\"total_tokens\""));
         assert!(json.contains("\"avg_latency_ms\""));
 
-        // Test deserialization
         let deserialized: LlmMetrics = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.total_requests, metrics.total_requests);
         assert_eq!(deserialized.total_success, metrics.total_success);
+    }
+
+    /// Helper to record test requests
+    async fn record_test_request(tracker: &LlmMetricsTracker, success: bool) {
+        tracker
+            .record_request(RecordRequestParams {
+                model_name: "mistral-small".to_string(),
+                operation: "chat".to_string(),
+                phase: "LlmDiscovery".to_string(),
+                prompt_tokens: 100,
+                completion_tokens: 200,
+                latency_ms: 300,
+                success,
+            })
+            .await;
     }
 }
 

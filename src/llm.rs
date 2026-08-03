@@ -292,16 +292,11 @@ impl LlmClient {
                         url
                     );
                     if retries + 1 >= max_attempts {
-                        let latency_ms = start_time.elapsed().as_millis() as u64;
-                        self.record_metrics(RecordMetricsParams {
-                            model: model.clone(),
-                            operation: "chat".to_string(),
-                            phase: "unknown".to_string(),
-                            tokens_prompt: 0,
-                            tokens_completion: 0,
-                            latency_ms,
-                            success: false,
-                        })
+                        record_failure_metrics(
+                            self,
+                            model.clone(),
+                            start_time.elapsed().as_millis() as u64,
+                        )
                         .await;
 
                         return Err(format!(
@@ -321,16 +316,11 @@ impl LlmClient {
                         model, e, status, kind, url_e, retries + 1, max_attempts
                     );
                     if retries + 1 >= max_attempts {
-                        let latency_ms = start_time.elapsed().as_millis() as u64;
-                        self.record_metrics(RecordMetricsParams {
-                            model: model.clone(),
-                            operation: "chat".to_string(),
-                            phase: "unknown".to_string(),
-                            tokens_prompt: 0,
-                            tokens_completion: 0,
-                            latency_ms,
-                            success: false,
-                        })
+                        record_failure_metrics(
+                            self,
+                            model.clone(),
+                            start_time.elapsed().as_millis() as u64,
+                        )
                         .await;
 
                         return Err(format!(
@@ -808,4 +798,23 @@ pub fn create_llm_client_with_metrics(
         llm_config,
         Some(scanner.metrics_tracker.clone()),
     ))
+}
+
+/// Helper to record failure metrics for failed LLM requests
+async fn record_failure_metrics(
+    client: &LlmClient,
+    model: String,
+    latency_ms: u64,
+) {
+    client
+        .record_metrics(RecordMetricsParams {
+            model,
+            operation: "chat".to_string(),
+            phase: "unknown".to_string(),
+            tokens_prompt: 0,
+            tokens_completion: 0,
+            latency_ms,
+            success: false,
+        })
+        .await;
 }

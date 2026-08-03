@@ -24,6 +24,7 @@ mod validation_success_path_tests;
 mod validation_tests;
 // Include centralized fixtures - copy from tests/fixtures.rs
 mod agent_executor;
+mod agent_session;
 mod confidence_refinement;
 mod config;
 mod cross_file_analysis;
@@ -122,6 +123,11 @@ mod pipeline_tests;
 mod report_html_tests;
 mod root_cause_dedup_phase_tests;
 
+// Exploit test helpers
+mod exploit_test_helpers;
+
+// Additional coverage: agent sandbox/session/tools, cve+misc, chain analysis, core utilities
+
 // Additional coverage: agent sandbox/session/tools, cve+misc, chain analysis, core utilities
 mod agent_sandbox_tests;
 mod chain_analysis_tests;
@@ -164,6 +170,12 @@ mod variant_search_edge_tests;
 
 // Pipeline ordering and phase sequence tests
 mod pipeline_ordering_tests;
+
+// Pipeline test helpers (shared between phase_dispatch and pipeline_ordering)
+mod pipeline_test_helpers;
+
+// Prompt test fixtures (shared between prompt_tests and prompt_templates_tests)
+mod prompt_test_fixtures;
 
 // Findings module tests
 mod findings_tests;

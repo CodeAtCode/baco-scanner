@@ -7,7 +7,7 @@ pub use rules::SemgrepRunner;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::findings::Severity;
+    use crate::findings::{Severity, VulnerabilityFinding};
 
     #[test]
     fn test_parse_semgrep_output() {
@@ -366,16 +366,20 @@ mod tests {
         assert_eq!(findings[0].line_number, Some(1));
     }
 
-    #[test]
-    fn test_parse_semgrep_missing_extra_field() {
+    /// Test helper: parse semgrep JSON with missing extra fields
+    fn parse_test_json_missing_fields() -> Vec<VulnerabilityFinding> {
         let mock_json = r#"{
             "results": [
                 {"check_id": "test.issue", "path": "test.py", "start": {"line": 1}}
             ]
         }"#;
         let runner = SemgrepRunner::new(None, vec![]);
-        let findings =
-            parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules).unwrap();
+        parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules).unwrap()
+    }
+
+    #[test]
+    fn test_parse_semgrep_missing_extra_field() {
+        let findings = parse_test_json_missing_fields();
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].severity, Severity::Info); // Default severity
         assert_eq!(findings[0].cwe_id, None);
@@ -481,14 +485,7 @@ mod tests {
 
     #[test]
     fn test_parse_semgrep_missing_extra_object() {
-        let mock_json = r#"{
-            "results": [
-                {"check_id": "test.issue", "path": "test.py", "start": {"line": 1}}
-            ]
-        }"#;
-        let runner = SemgrepRunner::new(None, vec![]);
-        let findings =
-            parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules).unwrap();
+        let findings = parse_test_json_missing_fields();
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].severity, Severity::Info);
         assert_eq!(findings[0].cwe_id, None);

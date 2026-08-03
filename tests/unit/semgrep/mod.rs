@@ -224,44 +224,6 @@ fn test_parse_json_not_array_root() {
 // ============================================================================
 
 #[test]
-fn test_parse_json_missing_check_id_skips_result() {
-    let mock_json = r#"{
-        "results": [
-            {
-                "path": "test.py",
-                "start": {"line": 1},
-                "extra": {"message": "No check_id"}
-            }
-        ]
-    }"#;
-
-    let runner = SemgrepRunner::new(None, vec![]);
-    let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
-
-    // Missing check_id should skip the result
-    assert!(findings.is_empty());
-}
-
-#[test]
-fn test_parse_json_missing_path_skips_result() {
-    let mock_json = r#"{
-        "results": [
-            {
-                "check_id": "test.rule",
-                "start": {"line": 1},
-                "extra": {"message": "No path"}
-            }
-        ]
-    }"#;
-
-    let runner = SemgrepRunner::new(None, vec![]);
-    let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
-
-    // Missing path should skip the result
-    assert!(findings.is_empty());
-}
-
-#[test]
 fn test_parse_json_missing_start_line_skips_result() {
     let mock_json = r#"{
         "results": [

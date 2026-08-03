@@ -8,6 +8,9 @@
 //! - PocCompiler (validation for Rust, Python, JavaScript)
 //! - WorktreeManager (worktree operations, patch staging)
 
+use crate::fixtures::{
+    verify_access_weights, verify_blast_radius_weights, verify_severity_mapping_boundaries,
+};
 use baco::analysis_context::AnalysisContext;
 use baco::confidence::ConfidenceCalculator;
 use baco::findings::{Severity, VerificationStatus, VulnerabilityFinding};
@@ -267,36 +270,12 @@ fn test_severity_rubric_auth_factor() {
 
 #[test]
 fn test_severity_rubric_access_weight() {
-    let rubric_read = SeverityRubric::new(0.5, 0.5, 0.5, false, AccessType::Read, BlastRadius::Low);
-    let rubric_write =
-        SeverityRubric::new(0.5, 0.5, 0.5, false, AccessType::Write, BlastRadius::Low);
-    let rubric_both = SeverityRubric::new(0.5, 0.5, 0.5, false, AccessType::Both, BlastRadius::Low);
-
-    assert_eq!(rubric_read.access_weight(), 0.5);
-    assert_eq!(rubric_write.access_weight(), 0.8);
-    assert_eq!(rubric_both.access_weight(), 1.0);
+    verify_access_weights();
 }
 
 #[test]
 fn test_severity_rubric_blast_radius_weight() {
-    let rubric_low = SeverityRubric::new(0.5, 0.5, 0.5, false, AccessType::Read, BlastRadius::Low);
-    let rubric_medium =
-        SeverityRubric::new(0.5, 0.5, 0.5, false, AccessType::Read, BlastRadius::Medium);
-    let rubric_high =
-        SeverityRubric::new(0.5, 0.5, 0.5, false, AccessType::Read, BlastRadius::High);
-    let rubric_critical = SeverityRubric::new(
-        0.5,
-        0.5,
-        0.5,
-        false,
-        AccessType::Read,
-        BlastRadius::Critical,
-    );
-
-    assert_eq!(rubric_low.blast_radius_weight(), 0.3);
-    assert_eq!(rubric_medium.blast_radius_weight(), 0.6);
-    assert_eq!(rubric_high.blast_radius_weight(), 0.85);
-    assert_eq!(rubric_critical.blast_radius_weight(), 1.0);
+    verify_blast_radius_weights();
 }
 
 #[test]
@@ -335,29 +314,7 @@ fn test_severity_rubric_scorer_compute_raw_score_formula() {
 
 #[test]
 fn test_severity_rubric_scorer_map_to_severity_boundaries() {
-    assert_eq!(SeverityRubricScorer::map_to_severity(0.0), V3Severity::Low);
-    assert_eq!(SeverityRubricScorer::map_to_severity(0.19), V3Severity::Low);
-    assert_eq!(
-        SeverityRubricScorer::map_to_severity(0.2),
-        V3Severity::Medium
-    );
-    assert_eq!(
-        SeverityRubricScorer::map_to_severity(0.49),
-        V3Severity::Medium
-    );
-    assert_eq!(SeverityRubricScorer::map_to_severity(0.5), V3Severity::High);
-    assert_eq!(
-        SeverityRubricScorer::map_to_severity(0.79),
-        V3Severity::High
-    );
-    assert_eq!(
-        SeverityRubricScorer::map_to_severity(0.8),
-        V3Severity::Critical
-    );
-    assert_eq!(
-        SeverityRubricScorer::map_to_severity(1.0),
-        V3Severity::Critical
-    );
+    verify_severity_mapping_boundaries();
 }
 
 #[test]

@@ -1,72 +1,8 @@
 use baco::checkpoint::ScanPhase;
 
-/// All ScanPhase variants that should have match arms in run_phase.
-/// Terminal/orphaned phases are handled by the _ catch-all, which is correct.
-fn active_phases() -> Vec<ScanPhase> {
-    vec![
-        ScanPhase::Indexing,
-        ScanPhase::Semgrep,
-        ScanPhase::CweRouting,
-        ScanPhase::LlmStaticAnalysis,
-        ScanPhase::LlmDiscovery,
-        ScanPhase::LlmVerification,
-        ScanPhase::SecurityAgentVerification,
-        ScanPhase::TicketCrossRef,
-        ScanPhase::GitAnalysis,
-        ScanPhase::CrossFileAnalysis,
-        ScanPhase::ConfidenceScoring,
-        ScanPhase::AiAggregation,
-        ScanPhase::Reporting,
-        ScanPhase::ThreatModeling,
-        ScanPhase::RootCauseDedup,
-        ScanPhase::MultiVerifier,
-        ScanPhase::AutoPatching,
-        ScanPhase::CveBootstrap,
-        ScanPhase::PocCompiler,
-        ScanPhase::VariantSearch,
-    ]
-}
-
-/// Orphaned phases that should fall through to the _ catch-all.
-/// These have no implementation and should be skipped gracefully.
-fn orphaned_phases() -> Vec<ScanPhase> {
-    vec![
-        ScanPhase::CpgSlice,
-        ScanPhase::Hunt,
-        ScanPhase::Validate,
-        ScanPhase::IndependentVerify,
-        ScanPhase::ExploitSynth,
-        ScanPhase::RuleSynthesis,
-    ]
-}
-
-/// Terminal states.
-fn terminal_phases() -> Vec<ScanPhase> {
-    vec![ScanPhase::Complete, ScanPhase::Error]
-}
-
-/// All phases that appear in the sequential_phases array in orchestrator.rs
-fn sequential_pipeline_phases() -> Vec<ScanPhase> {
-    vec![
-        ScanPhase::CweRouting,
-        ScanPhase::LlmDiscovery,
-        ScanPhase::LlmVerification,
-        ScanPhase::SecurityAgentVerification,
-        ScanPhase::TicketCrossRef,
-        ScanPhase::GitAnalysis,
-        ScanPhase::CrossFileAnalysis,
-        ScanPhase::ConfidenceScoring,
-        ScanPhase::AiAggregation,
-        ScanPhase::ThreatModeling,
-        ScanPhase::RootCauseDedup,
-        ScanPhase::MultiVerifier,
-        ScanPhase::AutoPatching,
-        ScanPhase::CveBootstrap,
-        ScanPhase::PocCompiler,
-        ScanPhase::VariantSearch,
-        ScanPhase::Reporting,
-    ]
-}
+use crate::pipeline_test_helpers::{
+    active_phases, orphaned_phases, sequential_pipeline_phases, terminal_phases,
+};
 
 #[test]
 fn test_all_active_phases_exist() {

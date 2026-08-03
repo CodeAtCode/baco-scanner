@@ -10,6 +10,7 @@
 //! - Trust boundaries detection
 //! - Edge cases and error handling
 
+use crate::fixtures::make_threat_model_test_context;
 use baco::analysis_context::AnalysisContext;
 use baco::threat_model::*;
 use tempfile::tempdir;
@@ -146,7 +147,7 @@ async fn test_run_with_empty_context() {
 #[tokio::test]
 async fn test_run_creates_context_if_missing() {
     let tmp = tempdir().unwrap();
-    let ctx = AnalysisContext::default();
+    let ctx = make_threat_model_test_context();
 
     let _ = ThreatModelingPhase::run(tmp.path(), &ctx, None)
         .await

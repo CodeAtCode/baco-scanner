@@ -64,17 +64,8 @@ impl ScanPhase for ConfidenceScoringPhase {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::ScannerConfig;
     use crate::findings::{Severity, VerificationStatus, VulnerabilityFinding};
-    use crate::scanner::Scanner;
-    use tempfile::TempDir;
-
-    fn create_test_scanner() -> (Scanner, TempDir) {
-        let temp_dir = TempDir::new().unwrap();
-        let config = ScannerConfig::default();
-        let scanner = Scanner::new(config, temp_dir.path().to_path_buf(), false);
-        (scanner, temp_dir)
-    }
+    use crate::phase::helpers::setup_test_phase_context;
 
     #[test]
     fn test_confidence_scoring_phase_creation() {
@@ -85,24 +76,14 @@ mod tests {
 
     #[test]
     fn test_is_enabled_always_true() {
-        let (scanner, _temp) = create_test_scanner();
-        let analyzed_files = Vec::new();
-        let ctx = PhaseContext {
-            scanner: Box::leak(Box::new(scanner)),
-            analyzed_files: Box::leak(Box::new(analyzed_files)),
-        };
+        let (_, ctx) = setup_test_phase_context();
         let phase = ConfidenceScoringPhase;
         assert!(phase.is_enabled(&ctx));
     }
 
     #[tokio::test]
     async fn test_execute_with_empty_findings() {
-        let (scanner, _temp) = create_test_scanner();
-        let analyzed_files = Vec::new();
-        let mut ctx = PhaseContext {
-            scanner: Box::leak(Box::new(scanner)),
-            analyzed_files: Box::leak(Box::new(analyzed_files)),
-        };
+        let (_temp, mut ctx) = setup_test_phase_context();
         let phase = ConfidenceScoringPhase;
         let result = phase.execute(&mut ctx).await;
         assert!(result.is_ok());
@@ -112,6 +93,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_calculates_confidence_scores() {
+        use crate::phase::helpers::create_test_scanner;
         let (scanner, _temp) = create_test_scanner();
         scanner.state.send_modify(|s| {
             s.findings.push(VulnerabilityFinding {
@@ -163,6 +145,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_with_confirmed_finding() {
+        use crate::phase::helpers::create_test_scanner;
         let (scanner, _temp) = create_test_scanner();
         scanner.state.send_modify(|s| {
             s.findings.push(VulnerabilityFinding {

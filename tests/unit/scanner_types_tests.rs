@@ -7,6 +7,9 @@
 //! - Dependency, DependencyEcosystem, ProjectStack, MajorityVerdict
 //! - SeverityRubric, AccessType, BlastRadius, V3Severity, RubricDimensions, RubricScore
 
+use crate::fixtures::{
+    verify_access_weights, verify_blast_radius_weights, verify_severity_mapping_boundaries,
+};
 use baco::scanner_types::{
     AccessType, BlastRadius, CveCluster, CveEntry, CveSource, Dependency, DependencyEcosystem,
     MajorityVerdict, PatchCandidate, PatchValidationResult, PoCCompileResult, ProjectStack,
@@ -509,16 +512,29 @@ fn test_blast_radius_default_is_high() {
     assert_eq!(radius, BlastRadius::High);
 }
 
+fn assert_enum_variants_distinct<T: PartialEq + std::fmt::Debug>(variants: &[T], name: &str) {
+    for (i, v1) in variants.iter().enumerate() {
+        for (j, v2) in variants.iter().enumerate() {
+            if i != j {
+                assert_ne!(
+                    v1, v2,
+                    "{} variants at indices {} and {} should be distinct",
+                    name, i, j
+                );
+            }
+        }
+    }
+}
+
 #[test]
 fn test_blast_radius_all_variants() {
-    let low = BlastRadius::Low;
-    let medium = BlastRadius::Medium;
-    let high = BlastRadius::High;
-    let critical = BlastRadius::Critical;
-
-    assert_ne!(low, medium);
-    assert_ne!(medium, high);
-    assert_ne!(high, critical);
+    let variants = vec![
+        BlastRadius::Low,
+        BlastRadius::Medium,
+        BlastRadius::High,
+        BlastRadius::Critical,
+    ];
+    assert_enum_variants_distinct(&variants, "BlastRadius");
 }
 
 #[test]
@@ -542,14 +558,13 @@ fn test_v3_severity_default_is_low() {
 
 #[test]
 fn test_v3_severity_all_variants() {
-    let low = V3Severity::Low;
-    let medium = V3Severity::Medium;
-    let high = V3Severity::High;
-    let critical = V3Severity::Critical;
-
-    assert_ne!(low, medium);
-    assert_ne!(medium, high);
-    assert_ne!(high, critical);
+    let variants = vec![
+        V3Severity::Low,
+        V3Severity::Medium,
+        V3Severity::High,
+        V3Severity::Critical,
+    ];
+    assert_enum_variants_distinct(&variants, "V3Severity");
 }
 
 #[test]
@@ -618,34 +633,12 @@ fn test_severity_rubric_auth_factor() {
 
 #[test]
 fn test_severity_rubric_access_weight() {
-    let read_rubric = SeverityRubric::new(0.5, 0.5, 0.5, false, AccessType::Read, BlastRadius::Low);
-    let write_rubric =
-        SeverityRubric::new(0.5, 0.5, 0.5, false, AccessType::Write, BlastRadius::Low);
-    let both_rubric = SeverityRubric::new(0.5, 0.5, 0.5, false, AccessType::Both, BlastRadius::Low);
-
-    assert_eq!(read_rubric.access_weight(), 0.5);
-    assert_eq!(write_rubric.access_weight(), 0.8);
-    assert_eq!(both_rubric.access_weight(), 1.0);
+    verify_access_weights();
 }
 
 #[test]
 fn test_severity_rubric_blast_radius_weight() {
-    let low = SeverityRubric::new(0.5, 0.5, 0.5, false, AccessType::Read, BlastRadius::Low);
-    let medium = SeverityRubric::new(0.5, 0.5, 0.5, false, AccessType::Read, BlastRadius::Medium);
-    let high = SeverityRubric::new(0.5, 0.5, 0.5, false, AccessType::Read, BlastRadius::High);
-    let critical = SeverityRubric::new(
-        0.5,
-        0.5,
-        0.5,
-        false,
-        AccessType::Read,
-        BlastRadius::Critical,
-    );
-
-    assert_eq!(low.blast_radius_weight(), 0.3);
-    assert_eq!(medium.blast_radius_weight(), 0.6);
-    assert_eq!(high.blast_radius_weight(), 0.85);
-    assert_eq!(critical.blast_radius_weight(), 1.0);
+    verify_blast_radius_weights();
 }
 
 #[test]
@@ -735,14 +728,7 @@ fn test_rubric_score_severity_without_override() {
 
 #[test]
 fn test_rubric_score_map_to_severity() {
-    assert_eq!(RubricScore::map_to_severity(0.0), V3Severity::Low);
-    assert_eq!(RubricScore::map_to_severity(0.19), V3Severity::Low);
-    assert_eq!(RubricScore::map_to_severity(0.2), V3Severity::Medium);
-    assert_eq!(RubricScore::map_to_severity(0.49), V3Severity::Medium);
-    assert_eq!(RubricScore::map_to_severity(0.5), V3Severity::High);
-    assert_eq!(RubricScore::map_to_severity(0.79), V3Severity::High);
-    assert_eq!(RubricScore::map_to_severity(0.8), V3Severity::Critical);
-    assert_eq!(RubricScore::map_to_severity(1.0), V3Severity::Critical);
+    verify_severity_mapping_boundaries();
 }
 
 #[test]

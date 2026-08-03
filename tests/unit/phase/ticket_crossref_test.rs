@@ -2,7 +2,7 @@
 mod tests {
     use baco::config::{ScannerConfig, TicketSystemConfig};
     use baco::findings::Severity;
-    use baco::phase::helpers::create_test_finding;
+    use baco::phase::helpers::{create_test_finding, create_test_phase_context};
     use baco::phase::ticket_crossref::TicketCrossRefPhase;
     use baco::phase::{PhaseContext, ScanPhase};
     use baco::scanner::Scanner;
@@ -93,15 +93,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_ticket_crossref_phase_is_disabled_without_systems() {
-        let temp_dir = TempDir::new().unwrap();
-        let config = ScannerConfig::default();
-
-        let mut scanner = Scanner::new(config.clone(), temp_dir.path().to_path_buf(), false);
-
-        let ctx = PhaseContext {
-            scanner: &mut scanner,
-            analyzed_files: &mut vec![],
-        };
+        let (_temp_dir, ctx) = create_test_phase_context();
 
         let phase = TicketCrossRefPhase;
         assert!(!phase.is_enabled(&ctx));

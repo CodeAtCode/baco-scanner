@@ -9,6 +9,7 @@
 //! - Additional parsing (single vuln, missing optional fields)
 //! - Type tests (CveSource Display, V3Severity all variants)
 
+use crate::fixtures::{make_kev_only_cve, make_nvd_only_cve};
 use baco::cve_client::CveClient;
 use baco::scanner_types::cve::{CveEntry, CveSource};
 use baco::scanner_types::severity::V3Severity;
@@ -215,14 +216,7 @@ fn test_dedup_empty_inputs() {
 
 #[test]
 fn test_dedup_only_kev() {
-    let kev = vec![CveEntry {
-        cve_id: "CVE-2024-1111".to_string(),
-        description: "KEV only".to_string(),
-        severity: V3Severity::High,
-        source: CveSource::KEV,
-        affected_products: vec![],
-        published_date: None,
-    }];
+    let kev = vec![make_kev_only_cve()];
     let nvd = vec![];
 
     let result = CveClient::dedup_cve_entries(kev, nvd);
@@ -233,14 +227,7 @@ fn test_dedup_only_kev() {
 #[test]
 fn test_dedup_only_nvd() {
     let kev = vec![];
-    let nvd = vec![CveEntry {
-        cve_id: "CVE-2024-1111".to_string(),
-        description: "NVD only".to_string(),
-        severity: V3Severity::Medium,
-        source: CveSource::NVD,
-        affected_products: vec![],
-        published_date: None,
-    }];
+    let nvd = vec![make_nvd_only_cve()];
 
     let result = CveClient::dedup_cve_entries(kev, nvd);
     assert_eq!(result.len(), 1);
@@ -251,16 +238,21 @@ fn test_dedup_only_nvd() {
 // Severity mapping tests
 // ============================================================================
 
-#[test]
-fn test_severity_mapping_critical() {
-    let kev = vec![CveEntry {
+/// Helper to create a test CVE entry with given severity
+fn make_test_cve(severity: V3Severity) -> Vec<CveEntry> {
+    vec![CveEntry {
         cve_id: "CVE-2024-1234".to_string(),
         description: "Test".to_string(),
-        severity: V3Severity::Critical,
+        severity,
         source: CveSource::KEV,
         affected_products: vec![],
         published_date: None,
-    }];
+    }]
+}
+
+#[test]
+fn test_severity_mapping_critical() {
+    let kev = make_test_cve(V3Severity::Critical);
     let nvd = Vec::new();
 
     let result = CveClient::dedup_cve_entries(kev, nvd);
@@ -269,14 +261,7 @@ fn test_severity_mapping_critical() {
 
 #[test]
 fn test_severity_mapping_high() {
-    let kev = vec![CveEntry {
-        cve_id: "CVE-2024-1234".to_string(),
-        description: "Test".to_string(),
-        severity: V3Severity::High,
-        source: CveSource::KEV,
-        affected_products: vec![],
-        published_date: None,
-    }];
+    let kev = make_test_cve(V3Severity::High);
     let nvd = Vec::new();
 
     let result = CveClient::dedup_cve_entries(kev, nvd);
@@ -285,14 +270,7 @@ fn test_severity_mapping_high() {
 
 #[test]
 fn test_severity_mapping_medium() {
-    let kev = vec![CveEntry {
-        cve_id: "CVE-2024-1234".to_string(),
-        description: "Test".to_string(),
-        severity: V3Severity::Medium,
-        source: CveSource::KEV,
-        affected_products: vec![],
-        published_date: None,
-    }];
+    let kev = make_test_cve(V3Severity::Medium);
     let nvd = Vec::new();
 
     let result = CveClient::dedup_cve_entries(kev, nvd);
@@ -301,14 +279,7 @@ fn test_severity_mapping_medium() {
 
 #[test]
 fn test_severity_mapping_low() {
-    let kev = vec![CveEntry {
-        cve_id: "CVE-2024-1234".to_string(),
-        description: "Test".to_string(),
-        severity: V3Severity::Low,
-        source: CveSource::KEV,
-        affected_products: vec![],
-        published_date: None,
-    }];
+    let kev = make_test_cve(V3Severity::Low);
     let nvd = Vec::new();
 
     let result = CveClient::dedup_cve_entries(kev, nvd);

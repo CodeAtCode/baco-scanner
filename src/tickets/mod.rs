@@ -73,9 +73,7 @@ mod tests {
         0
     );
 
-    // Multiple systems test
-    test_ticket_system!(
-        test_search_with_multiple_systems,
+    fn create_github_gitlab_systems() -> Vec<TicketSystem> {
         vec![
             TicketSystem {
                 name: "GitHub".to_string(),
@@ -89,27 +87,19 @@ mod tests {
                 url: "https://gitlab.com".to_string(),
                 credentials: None,
             },
-        ],
+        ]
+    }
+
+    test_ticket_system!(
+        test_search_with_multiple_systems,
+        create_github_gitlab_systems(),
         "test query",
         0
     );
 
     test_ticket_system!(
         test_search_combined_results,
-        vec![
-            TicketSystem {
-                name: "GitHub".to_string(),
-                system_type: "github".to_string(),
-                url: "https://github.com".to_string(),
-                credentials: None,
-            },
-            TicketSystem {
-                name: "GitLab".to_string(),
-                system_type: "gitlab".to_string(),
-                url: "https://gitlab.com".to_string(),
-                credentials: None,
-            },
-        ],
+        create_github_gitlab_systems(),
         "test query",
         0
     );
@@ -128,14 +118,19 @@ mod tests {
         assert_eq!(results.len(), 0);
     }
 
-    #[tokio::test]
-    async fn test_search_github_stubbed() {
-        let systems = vec![TicketSystem {
+    /// Test helper: create a GitHub TicketSystem
+    fn create_github_system() -> TicketSystem {
+        TicketSystem {
             name: "GitHub".to_string(),
             system_type: "github".to_string(),
             url: "https://github.com".to_string(),
             credentials: None,
-        }];
+        }
+    }
+
+    #[tokio::test]
+    async fn test_search_github_stubbed() {
+        let systems = vec![create_github_system()];
 
         let searcher = TicketSearcher::new(systems);
         let results = searcher.search_for_finding("CVE-2024-1234").await.unwrap();
@@ -437,12 +432,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_search_with_only_cve() {
-        let systems = vec![TicketSystem {
-            name: "GitHub".to_string(),
-            system_type: "github".to_string(),
-            url: "https://github.com".to_string(),
-            credentials: None,
-        }];
+        let systems = vec![create_github_system()];
 
         let searcher = TicketSearcher::new(systems);
         let results = searcher.search_for_finding("CVE-2024-1234").await.unwrap();

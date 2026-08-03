@@ -5,6 +5,8 @@ use crate::indexer::FileIndex;
 use async_trait::async_trait;
 use std::path::PathBuf;
 
+use super::indexing_helpers::log_incremental_stats;
+
 pub struct IndexingPhase;
 
 #[async_trait]
@@ -82,18 +84,7 @@ impl ScanPhase for IndexingPhase {
             }
 
             // Log statistics about incremental scanning
-            if previous_hash_store.is_some() {
-                let unchanged_count = index
-                    .files
-                    .iter()
-                    .filter(|f| f.hash.as_ref().is_some())
-                    .count();
-                tracing::info!(
-                    "Incremental scan: {} total files, {} unchanged from previous scan",
-                    index.files.len(),
-                    unchanged_count
-                );
-            }
+            log_incremental_stats(&index, previous_hash_store.is_some());
         } else {
             tracing::info!("Incremental scanning is disabled, skipping hash store save");
         }
@@ -109,16 +100,7 @@ impl ScanPhase for IndexingPhase {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::ScannerConfig;
-    use crate::scanner::Scanner;
-    use tempfile::TempDir;
-
-    fn create_test_scanner() -> (Scanner, TempDir) {
-        let temp_dir = TempDir::new().unwrap();
-        let config = ScannerConfig::default();
-        let scanner = Scanner::new(config, temp_dir.path().to_path_buf(), false);
-        (scanner, temp_dir)
-    }
+    use crate::phase::helpers::setup_test_phase_context;
 
     #[test]
     fn test_indexing_phase_creation() {
@@ -129,24 +111,14 @@ mod tests {
 
     #[test]
     fn test_is_enabled_always_true() {
-        let (scanner, _temp) = create_test_scanner();
-        let analyzed_files = Vec::new();
-        let ctx = PhaseContext {
-            scanner: Box::leak(Box::new(scanner)),
-            analyzed_files: Box::leak(Box::new(analyzed_files)),
-        };
+        let (_, ctx) = setup_test_phase_context();
         let phase = IndexingPhase;
         assert!(phase.is_enabled(&ctx));
     }
 
     #[tokio::test]
     async fn test_execute_without_incremental() {
-        let (scanner, _temp) = create_test_scanner();
-        let analyzed_files = Vec::new();
-        let mut ctx = PhaseContext {
-            scanner: Box::leak(Box::new(scanner)),
-            analyzed_files: Box::leak(Box::new(analyzed_files)),
-        };
+        let (_temp, mut ctx) = setup_test_phase_context();
         let phase = IndexingPhase;
         let result = phase.execute(&mut ctx).await;
         assert!(result.is_ok());
@@ -156,12 +128,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_with_incremental_disabled() {
-        let (scanner, _temp) = create_test_scanner();
-        let analyzed_files = Vec::new();
-        let mut ctx = PhaseContext {
-            scanner: Box::leak(Box::new(scanner)),
-            analyzed_files: Box::leak(Box::new(analyzed_files)),
-        };
+        let (_temp, mut ctx) = setup_test_phase_context();
         let phase = IndexingPhase;
         let result = phase.execute(&mut ctx).await;
         assert!(result.is_ok());

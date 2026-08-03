@@ -3,6 +3,7 @@
 use crate::checkpoint::ScanPhase;
 use crate::findings::VulnerabilityFinding;
 use crate::scanner::checkpoint::{load_checkpoint_findings, save_checkpoint};
+use crate::scanner::helpers::log_and_aggregate_llm_results;
 
 use indicatif::{ProgressBar, ProgressStyle};
 
@@ -128,19 +129,7 @@ async fn run_parallel_phases(
     if let Some(Ok((mut semgrep_findings, _))) = semgrep_result {
         findings.append(&mut semgrep_findings);
     }
-    if let Some(Ok((mut llm_findings, new_files))) = llm_static_result {
-        tracing::info!("[SCANNER] Added {} LLM findings", llm_findings.len());
-        if !llm_findings.is_empty() {
-            tracing::debug!(
-                "[SCANNER] First finding description length: {}",
-                llm_findings[0].description.len()
-            );
-        }
-        findings.append(&mut llm_findings);
-        analyzed_files = new_files;
-    } else if let Some(Err(e)) = &llm_static_result {
-        tracing::warn!("[SCANNER] LLM static analysis failed: {}", e);
-    }
+    log_and_aggregate_llm_results(&llm_static_result, &mut findings, &mut analyzed_files);
 
     tracing::info!("After parallel phases: {} findings total", findings.len());
 
@@ -203,16 +192,9 @@ async fn run_parallel_phases(
     Ok((findings, analyzed_files))
 }
 
-/// Execute sequential phases
-async fn run_sequential_phases(
-    scanner: &super::Scanner,
-    pb: &ProgressBar,
-    mut findings: Vec<VulnerabilityFinding>,
-    mut analyzed_files: Vec<String>,
-    completed_phases: &[ScanPhase],
-    start_position: u64,
-) -> Result<(Vec<VulnerabilityFinding>, Vec<String>), String> {
-    let sequential_phases = [
+/// Return the list of sequential scan phases
+fn sequential_phases() -> [ScanPhase; 17] {
+    [
         ScanPhase::CweRouting,
         ScanPhase::LlmDiscovery,
         ScanPhase::LlmVerification,
@@ -231,7 +213,19 @@ async fn run_sequential_phases(
         ScanPhase::PocCompiler,
         ScanPhase::VariantSearch,
         ScanPhase::Reporting,
-    ];
+    ]
+}
+
+/// Execute sequential phases
+async fn run_sequential_phases(
+    scanner: &super::Scanner,
+    pb: &ProgressBar,
+    mut findings: Vec<VulnerabilityFinding>,
+    mut analyzed_files: Vec<String>,
+    completed_phases: &[ScanPhase],
+    start_position: u64,
+) -> Result<(Vec<VulnerabilityFinding>, Vec<String>), String> {
+    let sequential_phases = sequential_phases();
 
     let is_phase_completed = |phase: &ScanPhase| completed_phases.contains(phase);
 
@@ -685,50 +679,13 @@ mod tests {
 
     #[test]
     fn test_sequential_phases_array_length() {
-        let sequential_phases = [
-            ScanPhase::CweRouting,
-            ScanPhase::LlmDiscovery,
-            ScanPhase::LlmVerification,
-            ScanPhase::SecurityAgentVerification,
-            ScanPhase::TicketCrossRef,
-            ScanPhase::GitAnalysis,
-            ScanPhase::CrossFileAnalysis,
-            ScanPhase::ConfidenceScoring,
-            ScanPhase::AiAggregation,
-            ScanPhase::ThreatModeling,
-            ScanPhase::RootCauseDedup,
-            ScanPhase::MultiVerifier,
-            ScanPhase::AutoPatching,
-            ScanPhase::CveBootstrap,
-            ScanPhase::PocCompiler,
-            ScanPhase::VariantSearch,
-            ScanPhase::Reporting,
-        ];
-
+        let sequential_phases = sequential_phases();
         assert_eq!(sequential_phases.len(), 17);
     }
 
     #[test]
     fn test_sequential_phases_contains_expected_phases() {
-        let sequential_phases = [
-            ScanPhase::CweRouting,
-            ScanPhase::LlmDiscovery,
-            ScanPhase::LlmVerification,
-            ScanPhase::SecurityAgentVerification,
-            ScanPhase::TicketCrossRef,
-            ScanPhase::GitAnalysis,
-            ScanPhase::CrossFileAnalysis,
-            ScanPhase::ConfidenceScoring,
-            ScanPhase::AiAggregation,
-            ScanPhase::ThreatModeling,
-            ScanPhase::RootCauseDedup,
-            ScanPhase::MultiVerifier,
-            ScanPhase::AutoPatching,
-            ScanPhase::CveBootstrap,
-            ScanPhase::PocCompiler,
-            ScanPhase::VariantSearch,
-            ScanPhase::Reporting,
-        ];
+        let sequential_phases = sequential_phases();
 
         assert!(sequential_phases.contains(&ScanPhase::LlmDiscovery));
         assert!(sequential_phases.contains(&ScanPhase::LlmVerification));
@@ -739,25 +696,7 @@ mod tests {
 
     #[test]
     fn test_phase_ordering_first_phase() {
-        let sequential_phases = [
-            ScanPhase::CweRouting,
-            ScanPhase::LlmDiscovery,
-            ScanPhase::LlmVerification,
-            ScanPhase::SecurityAgentVerification,
-            ScanPhase::TicketCrossRef,
-            ScanPhase::GitAnalysis,
-            ScanPhase::CrossFileAnalysis,
-            ScanPhase::ConfidenceScoring,
-            ScanPhase::AiAggregation,
-            ScanPhase::ThreatModeling,
-            ScanPhase::RootCauseDedup,
-            ScanPhase::MultiVerifier,
-            ScanPhase::AutoPatching,
-            ScanPhase::CveBootstrap,
-            ScanPhase::PocCompiler,
-            ScanPhase::VariantSearch,
-            ScanPhase::Reporting,
-        ];
+        let sequential_phases = sequential_phases();
 
         assert_eq!(sequential_phases[0], ScanPhase::CweRouting);
         assert_eq!(
@@ -804,25 +743,7 @@ mod tests {
 
     #[test]
     fn test_phase_message_formatting() {
-        let sequential_phases = [
-            ScanPhase::CweRouting,
-            ScanPhase::LlmDiscovery,
-            ScanPhase::LlmVerification,
-            ScanPhase::SecurityAgentVerification,
-            ScanPhase::TicketCrossRef,
-            ScanPhase::GitAnalysis,
-            ScanPhase::CrossFileAnalysis,
-            ScanPhase::ConfidenceScoring,
-            ScanPhase::AiAggregation,
-            ScanPhase::ThreatModeling,
-            ScanPhase::RootCauseDedup,
-            ScanPhase::MultiVerifier,
-            ScanPhase::AutoPatching,
-            ScanPhase::CveBootstrap,
-            ScanPhase::PocCompiler,
-            ScanPhase::VariantSearch,
-            ScanPhase::Reporting,
-        ];
+        let sequential_phases = sequential_phases();
 
         for (i, phase) in sequential_phases.iter().enumerate() {
             let phase_num = 4 + i;

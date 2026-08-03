@@ -15,6 +15,8 @@ use baco::prompt::templates::{
     xss_hunt_prompt, BacoPhase, ProjectType, TemplateVariables,
 };
 
+use crate::prompt_test_fixtures::default_template_variables;
+
 // ============================================================================
 // BacoPhase Tests
 // ============================================================================
@@ -161,9 +163,7 @@ fn test_template_variables_default_is_empty() {
 
 #[test]
 fn test_template_variables_insert_and_get() {
-    let mut vars = TemplateVariables::new();
-    vars.insert("KEY1".to_string(), "value1".to_string());
-    vars.insert("KEY2".to_string(), "value2".to_string());
+    let vars = default_template_variables();
 
     assert_eq!(vars.len(), 2);
     assert_eq!(vars.get("KEY1"), Some(&"value1".to_string()));

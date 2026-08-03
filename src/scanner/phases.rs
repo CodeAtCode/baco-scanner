@@ -1271,6 +1271,7 @@ mod tests {
     use super::*;
     use crate::config::{AgentConfig, LlmPhasesConfig, PerformanceSettings, ScannerSettings};
     use crate::findings::Severity;
+    use crate::scanner::Scanner;
     use indicatif::ProgressBar;
     use std::path::PathBuf;
 
@@ -2053,21 +2054,48 @@ mod tests {
             ScanPhase::CrossFileAnalysis,
             ScanPhase::ConfidenceScoring,
         ];
+        current_findings = run_phase_list(
+            &phases,
+            &scanner,
+            current_findings,
+            analyzed_files,
+            &pb,
+            &metrics_tracker,
+            &target_path,
+            &config,
+            &project_stack,
+        )
+        .await;
+        assert!(current_findings.len() >= initial_findings.len());
+    }
+
+    /// Helper to run a list of phases sequentially
+    async fn run_phase_list(
+        phases: &[ScanPhase],
+        scanner: &Scanner,
+        mut current_findings: Vec<VulnerabilityFinding>,
+        analyzed_files: Vec<String>,
+        pb: &ProgressBar,
+        metrics_tracker: &LlmMetricsTracker,
+        target_path: &std::path::Path,
+        config: &config::ScannerConfig,
+        project_stack: &Option<crate::scanner_types::project::ProjectStack>,
+    ) -> Vec<VulnerabilityFinding> {
         for phase in phases {
             let phase_config = PhaseConfig {
-                phase: &phase,
+                phase,
                 findings: current_findings.clone(),
-                pb: &pb,
+                pb,
                 analyzed_files: &analyzed_files,
-                metrics_tracker: &metrics_tracker,
-                target_path: &target_path,
-                config: &config,
-                project_stack: &project_stack,
+                metrics_tracker,
+                target_path,
+                config,
+                project_stack,
             };
-            let result = run_phase(&scanner, phase_config).await.unwrap();
+            let result = run_phase(scanner, phase_config).await.unwrap();
             current_findings = result.0;
         }
-        assert!(current_findings.len() >= initial_findings.len());
+        current_findings
     }
 
     // ========================================================================
@@ -2546,20 +2574,18 @@ mod tests {
             ScanPhase::CrossFileAnalysis,
         ];
 
-        for phase in phases {
-            let phase_config = PhaseConfig {
-                phase: &phase,
-                findings: current_findings.clone(),
-                pb: &pb,
-                analyzed_files: &analyzed_files,
-                metrics_tracker: &metrics_tracker,
-                target_path: &target_path,
-                config: &config,
-                project_stack: &project_stack,
-            };
-            let result = run_phase(&scanner, phase_config).await.unwrap();
-            current_findings = result.0;
-        }
+        current_findings = run_phase_list(
+            &phases,
+            &scanner,
+            current_findings,
+            analyzed_files,
+            &pb,
+            &metrics_tracker,
+            &target_path,
+            &config,
+            &project_stack,
+        )
+        .await;
 
         assert!(current_findings.len() >= initial_findings.len());
     }
@@ -2795,7 +2821,7 @@ mod tests {
     // Validate phase config test
     #[tokio::test]
     async fn test_validate_phase_config() {
-        let mut config = validate::OrchestrationConfig::default();
+        let mut config = OrchestrationConfig::default();
         config.enabled = false;
         assert!(!config.enabled);
     }
@@ -2803,7 +2829,7 @@ mod tests {
     // Hunt phase config test
     #[tokio::test]
     async fn test_hunt_phase_config() {
-        let mut config = hunt::OrchestrationConfig::default();
+        let mut config = OrchestrationConfig::default();
         config.enabled = false;
         assert!(!config.enabled);
     }
@@ -2811,7 +2837,7 @@ mod tests {
     // IndependentVerify config test
     #[tokio::test]
     async fn test_independent_verify_config() {
-        let mut config = independent_verify::OrchestrationConfig::default();
+        let mut config = OrchestrationConfig::default();
         config.enabled = false;
         assert!(!config.enabled);
     }
@@ -2868,20 +2894,35 @@ mod tests {
 // T2.5 Six-Phase Orchestration (Cloudflare pattern)
 // ============================================================================
 
+/// Shared config for orchestration phases
+#[derive(Debug, Clone, Default)]
+#[allow(dead_code)]
+pub(crate) struct OrchestrationConfig {
+    pub enabled: bool,
+    pub hunt_classes: Vec<String>,
+    pub validate_batch_size: usize,
+    pub independent_verify: bool,
+}
+
+/// Helper for disabled phase pattern
+#[allow(dead_code)]
+async fn run_disabled_phase<F, R>(config: &OrchestrationConfig, _source: &str, f: F) -> R
+where
+    F: FnOnce(&str) -> R,
+{
+    if !config.enabled {
+        return f(_source);
+    }
+    f(_source)
+}
+
 /// Hunt phase: 7 parallel attack-class prompts
 mod hunt {
     use crate::findings::VulnerabilityFinding;
     use crate::llm::LlmClient;
     use std::path::Path;
 
-    #[derive(Debug, Clone, Default)]
-    #[allow(dead_code)]
-    pub struct OrchestrationConfig {
-        pub enabled: bool,
-        pub hunt_classes: Vec<String>,
-        pub validate_batch_size: usize,
-        pub independent_verify: bool,
-    }
+    use super::OrchestrationConfig;
 
     #[allow(dead_code)]
     pub struct HuntPhase {
@@ -2917,14 +2958,7 @@ mod validate {
     use crate::findings::VulnerabilityFinding;
     use crate::llm::LlmClient;
 
-    #[derive(Debug, Clone, Default)]
-    #[allow(dead_code)]
-    pub struct OrchestrationConfig {
-        pub enabled: bool,
-        pub hunt_classes: Vec<String>,
-        pub validate_batch_size: usize,
-        pub independent_verify: bool,
-    }
+    use super::OrchestrationConfig;
 
     #[allow(dead_code)]
     pub struct ValidatePhase {
@@ -2960,14 +2994,7 @@ mod independent_verify {
     use crate::llm::LlmClient;
     use std::path::Path;
 
-    #[derive(Debug, Clone, Default)]
-    #[allow(dead_code)]
-    pub struct OrchestrationConfig {
-        pub enabled: bool,
-        pub hunt_classes: Vec<String>,
-        pub validate_batch_size: usize,
-        pub independent_verify: bool,
-    }
+    use super::OrchestrationConfig;
 
     #[allow(dead_code)]
     pub struct IndependentVerifyPhase {
