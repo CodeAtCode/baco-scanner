@@ -6,10 +6,7 @@ mod env;
 mod helpers;
 mod orchestrator;
 pub(crate) mod parallel;
-#[cfg(test)]
-pub(crate) mod phases;
-#[cfg(not(test))]
-mod phases;
+pub mod phases;
 mod pipeline;
 mod sequential;
 

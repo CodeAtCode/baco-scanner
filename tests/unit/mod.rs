@@ -185,3 +185,12 @@ mod llm_verification_phase_tests;
 
 // MultiVerifier phase tests
 mod multi_verifier_phase_tests;
+
+// Inline tests migrated from source files (reduces file sizes below 1000 lines)
+mod agent_session_inline_tests;
+mod confidence_refinement_inline_tests;
+mod llm_verification_inline_tests;
+mod prompt_templates_inline_tests;
+mod scanner_orchestrator_inline_tests;
+mod scanner_phases_inline_tests;
+mod tickets_inline_tests;
