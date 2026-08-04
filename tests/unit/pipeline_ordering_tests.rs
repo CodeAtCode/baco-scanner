@@ -23,7 +23,7 @@ fn test_pipeline_ends_with_reporting() {
 }
 
 #[test]
-fn test_pipeline_cwe_routing_before_llm_static() {
+fn test_pipeline_llm_static_before_cwe_routing() {
     let phases = actual_pipeline_phases();
     let llm_static_idx = phases
         .iter()
@@ -34,8 +34,8 @@ fn test_pipeline_cwe_routing_before_llm_static() {
         .position(|p| *p == ScanPhase::CweRouting)
         .unwrap();
     assert!(
-        cwe_routing_idx < llm_static_idx,
-        "CweRouting must come before LlmStaticAnalysis"
+        llm_static_idx < cwe_routing_idx,
+        "LlmStaticAnalysis must come before CweRouting"
     );
 }
 

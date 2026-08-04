@@ -1,7 +1,7 @@
 //! Threat Modeling Phase
 //!
 //! Implements STRIDE-based threat modeling that:
-//! - Consumes CodebaseUnderstanding output from Phase 1
+//! - Consumes architecture summary from static analysis (generated on clean scan)
 //! - Identifies trust boundaries, data flows, attack surfaces
 //! - Generates comprehensive threat models
 //! - Persists to AnalysisContext
@@ -27,7 +27,7 @@ pub struct ThreatModelingPhase;
 impl ThreatModelingPhase {
     /// Run threat modeling phase on the target codebase.
     ///
-    /// Uses architecture understanding from CodebaseUnderstanding phase to:
+    /// Uses architecture summary from static analysis to:
     /// - Identify trust boundaries (external APIs, DB connections, file system access)
     /// - Map data flows (request/response cycles, persistence points)
     /// - Locate attack surfaces (entry points, deserialization, privilege escalation)
@@ -35,7 +35,7 @@ impl ThreatModelingPhase {
     ///
     /// # Arguments
     /// * `target_path` - Path to the codebase
-    /// * `context` - AnalysisContext containing CodebaseUnderstanding output
+    /// * `context` - AnalysisContext containing architecture summary
     /// * `llm_client` - Optional LLM client for deep analysis (fallback to static if unavailable)
     ///
     /// # Returns
@@ -45,7 +45,7 @@ impl ThreatModelingPhase {
         context: &AnalysisContext,
         llm_client: Option<&LlmClient>,
     ) -> Result<String, String> {
-        // Load or rebuild architecture summary from CodebaseUnderstanding
+        // Load or generate architecture summary via static analysis
         let architecture = load_or_generate_architecture(target_path, context);
 
         let prompt = if let Some(client) = llm_client {

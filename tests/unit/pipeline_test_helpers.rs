@@ -11,8 +11,8 @@ pub fn active_phases() -> Vec<ScanPhase> {
     vec![
         ScanPhase::Indexing,
         ScanPhase::Semgrep,
-        ScanPhase::CweRouting,
         ScanPhase::LlmStaticAnalysis,
+        ScanPhase::CweRouting,
         ScanPhase::LlmDiscovery,
         ScanPhase::LlmVerification,
         ScanPhase::SecurityAgentVerification,

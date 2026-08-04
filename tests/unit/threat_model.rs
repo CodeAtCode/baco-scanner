@@ -39,6 +39,12 @@ fn test_load_or_generate_architecture_with_existing_summary() {
 #[test]
 fn test_load_or_generate_architecture_with_empty_summary() {
     let tmp = tempdir().unwrap();
+
+    // Create a simple Rust file for detection
+    let src_dir = tmp.path().join("src");
+    std::fs::create_dir_all(&src_dir).unwrap();
+    std::fs::write(src_dir.join("main.rs"), "fn main() {}").unwrap();
+
     let ctx = AnalysisContext {
         project_type: baco::project_type::ProjectType::CLI,
         architecture_summary: String::new(),
@@ -50,7 +56,10 @@ fn test_load_or_generate_architecture_with_empty_summary() {
 
     let result = load_or_generate_architecture(tmp.path(), &ctx);
 
-    assert_eq!(result, "No architecture summary available");
+    // Should generate architecture summary, not return placeholder
+    assert!(result.contains("ARCHITECTURAL SUMMARY"));
+    assert!(result.contains("Project type"));
+    assert_ne!(result, "No architecture summary available");
 }
 
 #[test]
@@ -750,6 +759,12 @@ fn test_generate_threat_model_static_variations() {
 #[test]
 fn test_load_or_generate_architecture_no_summary() {
     let tmp = tempdir().unwrap();
+
+    // Create a simple Rust file for detection
+    let src_dir = tmp.path().join("src");
+    std::fs::create_dir_all(&src_dir).unwrap();
+    std::fs::write(src_dir.join("main.rs"), "fn main() {}").unwrap();
+
     let ctx = AnalysisContext {
         project_type: baco::project_type::ProjectType::CLI,
         architecture_summary: String::new(),
@@ -759,7 +774,11 @@ fn test_load_or_generate_architecture_no_summary() {
     };
 
     let result = load_or_generate_architecture(tmp.path(), &ctx);
-    assert_eq!(result, "No architecture summary available");
+
+    // Should generate architecture summary, not return placeholder
+    assert!(result.contains("ARCHITECTURAL SUMMARY"));
+    assert!(result.contains("Project type"));
+    assert_ne!(result, "No architecture summary available");
 }
 
 #[test]

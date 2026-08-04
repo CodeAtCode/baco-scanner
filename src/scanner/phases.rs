@@ -1217,11 +1217,53 @@ Respond with ONLY JSON:
 
             let searcher = VariantSearcher::new(target_path.to_string_lossy().to_string());
 
-            // For now, return empty variants (full implementation requires more work)
             match searcher.search_variants() {
-                Ok(_hits) => {
-                    // Future: convert hits to findings and merge
-                    tracing::info!("Variant search completed (stub implementation)");
+                Ok(variant_hits) => {
+                    let variant_findings: Vec<VulnerabilityFinding> = variant_hits
+                        .into_iter()
+                        .map(|hit| {
+                            let finding_id = format!("variant-{}:{}", hit.file_path, hit.line_number);
+                            VulnerabilityFinding {
+                                id: finding_id,
+                                title: "Code variant detected".to_string(),
+                                description: format!(
+                                    "Potential vulnerability variant found with similarity score: {:.2}",
+                                    hit.similarity_score
+                                ),
+                                severity: crate::findings::Severity::Medium,
+                                confidence_score: hit.similarity_score,
+                                cwe_id: None,
+                                file_path: hit.file_path,
+                                line_number: Some(hit.line_number),
+                                code_snippet: Some(hit.snippet),
+                                diff_hunk: None,
+                                recommendation: Some("Review this code variant for potential vulnerabilities".to_string()),
+                                code_location: None,
+                                already_reported: false,
+                                sources: vec!["variant_search".to_string()],
+                                commit_reference: None,
+                                ticket_reference: None,
+                                priority_score: None,
+                                cross_file_references: None,
+                                verification_status: None,
+                                verification_notes: None,
+                                verification_error: None,
+                                agent_evidence_path: None,
+                                security_issue: None,
+                                poc_code: None,
+                                mitigation_code: None,
+                                poc_format: None,
+                                llm_model: None,
+                                agent_mode: false,
+                                statement_range: None,
+                                triage_verdict: None,
+                            }
+                        })
+                        .collect();
+
+                    let count = variant_findings.len();
+                    findings.extend(variant_findings);
+                    tracing::info!("Variant search completed: {} variants found", count);
                     Ok((findings, analyzed_files.to_vec()))
                 }
                 Err(e) => {

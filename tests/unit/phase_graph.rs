@@ -10,8 +10,8 @@ use baco::scanner::{Orchestrator, PhaseGraph};
 const EXPECTED_PHASES: [ScanPhase; 20] = [
     ScanPhase::Indexing,
     ScanPhase::Semgrep,
-    ScanPhase::CweRouting,
     ScanPhase::LlmStaticAnalysis,
+    ScanPhase::CweRouting,
     ScanPhase::LlmDiscovery,
     ScanPhase::LlmVerification,
     ScanPhase::SecurityAgentVerification,
@@ -50,9 +50,9 @@ fn test_last_phase_is_reporting() {
 }
 
 #[test]
-fn test_cwe_routing_at_index_2() {
+fn test_llm_static_at_index_2() {
     let graph = PhaseGraph::new();
-    assert_eq!(graph.phases()[2], ScanPhase::CweRouting);
+    assert_eq!(graph.phases()[2], ScanPhase::LlmStaticAnalysis);
 }
 
 #[test]
@@ -82,20 +82,20 @@ fn test_no_duplicate_phases() {
 }
 
 #[test]
-fn test_next_phase_semgrep_to_cwe_routing() {
+fn test_next_phase_semgrep_to_llm_static() {
     let graph = PhaseGraph::new();
     assert_eq!(
         graph.next_phase(&ScanPhase::Semgrep),
-        Some(&ScanPhase::CweRouting)
+        Some(&ScanPhase::LlmStaticAnalysis)
     );
 }
 
 #[test]
-fn test_next_phase_cwe_routing_to_llm_static() {
+fn test_next_phase_llm_static_to_cwe_routing() {
     let graph = PhaseGraph::new();
     assert_eq!(
-        graph.next_phase(&ScanPhase::CweRouting),
-        Some(&ScanPhase::LlmStaticAnalysis)
+        graph.next_phase(&ScanPhase::LlmStaticAnalysis),
+        Some(&ScanPhase::CweRouting)
     );
 }
 
@@ -136,11 +136,11 @@ fn test_previous_phase_reporting_to_variant_search() {
 }
 
 #[test]
-fn test_previous_phase_cwe_routing_to_semgrep() {
+fn test_previous_phase_cwe_routing_to_llm_static() {
     let graph = PhaseGraph::new();
     assert_eq!(
         graph.previous_phase(&ScanPhase::CweRouting),
-        Some(&ScanPhase::Semgrep)
+        Some(&ScanPhase::LlmStaticAnalysis)
     );
 }
 

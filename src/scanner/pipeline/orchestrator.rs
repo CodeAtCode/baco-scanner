@@ -34,8 +34,8 @@ impl PhaseGraph {
         let phases = vec![
             ScanPhase::Indexing,
             ScanPhase::Semgrep,
-            ScanPhase::CweRouting,
             ScanPhase::LlmStaticAnalysis,
+            ScanPhase::CweRouting,
             ScanPhase::LlmDiscovery,
             ScanPhase::LlmVerification,
             ScanPhase::SecurityAgentVerification,
@@ -79,15 +79,15 @@ impl PhaseGraph {
             2
         );
         add_metadata!(
-            ScanPhase::CweRouting,
-            "CWE Routing",
-            "Route findings to specialized models",
-            3
-        );
-        add_metadata!(
             ScanPhase::LlmStaticAnalysis,
             "LLM Static Analysis",
             "Analyze files with LLM",
+            3
+        );
+        add_metadata!(
+            ScanPhase::CweRouting,
+            "CWE Routing",
+            "Route findings to specialized models",
             4
         );
         add_metadata!(

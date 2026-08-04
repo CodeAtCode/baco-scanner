@@ -154,15 +154,235 @@ pub fn save_to_context(target_path: &Path, threat_model: &str) {
         .expect("Failed to save threat model to context");
 }
 
-/// Load architecture summary from AnalysisContext or regenerate via CodebaseUnderstanding.
+/// Generate architecture summary by statically inspecting the codebase.
 #[cfg_attr(test, visibility::make(pub))]
-pub fn load_or_generate_architecture(_target_path: &Path, context: &AnalysisContext) -> String {
+pub fn generate_architecture_static(target_path: &Path) -> String {
+    let mut summary = String::new();
+
+    // Get project type
+    let project_type = detect_project_type(target_path);
+    summary.push_str("=== ARCHITECTURAL SUMMARY ===\n");
+    summary.push_str(&format!("Project type: {}\n", project_type));
+
+    // Index project files
+    let file_index = crate::indexer::FileIndex::index_project(
+        target_path.to_str().unwrap_or("."),
+        &[
+            "rust".to_string(),
+            "typescript".to_string(),
+            "javascript".to_string(),
+            "python".to_string(),
+        ],
+        1024 * 1024, // 1MB max file size
+        &[
+            "target/".to_string(),
+            "node_modules/".to_string(),
+            ".git/".to_string(),
+        ],
+    );
+
+    let file_count = file_index.as_ref().map(|i| i.files.len()).unwrap_or(0);
+    summary.push_str(&format!("Total files: {}\n\n", file_count));
+
+    // Detect components by scanning file contents
+    let (has_http, has_db, has_filesys, has_auth) = detect_components(target_path, file_index);
+
+    summary.push_str("Components detected:\n");
+    if has_http {
+        summary.push_str("- HTTP API: yes\n");
+    } else {
+        summary.push_str("- No web framework\n");
+    }
+    if has_db {
+        summary.push_str("- database: yes\n");
+    } else {
+        summary.push_str("- No database\n");
+    }
+    if has_filesys {
+        summary.push_str("- file system: yes\n");
+    } else {
+        summary.push_str("- No file system\n");
+    }
+    if has_auth {
+        summary.push_str("- Authentication: yes\n");
+    } else {
+        summary.push_str("- No auth\n");
+    }
+    summary.push('\n');
+
+    // Entry points
+    summary.push_str("Entry points:\n");
+    if has_http {
+        summary.push_str("- HTTP endpoints\n");
+    }
+    if file_count > 0 {
+        summary.push_str("- Source code entry (main.rs / index.js / etc.)\n");
+    }
+
+    // Data stores
+    summary.push_str("\nData stores:\n");
+    if !has_db {
+        summary.push_str("- None detected\n");
+    }
+
+    summary
+}
+
+/// Detect components by scanning indexed files for keywords.
+fn detect_components(
+    target_path: &Path,
+    file_index: Result<crate::indexer::FileIndex, std::io::Error>,
+) -> (bool, bool, bool, bool) {
+    let mut has_http = false;
+    let mut has_db = false;
+    let mut has_filesys = false;
+    let mut has_auth = false;
+
+    let http_keywords = [
+        "HTTP",
+        "endpoint",
+        "router",
+        "axum",
+        "actix",
+        "warp",
+        "rocket",
+        "tower",
+        "express",
+        "flask",
+        "django",
+        "fastapi",
+        "spring",
+        "gin",
+        "echo",
+        "http::",
+        "actix_web",
+        "axum::",
+    ];
+    let db_keywords = [
+        "sqlite",
+        "postgres",
+        "mysql",
+        "mongodb",
+        "redis",
+        "database",
+        "data store",
+        "Repository",
+        "Entity",
+        "migration",
+        "sqlx",
+        "diesel",
+        "orm",
+        "prisma",
+    ];
+    let fs_keywords = [
+        "fs::read",
+        "fs::write",
+        "File::open",
+        "File::create",
+        "tempfile",
+        "file upload",
+        "filesystem",
+        "std::fs",
+        "read_to_string",
+    ];
+    let auth_keywords = [
+        "auth",
+        "session",
+        "token",
+        "jwt",
+        "password",
+        "credential",
+        "oauth",
+        "bearer",
+        "authentication",
+        "authorization",
+    ];
+
+    // Get files from index or fallback to scanning common source files
+    let files_to_scan = match file_index {
+        Ok(index) => index.files.into_iter().take(100).collect(),
+        Err(_) => {
+            // Fallback: scan common source files directly
+            let mut files = Vec::new();
+            let src_path = target_path.join("src");
+            if src_path.exists() {
+                if let Ok(entries) = std::fs::read_dir(&src_path) {
+                    for entry in entries.flatten().take(100) {
+                        if entry.path().extension().and_then(|e| e.to_str()) == Some("rs") {
+                            files.push(crate::indexer::FileInfo {
+                                path: entry.path(),
+                                size: 0,
+                                language: "rust".to_string(),
+                                hash: None,
+                            });
+                        }
+                    }
+                }
+            }
+            files
+        }
+    };
+
+    for file_info in files_to_scan {
+        if let Ok(content) = std::fs::read_to_string(&file_info.path) {
+            let lower = content.to_lowercase();
+
+            if !has_http
+                && http_keywords
+                    .iter()
+                    .any(|k| lower.contains(&k.to_lowercase()))
+            {
+                has_http = true;
+            }
+            if !has_db
+                && db_keywords
+                    .iter()
+                    .any(|k| lower.contains(&k.to_lowercase()))
+            {
+                has_db = true;
+            }
+            if !has_filesys
+                && fs_keywords
+                    .iter()
+                    .any(|k| lower.contains(&k.to_lowercase()))
+            {
+                has_filesys = true;
+            }
+            if !has_auth
+                && auth_keywords
+                    .iter()
+                    .any(|k| lower.contains(&k.to_lowercase()))
+            {
+                has_auth = true;
+            }
+
+            // Early exit if all detected
+            if has_http && has_db && has_filesys && has_auth {
+                break;
+            }
+        }
+    }
+
+    (has_http, has_db, has_filesys, has_auth)
+}
+
+/// Load architecture summary from AnalysisContext or regenerate via static codebase analysis.
+#[cfg_attr(test, visibility::make(pub))]
+pub fn load_or_generate_architecture(target_path: &Path, context: &AnalysisContext) -> String {
     if !context.architecture_summary.is_empty() {
         tracing::debug!("Using existing architecture summary from context");
         context.architecture_summary.clone()
     } else {
-        tracing::warn!("No architecture summary in context, using empty architecture");
-        "No architecture summary available".to_string()
+        tracing::info!("Generating architecture summary via static analysis");
+        let generated = generate_architecture_static(target_path);
+        // Persist for reuse by later phases
+        let mut ctx =
+            AnalysisContext::load(target_path).unwrap_or_else(|_| AnalysisContext::default());
+        ctx.architecture_summary = generated.clone();
+        if let Err(e) = ctx.save(target_path) {
+            tracing::warn!("Failed to persist architecture summary: {e}");
+        }
+        generated
     }
 }
 
@@ -289,8 +509,17 @@ mod tests {
         use tempfile::tempdir;
         let tmp = tempdir().unwrap();
 
+        // Create a simple Rust file for detection
+        let src_dir = tmp.path().join("src");
+        std::fs::create_dir_all(&src_dir).unwrap();
+        std::fs::write(src_dir.join("main.rs"), "fn main() {}").unwrap();
+
         let ctx = AnalysisContext::default();
         let arch = load_or_generate_architecture(tmp.path(), &ctx);
-        assert_eq!(arch, "No architecture summary available");
+
+        // Should generate architecture summary, not return placeholder
+        assert!(arch.contains("ARCHITECTURAL SUMMARY"));
+        assert!(arch.contains("Project type"));
+        assert_ne!(arch, "No architecture summary available");
     }
 }

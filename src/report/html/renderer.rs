@@ -355,6 +355,8 @@ pub fn generate_html_report(
         .finding.medium {{ border-left-color: var(--medium); background: #fffbf0; }}
         .finding.low {{ border-left-color: var(--low); background: #f0fff4; }}
         .finding.info {{ border-left-color: var(--info); background: #f0f9fb; }}
+        .finding-meta-row ul, .finding-meta-row ol {{margin-left:20px}}
+        .cwe-badge {{margin:2px}}
         
         .finding-header {{ display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }}
         .finding-header h3 {{ margin: 0; flex: 1; }}
