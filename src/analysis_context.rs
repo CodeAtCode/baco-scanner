@@ -1,6 +1,6 @@
 //! Analysis context persistence.
 //!
-//! Serializes/deserializes `AnalysisContext` to `target/baco/context.json`
+//! Serializes/deserializes `AnalysisContext` to `context.json` in the output dir
 //! so phases can share state without passing through LLM calls.
 
 use crate::project_type::ProjectType;
@@ -19,21 +19,20 @@ pub struct AnalysisContext {
 }
 
 impl AnalysisContext {
-    /// Write the context as JSON to `target/baco/context.json` under *path*.
+    /// Write the context as JSON to `context.json` under *path*.
     /// Auto-creates the directory if it does not exist.
     pub fn save(&self, path: &Path) -> std::io::Result<()> {
-        let dir = path.join("target/baco");
-        fs::create_dir_all(&dir)?;
-        let out_path = dir.join("context.json");
+        fs::create_dir_all(path)?;
+        let out_path = path.join("context.json");
         let json = serde_json::to_string_pretty(self)?;
         fs::write(out_path, json)?;
         Ok(())
     }
 
-    /// Load the context from `target/baco/context.json` under *path*.
+    /// Load the context from `context.json` under *path*.
     /// Returns a default (empty) context if the file does not exist.
     pub fn load(path: &Path) -> std::io::Result<AnalysisContext> {
-        let out_path = path.join("target/baco/context.json");
+        let out_path = path.join("context.json");
         match fs::read_to_string(&out_path) {
             Ok(content) => {
                 let ctx: AnalysisContext = serde_json::from_str(&content)

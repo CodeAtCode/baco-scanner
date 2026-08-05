@@ -381,7 +381,7 @@ fn test_analysis_context_save_creates_file() {
 
     ctx.save(tmp.path()).unwrap();
 
-    let context_path = tmp.path().join("target/baco/context.json");
+    let context_path = tmp.path().join("context.json");
     assert!(context_path.exists());
 }
 

@@ -35,33 +35,77 @@ pub fn render_finding(finding: &VulnerabilityFinding, finding_id: usize) -> Stri
         String::new()
     };
 
+    // Build triage verdict badge (most important visual signal)
+    // Using findings::TriageVerdict variants: Kill = false positive, Pass = true positive
+    let triage_badge = match finding.triage_verdict {
+        Some(crate::findings::TriageVerdict::Kill) => {
+            r#"<span class="triage-badge false-positive">FALSE POSITIVE</span>"#.to_string()
+        }
+        Some(crate::findings::TriageVerdict::Pass) => {
+            r#"<span class="triage-badge true-positive">VERIFIED TP</span>"#.to_string()
+        }
+        Some(crate::findings::TriageVerdict::Downgrade { .. }) => {
+            r#"<span class="triage-badge downgrade">DOWNGRADED</span>"#.to_string()
+        }
+        Some(crate::findings::TriageVerdict::ChainRequired { .. }) => {
+            r#"<span class="triage-badge chain-required">CHAIN REQUIRED</span>"#.to_string()
+        }
+        None => String::new(),
+    };
+
+    // Build location span for header (file:line)
+    let location_span = if let Some(line) = finding.line_number {
+        format!(
+            r#"<span class="finding-location">{}:{}</span>"#,
+            encode_text(&finding.file_path),
+            line
+        )
+    } else {
+        encode_text(&finding.file_path).to_string()
+    };
+
+    // Build confidence badge for header
+    let confidence_badge = format!(
+        r#"<span class="confidence-badge {}">{:.0}%</span>"#,
+        confidence_class,
+        finding.confidence_score * 100.0
+    );
+
     let mut html = format!(
-        r#"<div class="finding {}" id="{}">
+        r#"<div class="finding {6}" id="{0}">
     <div class="finding-header">
-        <h3 class="collapsible" onclick="document.getElementById('{0}-details').style.display = document.getElementById('{0}-details').style.display === 'none' ? 'block' : 'none'">{}</h3>
-        <span class="severity {}">{}</span>
-        {}    </div>
+        <h3 class="collapsible" style="cursor: pointer;" onclick="document.getElementById('{0}-details').style.display = document.getElementById('{0}-details').style.display === 'none' ? 'block' : 'none'">{1} {2} {3} {4} {5}</h3>
+        <span class="severity {6}">{7}</span>
+        {8}</div>
     <div class="finding-details" id="{0}-details">
         <div class="finding-meta-row">
             <div class="meta">
-                <strong>File:</strong> {} {}<br>
-                <strong>Source:</strong> {}<br>
-                <strong>Confidence:</strong> <span class="confidence-badge {}">{:.0}%</span><br>
-                {}            </div>
+                <strong>File:</strong> {9} {10}<br>
+                <strong>Source:</strong> {11}<br>
+                <strong>Confidence:</strong> {12}<br>
+                {13}</div>
         </div>
-        <p>{}</p>
+        <p>{14}</p>
 "#,
-        severity_class,
-        finding_div_id,
+        finding_div_id.clone(), // For id attribute (also used in onclick)
+        // H3 header: title + triage badge + location + confidence + CWE
         encode_text(&finding.title),
+        triage_badge,
+        location_span,
+        confidence_badge,
+        cwe_badge,
         severity_class,
         encode_text(&finding.severity.to_string()),
-        cwe_badge,
+        // Second CWE badge in header (kept for consistency)
+        if let Some(cwe) = &finding.cwe_id {
+            format!(r#"<span class="cwe-badge">{}</span>"#, encode_text(cwe))
+        } else {
+            String::new()
+        },
         encode_text(&finding.file_path),
         line_info,
         encode_text(&finding.sources.join(", ")),
-        confidence_class,
-        finding.confidence_score * 100.0,
+        confidence_badge,
         // Source and agent mode info (treat empty strings as missing)
         if finding.agent_mode {
             let source = finding
@@ -77,7 +121,7 @@ pub fn render_finding(finding: &VulnerabilityFinding, finding_id: usize) -> Stri
             if model.is_empty() {
                 String::new() // Don't show source if empty
             } else {
-                format!(r#"<br><strong>Source:</strong> {}"#, model)
+                format!(r#"<br><strong>Source:</strong> {}"#, encode_text(model))
             }
         } else {
             String::new()
@@ -185,6 +229,43 @@ pub fn render_finding(finding: &VulnerabilityFinding, finding_id: usize) -> Stri
             r#"<strong>Ticket:</strong> {}"#,
             encode_text(ticket)
         ));
+    }
+    // Render the 5 missing fields
+    if let Some((start, end)) = finding.statement_range {
+        // Only show if different from line_number
+        if finding.line_number.map(|l| l != start).unwrap_or(true) {
+            meta_items.push(format!(
+                r#"<strong>Statement range:</strong> lines {}-{}"#,
+                start, end
+            ));
+        }
+    }
+    if let Some(notes) = &finding.verification_notes {
+        meta_items.push(format!(
+            r#"<strong>Verification notes:</strong> {}"#,
+            markdown_to_html(notes)
+        ));
+    }
+    if let Some(err) = &finding.verification_error {
+        meta_items.push(format!(
+            r#"<strong>Verification error:</strong> <span class="verification-error">{}</span>"#,
+            encode_text(err)
+        ));
+    }
+    if let Some(commit) = &finding.commit_reference {
+        meta_items.push(format!(
+            r#"<strong>Commit:</strong> {}"#,
+            encode_text(commit)
+        ));
+    }
+    if let Some(verdict) = &finding.triage_verdict {
+        let verdict_text = match verdict {
+            crate::findings::TriageVerdict::Pass => "Pass",
+            crate::findings::TriageVerdict::Kill => "Kill",
+            crate::findings::TriageVerdict::Downgrade { .. } => "Downgrade",
+            crate::findings::TriageVerdict::ChainRequired { .. } => "Chain Required",
+        };
+        meta_items.push(format!(r#"<strong>Triage:</strong> {}"#, verdict_text));
     }
 
     if !meta_items.is_empty() {

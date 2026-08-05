@@ -97,20 +97,6 @@ pub fn generate_html_report(
     // Generate summary cards
     let summary_cards_html = build_summary_cards(&stats);
 
-    // Calculate source statistics
-    let mut source_counts: std::collections::HashMap<String, usize> =
-        std::collections::HashMap::new();
-    for finding in findings {
-        for source in &finding.sources {
-            *source_counts.entry(source.clone()).or_insert(0) += 1;
-        }
-    }
-    let _sources_json: String = source_counts
-        .iter()
-        .map(|(s, c)| format!("\"{}\":{}", s, c))
-        .collect::<Vec<_>>()
-        .join(",");
-
     // Calculate average confidence
     let avg_confidence = if findings.is_empty() {
         0.0
