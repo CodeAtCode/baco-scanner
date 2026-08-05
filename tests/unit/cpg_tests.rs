@@ -393,3 +393,112 @@ fn test_data_flow_nodes_preserve_order() {
     assert_eq!(nodes[0].line, 3);
     assert_eq!(nodes[1].line, 1);
 }
+
+// ============================================================================
+// CpgHandleJoern tests
+// ============================================================================
+
+#[test]
+fn test_cpg_handle_joern_struct_construction() {
+    let handle = baco::cpg::CpgHandleJoern {
+        workspace: PathBuf::from("/tmp/workspace"),
+        cpg_path: PathBuf::from("/tmp/workspace/project.cpg"),
+    };
+
+    assert_eq!(handle.workspace, PathBuf::from("/tmp/workspace"));
+    assert_eq!(handle.cpg_path, PathBuf::from("/tmp/workspace/project.cpg"));
+}
+
+#[test]
+fn test_cpg_handle_joern_field_access() {
+    let workspace = PathBuf::from("/test/ws");
+    let cpg_path = PathBuf::from("/test/ws/test.cpg");
+
+    let handle = baco::cpg::CpgHandleJoern {
+        workspace: workspace.clone(),
+        cpg_path: cpg_path.clone(),
+    };
+
+    // Verify field access
+    assert_eq!(handle.workspace, workspace);
+    assert_eq!(handle.cpg_path, cpg_path);
+}
+
+// ============================================================================
+// CpgError Display tests
+// ============================================================================
+
+#[test]
+fn test_cpg_error_cpg_not_found_display_contains_path() {
+    let path = PathBuf::from("/missing/project.cpg");
+    let err = CpgError::CpgNotFound(path.clone());
+    let msg = format!("{}", err);
+
+    assert!(msg.contains("/missing/project.cpg"));
+}
+
+#[test]
+fn test_cpg_error_invalid_query_display_contains_message() {
+    let err = CpgError::InvalidQuery("syntax error in query".to_string());
+    let msg = format!("{}", err);
+
+    assert!(msg.contains("syntax error in query"));
+}
+
+// ============================================================================
+// CpgConfig tests
+// ============================================================================
+
+#[test]
+fn test_cpg_config_with_custom_joern_path() {
+    let config = CpgConfig {
+        enabled: true,
+        joern_path: Some(PathBuf::from("/custom/joern")),
+        slice_budget_lines: 200,
+    };
+
+    assert_eq!(config.joern_path, Some(PathBuf::from("/custom/joern")));
+}
+
+#[test]
+fn test_cpg_config_with_slice_budget_500() {
+    let config = CpgConfig {
+        enabled: true,
+        joern_path: None,
+        slice_budget_lines: 500,
+    };
+
+    assert_eq!(config.slice_budget_lines, 500);
+}
+
+// ============================================================================
+// CodeSlice empty and mutation tests
+// ============================================================================
+
+#[test]
+fn test_code_slice_empty_then_mutated_is_not_empty() {
+    let mut slice = CodeSlice::empty();
+
+    // Initially empty
+    assert!(slice.is_empty());
+
+    // Mutate source
+    slice.source = "fn main() {}".to_string();
+    assert!(!slice.is_empty());
+}
+
+#[test]
+fn test_code_slice_empty_then_mutated_data_flow_is_not_empty() {
+    let mut slice = CodeSlice::empty();
+
+    // Initially empty
+    assert!(slice.is_empty());
+
+    // Mutate data_flow
+    slice.data_flow.push(DataFlowNode {
+        line: 1,
+        code: "x = 1".to_string(),
+        variable: "x".to_string(),
+    });
+    assert!(!slice.is_empty());
+}

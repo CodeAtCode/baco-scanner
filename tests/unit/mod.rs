@@ -194,3 +194,6 @@ mod prompt_templates_inline_tests;
 mod scanner_orchestrator_inline_tests;
 mod scanner_phases_inline_tests;
 mod tickets_inline_tests;
+
+// Additional exploit coverage
+mod exploit_coverage;
