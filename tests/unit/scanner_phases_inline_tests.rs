@@ -7,7 +7,7 @@ mod tests {
     use baco::config::{AgentConfig, LlmPhasesConfig, PerformanceSettings, ScannerSettings};
     use baco::findings::{Severity, VerificationStatus, VulnerabilityFinding};
     use baco::llm_metrics::LlmMetricsTracker;
-    use baco::scanner::phases::{run_phase, OrchestrationConfig, PhaseConfig};
+    use baco::scanner::phases::{run_phase, PhaseConfig};
     use baco::scanner::Scanner;
     use indicatif::ProgressBar;
     use std::path::PathBuf;
@@ -1553,30 +1553,6 @@ mod tests {
         assert!(result.is_ok());
         let (updated, _) = result.unwrap();
         assert_eq!(updated.len(), findings.len());
-    }
-
-    // Validate phase config test
-    #[tokio::test]
-    async fn test_validate_phase_config() {
-        let mut config = OrchestrationConfig::default();
-        config.enabled = false;
-        assert!(!config.enabled);
-    }
-
-    // Hunt phase config test
-    #[tokio::test]
-    async fn test_hunt_phase_config() {
-        let mut config = OrchestrationConfig::default();
-        config.enabled = false;
-        assert!(!config.enabled);
-    }
-
-    // IndependentVerify config test
-    #[tokio::test]
-    async fn test_independent_verify_config() {
-        let mut config = OrchestrationConfig::default();
-        config.enabled = false;
-        assert!(!config.enabled);
     }
 
     // ExploitSynth with disabled config

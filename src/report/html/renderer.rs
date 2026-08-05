@@ -355,7 +355,6 @@ pub fn generate_html_report(
         .finding.medium {{ border-left-color: var(--medium); background: #fffbf0; }}
         .finding.low {{ border-left-color: var(--low); background: #f0fff4; }}
         .finding.info {{ border-left-color: var(--info); background: #f0f9fb; }}
-        .finding-meta-row ul, .finding-meta-row ol {{margin-left:20px}}
         .cwe-badge {{margin:2px}}
         
         .finding-header {{ display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }}
@@ -415,6 +414,7 @@ pub fn generate_html_report(
         .finding-count {{ font-size: 0.9rem; color: #6c757d; margin-bottom: 15px; }}
         
         .finding-details {{ margin-top: 15px; }}
+        .info-details ul, .info-details ol {{margin-left:20px}}
         
         .collapsible {{ cursor: pointer; user-select: none; }}
         .collapsible::before {{ content: "▼"; margin-right: 8px; font-size: 0.8rem; }}
