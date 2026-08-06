@@ -9,9 +9,6 @@ use indicatif::{ProgressBar, ProgressStyle};
 
 use std::time::Instant;
 
-/// Type alias for phase result
-type PhaseResult = Result<(Vec<VulnerabilityFinding>, Vec<String>), String>;
-
 /// Execute parallel phases (Indexing, Semgrep, LlmStaticAnalysis)
 async fn run_parallel_phases(
     scanner: &super::Scanner,
@@ -30,16 +27,15 @@ async fn run_parallel_phases(
     pb.enable_steady_tick(std::time::Duration::from_millis(100));
     pb.set_message("Running parallel phases (Indexing, Semgrep, LLM Static)...");
 
-    let findings_for_parallel = findings.clone();
     tracing::info!(
-        "\u{1B}[34m[SCANNER]\u{1B}[0m Findings cloned: {} items",
-        findings_for_parallel.len()
+        "\u{1B}[34m[SCANNER]\u{1B}[0m Spawning parallel tasks with {} findings",
+        findings.len()
     );
 
     let indexing_handle = if !is_phase_completed(&ScanPhase::Indexing) {
         let this = scanner;
         let pb = pb.clone();
-        let initial_findings = findings_for_parallel.clone();
+        let initial_findings = findings.clone();
         Some(async move {
             this.run_phase(&ScanPhase::Indexing, initial_findings, &pb, &[])
                 .await
@@ -52,7 +48,7 @@ async fn run_parallel_phases(
     let semgrep_handle = if !is_phase_completed(&ScanPhase::Semgrep) {
         let this = scanner;
         let pb = pb.clone();
-        let initial_findings = findings_for_parallel.clone();
+        let initial_findings = findings.clone();
         Some(async move {
             this.run_phase(&ScanPhase::Semgrep, initial_findings, &pb, &[])
                 .await
@@ -85,7 +81,7 @@ async fn run_parallel_phases(
             }
             let this = scanner;
             let pb = pb.clone();
-            let initial_findings = findings_for_parallel;
+            let initial_findings = findings.clone();
             let analyzed_files_clone = analyzed_files.clone();
             Some(async move {
                 this.run_phase(
@@ -107,18 +103,39 @@ async fn run_parallel_phases(
 
     let start_time = Instant::now();
 
-    let indexing_result = match indexing_handle {
-        Some(handle) => Some(handle.await),
-        None => None,
-    };
-    let semgrep_result = match semgrep_handle {
-        Some(handle) => Some(handle.await),
-        None => None,
-    };
-    let llm_static_result: Option<PhaseResult> = match llm_static_handle {
-        Some(handle) => Some(handle.await),
-        None => None,
-    };
+    // Execute all spawned tasks in true parallel using tokio::join!
+    let (indexing_result, semgrep_result, llm_static_result) =
+        match (indexing_handle, semgrep_handle, llm_static_handle) {
+            (Some(i), Some(s), Some(l)) => {
+                let (ir, sr, lr) = tokio::join!(i, s, l);
+                (Some(ir), Some(sr), Some(lr))
+            }
+            (Some(i), Some(s), None) => {
+                let (ir, sr) = tokio::join!(i, s);
+                (Some(ir), Some(sr), None)
+            }
+            (Some(i), None, Some(l)) => {
+                let (ir, lr) = tokio::join!(i, l);
+                (Some(ir), None, Some(lr))
+            }
+            (Some(i), None, None) => {
+                let ir = i.await;
+                (Some(ir), None, None)
+            }
+            (None, Some(s), Some(l)) => {
+                let (sr, lr) = tokio::join!(s, l);
+                (None, Some(sr), Some(lr))
+            }
+            (None, Some(s), None) => {
+                let sr = s.await;
+                (None, Some(sr), None)
+            }
+            (None, None, Some(l)) => {
+                let lr = l.await;
+                (None, None, Some(lr))
+            }
+            (None, None, None) => (None, None, None),
+        };
 
     let parallel_duration = start_time.elapsed();
     tracing::info!("Parallel phases completed in {:?}", parallel_duration);
