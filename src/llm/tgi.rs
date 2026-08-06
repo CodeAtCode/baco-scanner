@@ -265,4 +265,275 @@ mod tests {
         assert_eq!(options.temperature, Some(0.8));
         assert_eq!(options.stop.len(), 2);
     }
+
+    #[tokio::test]
+    async fn test_complete_happy_path() {
+        let mut server = mockito::Server::new_async().await;
+        let mock = server
+            .mock("POST", "/v1/chat/completions")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(r#"{"choices":[{"message":{"content":"test response"}}]}"#)
+            .create_async()
+            .await;
+
+        let config = TgiConfig {
+            enabled: true,
+            endpoint: server.url(),
+            model: "test-model".to_string(),
+            ..Default::default()
+        };
+        let client = TgiClient::new(&config).unwrap();
+        let result = client.complete("test prompt").await;
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "test response");
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_complete_http_error() {
+        let mut server = mockito::Server::new_async().await;
+        let mock = server
+            .mock("POST", "/v1/chat/completions")
+            .with_status(500)
+            .with_header("content-type", "application/json")
+            .with_body(r#"{"error": "internal server error"}"#)
+            .create_async()
+            .await;
+
+        let config = TgiConfig {
+            enabled: true,
+            endpoint: server.url(),
+            model: "test-model".to_string(),
+            ..Default::default()
+        };
+        let client = TgiClient::new(&config).unwrap();
+        let result = client.complete("test prompt").await;
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.contains("status"));
+        assert!(err.contains("500"));
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_complete_malformed_json() {
+        let mut server = mockito::Server::new_async().await;
+        let mock = server
+            .mock("POST", "/v1/chat/completions")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(r#"{"choices": invalid json}"#)
+            .create_async()
+            .await;
+
+        let config = TgiConfig {
+            enabled: true,
+            endpoint: server.url(),
+            model: "test-model".to_string(),
+            ..Default::default()
+        };
+        let client = TgiClient::new(&config).unwrap();
+        let result = client.complete("test prompt").await;
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.contains("parse"));
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_complete_empty_choices() {
+        let mut server = mockito::Server::new_async().await;
+        let mock = server
+            .mock("POST", "/v1/chat/completions")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(r#"{"choices": []}"#)
+            .create_async()
+            .await;
+
+        let config = TgiConfig {
+            enabled: true,
+            endpoint: server.url(),
+            model: "test-model".to_string(),
+            ..Default::default()
+        };
+        let client = TgiClient::new(&config).unwrap();
+        let result = client.complete("test prompt").await;
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.contains("missing choices"));
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_complete_with_options_overrides() {
+        let mut server = mockito::Server::new_async().await;
+        let mock = server
+            .mock("POST", "/v1/chat/completions")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(r#"{"choices":[{"message":{"content":"custom options response"}}]}"#)
+            .create_async()
+            .await;
+
+        let config = TgiConfig {
+            enabled: true,
+            endpoint: server.url(),
+            model: "test-model".to_string(),
+            ..Default::default()
+        };
+        let client = TgiClient::new(&config).unwrap();
+        let options = CompletionOptions {
+            max_new_tokens: Some(100),
+            temperature: Some(0.5),
+            stop: vec!["END".to_string()],
+        };
+        let result = client.complete_with_options("test prompt", &options).await;
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "custom options response");
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_complete_with_options_defaults() {
+        let mut server = mockito::Server::new_async().await;
+        let mock = server
+            .mock("POST", "/v1/chat/completions")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(r#"{"choices":[{"message":{"content":"default options response"}}]}"#)
+            .create_async()
+            .await;
+
+        let config = TgiConfig {
+            enabled: true,
+            endpoint: server.url(),
+            model: "test-model".to_string(),
+            ..Default::default()
+        };
+        let client = TgiClient::new(&config).unwrap();
+        let options = CompletionOptions::default();
+        let result = client.complete_with_options("test prompt", &options).await;
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "default options response");
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_with_options_overrides_max_tokens() {
+        let mut server = mockito::Server::new_async().await;
+        let mock = server
+            .mock("POST", "/v1/chat/completions")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(r#"{"choices":[{"message":{"content":"max tokens override"}}]}"#)
+            .create_async()
+            .await;
+
+        let config = TgiConfig {
+            enabled: true,
+            endpoint: server.url(),
+            model: "test-model".to_string(),
+            ..Default::default()
+        };
+        let options = CompletionOptions {
+            max_new_tokens: Some(512),
+            ..Default::default()
+        };
+        let client = TgiClient::with_options(&config, &options).unwrap();
+        let result = client.complete("test prompt").await;
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "max tokens override");
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_with_options_overrides_temperature() {
+        let mut server = mockito::Server::new_async().await;
+        let mock = server
+            .mock("POST", "/v1/chat/completions")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(r#"{"choices":[{"message":{"content":"temperature override"}}]}"#)
+            .create_async()
+            .await;
+
+        let config = TgiConfig {
+            enabled: true,
+            endpoint: server.url(),
+            model: "test-model".to_string(),
+            ..Default::default()
+        };
+        let options = CompletionOptions {
+            temperature: Some(0.9),
+            ..Default::default()
+        };
+        let client = TgiClient::with_options(&config, &options).unwrap();
+        let result = client.complete("test prompt").await;
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "temperature override");
+        mock.assert_async().await;
+    }
+
+    // Note: is_available() tests are ignored because the method creates its own
+    // tokio runtime via Runtime::new().block_on(), which conflicts with the
+    // #[tokio::test] runtime. This is a known limitation of the current implementation.
+    // To test properly, either: (1) make is_available() async, or (2) use a separate
+    // test binary that runs without the tokio test runtime.
+    #[tokio::test]
+    #[ignore]
+    async fn test_is_available_true() {
+        let mut server = mockito::Server::new_async().await;
+        let _mock = server
+            .mock("GET", "/health")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(r#"{"status": "ok"}"#)
+            .create_async()
+            .await;
+
+        let config = TgiConfig {
+            enabled: true,
+            endpoint: server.url(),
+            model: "test-model".to_string(),
+            ..Default::default()
+        };
+        let client = TgiClient::new(&config).unwrap();
+        let available = client.is_available();
+
+        assert!(available);
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_is_available_false() {
+        let mut server = mockito::Server::new_async().await;
+        let _mock = server
+            .mock("GET", "/health")
+            .with_status(500)
+            .with_header("content-type", "application/json")
+            .with_body(r#"{"error": "server error"}"#)
+            .create_async()
+            .await;
+
+        let config = TgiConfig {
+            enabled: true,
+            endpoint: server.url(),
+            model: "test-model".to_string(),
+            ..Default::default()
+        };
+        let client = TgiClient::new(&config).unwrap();
+        let available = client.is_available();
+
+        assert!(!available);
+    }
 }

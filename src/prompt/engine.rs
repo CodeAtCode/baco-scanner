@@ -325,4 +325,160 @@ mod tests {
         let result = engine.get_prompt(&BacoPhase::Indexing);
         assert!(!result.is_empty()); // Indexing should exist
     }
+
+    // ========================================================================
+    // load_overrides_from_file Tests
+    // ========================================================================
+
+    #[test]
+    fn test_load_overrides_from_file_valid_toml() {
+        let content = r#"
+[phases]
+indexing = "Custom indexing prompt"
+semgrep = "Custom semgrep prompt"
+"#;
+
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(temp_file.path(), content).unwrap();
+
+        let result = PromptEngine::load_overrides_from_file(temp_file.path().to_str().unwrap());
+        assert!(result.is_ok());
+
+        let overrides = result.unwrap();
+        assert_eq!(
+            overrides.get("indexing"),
+            Some(&"Custom indexing prompt".to_string())
+        );
+        assert_eq!(
+            overrides.get("semgrep"),
+            Some(&"Custom semgrep prompt".to_string())
+        );
+    }
+
+    #[test]
+    fn test_load_overrides_from_file_nonexistent_path() {
+        let result = PromptEngine::load_overrides_from_file("/nonexistent/path/to/file.toml");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("No such file"));
+    }
+
+    #[test]
+    fn test_load_overrides_from_file_malformed_toml() {
+        let content = r#"
+[phases
+indexing = "unclosed bracket
+"#;
+
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(temp_file.path(), content).unwrap();
+
+        let result = PromptEngine::load_overrides_from_file(temp_file.path().to_str().unwrap());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_load_overrides_from_file_empty_file() {
+        let content = "";
+
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(temp_file.path(), content).unwrap();
+
+        let result = PromptEngine::load_overrides_from_file(temp_file.path().to_str().unwrap());
+        assert!(result.is_ok());
+
+        let overrides = result.unwrap();
+        assert!(overrides.is_empty());
+    }
+
+    #[test]
+    fn test_load_overrides_from_file_partial_overrides() {
+        let content = r#"
+[phases]
+indexing = "Only indexing override"
+"#;
+
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(temp_file.path(), content).unwrap();
+
+        let result = PromptEngine::load_overrides_from_file(temp_file.path().to_str().unwrap());
+        assert!(result.is_ok());
+
+        let overrides = result.unwrap();
+        assert_eq!(overrides.len(), 1);
+        assert!(overrides.contains_key("indexing"));
+        assert!(!overrides.contains_key("semgrep"));
+    }
+
+    #[test]
+    fn test_load_overrides_from_file_merge_with_existing() {
+        // Create engine with initial overrides
+        let mut initial_overrides = HashMap::new();
+        initial_overrides.insert("indexing".to_string(), "Initial indexing".to_string());
+
+        let engine = PromptEngine::from_config_overrides(initial_overrides);
+        assert_eq!(
+            engine.overrides.get("indexing"),
+            Some(&"Initial indexing".to_string())
+        );
+
+        // Create a TOML file with different overrides
+        let content = r#"
+[phases]
+semgrep = "File-based semgrep"
+llm_discovery = "File-based discovery"
+"#;
+
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(temp_file.path(), content).unwrap();
+
+        // Load overrides from file
+        let file_overrides =
+            PromptEngine::load_overrides_from_file(temp_file.path().to_str().unwrap()).unwrap();
+
+        // Verify file overrides were loaded
+        assert_eq!(
+            file_overrides.get("semgrep"),
+            Some(&"File-based semgrep".to_string())
+        );
+        assert_eq!(
+            file_overrides.get("llm_discovery"),
+            Some(&"File-based discovery".to_string())
+        );
+
+        // Note: The file overrides don't automatically merge into the engine instance
+        // This test verifies that both sources can coexist
+        assert!(engine.overrides.contains_key("indexing")); // Initial override still exists
+    }
+
+    #[test]
+    fn test_load_overrides_from_file_empty_phases_table() {
+        let content = "[phases]\n";
+
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(temp_file.path(), content).unwrap();
+
+        let result = PromptEngine::load_overrides_from_file(temp_file.path().to_str().unwrap());
+        assert!(result.is_ok());
+
+        let overrides = result.unwrap();
+        assert!(overrides.is_empty());
+    }
+
+    #[test]
+    fn test_load_overrides_from_file_special_characters_in_value() {
+        let content = r#"
+[phases]
+indexing = "Prompt with 'quotes' and \"double quotes\" and special chars: $PATH"
+"#;
+
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(temp_file.path(), content).unwrap();
+
+        let result = PromptEngine::load_overrides_from_file(temp_file.path().to_str().unwrap());
+        assert!(result.is_ok());
+
+        let overrides = result.unwrap();
+        assert!(overrides.contains_key("indexing"));
+        assert!(overrides.get("indexing").unwrap().contains("quotes"));
+    }
 }

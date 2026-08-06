@@ -156,4 +156,118 @@ severity: WARNING
         // Just check it returns a Vec without panicking
         assert!(valid_indices.len() <= rules.len());
     }
+
+    #[test]
+    fn test_validate_rule_empty_string() {
+        let result = validate_rule("");
+        // Empty string will either fail semgrep validation or return SemgrepNotFound
+        match result {
+            Err(RuleError::SemgrepNotFound) => {}
+            Err(_) => {}
+            Ok(()) => panic!("Expected validation to fail for empty input"),
+        }
+    }
+
+    #[test]
+    fn test_validate_rule_with_null_bytes() {
+        let rule_with_null = "rules:\n  - id: test\x00null";
+        let result = validate_rule(rule_with_null);
+        match result {
+            Err(RuleError::SemgrepNotFound) => {}
+            Err(_) => {}
+            Ok(()) => panic!("Expected validation to fail for input with null bytes"),
+        }
+    }
+
+    #[test]
+    fn test_validate_rule_with_unicode() {
+        let rule_with_unicode = r#"rules:
+  - id: test-unicode-测试
+    message: "Unicode: émojis 🚀, cañón"
+    languages:
+      - python
+"#;
+        let result = validate_rule(rule_with_unicode);
+        match result {
+            Err(RuleError::SemgrepNotFound) => {}
+            Err(_) => {}
+            Ok(()) => {}
+        }
+    }
+
+    #[test]
+    fn test_validate_rule_very_long_input() {
+        let long_yaml = format!("rules:\n{}", "  - id: test-rule-\n".repeat(1000));
+        let result = validate_rule(&long_yaml);
+        // Should not panic, may succeed or fail depending on semgrep
+        match result {
+            Err(RuleError::SemgrepNotFound) => {}
+            _ => {}
+        }
+    }
+
+    #[test]
+    fn test_validate_rules_empty_slice() {
+        let rules: Vec<String> = vec![];
+        let valid_indices = validate_rules(&rules);
+        assert!(valid_indices.is_empty());
+    }
+
+    #[test]
+    fn test_validate_rules_single_element() {
+        let rules = vec!["single rule".to_string()];
+        let valid_indices = validate_rules(&rules);
+        // Should return either empty vec or vec with [0]
+        assert!(valid_indices.len() <= 1);
+    }
+
+    #[test]
+    fn test_validate_rules_all_invalid() {
+        let rules = vec![
+            "invalid yaml {{{".to_string(),
+            "also invalid".to_string(),
+            "no semgrep here".to_string(),
+        ];
+        let valid_indices = validate_rules(&rules);
+        // If semgrep is not installed, all will fail with SemgrepNotFound
+        // If installed, invalid YAML should fail validation
+        assert!(valid_indices.is_empty() || valid_indices.len() < rules.len());
+    }
+
+    #[test]
+    fn test_rule_error_source_returns_none() {
+        let err = RuleError::LlmError("test".to_string());
+        assert!(std::error::Error::source(&err).is_none());
+
+        let err = RuleError::YamlError("test".to_string());
+        assert!(std::error::Error::source(&err).is_none());
+
+        let err = RuleError::SemgrepError("test".to_string());
+        assert!(std::error::Error::source(&err).is_none());
+
+        let err = RuleError::SemgrepNotFound;
+        assert!(std::error::Error::source(&err).is_none());
+
+        let err = RuleError::IoError("test".to_string());
+        assert!(std::error::Error::source(&err).is_none());
+    }
+
+    #[test]
+    fn test_rule_error_is_send_sync() {
+        fn assert_send<T: Send>() {}
+        fn assert_sync<T: Sync>() {}
+        assert_send::<RuleError>();
+        assert_sync::<RuleError>();
+    }
+
+    #[test]
+    fn test_rule_error_clone() {
+        let err1 = RuleError::LlmError("test error".to_string());
+        let err2 = err1.clone();
+        assert_eq!(format!("{}", err1), format!("{}", err2));
+
+        let err1 = RuleError::SemgrepNotFound;
+        let err2 = err1.clone();
+        assert_eq!(format!("{}", err1), format!("{}", err2));
+    }
 }

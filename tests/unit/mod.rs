@@ -55,6 +55,9 @@ mod orchestrator_integration_tests;
 // Scanner core tests
 mod scanner_core_tests;
 
+// Scanner env tests - standalone function tests
+mod scanner_env_tests;
+
 // Threat modeling tests
 mod threat_model;
 mod threat_model_file;
@@ -157,6 +160,9 @@ mod scanner_parallel_tests;
 
 // Final coverage push: cve_client deep coverage
 mod cve_client_deep_tests;
+
+// CVE client network tests using mockito
+mod cve_client_network_tests;
 
 // Deep rulesynth tests - comprehensive coverage for rulesynth module
 mod rulesynth_deep_tests;

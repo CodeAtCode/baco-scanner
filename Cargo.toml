@@ -74,6 +74,7 @@ serial_test = "3"
 futures = "0.3"
 mockito = "1.2"
 visibility = "0.1"
+tempfile = "3"
 
 [[test]]
 name = "unit_tests"

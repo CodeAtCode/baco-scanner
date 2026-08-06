@@ -14,6 +14,7 @@ use tracing::warn;
 /// CVE bootstrap HTTP client
 pub struct CveClient {
     http: Client,
+    base_url: Option<String>,
 }
 
 impl Default for CveClient {
@@ -30,6 +31,7 @@ impl CveClient {
                 .timeout(Duration::from_secs(30))
                 .build()
                 .expect("Failed to create HTTP client"),
+            base_url: None,
         }
     }
 
@@ -37,8 +39,12 @@ impl CveClient {
     ///
     /// Source: https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json
     pub async fn fetch_kev_catalog(&self) -> Result<Vec<CveEntry>, Box<dyn std::error::Error>> {
-        let url =
-            "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json";
+        let url = if let Some(ref base) = self.base_url {
+            format!("{}/known_exploited_vulnerabilities.json", base)
+        } else {
+            "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
+                .to_string()
+        };
 
         let response = self.http.get(url).send().await?;
 
@@ -72,7 +78,7 @@ impl CveClient {
                 Ok(entries)
             }
             Err(e) => {
-                // Log a debug level for JSON parse errors - API format might have changed
+                // Log a debug level for JSON parse errors - API format may have changed
                 tracing::debug!(
                     "KEV catalog JSON parse error (API format may have changed): {}",
                     e
@@ -95,10 +101,19 @@ impl CveClient {
         product: &str,
     ) -> Result<Vec<CveEntry>, Box<dyn std::error::Error>> {
         let query = format!("{}+{}", vendor, product);
-        let url = format!(
-            "https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch={}",
-            urlencoding::encode(&query)
-        );
+
+        let url = if let Some(ref base) = self.base_url {
+            format!(
+                "{}/cves/2.0?keywordSearch={}",
+                base,
+                urlencoding::encode(&query)
+            )
+        } else {
+            format!(
+                "https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch={}",
+                urlencoding::encode(&query)
+            )
+        };
 
         let response = self.http.get(&url).send().await?;
 
@@ -169,6 +184,25 @@ impl CveClient {
 
         result.into_values().collect()
     }
+
+    /// Test-only constructor with custom HTTP client
+    ///
+    /// Allows injecting a mock HTTP client for testing network methods.
+    /// This is required because the production `new()` uses hardcoded URLs
+    /// that cannot be overridden for testing.
+    pub fn with_http_client(http: Client) -> Self {
+        Self {
+            http,
+            base_url: None,
+        }
+    }
+
+    /// Test-only method to set base URL for mocking
+    ///
+    /// Used in tests to redirect requests to mockito server.
+    pub fn set_base_url(&mut self, base: String) {
+        self.base_url = Some(base);
+    }
 }
 
 /// KEV catalog response structure
@@ -206,6 +240,7 @@ struct NvdDescription {
 
 #[derive(Debug, Serialize, Deserialize)]
 struct NvdMetrics {
+    #[serde(rename = "cvssMetricV31")]
     cvss_metric_v31: Vec<NvdCvssV31>,
 }
 

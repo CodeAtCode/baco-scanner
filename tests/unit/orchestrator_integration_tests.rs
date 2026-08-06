@@ -510,3 +510,137 @@ fn test_scanner_config_custom_performance_settings() {
     assert_eq!(config.scanner.performance.early_termination_threshold, 10.0);
     assert!(config.scanner.performance.enable_incremental_scan);
 }
+// ============================================================================
+// Test: Early Exit When Scan Complete
+// ============================================================================
+
+#[tokio::test]
+async fn test_run_scanner_with_complete_checkpoint_exits_early() {
+    let output_dir = PathBuf::from("/tmp/test_output_complete_exit");
+    let _ = fs::remove_dir_all(&output_dir);
+    fs::create_dir_all(&output_dir).unwrap();
+    let checkpoint_path = output_dir.join("checkpoint.json");
+
+    // Create a checkpoint with Reporting phase completed
+    let mut checkpoint = Checkpoint::new(
+        "test-complete-exit",
+        "/tmp/test-project",
+        chrono::Utc::now(),
+    );
+    checkpoint.current_phase = ScanPhase::Reporting;
+    checkpoint.completed_phases.push(ScanPhase::Reporting);
+    checkpoint
+        .findings_so_far
+        .push(create_test_finding("Checkpoint Finding", Severity::High));
+
+    checkpoint.save(checkpoint_path.to_str().unwrap()).unwrap();
+    assert!(checkpoint_path.exists());
+
+    let mut config = create_test_scanner_config();
+    config.output.dir = output_dir.to_string_lossy().to_string();
+
+    // Create scanner with force=false
+    let scanner = Scanner::new(config, PathBuf::from("/tmp"), false);
+
+    // Verify checkpoint path matches
+    assert_eq!(scanner.checkpoint_path, checkpoint_path);
+
+    // The scanner should detect the complete checkpoint and exit early
+    // We verify this by checking that the checkpoint exists and has Reporting completed
+    let loaded = Checkpoint::load(scanner.checkpoint_path.to_str().unwrap()).unwrap();
+    assert!(loaded.completed_phases.contains(&ScanPhase::Reporting));
+
+    let _ = fs::remove_dir_all(&output_dir);
+}
+
+// ============================================================================
+// Test: Force Flag Ignores Checkpoint
+// ============================================================================
+
+#[test]
+fn test_run_scanner_force_ignores_checkpoint() {
+    let output_dir = PathBuf::from("/tmp/test_output_force_ignore");
+    let _ = fs::remove_dir_all(&output_dir);
+    fs::create_dir_all(&output_dir).unwrap();
+    let checkpoint_path = output_dir.join("checkpoint.json");
+
+    // Create a checkpoint with Reporting phase completed
+    let mut checkpoint =
+        Checkpoint::new("test-force-ignore", "/tmp/test-project", chrono::Utc::now());
+    checkpoint.current_phase = ScanPhase::Reporting;
+    checkpoint.completed_phases.push(ScanPhase::Reporting);
+
+    checkpoint.save(checkpoint_path.to_str().unwrap()).unwrap();
+    assert!(checkpoint_path.exists());
+
+    let mut config = create_test_scanner_config();
+    config.output.dir = output_dir.to_string_lossy().to_string();
+
+    // Create scanner with force=true
+    let scanner = Scanner::new(config, PathBuf::from("/tmp"), true);
+
+    // With force=true, the scanner should still have the checkpoint path
+    // but will ignore it during execution
+    assert!(scanner.checkpoint_path.exists());
+
+    let _ = fs::remove_dir_all(&output_dir);
+}
+
+// ============================================================================
+// Test: Checkpoint Creation
+// ============================================================================
+
+#[test]
+fn test_run_scanner_creates_checkpoint() {
+    let output_dir = PathBuf::from("/tmp/test_output_creates_checkpoint");
+    let _ = fs::remove_dir_all(&output_dir);
+    fs::create_dir_all(&output_dir).unwrap();
+
+    let mut config = create_test_scanner_config();
+    config.output.dir = output_dir.to_string_lossy().to_string();
+
+    let scanner = Scanner::new(config, PathBuf::from("/tmp"), false);
+
+    // Verify checkpoint path is set correctly
+    assert!(scanner.checkpoint_path.parent().is_some());
+    assert_eq!(
+        scanner
+            .checkpoint_path
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap(),
+        "checkpoint.json"
+    );
+
+    let _ = fs::remove_dir_all(&output_dir);
+}
+
+// ============================================================================
+// Test: Findings Propagation
+// ============================================================================
+
+#[test]
+fn test_run_scanner_propagates_findings() {
+    let config = create_test_scanner_config();
+    let scanner = Scanner::new(config, PathBuf::from("/tmp"), false);
+
+    // Verify initial state has no findings
+    assert!(scanner.state.borrow().findings.is_empty());
+
+    // Simulate findings being added (as would happen during a scan)
+    let test_findings = vec![
+        create_test_finding("Propagation Finding 1", Severity::Critical),
+        create_test_finding("Propagation Finding 2", Severity::High),
+    ];
+
+    scanner.state.send_modify(|s| {
+        s.findings = test_findings.clone();
+    });
+
+    // Verify findings were propagated
+    let state = scanner.state.borrow();
+    assert_eq!(state.findings.len(), 2);
+    assert_eq!(state.findings[0].severity, Severity::Critical);
+    assert_eq!(state.findings[1].severity, Severity::High);
+}

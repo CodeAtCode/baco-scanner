@@ -787,3 +787,194 @@ fn test_threat_modeling_phase_debug() {
     let debug_output = format!("{:?}", phase);
     assert!(!debug_output.is_empty());
 }
+
+// ============================================================================
+// GENERATE THREAT MODEL WITH LLM - FALLBACK PATH TESTS
+// These test that when the LLM client fails, the function falls back to
+// static threat model generation.
+// ============================================================================
+
+#[tokio::test]
+async fn test_generate_threat_model_with_llm_fallback_to_static() {
+    use baco::llm::{LlmClient, LlmConfig};
+
+    // Create a temp directory with a minimal project
+    let tmp_dir = tempdir().unwrap();
+    let src_dir = tmp_dir.path().join("src");
+    std::fs::create_dir_all(&src_dir).unwrap();
+    std::fs::write(src_dir.join("main.rs"), "fn main() {}").unwrap();
+
+    // Create an LLM client with an invalid base URL that will fail
+    let config = LlmConfig {
+        base_url: "http://127.0.0.1:1".to_string(), // Unreachable port
+        api_key: "invalid-key".to_string(),
+        model: "test-model".to_string(),
+        models: vec![],
+        timeout: 1, // Very short timeout to fail fast
+        max_retries: 0,
+        retry_backoff_ms: 0,
+    };
+    let client = LlmClient::new(config);
+
+    let architecture = "HTTP API with database";
+    let result = generate_threat_model_with_llm(tmp_dir.path(), architecture, &client).await;
+
+    // Should succeed with fallback to static generation
+    assert!(result.is_ok());
+    let threat_model = result.unwrap();
+
+    // Verify it contains static generation markers
+    assert!(threat_model.contains("TRUST BOUNDARIES"));
+    assert!(threat_model.contains("STRIDE"));
+    assert!(threat_model.contains("=== THREAT MODEL: STRIDE Analysis ==="));
+}
+
+#[tokio::test]
+async fn test_generate_threat_model_with_llm_fallback_empty_api_key() {
+    use baco::llm::{LlmClient, LlmConfig};
+
+    // Create a temp directory with a minimal project
+    let tmp_dir = tempdir().unwrap();
+    let src_dir = tmp_dir.path().join("src");
+    std::fs::create_dir_all(&src_dir).unwrap();
+    std::fs::write(src_dir.join("main.rs"), "fn main() {}").unwrap();
+
+    // Create an LLM client with empty API key
+    let config = LlmConfig {
+        base_url: "https://api.openai.com/v1".to_string(),
+        api_key: "".to_string(), // Empty API key
+        model: "gpt-4".to_string(),
+        models: vec![],
+        timeout: 1,
+        max_retries: 0,
+        retry_backoff_ms: 0,
+    };
+    let client = LlmClient::new(config);
+
+    let architecture = "CLI tool with file system";
+    let result = generate_threat_model_with_llm(tmp_dir.path(), architecture, &client).await;
+
+    // Should succeed with fallback to static generation
+    assert!(result.is_ok());
+    let threat_model = result.unwrap();
+
+    // Verify static generation output
+    assert!(threat_model.contains("TRUST BOUNDARIES"));
+    assert!(threat_model.contains("STRIDE THREATS"));
+}
+
+#[tokio::test]
+async fn test_generate_threat_model_with_llm_fallback_architecture_aware() {
+    use baco::llm::{LlmClient, LlmConfig};
+
+    // Create a temp directory with a minimal project
+    let tmp_dir = tempdir().unwrap();
+    let src_dir = tmp_dir.path().join("src");
+    std::fs::create_dir_all(&src_dir).unwrap();
+    std::fs::write(src_dir.join("main.rs"), "fn main() {}").unwrap();
+
+    // Create an LLM client that will fail
+    let config = LlmConfig {
+        base_url: "http://invalid.local:9999".to_string(),
+        api_key: "test".to_string(),
+        model: "test".to_string(),
+        models: vec![],
+        timeout: 1,
+        max_retries: 0,
+        retry_backoff_ms: 0,
+    };
+    let client = LlmClient::new(config);
+
+    // Test with database architecture
+    let result_with_db =
+        generate_threat_model_with_llm(tmp_dir.path(), "HTTP with postgresql", &client)
+            .await
+            .unwrap();
+
+    // Test without database
+    let result_no_db =
+        generate_threat_model_with_llm(tmp_dir.path(), "No database, just HTTP", &client)
+            .await
+            .unwrap();
+
+    // With DB should contain SQL injection threats
+    assert!(result_with_db.contains("SQL injection"));
+
+    // Without DB should NOT contain SQL injection (due to "No database" negation)
+    assert!(!result_no_db.contains("SQL injection"));
+}
+
+#[tokio::test]
+async fn test_generate_threat_model_with_llm_fallback_all_stride_categories() {
+    use baco::llm::{LlmClient, LlmConfig};
+
+    let tmp_dir = tempdir().unwrap();
+    let src_dir = tmp_dir.path().join("src");
+    std::fs::create_dir_all(&src_dir).unwrap();
+    std::fs::write(src_dir.join("main.rs"), "fn main() {}").unwrap();
+
+    let config = LlmConfig {
+        base_url: "http://127.0.0.1:1".to_string(),
+        api_key: "test".to_string(),
+        model: "test".to_string(),
+        models: vec![],
+        timeout: 1,
+        max_retries: 0,
+        retry_backoff_ms: 0,
+    };
+    let client = LlmClient::new(config);
+
+    let result = generate_threat_model_with_llm(
+        tmp_dir.path(),
+        "Full stack: HTTP + database + file system",
+        &client,
+    )
+    .await
+    .unwrap();
+
+    // Verify all STRIDE categories are present
+    assert!(result.contains("#### S - Spoofing"));
+    assert!(result.contains("#### T - Tampering"));
+    assert!(result.contains("#### R - Repudiation"));
+    assert!(result.contains("#### I - Information Disclosure"));
+    assert!(result.contains("#### D - Denial of Service"));
+    assert!(result.contains("#### E - Elevation of Privilege"));
+}
+
+#[tokio::test]
+async fn test_generate_threat_model_with_llm_fallback_various_architectures() {
+    use baco::llm::{LlmClient, LlmConfig};
+
+    let tmp_dir = tempdir().unwrap();
+    let src_dir = tmp_dir.path().join("src");
+    std::fs::create_dir_all(&src_dir).unwrap();
+    std::fs::write(src_dir.join("main.rs"), "fn main() {}").unwrap();
+
+    let config = LlmConfig {
+        base_url: "http://127.0.0.1:1".to_string(),
+        api_key: "test".to_string(),
+        model: "test".to_string(),
+        models: vec![],
+        timeout: 1,
+        max_retries: 0,
+        retry_backoff_ms: 0,
+    };
+    let client = LlmClient::new(config);
+
+    let architectures = vec![
+        "Simple CLI tool",
+        "Web API with PostgreSQL and Redis",
+        "Microservice with gRPC",
+        "Batch processor with file I/O",
+    ];
+
+    for arch in architectures {
+        let result = generate_threat_model_with_llm(tmp_dir.path(), arch, &client)
+            .await
+            .unwrap();
+
+        // Each should produce valid static threat model
+        assert!(result.contains("TRUST BOUNDARIES"));
+        assert!(result.contains("STRIDE"));
+    }
+}
