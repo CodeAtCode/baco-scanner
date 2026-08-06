@@ -121,7 +121,10 @@ impl TgiClient {
             .build()
             .unwrap_or_else(|_| Client::new());
 
-        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let runtime = match tokio::runtime::Runtime::new() {
+            Ok(rt) => rt,
+            Err(_) => return false,
+        };
         runtime.block_on(async {
             match http.get(&health_url).send().await {
                 Ok(resp) => resp.status().is_success(),
