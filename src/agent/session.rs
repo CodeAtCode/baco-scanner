@@ -438,3 +438,576 @@ impl AgentSession {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::agent::mock_llm::MockLlmClient;
+    use crate::config::AgentConfig;
+    use crate::findings::VerificationStatus;
+    use crate::llm::ChatResponse;
+    use serde_json::json;
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+
+    fn create_test_config(max_turns: u32) -> AgentConfig {
+        AgentConfig {
+            enabled: false,
+            max_turns,
+            tool_timeout_secs: 30,
+            trusted_paths: vec![],
+            keep_artifacts: false,
+        }
+    }
+
+    fn create_temp_dir() -> tempfile::TempDir {
+        tempfile::tempdir().expect("Failed to create temp directory")
+    }
+
+    fn create_test_file(
+        temp_dir: &tempfile::TempDir,
+        filename: &str,
+        content: &str,
+    ) -> std::path::PathBuf {
+        let file_path = temp_dir.path().join(filename);
+        std::fs::write(&file_path, content).expect("Failed to write test file");
+        file_path
+    }
+
+    #[test]
+    fn test_agent_session_construction() {
+        let mock_client = MockLlmClient::new(vec![]);
+        let config = create_test_config(10);
+        let temp_dir = create_temp_dir();
+        let progress_cb: ProgressCallback = Arc::new(|_| {});
+
+        let _session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
+    }
+
+    #[test]
+    fn test_progress_callback_thread_safe() {
+        let called = Arc::new(AtomicBool::new(false));
+        let called_clone = called.clone();
+
+        let progress_cb: ProgressCallback = Arc::new(move |_msg| {
+            called_clone.store(true, Ordering::SeqCst);
+        });
+
+        let progress_cb_clone = progress_cb.clone();
+        progress_cb_clone("test from clone".to_string());
+
+        assert!(called.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn test_progress_callback_counter() {
+        let count = Arc::new(AtomicUsize::new(0));
+        let count_clone = count.clone();
+
+        let progress_cb: ProgressCallback = Arc::new(move |_msg| {
+            count_clone.fetch_add(1, Ordering::SeqCst);
+        });
+
+        progress_cb("msg1".to_string());
+        progress_cb("msg2".to_string());
+        progress_cb("msg3".to_string());
+
+        assert_eq!(count.load(Ordering::SeqCst), 3);
+    }
+
+    #[tokio::test]
+    async fn test_max_turns_enforcement_analyze() {
+        let responses: Vec<ChatResponse> = (0..20)
+            .map(|i| {
+                MockLlmClient::mock_tool_call(
+                    "file_read",
+                    json!({ "path": format!("file{}.rs", i) }),
+                )
+            })
+            .collect();
+
+        let mock_client = MockLlmClient::new(responses);
+        let config = create_test_config(3);
+        let temp_dir = create_temp_dir();
+        let progress_cb: ProgressCallback = Arc::new(|_| {});
+
+        let test_file = create_test_file(&temp_dir, "test.rs", "fn main() {}");
+        let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
+
+        let result = session
+            .analyze_file(test_file.to_string_lossy().as_ref())
+            .await;
+
+        assert!(result.is_ok());
+        let finding = result.unwrap();
+        assert!(finding.agent_turns >= 3 && finding.agent_turns <= 4);
+    }
+
+    #[tokio::test]
+    async fn test_max_turns_enforcement_verify() {
+        let responses: Vec<ChatResponse> = (0..20)
+            .map(|i| {
+                MockLlmClient::mock_tool_call(
+                    "file_write",
+                    json!({ "path": format!("test{}.rs", i), "content": "fn test() {}" }),
+                )
+            })
+            .collect();
+
+        let mock_client = MockLlmClient::new(responses);
+        let config = create_test_config(5);
+        let temp_dir = create_temp_dir();
+        let progress_cb: ProgressCallback = Arc::new(|_| {});
+
+        let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
+
+        let finding = VulnerabilityFinding {
+            id: "test-1".to_string(),
+            title: "Test".to_string(),
+            description: "Test desc".to_string(),
+            severity: Severity::Medium,
+            confidence_score: 0.5,
+            cwe_id: None,
+            file_path: "test.rs".to_string(),
+            line_number: None,
+            code_snippet: None,
+            diff_hunk: None,
+            recommendation: None,
+            code_location: None,
+            already_reported: false,
+            sources: vec![],
+            commit_reference: None,
+            ticket_reference: None,
+            priority_score: None,
+            cross_file_references: None,
+            verification_status: None,
+            verification_notes: None,
+            verification_error: None,
+            agent_evidence_path: None,
+            security_issue: None,
+            poc_code: None,
+            mitigation_code: None,
+            poc_format: None,
+            llm_model: None,
+            agent_mode: true,
+            statement_range: None,
+            triage_verdict: None,
+        };
+
+        let result = session.verify_finding("test.rs", &finding).await;
+        assert!(result.is_ok());
+        let verified = result.unwrap();
+        assert!(verified.agent_turns >= 5 && verified.agent_turns <= 6);
+    }
+
+    #[tokio::test]
+    async fn test_chat_with_tools_mock_client() {
+        let responses = vec![
+            MockLlmClient::mock_tool_call("file_read", json!({ "path": "test.rs" })),
+            MockLlmClient::mock_final_response(
+                r#"{"title": "After Tools", "description": "Found after using tools", "severity": "Low"}"#,
+            ),
+        ];
+
+        let mock_client = MockLlmClient::new(responses);
+        let config = create_test_config(10);
+        let temp_dir = create_temp_dir();
+        let progress_cb: ProgressCallback = Arc::new(|_| {});
+
+        let test_file = create_test_file(&temp_dir, "test.rs", "fn main() {}");
+        let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
+
+        let result = session
+            .analyze_file(test_file.to_string_lossy().as_ref())
+            .await;
+
+        assert!(result.is_ok());
+        let finding = result.unwrap();
+        assert_eq!(finding.agent_turns, 2);
+        assert!(!finding.tools_used.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_terminate_behavior_empty_finding() {
+        let responses = vec![ChatResponse {
+            content: "After reviewing the code, no vulnerabilities were found.".to_string(),
+            tool_calls: vec![],
+            raw: json!({}),
+            model_used: "mock".to_string(),
+        }];
+
+        let mock_client = MockLlmClient::new(responses);
+        let config = create_test_config(10);
+        let temp_dir = create_temp_dir();
+        let progress_cb: ProgressCallback = Arc::new(|_| {});
+
+        let test_file = create_test_file(&temp_dir, "secure.rs", "fn main() {}");
+        let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
+
+        let result = session
+            .analyze_file(test_file.to_string_lossy().as_ref())
+            .await;
+
+        assert!(result.is_ok());
+        let finding = result.unwrap();
+        assert!(
+            finding.finding.title.is_empty() || finding.finding.title.contains("Security Audit")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_nonexistent_file_error() {
+        let mock_client = MockLlmClient::new(vec![]);
+        let config = create_test_config(10);
+        let temp_dir = create_temp_dir();
+        let progress_cb: ProgressCallback = Arc::new(|_| {});
+
+        let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
+
+        let result = session.analyze_file("/nonexistent/path/file.rs").await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("FILE_NOT_FOUND"));
+    }
+
+    #[tokio::test]
+    async fn test_single_turn_limit() {
+        let responses = vec![
+            MockLlmClient::mock_tool_call("file_read", json!({ "path": "test.rs" })),
+            MockLlmClient::mock_tool_call("file_read", json!({ "path": "test2.rs" })),
+        ];
+
+        let mock_client = MockLlmClient::new(responses);
+        let config = create_test_config(1);
+        let temp_dir = create_temp_dir();
+        let progress_cb: ProgressCallback = Arc::new(|_| {});
+
+        let test_file = create_test_file(&temp_dir, "test.rs", "fn main() {}");
+        let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
+
+        let result = session
+            .analyze_file(test_file.to_string_lossy().as_ref())
+            .await;
+
+        assert!(result.is_ok());
+        let finding = result.unwrap();
+        assert!(finding.agent_turns >= 1 && finding.agent_turns <= 2);
+    }
+
+    #[tokio::test]
+    async fn test_severity_parsing_high() {
+        let responses = vec![MockLlmClient::mock_final_response(
+            r#"{"title": "Critical", "description": "High severity", "severity": "High"}"#,
+        )];
+
+        let mock_client = MockLlmClient::new(responses);
+        let config = create_test_config(10);
+        let temp_dir = create_temp_dir();
+        let progress_cb: ProgressCallback = Arc::new(|_| {});
+
+        let test_file = create_test_file(&temp_dir, "test.rs", "fn main() {}");
+        let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
+
+        let result = session
+            .analyze_file(test_file.to_string_lossy().as_ref())
+            .await;
+
+        assert!(result.is_ok());
+        let finding = result.unwrap();
+        assert_eq!(finding.finding.severity, Severity::High);
+    }
+
+    #[tokio::test]
+    async fn test_severity_parsing_low() {
+        let responses = vec![MockLlmClient::mock_final_response(
+            r#"{"title": "Info", "description": "Low severity", "severity": "Low"}"#,
+        )];
+
+        let mock_client = MockLlmClient::new(responses);
+        let config = create_test_config(10);
+        let temp_dir = create_temp_dir();
+        let progress_cb: ProgressCallback = Arc::new(|_| {});
+
+        let test_file = create_test_file(&temp_dir, "test.rs", "fn main() {}");
+        let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
+
+        let result = session
+            .analyze_file(test_file.to_string_lossy().as_ref())
+            .await;
+
+        assert!(result.is_ok());
+        let finding = result.unwrap();
+        assert_eq!(finding.finding.severity, Severity::Low);
+    }
+
+    #[tokio::test]
+    async fn test_metadata_parsing_cwe_id() {
+        let responses = vec![MockLlmClient::mock_final_response(
+            r#"{"title": "SQLi", "description": "SQL injection", "severity": "High", "cwe_id": "CWE-89"}"#,
+        )];
+
+        let mock_client = MockLlmClient::new(responses);
+        let config = create_test_config(10);
+        let temp_dir = create_temp_dir();
+        let progress_cb: ProgressCallback = Arc::new(|_| {});
+
+        let test_file = create_test_file(&temp_dir, "test.rs", "fn main() {}");
+        let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
+
+        let result = session
+            .analyze_file(test_file.to_string_lossy().as_ref())
+            .await;
+
+        assert!(result.is_ok());
+        let finding = result.unwrap();
+        assert_eq!(finding.finding.cwe_id, Some("CWE-89".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_metadata_parsing_line_number() {
+        let responses = vec![MockLlmClient::mock_final_response(
+            r#"{"title": "Overflow", "description": "Buffer overflow", "severity": "High", "line_number": 42}"#,
+        )];
+
+        let mock_client = MockLlmClient::new(responses);
+        let config = create_test_config(10);
+        let temp_dir = create_temp_dir();
+        let progress_cb: ProgressCallback = Arc::new(|_| {});
+
+        let test_file = create_test_file(&temp_dir, "test.rs", "fn main() {}");
+        let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
+
+        let result = session
+            .analyze_file(test_file.to_string_lossy().as_ref())
+            .await;
+
+        assert!(result.is_ok());
+        let finding = result.unwrap();
+        assert_eq!(finding.finding.line_number, Some(42));
+    }
+
+    #[tokio::test]
+    async fn test_llm_error_recovery() {
+        let responses = vec![
+            ChatResponse {
+                content: "Error: rate limit exceeded".to_string(),
+                tool_calls: vec![],
+                raw: json!({}),
+                model_used: "mock".to_string(),
+            },
+            MockLlmClient::mock_final_response(
+                r#"{"title": "Recovered", "description": "Recovered", "severity": "Medium"}"#,
+            ),
+        ];
+
+        let mock_client = MockLlmClient::new(responses);
+        let config = create_test_config(10);
+        let temp_dir = create_temp_dir();
+        let progress_cb: ProgressCallback = Arc::new(|_| {});
+
+        let test_file = create_test_file(&temp_dir, "test.rs", "fn main() {}");
+        let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
+
+        let result = session
+            .analyze_file(test_file.to_string_lossy().as_ref())
+            .await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_invalid_json_response() {
+        let responses = vec![ChatResponse {
+            content: "This is not JSON".to_string(),
+            tool_calls: vec![],
+            raw: json!({}),
+            model_used: "mock".to_string(),
+        }];
+
+        let mock_client = MockLlmClient::new(responses);
+        let config = create_test_config(10);
+        let temp_dir = create_temp_dir();
+        let progress_cb: ProgressCallback = Arc::new(|_| {});
+
+        let test_file = create_test_file(&temp_dir, "test.rs", "fn main() {}");
+        let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
+
+        let result = session
+            .analyze_file(test_file.to_string_lossy().as_ref())
+            .await;
+
+        assert!(result.is_ok());
+        let finding = result.unwrap();
+        assert!(
+            finding.finding.title.is_empty() || finding.finding.title.contains("Security Audit")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_verify_finding_confirmed() {
+        let responses = vec![MockLlmClient::mock_final_response(
+            "compiled=true\ntest_passed=true\nVulnerability confirmed",
+        )];
+
+        let mock_client = MockLlmClient::new(responses);
+        let config = create_test_config(10);
+        let temp_dir = create_temp_dir();
+        let progress_cb: ProgressCallback = Arc::new(|_| {});
+
+        let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
+
+        let finding = VulnerabilityFinding {
+            id: "test-1".to_string(),
+            title: "Test".to_string(),
+            description: "Test desc".to_string(),
+            severity: Severity::High,
+            confidence_score: 0.9,
+            cwe_id: None,
+            file_path: "test.rs".to_string(),
+            line_number: Some(42),
+            code_snippet: None,
+            diff_hunk: None,
+            recommendation: None,
+            code_location: None,
+            already_reported: false,
+            sources: vec![],
+            commit_reference: None,
+            ticket_reference: None,
+            priority_score: None,
+            cross_file_references: None,
+            verification_status: None,
+            verification_notes: None,
+            verification_error: None,
+            agent_evidence_path: None,
+            security_issue: None,
+            poc_code: None,
+            mitigation_code: None,
+            poc_format: None,
+            llm_model: None,
+            agent_mode: true,
+            statement_range: None,
+            triage_verdict: None,
+        };
+
+        let result = session.verify_finding("test.rs", &finding).await;
+        assert!(result.is_ok());
+        let verified = result.unwrap();
+        assert_eq!(
+            verified.finding.verification_status,
+            Some(VerificationStatus::Confirmed)
+        );
+    }
+
+    #[tokio::test]
+    async fn test_verify_finding_needs_review() {
+        let responses = vec![MockLlmClient::mock_final_response(
+            "Could not reproduce. Test failed.",
+        )];
+
+        let mock_client = MockLlmClient::new(responses);
+        let config = create_test_config(10);
+        let temp_dir = create_temp_dir();
+        let progress_cb: ProgressCallback = Arc::new(|_| {});
+
+        let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
+
+        let finding = VulnerabilityFinding {
+            id: "test-2".to_string(),
+            title: "Test".to_string(),
+            description: "Test desc".to_string(),
+            severity: Severity::Medium,
+            confidence_score: 0.5,
+            cwe_id: None,
+            file_path: "test.rs".to_string(),
+            line_number: None,
+            code_snippet: None,
+            diff_hunk: None,
+            recommendation: None,
+            code_location: None,
+            already_reported: false,
+            sources: vec![],
+            commit_reference: None,
+            ticket_reference: None,
+            priority_score: None,
+            cross_file_references: None,
+            verification_status: None,
+            verification_notes: None,
+            verification_error: None,
+            agent_evidence_path: None,
+            security_issue: None,
+            poc_code: None,
+            mitigation_code: None,
+            poc_format: None,
+            llm_model: None,
+            agent_mode: true,
+            statement_range: None,
+            triage_verdict: None,
+        };
+
+        let result = session.verify_finding("test.rs", &finding).await;
+        assert!(result.is_ok());
+        let verified = result.unwrap();
+        assert_eq!(
+            verified.finding.verification_status,
+            Some(VerificationStatus::NeedsReview)
+        );
+    }
+
+    #[tokio::test]
+    async fn test_verify_finding_preserves_metadata() {
+        let responses = vec![MockLlmClient::mock_final_response(
+            "compiled=true\ntest_passed=true",
+        )];
+
+        let mock_client = MockLlmClient::new(responses);
+        let config = create_test_config(10);
+        let temp_dir = create_temp_dir();
+        let progress_cb: ProgressCallback = Arc::new(|_| {});
+
+        let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
+
+        let finding = VulnerabilityFinding {
+            id: "test-3".to_string(),
+            title: "Original Title".to_string(),
+            description: "Original desc".to_string(),
+            severity: Severity::Low,
+            confidence_score: 0.8,
+            cwe_id: Some("CWE-119".to_string()),
+            file_path: "src/vuln.rs".to_string(),
+            line_number: Some(123),
+            code_snippet: None,
+            diff_hunk: None,
+            recommendation: None,
+            code_location: None,
+            already_reported: false,
+            sources: vec![],
+            commit_reference: None,
+            ticket_reference: None,
+            priority_score: None,
+            cross_file_references: None,
+            verification_status: None,
+            verification_notes: None,
+            verification_error: None,
+            agent_evidence_path: None,
+            security_issue: None,
+            poc_code: None,
+            mitigation_code: None,
+            poc_format: None,
+            llm_model: None,
+            agent_mode: true,
+            statement_range: None,
+            triage_verdict: None,
+        };
+
+        let result = session.verify_finding("src/vuln.rs", &finding).await;
+        assert!(result.is_ok());
+        let verified = result.unwrap();
+        assert_eq!(verified.finding.title, "Original Title");
+        assert_eq!(verified.finding.severity, Severity::Low);
+        assert_eq!(verified.finding.cwe_id, Some("CWE-119".to_string()));
+        assert_eq!(verified.finding.file_path, "src/vuln.rs");
+    }
+}
+
+// Note: Context window pruning is not currently implemented in AgentSession.
+// The session enforces max_turns but does not prune message history based on context window size.
+// This is noted for future implementation.

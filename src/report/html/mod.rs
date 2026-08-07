@@ -1,5 +1,5 @@
 pub mod finding_renderer;
-mod renderer;
+pub(crate) mod renderer;
 pub mod utilities;
 
 pub use finding_renderer::render_finding;

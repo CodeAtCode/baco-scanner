@@ -860,4 +860,183 @@ mod tests {
         // fix_code should be used as diff_hunk when diff_hunk not provided
         assert_eq!(finding.diff_hunk, Some("Remove var".to_string()));
     }
+
+    // ============================================================================
+    // generate_mitigation_code Tests
+    // ============================================================================
+
+    #[test]
+    fn test_generate_mitigation_code_cwe79_xss() {
+        // XSS mitigation not currently implemented in generate_mitigation_code
+        let mit = generate_mitigation_code("XSS Vulnerability", "test.js", 42);
+        assert!(mit.is_none());
+    }
+
+    #[test]
+    fn test_generate_mitigation_code_cwe89_sqli() {
+        // SQLi mitigation not currently implemented in generate_mitigation_code
+        let mit = generate_mitigation_code("SQL Injection", "db.c", 10);
+        assert!(mit.is_none());
+    }
+
+    #[test]
+    fn test_generate_mitigation_code_cwe78_os_command_injection() {
+        // OS Command Injection mitigation not currently implemented
+        let mit = generate_mitigation_code("OS Command Injection", "shell.c", 25);
+        assert!(mit.is_none());
+    }
+
+    #[test]
+    fn test_generate_mitigation_code_empty_cwe() {
+        let mit = generate_mitigation_code("", "test.c", 0);
+        assert!(mit.is_none());
+    }
+
+    #[test]
+    fn test_generate_mitigation_code_invalid_cwe() {
+        let mit = generate_mitigation_code("Unknown Vulnerability", "test.c", 10);
+        assert!(mit.is_none());
+    }
+
+    // ============================================================================
+    // format_cwe_specs Tests
+    // ============================================================================
+
+    #[test]
+    fn test_format_cwe_specs_empty_list() {
+        let results: Vec<&CweDocument> = vec![];
+        let formatted = format_cwe_specs(&results);
+        assert!(formatted.is_empty());
+    }
+
+    #[test]
+    fn test_format_cwe_specs_single_cwe() {
+        let doc = CweDocument {
+            cwe_id: "CWE-79".to_string(),
+            name: "Cross-site Scripting".to_string(),
+            description: "Basic XSS vulnerability".to_string(),
+            examples: vec!["Example 1".to_string()],
+            mitigation: "Escape output".to_string(),
+        };
+
+        let formatted = format_cwe_specs(&[&doc]);
+
+        assert!(formatted.contains("CWE-79: Cross-site Scripting"));
+        assert!(formatted.contains("Description: Basic XSS vulnerability"));
+        assert!(formatted.contains("Examples:"));
+        assert!(formatted.contains("  - Example 1"));
+        assert!(formatted.contains("Mitigation: Escape output"));
+    }
+
+    #[test]
+    fn test_format_cwe_specs_multiple_cwes() {
+        let doc1 = CweDocument {
+            cwe_id: "CWE-79".to_string(),
+            name: "Cross-site Scripting".to_string(),
+            description: "XSS desc".to_string(),
+            examples: vec![],
+            mitigation: "Escape".to_string(),
+        };
+
+        let doc2 = CweDocument {
+            cwe_id: "CWE-89".to_string(),
+            name: "SQL Injection".to_string(),
+            description: "SQLi desc".to_string(),
+            examples: vec!["SQL example".to_string()],
+            mitigation: "Parameterized queries".to_string(),
+        };
+
+        let formatted = format_cwe_specs(&[&doc1, &doc2]);
+
+        assert!(formatted.contains("CWE-79: Cross-site Scripting"));
+        assert!(formatted.contains("CWE-89: SQL Injection"));
+        assert!(formatted.contains("XSS desc"));
+        assert!(formatted.contains("SQLi desc"));
+        // Multiple CWEs should be separated by double newlines
+        assert!(formatted.contains("\n\n"));
+    }
+
+    #[test]
+    fn test_format_cwe_specs_malformed_cwe_strings() {
+        let doc = CweDocument {
+            cwe_id: "INVALID".to_string(),
+            name: "Invalid CWE".to_string(),
+            description: "Bad format".to_string(),
+            examples: vec![],
+            mitigation: "Fix it".to_string(),
+        };
+
+        let formatted = format_cwe_specs(&[&doc]);
+
+        // Should still format even with malformed CWE ID
+        assert!(formatted.contains("INVALID: Invalid CWE"));
+        assert!(formatted.contains("Bad format"));
+    }
+
+    #[test]
+    fn test_format_cwe_specs_no_examples() {
+        let doc = CweDocument {
+            cwe_id: "CWE-79".to_string(),
+            name: "XSS".to_string(),
+            description: "No examples".to_string(),
+            examples: vec![],
+            mitigation: "Mitigation".to_string(),
+        };
+
+        let formatted = format_cwe_specs(&[&doc]);
+
+        assert!(formatted.contains("CWE-79: XSS"));
+        assert!(!formatted.contains("Examples:")); // Examples section should not appear
+        assert!(formatted.contains("Mitigation: Mitigation"));
+    }
+
+    // ============================================================================
+    // LlmAnalyzer::new() Construction Tests
+    // ============================================================================
+
+    #[test]
+    fn test_llm_analyzer_new_basic_construction() {
+        let config = LlmConfig::default();
+        let client = LlmClient::new(config.clone());
+        let scanner_config = crate::config::ScannerConfig::default();
+        let analyzer = LlmAnalyzer::new(client, vec!["c".to_string()], 512, &scanner_config);
+
+        // Analyzer should be created successfully
+        assert!(analyzer.should_analyze(Path::new("test.c")));
+    }
+
+    #[test]
+    fn test_llm_analyzer_new_with_multiple_languages() {
+        let config = LlmConfig::default();
+        let client = LlmClient::new(config.clone());
+        let scanner_config = crate::config::ScannerConfig::default();
+        let analyzer = LlmAnalyzer::new(
+            client,
+            vec!["c".to_string(), "python".to_string(), "rust".to_string()],
+            512,
+            &scanner_config,
+        );
+
+        assert!(analyzer.should_analyze(Path::new("test.c")));
+        assert!(analyzer.should_analyze(Path::new("test.py")));
+        assert!(analyzer.should_analyze(Path::new("test.rs")));
+        assert!(!analyzer.should_analyze(Path::new("test.js")));
+    }
+
+    #[test]
+    fn test_llm_analyzer_new_with_various_file_sizes() {
+        let config = LlmConfig::default();
+        let client = LlmClient::new(config.clone());
+        let scanner_config = crate::config::ScannerConfig::default();
+
+        // Small file size limit
+        let analyzer = LlmAnalyzer::new(client, vec!["c".to_string()], 1, &scanner_config);
+        assert!(analyzer.should_analyze(Path::new("test.c")));
+
+        // Large file size limit
+        let config = LlmConfig::default();
+        let client = LlmClient::new(config.clone());
+        let analyzer = LlmAnalyzer::new(client, vec!["c".to_string()], 10240, &scanner_config);
+        assert!(analyzer.should_analyze(Path::new("test.c")));
+    }
 }
