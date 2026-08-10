@@ -254,6 +254,8 @@ pub struct LlmConfig {
     pub retry_backoff_ms: u64,
     #[serde(default = "default_max_concurrent")]
     pub max_concurrent: usize,
+    #[serde(default = "default_llm_temperature")]
+    pub temperature: f32,
     #[serde(default)]
     pub phases: LlmPhasesConfig,
     #[serde(default)]
@@ -374,6 +376,10 @@ impl Default for AgentConfig {
 
 fn default_max_concurrent() -> usize {
     4
+}
+
+fn default_llm_temperature() -> f32 {
+    0.5
 }
 
 fn default_max_turns() -> u32 {

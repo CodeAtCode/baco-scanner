@@ -86,6 +86,7 @@ fn create_valid_config() -> LlmConfig {
         timeout: 30,
         max_retries: 1,
         retry_backoff_ms: 0,
+        temperature: 0.5,
     }
 }
 
@@ -99,6 +100,7 @@ fn create_empty_config() -> LlmConfig {
         timeout: 0,
         max_retries: 0,
         retry_backoff_ms: 0,
+        temperature: 0.5,
     }
 }
 
@@ -126,6 +128,7 @@ fn test_enrichment_service_new_with_empty_api_key_no_client() {
         timeout: 30,
         max_retries: 3,
         retry_backoff_ms: 1000,
+        temperature: 0.5,
     };
     let service = EnrichmentService::new(&config);
     let _ = service;
@@ -141,6 +144,7 @@ fn test_enrichment_service_new_with_empty_base_url_no_client() {
         timeout: 30,
         max_retries: 3,
         retry_backoff_ms: 1000,
+        temperature: 0.5,
     };
     let service = EnrichmentService::new(&config);
     let _ = service;

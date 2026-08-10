@@ -344,7 +344,7 @@ fn test_client_new_with_extreme_temperature_values() {
         enabled: true,
         endpoint: "http://localhost:8080".to_string(),
         model: "test".to_string(),
-        temperature: 0.0,
+        temperature: 0.5,
         ..Default::default()
     };
     let result = TgiClient::new(&config);

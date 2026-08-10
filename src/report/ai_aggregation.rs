@@ -547,6 +547,7 @@ mod tests {
             timeout: 30,
             max_retries: 3,
             retry_backoff_ms: 1000,
+            temperature: 0.5,
         }
     }
 
@@ -938,6 +939,7 @@ mod tests {
             timeout: 1, // Very short timeout to fail fast
             max_retries: 1,
             retry_backoff_ms: 0,
+            temperature: 0.5,
         };
         let phase = AiAggregationPhase::new(config);
 

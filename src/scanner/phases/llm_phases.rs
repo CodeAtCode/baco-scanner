@@ -71,6 +71,7 @@ pub async fn run_llm_static_analysis(
             timeout: discovery_timeout,
             max_retries: config.llm.max_retries as u32,
             retry_backoff_ms: config.llm.retry_backoff_ms,
+            temperature: 0.5,
         };
 
         let client =

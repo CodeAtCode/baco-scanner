@@ -240,6 +240,7 @@ pub fn create_test_config() -> ScannerConfig {
                 prompt_overrides: Default::default(),
             },
             tgi: baco::config::TgiConfig::default(),
+            temperature: 0.5,
         },
         tickets: TicketConfig::default(),
         agent: AgentConfig {

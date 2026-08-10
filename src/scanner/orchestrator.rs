@@ -202,7 +202,7 @@ async fn run_parallel_phases(
     }
 
     // Re-enable progress bar and show completion
-    pb.set_draw_target(indicatif::ProgressDrawTarget::stdout());
+    pb.set_draw_target(indicatif::ProgressDrawTarget::stderr());
     pb.set_message("Parallel phases complete, running sequential phases...");
     pb.set_position(300);
 

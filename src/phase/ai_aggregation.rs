@@ -38,6 +38,7 @@ impl ScanPhase for AiAggregationPhase {
                 timeout: scanner.config.llm.timeout_secs,
                 max_retries: scanner.config.llm.max_retries as u32,
                 retry_backoff_ms: scanner.config.llm.retry_backoff_ms,
+                temperature: 0.5,
             };
 
             let aggregation_runner = AiAggregationRunner::new(llm_config);

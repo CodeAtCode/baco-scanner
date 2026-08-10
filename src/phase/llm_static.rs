@@ -51,6 +51,7 @@ impl ScanPhase for LlmStaticAnalysisPhase {
                 timeout: 5, // Very short timeout for connectivity check
                 max_retries: 1,
                 retry_backoff_ms: 0,
+                temperature: 0.5,
             };
 
             let test_client = LlmClient::new(llm_config);
@@ -123,6 +124,7 @@ impl ScanPhase for LlmStaticAnalysisPhase {
                 timeout: discovery_timeout,
                 max_retries: ctx.scanner.config.llm.max_retries as u32,
                 retry_backoff_ms: ctx.scanner.config.llm.retry_backoff_ms,
+                temperature: 0.5,
             };
 
             let client =

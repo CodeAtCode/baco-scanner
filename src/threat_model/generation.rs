@@ -541,6 +541,7 @@ mod tests {
             timeout: 1, // Very short timeout to fail fast
             max_retries: 0,
             retry_backoff_ms: 0,
+            temperature: 0.5,
         };
         let client = crate::llm::LlmClient::new(config);
 
@@ -577,6 +578,7 @@ mod tests {
             timeout: 1,
             max_retries: 0,
             retry_backoff_ms: 0,
+            temperature: 0.5,
         };
         let client = crate::llm::LlmClient::new(config);
 
@@ -612,6 +614,7 @@ mod tests {
             timeout: 1,
             max_retries: 0,
             retry_backoff_ms: 0,
+            temperature: 0.5,
         };
         let client = crate::llm::LlmClient::new(config);
 
@@ -652,6 +655,7 @@ mod tests {
             timeout: 1,
             max_retries: 0,
             retry_backoff_ms: 0,
+            temperature: 0.5,
         };
         let client = crate::llm::LlmClient::new(config);
 
@@ -690,6 +694,7 @@ mod tests {
             timeout: 1,
             max_retries: 0,
             retry_backoff_ms: 0,
+            temperature: 0.5,
         };
         let client = crate::llm::LlmClient::new(config);
 

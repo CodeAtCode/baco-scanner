@@ -28,6 +28,7 @@ fn make_config() -> LlmConfig {
         timeout: 30,
         max_retries: 3,
         retry_backoff_ms: 1000,
+        temperature: 0.5,
     }
 }
 
@@ -40,6 +41,7 @@ fn make_config_empty() -> LlmConfig {
         timeout: 30,
         max_retries: 3,
         retry_backoff_ms: 1000,
+        temperature: 0.5,
     }
 }
 

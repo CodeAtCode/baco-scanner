@@ -187,6 +187,7 @@ mod tests {
                 max_concurrent: 4,
                 phases: LlmPhasesConfig::default(),
                 tgi: crate::config::TgiConfig::default(),
+                temperature: 0.5,
             },
             tickets: crate::config::TicketConfig::default(),
             agent: crate::config::AgentConfig::default(),

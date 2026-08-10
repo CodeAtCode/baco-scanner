@@ -358,6 +358,7 @@ pub async fn run_ai_aggregation(
         timeout: config.llm.timeout_secs,
         max_retries: config.llm.max_retries as u32,
         retry_backoff_ms: config.llm.retry_backoff_ms,
+        temperature: 0.5,
     };
 
     let aggregation = crate::report::ai_aggregation::AiAggregationPhase::new(llm_config);

@@ -17,6 +17,7 @@ timeout_secs = 30
 max_retries = 2
 retry_backoff_ms = 1000
 max_concurrent = 2
+temperature = 0.5
 
 [llm.phases.discovery]
 base_url = "https://test-api.example.com/v1"

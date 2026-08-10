@@ -813,6 +813,7 @@ async fn test_generate_threat_model_with_llm_fallback_to_static() {
         timeout: 1, // Very short timeout to fail fast
         max_retries: 0,
         retry_backoff_ms: 0,
+        temperature: 0.5,
     };
     let client = LlmClient::new(config);
 
@@ -848,6 +849,7 @@ async fn test_generate_threat_model_with_llm_fallback_empty_api_key() {
         timeout: 1,
         max_retries: 0,
         retry_backoff_ms: 0,
+        temperature: 0.5,
     };
     let client = LlmClient::new(config);
 
@@ -882,6 +884,7 @@ async fn test_generate_threat_model_with_llm_fallback_architecture_aware() {
         timeout: 1,
         max_retries: 0,
         retry_backoff_ms: 0,
+        temperature: 0.5,
     };
     let client = LlmClient::new(config);
 
@@ -921,6 +924,7 @@ async fn test_generate_threat_model_with_llm_fallback_all_stride_categories() {
         timeout: 1,
         max_retries: 0,
         retry_backoff_ms: 0,
+        temperature: 0.5,
     };
     let client = LlmClient::new(config);
 
@@ -958,6 +962,7 @@ async fn test_generate_threat_model_with_llm_fallback_various_architectures() {
         timeout: 1,
         max_retries: 0,
         retry_backoff_ms: 0,
+        temperature: 0.5,
     };
     let client = LlmClient::new(config);
 

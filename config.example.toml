@@ -89,6 +89,9 @@ max_retries = 3
 retry_backoff_ms = 2000
 # Maximum concurrent LLM requests (default: 4)
 max_concurrent = 4
+# LLM temperature for response randomness (0.0 = deterministic, 1.0 = creative)
+# Default: 0.0 for security scanner determinism
+temperature = 0.5
 
 # Per-phase LLM configuration
 # Each phase can use a single model or multiple models (round-robin)

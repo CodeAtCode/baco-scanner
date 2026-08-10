@@ -18,6 +18,12 @@ pub struct LlmConfig {
     pub timeout: u64,
     pub max_retries: u32,
     pub retry_backoff_ms: u64,
+    #[serde(default = "default_runtime_temperature")]
+    pub temperature: f32,
+}
+
+fn default_runtime_temperature() -> f32 {
+    0.5
 }
 
 impl LlmConfig {
@@ -116,6 +122,7 @@ impl Default for LlmConfig {
             timeout: 30,
             max_retries: 3,
             retry_backoff_ms: 1000,
+            temperature: 0.5,
         }
     }
 }
@@ -506,7 +513,7 @@ impl LlmClient {
         let payload = serde_json::json!({
             "model": self.get_current_model(),
             "messages": messages,
-            "temperature": 0.7
+            "temperature": self.config.temperature
         });
         let tokens_prompt: usize = messages.iter().map(|m| m.content.len() / 4).sum();
 
@@ -536,7 +543,7 @@ impl LlmClient {
             serde_json::json!({
                 "model": model,
                 "messages": messages,
-                "temperature": 0.7
+                "temperature": self.config.temperature
             })
         } else {
             serde_json::json!({
@@ -544,7 +551,7 @@ impl LlmClient {
                 "messages": messages,
                 "tools": tools,
                 "tool_choice": "auto",
-                "temperature": 0.7
+                "temperature": self.config.temperature
             })
         };
 
@@ -641,6 +648,7 @@ mod tests {
             timeout: 30,
             max_retries: 3,
             retry_backoff_ms: 1000,
+            temperature: 0.5,
         };
         assert_eq!(config.base_url, "https://api.test.com/v1");
         assert_eq!(config.model, "test-model");
@@ -656,6 +664,7 @@ mod tests {
             timeout: 30,
             max_retries: 3,
             retry_backoff_ms: 1000,
+            temperature: 0.5,
         };
         let client = LlmClient::new(config);
         assert!(client.config.base_url.contains("api.test.com"));
@@ -792,6 +801,7 @@ pub fn create_llm_client_with_metrics(
         timeout: scanner.config.llm.timeout_secs,
         max_retries: scanner.config.llm.max_retries as u32,
         retry_backoff_ms: scanner.config.llm.retry_backoff_ms,
+        temperature: 0.5,
     };
 
     Some(LlmClient::with_metrics(
