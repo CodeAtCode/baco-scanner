@@ -10,12 +10,14 @@ use std::path::Path;
 
 // Shared test data for phase transition tests (mirrors src/scanner/checkpoint.rs)
 const PHASE_TRANSITION_TEST_CASES: &[(ScanPhase, ScanPhase)] = &[
-    // Parallel phases
+    // Parallel phases (Indexing, Semgrep, CpgSlice, LlmStaticAnalysis run concurrently)
     (ScanPhase::Indexing, ScanPhase::Semgrep),
-    (ScanPhase::Semgrep, ScanPhase::LlmStaticAnalysis),
+    (ScanPhase::Semgrep, ScanPhase::CpgSlice),
+    (ScanPhase::CpgSlice, ScanPhase::LlmStaticAnalysis),
     (ScanPhase::LlmStaticAnalysis, ScanPhase::CweRouting),
     // Sequential phases
-    (ScanPhase::CweRouting, ScanPhase::LlmDiscovery),
+    (ScanPhase::CweRouting, ScanPhase::RuleSynthesis),
+    (ScanPhase::RuleSynthesis, ScanPhase::LlmDiscovery),
     (ScanPhase::LlmDiscovery, ScanPhase::LlmVerification),
     (
         ScanPhase::LlmVerification,
@@ -35,16 +37,14 @@ const PHASE_TRANSITION_TEST_CASES: &[(ScanPhase, ScanPhase)] = &[
     (ScanPhase::MultiVerifier, ScanPhase::AutoPatching),
     (ScanPhase::AutoPatching, ScanPhase::CveBootstrap),
     (ScanPhase::CveBootstrap, ScanPhase::PocCompiler),
-    (ScanPhase::PocCompiler, ScanPhase::VariantSearch),
+    (ScanPhase::PocCompiler, ScanPhase::ExploitSynth),
+    (ScanPhase::ExploitSynth, ScanPhase::VariantSearch),
     (ScanPhase::VariantSearch, ScanPhase::Reporting),
     (ScanPhase::Reporting, ScanPhase::Complete),
-    // Orphaned phases
-    (ScanPhase::CpgSlice, ScanPhase::CweRouting),
+    // Orphaned phases (fallback routing for old checkpoints)
     (ScanPhase::Hunt, ScanPhase::LlmDiscovery),
     (ScanPhase::Validate, ScanPhase::LlmDiscovery),
     (ScanPhase::IndependentVerify, ScanPhase::LlmDiscovery),
-    (ScanPhase::ExploitSynth, ScanPhase::LlmDiscovery),
-    (ScanPhase::RuleSynthesis, ScanPhase::Complete),
     // Terminal states
     (ScanPhase::Complete, ScanPhase::Indexing),
     (ScanPhase::Error, ScanPhase::Indexing),
@@ -362,7 +362,7 @@ fn test_checkpoint_resume_from_semgrep() {
     checkpoint.save(&temp_path).unwrap();
 
     let next_phase = Checkpoint::resume_from(&temp_path).unwrap();
-    assert_eq!(next_phase, ScanPhase::LlmStaticAnalysis);
+    assert_eq!(next_phase, ScanPhase::CpgSlice);
 
     let _ = fs::remove_file(&temp_path);
 }

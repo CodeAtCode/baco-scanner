@@ -141,9 +141,9 @@ fn test_next_phase_chain_from_indexing() {
 fn test_previous_phase_chain_from_variant_search() {
     let graph = PhaseGraph::new();
 
-    let poc = graph.previous_phase(&ScanPhase::VariantSearch);
-    assert!(poc.is_some());
-    assert_eq!(poc.unwrap(), &ScanPhase::PocCompiler);
+    let exploit_synth = graph.previous_phase(&ScanPhase::VariantSearch);
+    assert!(exploit_synth.is_some());
+    assert_eq!(exploit_synth.unwrap(), &ScanPhase::ExploitSynth);
 }
 
 // ============================================================================

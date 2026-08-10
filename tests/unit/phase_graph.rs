@@ -1,17 +1,19 @@
-//! PhaseGraph tests — verify the 20-phase pipeline ordering and navigation.
+//! PhaseGraph tests — verify the 23-phase pipeline ordering and navigation.
 //!
 //! The PhaseGraph must mirror the real orchestrator pipeline exactly:
-//! Indexing → Semgrep → CweRouting → LlmStaticAnalysis → … → VariantSearch → Reporting.
+//! Indexing → Semgrep → CpgSlice → LlmStaticAnalysis → CweRouting → RuleSynthesis → … → Reporting.
 
 use baco::checkpoint::ScanPhase;
 use baco::config::ScannerConfig;
 use baco::scanner::{Orchestrator, PhaseGraph};
 
-const EXPECTED_PHASES: [ScanPhase; 20] = [
+const EXPECTED_PHASES: [ScanPhase; 23] = [
     ScanPhase::Indexing,
     ScanPhase::Semgrep,
+    ScanPhase::CpgSlice,
     ScanPhase::LlmStaticAnalysis,
     ScanPhase::CweRouting,
+    ScanPhase::RuleSynthesis,
     ScanPhase::LlmDiscovery,
     ScanPhase::LlmVerification,
     ScanPhase::SecurityAgentVerification,
@@ -26,14 +28,15 @@ const EXPECTED_PHASES: [ScanPhase; 20] = [
     ScanPhase::AutoPatching,
     ScanPhase::CveBootstrap,
     ScanPhase::PocCompiler,
+    ScanPhase::ExploitSynth,
     ScanPhase::VariantSearch,
     ScanPhase::Reporting,
 ];
 
 #[test]
-fn test_phase_count_is_20() {
+fn test_phase_count_is_23() {
     let graph = PhaseGraph::new();
-    assert_eq!(graph.phases().len(), 20);
+    assert_eq!(graph.phases().len(), 23);
 }
 
 #[test]
@@ -50,9 +53,27 @@ fn test_last_phase_is_reporting() {
 }
 
 #[test]
-fn test_llm_static_at_index_2() {
+fn test_cpg_slice_at_index_2() {
     let graph = PhaseGraph::new();
-    assert_eq!(graph.phases()[2], ScanPhase::LlmStaticAnalysis);
+    assert_eq!(graph.phases()[2], ScanPhase::CpgSlice);
+}
+
+#[test]
+fn test_llm_static_at_index_3() {
+    let graph = PhaseGraph::new();
+    assert_eq!(graph.phases()[3], ScanPhase::LlmStaticAnalysis);
+}
+
+#[test]
+fn test_rule_synthesis_at_index_5() {
+    let graph = PhaseGraph::new();
+    assert_eq!(graph.phases()[5], ScanPhase::RuleSynthesis);
+}
+
+#[test]
+fn test_exploit_synth_at_index_20() {
+    let graph = PhaseGraph::new();
+    assert_eq!(graph.phases()[20], ScanPhase::ExploitSynth);
 }
 
 #[test]
@@ -82,10 +103,19 @@ fn test_no_duplicate_phases() {
 }
 
 #[test]
-fn test_next_phase_semgrep_to_llm_static() {
+fn test_next_phase_semgrep_to_cpg_slice() {
     let graph = PhaseGraph::new();
     assert_eq!(
         graph.next_phase(&ScanPhase::Semgrep),
+        Some(&ScanPhase::CpgSlice)
+    );
+}
+
+#[test]
+fn test_next_phase_cpg_slice_to_llm_static() {
+    let graph = PhaseGraph::new();
+    assert_eq!(
+        graph.next_phase(&ScanPhase::CpgSlice),
         Some(&ScanPhase::LlmStaticAnalysis)
     );
 }
@@ -96,6 +126,33 @@ fn test_next_phase_llm_static_to_cwe_routing() {
     assert_eq!(
         graph.next_phase(&ScanPhase::LlmStaticAnalysis),
         Some(&ScanPhase::CweRouting)
+    );
+}
+
+#[test]
+fn test_next_phase_cwe_routing_to_rule_synthesis() {
+    let graph = PhaseGraph::new();
+    assert_eq!(
+        graph.next_phase(&ScanPhase::CweRouting),
+        Some(&ScanPhase::RuleSynthesis)
+    );
+}
+
+#[test]
+fn test_next_phase_poc_compiler_to_exploit_synth() {
+    let graph = PhaseGraph::new();
+    assert_eq!(
+        graph.next_phase(&ScanPhase::PocCompiler),
+        Some(&ScanPhase::ExploitSynth)
+    );
+}
+
+#[test]
+fn test_next_phase_exploit_synth_to_variant_search() {
+    let graph = PhaseGraph::new();
+    assert_eq!(
+        graph.next_phase(&ScanPhase::ExploitSynth),
+        Some(&ScanPhase::VariantSearch)
     );
 }
 
@@ -145,11 +202,20 @@ fn test_previous_phase_cwe_routing_to_llm_static() {
 }
 
 #[test]
-fn test_metadata_total_phases_is_20() {
+fn test_previous_phase_rule_synthesis_to_cwe_routing() {
+    let graph = PhaseGraph::new();
+    assert_eq!(
+        graph.previous_phase(&ScanPhase::RuleSynthesis),
+        Some(&ScanPhase::CweRouting)
+    );
+}
+
+#[test]
+fn test_metadata_total_phases_is_23() {
     let graph = PhaseGraph::new();
     for phase in graph.phases() {
         let meta = graph.get_metadata(phase).unwrap();
-        assert_eq!(meta.total_phases, 20, "total_phases mismatch for {phase:?}");
+        assert_eq!(meta.total_phases, 23, "total_phases mismatch for {phase:?}");
     }
 }
 
@@ -178,9 +244,18 @@ fn test_metadata_display_names() {
     let cwe_meta = graph.get_metadata(&ScanPhase::CweRouting).unwrap();
     assert_eq!(cwe_meta.display_name, "CWE Routing");
 
+    let cpg_meta = graph.get_metadata(&ScanPhase::CpgSlice).unwrap();
+    assert_eq!(cpg_meta.display_name, "CPG Slice");
+
+    let rule_meta = graph.get_metadata(&ScanPhase::RuleSynthesis).unwrap();
+    assert_eq!(rule_meta.display_name, "Rule Synthesis");
+
+    let exploit_meta = graph.get_metadata(&ScanPhase::ExploitSynth).unwrap();
+    assert_eq!(exploit_meta.display_name, "Exploit Synthesis");
+
     let reporting_meta = graph.get_metadata(&ScanPhase::Reporting).unwrap();
     assert_eq!(reporting_meta.display_name, "Reporting");
-    assert_eq!(reporting_meta.phase_number, 20);
+    assert_eq!(reporting_meta.phase_number, 23);
 }
 
 #[test]
@@ -196,14 +271,14 @@ fn test_default_equals_new() {
 }
 
 #[test]
-fn test_orchestrator_phase_graph_has_20_phases() {
+fn test_orchestrator_phase_graph_has_23_phases() {
     let config = ScannerConfig::default();
     let orchestrator = Orchestrator::new(&config);
     let phase_graph = orchestrator.phase_graph();
 
-    assert_eq!(phase_graph.phases().len(), 20);
+    assert_eq!(phase_graph.phases().len(), 23);
     assert_eq!(phase_graph.phases()[0], ScanPhase::Indexing);
-    assert_eq!(phase_graph.phases()[19], ScanPhase::Reporting);
+    assert_eq!(phase_graph.phases()[22], ScanPhase::Reporting);
 }
 
 #[test]

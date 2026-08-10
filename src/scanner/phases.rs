@@ -29,6 +29,7 @@ pub async fn run_phase(
     match phase {
         ScanPhase::Indexing => other_phases::run_indexing(scanner, cfg).await,
         ScanPhase::Semgrep => other_phases::run_semgrep(scanner, cfg).await,
+        ScanPhase::CpgSlice => other_phases::run_cpg_slice(scanner, cfg).await,
         ScanPhase::LlmStaticAnalysis => llm_phases::run_llm_static_analysis(scanner, cfg).await,
         ScanPhase::LlmDiscovery => llm_phases::run_llm_discovery(scanner, cfg).await,
         ScanPhase::LlmVerification => llm_phases::run_llm_verification(scanner, cfg).await,
@@ -49,6 +50,8 @@ pub async fn run_phase(
         ScanPhase::PocCompiler => other_phases::run_poc_compiler(scanner, cfg).await,
         ScanPhase::VariantSearch => other_phases::run_variant_search(scanner, cfg).await,
         ScanPhase::CweRouting => other_phases::run_cwe_routing(scanner, cfg).await,
+        ScanPhase::RuleSynthesis => other_phases::run_rule_synthesis(scanner, cfg).await,
+        ScanPhase::ExploitSynth => other_phases::run_exploit_synth(scanner, cfg).await,
         _ => other_phases::run_default(cfg).await,
     }
 }

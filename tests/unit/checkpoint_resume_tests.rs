@@ -115,7 +115,7 @@ fn test_resume_from_semgrep() {
     let tmp = tempfile::tempdir().unwrap();
     let path = make_checkpoint_path(&tmp, ScanPhase::Semgrep);
     let next = Checkpoint::resume_from(path.to_str().unwrap()).unwrap();
-    assert_eq!(next, ScanPhase::LlmStaticAnalysis);
+    assert_eq!(next, ScanPhase::CpgSlice);
 }
 
 #[test]
@@ -131,7 +131,7 @@ fn test_resume_from_cwe_routing() {
     let tmp = tempfile::tempdir().unwrap();
     let path = make_checkpoint_path(&tmp, ScanPhase::CweRouting);
     let next = Checkpoint::resume_from(path.to_str().unwrap()).unwrap();
-    assert_eq!(next, ScanPhase::LlmDiscovery);
+    assert_eq!(next, ScanPhase::RuleSynthesis);
 }
 
 #[test]
@@ -168,25 +168,29 @@ fn test_resume_from_orphaned_hunt() {
 }
 
 #[test]
-fn test_resume_from_orphaned_cpgslice() {
+fn test_resume_from_cpgslice() {
     let tmp = tempfile::tempdir().unwrap();
     let path = make_checkpoint_path(&tmp, ScanPhase::CpgSlice);
     let next = Checkpoint::resume_from(path.to_str().unwrap()).unwrap();
-    assert_eq!(next, ScanPhase::CweRouting);
+    assert_eq!(next, ScanPhase::LlmStaticAnalysis);
 }
 
 #[test]
-fn test_resume_from_orphaned_exploitsynth() {
+fn test_resume_from_exploitsynth() {
     let tmp = tempfile::tempdir().unwrap();
     let path = make_checkpoint_path(&tmp, ScanPhase::ExploitSynth);
     let next = Checkpoint::resume_from(path.to_str().unwrap()).unwrap();
-    assert_eq!(next, ScanPhase::LlmDiscovery);
+    assert_eq!(next, ScanPhase::VariantSearch);
 }
 
 #[test]
 fn test_resume_full_sequential_chain() {
     let phases = vec![
-        (ScanPhase::CweRouting, ScanPhase::LlmDiscovery),
+        (ScanPhase::Semgrep, ScanPhase::CpgSlice),
+        (ScanPhase::CpgSlice, ScanPhase::LlmStaticAnalysis),
+        (ScanPhase::LlmStaticAnalysis, ScanPhase::CweRouting),
+        (ScanPhase::CweRouting, ScanPhase::RuleSynthesis),
+        (ScanPhase::RuleSynthesis, ScanPhase::LlmDiscovery),
         (ScanPhase::LlmDiscovery, ScanPhase::LlmVerification),
         (
             ScanPhase::LlmVerification,
@@ -206,7 +210,8 @@ fn test_resume_full_sequential_chain() {
         (ScanPhase::MultiVerifier, ScanPhase::AutoPatching),
         (ScanPhase::AutoPatching, ScanPhase::CveBootstrap),
         (ScanPhase::CveBootstrap, ScanPhase::PocCompiler),
-        (ScanPhase::PocCompiler, ScanPhase::VariantSearch),
+        (ScanPhase::PocCompiler, ScanPhase::ExploitSynth),
+        (ScanPhase::ExploitSynth, ScanPhase::VariantSearch),
         (ScanPhase::VariantSearch, ScanPhase::Reporting),
         (ScanPhase::Reporting, ScanPhase::Complete),
     ];

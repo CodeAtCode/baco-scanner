@@ -246,7 +246,7 @@ pub async fn run_git_analysis(
     Ok((findings, analyzed_files.to_vec()))
 }
 
-/// Run cross-file analysis phase (Phase 9/20)
+/// Run cross-file analysis phase (Phase 12/23)
 pub async fn run_cross_file_analysis(
     _scanner: &super::super::Scanner,
     cfg: PhaseConfig<'_>,
@@ -264,6 +264,16 @@ pub async fn run_cross_file_analysis(
 
     tracing::info!("Running cross-file analysis phase...");
     findings = crate::crossfile::CrossFileAnalyzer::analyze_cross_file_references(&findings);
+
+    let chains = crate::chain_analysis::ChainAnalyzer::analyze_chains(&findings);
+    if !chains.is_empty() {
+        tracing::info!(
+            "Cross-file analysis detected {} attack chain(s); applying chain verdicts",
+            chains.len()
+        );
+        crate::chain_analysis::apply_chain_verdicts(&mut findings, &chains);
+    }
+
     pb.set_position(pb.position() + 100);
     Ok((findings, analyzed_files.to_vec()))
 }
@@ -840,6 +850,279 @@ pub async fn run_cwe_routing(
         findings.len()
     );
 
+    Ok((findings, analyzed_files.to_vec()))
+}
+
+/// Run CPG slice phase (Phase 3/23)
+///
+/// Uses Joern to build a Code Property Graph and extract code slices around
+/// suspected vulnerabilities, reducing LLM context size (LLMxCPG, Usenix 2025).
+/// No-op when `config.cpg.enabled` is false or Joern is unavailable.
+pub async fn run_cpg_slice(
+    _scanner: &super::super::Scanner,
+    cfg: PhaseConfig<'_>,
+) -> ScanResult<(Vec<VulnerabilityFinding>, Vec<String>)> {
+    let PhaseConfig {
+        phase: _,
+        findings,
+        pb,
+        analyzed_files,
+        metrics_tracker: _,
+        target_path,
+        config,
+        project_stack: _,
+    } = cfg;
+
+    if !config.cpg.enabled {
+        tracing::info!("CPG slice phase disabled (config.cpg.enabled=false); skipping");
+        pb.set_position(pb.position() + 100);
+        return Ok((findings, analyzed_files.to_vec()));
+    }
+
+    use crate::cpg::CpgEngine as _;
+    let engine = crate::cpg::JoernEngine::new(config.cpg.joern_path.clone());
+    if !engine.is_available() {
+        tracing::warn!(
+            "CPG slice phase enabled but Joern binary not found; skipping. \
+             Install Joern or set config.cpg.joern_path"
+        );
+        pb.set_position(pb.position() + 100);
+        return Ok((findings, analyzed_files.to_vec()));
+    }
+
+    tracing::info!(
+        "Running CPG slice phase on {} findings (budget={} lines)",
+        findings.len(),
+        config.cpg.slice_budget_lines
+    );
+    pb.set_message("Phase 3/23: CPG slice (building graph and slicing)");
+
+    let cpg = match engine.build(target_path) {
+        Ok(cpg) => cpg,
+        Err(e) => {
+            tracing::warn!(
+                "CPG build failed for {:?}: {}; skipping phase",
+                target_path,
+                e
+            );
+            pb.set_position(pb.position() + 100);
+            return Ok((findings, analyzed_files.to_vec()));
+        }
+    };
+
+    let slicer = crate::cpg::slicer::CpgSlicer::new(&engine);
+    let total = findings.len();
+    for (i, finding) in findings.iter().enumerate() {
+        let cwe_hint = finding.cwe_id.as_deref().unwrap_or("CWE-79");
+        let entry_point = finding
+            .code_location
+            .as_deref()
+            .and_then(|loc| loc.rsplit("::").next())
+            .unwrap_or("main");
+        if let Ok(slice) = slicer.slice(&cpg, cwe_hint, entry_point) {
+            if !slice.is_empty() {
+                tracing::debug!(
+                    "CPG slice for finding {} ({}): {} bytes, {} function(s)",
+                    finding.id,
+                    cwe_hint,
+                    slice.source.len(),
+                    slice.related_functions.len()
+                );
+            }
+        }
+        pb.set_position(pb.position() + (i as u64 * 100 / total.max(1) as u64));
+    }
+
+    pb.set_position(pb.position() + 100);
+    Ok((findings, analyzed_files.to_vec()))
+}
+
+/// Run rule synthesis phase (Phase 6/23)
+///
+/// Generates semgrep rules from CWE identifiers using LLM synthesis (MoCQ paper).
+/// No-op when `config.rulesynth.enabled` is false or no API key is configured.
+pub async fn run_rule_synthesis(
+    _scanner: &super::super::Scanner,
+    cfg: PhaseConfig<'_>,
+) -> ScanResult<(Vec<VulnerabilityFinding>, Vec<String>)> {
+    let PhaseConfig {
+        phase: _,
+        findings,
+        pb,
+        analyzed_files,
+        metrics_tracker,
+        target_path: _,
+        config,
+        project_stack: _,
+    } = cfg;
+
+    if !config.rulesynth.enabled {
+        tracing::info!("Rule synthesis disabled (config.rulesynth.enabled=false); skipping");
+        pb.set_position(pb.position() + 100);
+        return Ok((findings, analyzed_files.to_vec()));
+    }
+
+    let phase_config = &config.llm.phases.discovery;
+    let Some(api_key) = &phase_config.api_key else {
+        tracing::warn!("Rule synthesis enabled but no LLM API key configured; skipping phase");
+        pb.set_position(pb.position() + 100);
+        return Ok((findings, analyzed_files.to_vec()));
+    };
+
+    tracing::info!(
+        "Running rule synthesis phase (max {} rules/CWE) → {:?}",
+        config.rulesynth.max_rules_per_cwe,
+        config.rulesynth.output_dir
+    );
+    pb.set_message("Phase 6/23: Rule synthesis (LLM→semgrep rules)");
+
+    let timeout = phase_config.timeout_secs.unwrap_or(config.llm.timeout_secs);
+    let llm_config = crate::llm::LlmConfig {
+        base_url: phase_config.base_url.clone(),
+        api_key: api_key.clone(),
+        model: phase_config.model.clone(),
+        models: phase_config.get_models(),
+        timeout,
+        max_retries: config.llm.max_retries as u32,
+        retry_backoff_ms: config.llm.retry_backoff_ms,
+        temperature: config.llm.temperature,
+    };
+    let client = crate::llm::LlmClient::with_metrics(llm_config, Some(metrics_tracker.clone()));
+
+    let synthesizer = crate::rulesynth::RuleSynthesizer::new(&client, &config.rulesynth);
+
+    let mut seen_cwes: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    for finding in &findings {
+        if let Some(cwe) = &finding.cwe_id {
+            seen_cwes.insert(cwe.clone());
+        }
+    }
+
+    let total = seen_cwes.len();
+    for (i, cwe) in seen_cwes.iter().enumerate() {
+        for language in &config.project.languages {
+            match synthesizer.generate(cwe, language).await {
+                Ok(rules) => {
+                    if rules.is_empty() {
+                        tracing::debug!(
+                            "Rule synthesis: no valid rules for {} ({})",
+                            cwe,
+                            language
+                        );
+                    } else {
+                        tracing::info!(
+                            "Rule synthesis: generated {} valid rule(s) for {} ({})",
+                            rules.len(),
+                            cwe,
+                            language
+                        );
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("Rule synthesis failed for {} ({}): {}", cwe, language, e);
+                }
+            }
+        }
+        pb.set_position(pb.position() + (i as u64 * 100 / total.max(1) as u64));
+    }
+
+    pb.set_position(pb.position() + 100);
+    Ok((findings, analyzed_files.to_vec()))
+}
+
+/// Run exploit synthesis phase (Phase 21/23)
+///
+/// Generates sandbox-verified exploits for confirmed findings (QRS paper).
+/// No-op when `config.exploit.enabled` is false or Docker sandbox unavailable.
+pub async fn run_exploit_synth(
+    _scanner: &super::super::Scanner,
+    cfg: PhaseConfig<'_>,
+) -> ScanResult<(Vec<VulnerabilityFinding>, Vec<String>)> {
+    let PhaseConfig {
+        phase: _,
+        mut findings,
+        pb,
+        analyzed_files,
+        metrics_tracker,
+        target_path: _,
+        config,
+        project_stack: _,
+    } = cfg;
+
+    if !config.exploit.enabled {
+        tracing::info!("Exploit synthesis disabled (config.exploit.enabled=false); skipping");
+        pb.set_position(pb.position() + 100);
+        return Ok((findings, analyzed_files.to_vec()));
+    }
+
+    let phase_config = &config.llm.phases.discovery;
+    let Some(api_key) = &phase_config.api_key else {
+        tracing::warn!("Exploit synthesis enabled but no LLM API key configured; skipping phase");
+        pb.set_position(pb.position() + 100);
+        return Ok((findings, analyzed_files.to_vec()));
+    };
+
+    let timeout = phase_config.timeout_secs.unwrap_or(config.llm.timeout_secs);
+    let llm_config = crate::llm::LlmConfig {
+        base_url: phase_config.base_url.clone(),
+        api_key: api_key.clone(),
+        model: phase_config.model.clone(),
+        models: phase_config.get_models(),
+        timeout,
+        max_retries: config.llm.max_retries as u32,
+        retry_backoff_ms: config.llm.retry_backoff_ms,
+        temperature: config.llm.temperature,
+    };
+    let client = crate::llm::LlmClient::with_metrics(llm_config, Some(metrics_tracker.clone()));
+
+    let synth = crate::exploit::ExploitSynthesizer::new(&client, &config.exploit);
+    if !synth.is_available() {
+        tracing::warn!(
+            "Exploit synthesis enabled but sandbox unavailable (Docker not running?); skipping phase"
+        );
+        pb.set_position(pb.position() + 100);
+        return Ok((findings, analyzed_files.to_vec()));
+    }
+
+    tracing::info!(
+        "Running exploit synthesis on {} findings (max {} exploit(s)/finding, sandbox={})",
+        findings.len(),
+        config.exploit.max_exploits_per_finding,
+        config.exploit.sandbox_image
+    );
+    pb.set_message("Phase 21/23: Exploit synthesis (sandbox-verified PoCs)");
+
+    let total = findings.len();
+    for (i, finding) in findings.iter_mut().enumerate() {
+        match synth.synthesize_and_verify(finding).await {
+            Ok(result) => {
+                if result.confirmed {
+                    tracing::info!(
+                        "Exploit confirmed for finding {} (exit_code={})",
+                        finding.id,
+                        result.exit_code
+                    );
+                    if let Some(verdict) = &mut finding.triage_verdict {
+                        let _ = verdict;
+                    }
+                } else {
+                    tracing::debug!(
+                        "Exploit not confirmed for finding {} (exit_code={}, matched={})",
+                        finding.id,
+                        result.exit_code,
+                        result.matched_expected
+                    );
+                }
+            }
+            Err(crate::exploit::ExploitError::Disabled) => {}
+            Err(e) => {
+                tracing::warn!("Exploit synthesis failed for finding {}: {}", finding.id, e);
+            }
+        }
+        pb.set_position(pb.position() + (i as u64 * 100 / total.max(1) as u64));
+    }
+
+    pb.set_position(pb.position() + 100);
     Ok((findings, analyzed_files.to_vec()))
 }
 

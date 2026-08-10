@@ -11,8 +11,10 @@ pub fn active_phases() -> Vec<ScanPhase> {
     vec![
         ScanPhase::Indexing,
         ScanPhase::Semgrep,
+        ScanPhase::CpgSlice,
         ScanPhase::LlmStaticAnalysis,
         ScanPhase::CweRouting,
+        ScanPhase::RuleSynthesis,
         ScanPhase::LlmDiscovery,
         ScanPhase::LlmVerification,
         ScanPhase::SecurityAgentVerification,
@@ -27,6 +29,7 @@ pub fn active_phases() -> Vec<ScanPhase> {
         ScanPhase::AutoPatching,
         ScanPhase::CveBootstrap,
         ScanPhase::PocCompiler,
+        ScanPhase::ExploitSynth,
         ScanPhase::VariantSearch,
         ScanPhase::Reporting,
     ]
@@ -36,12 +39,9 @@ pub fn active_phases() -> Vec<ScanPhase> {
 /// These have no implementation and should be skipped gracefully.
 pub fn orphaned_phases() -> Vec<ScanPhase> {
     vec![
-        ScanPhase::CpgSlice,
         ScanPhase::Hunt,
         ScanPhase::Validate,
         ScanPhase::IndependentVerify,
-        ScanPhase::ExploitSynth,
-        ScanPhase::RuleSynthesis,
     ]
 }
 
@@ -54,6 +54,7 @@ pub fn terminal_phases() -> Vec<ScanPhase> {
 pub fn sequential_pipeline_phases() -> Vec<ScanPhase> {
     vec![
         ScanPhase::CweRouting,
+        ScanPhase::RuleSynthesis,
         ScanPhase::LlmDiscovery,
         ScanPhase::LlmVerification,
         ScanPhase::SecurityAgentVerification,
@@ -68,6 +69,7 @@ pub fn sequential_pipeline_phases() -> Vec<ScanPhase> {
         ScanPhase::AutoPatching,
         ScanPhase::CveBootstrap,
         ScanPhase::PocCompiler,
+        ScanPhase::ExploitSynth,
         ScanPhase::VariantSearch,
         ScanPhase::Reporting,
     ]

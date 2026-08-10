@@ -7,7 +7,7 @@ use crate::pipeline_test_helpers::{
 #[test]
 fn test_all_active_phases_exist() {
     let phases = active_phases();
-    assert_eq!(phases.len(), 20, "Should have 20 active phases");
+    assert_eq!(phases.len(), 23, "Should have 23 active phases");
 }
 
 #[test]
@@ -55,6 +55,7 @@ fn test_parallel_phases_are_active() {
     let parallel = vec![
         ScanPhase::Indexing,
         ScanPhase::Semgrep,
+        ScanPhase::CpgSlice,
         ScanPhase::LlmStaticAnalysis,
     ];
     for phase in &parallel {
@@ -98,12 +99,9 @@ fn test_orphaned_phases_have_safe_fallback() {
     // Verify each orphaned phase has a safe fallback in resume_from
     let tmp = tempfile::tempdir().unwrap();
     let fallbacks = vec![
-        (ScanPhase::CpgSlice, ScanPhase::CweRouting),
         (ScanPhase::Hunt, ScanPhase::LlmDiscovery),
         (ScanPhase::Validate, ScanPhase::LlmDiscovery),
         (ScanPhase::IndependentVerify, ScanPhase::LlmDiscovery),
-        (ScanPhase::ExploitSynth, ScanPhase::LlmDiscovery),
-        (ScanPhase::RuleSynthesis, ScanPhase::Complete),
     ];
 
     for (orphan, expected_fallback) in fallbacks {
@@ -118,6 +116,35 @@ fn test_orphaned_phases_have_safe_fallback() {
             next, expected_fallback,
             "Orphan {:?} should fallback to {:?}",
             orphan, expected_fallback
+        );
+    }
+}
+
+#[test]
+fn test_new_phases_have_resume_from_routing() {
+    // Verify the three newly-wired phases have proper resume_from transitions
+    let tmp = tempfile::tempdir().unwrap();
+    let transitions = vec![
+        (ScanPhase::Semgrep, ScanPhase::CpgSlice),
+        (ScanPhase::CpgSlice, ScanPhase::LlmStaticAnalysis),
+        (ScanPhase::CweRouting, ScanPhase::RuleSynthesis),
+        (ScanPhase::RuleSynthesis, ScanPhase::LlmDiscovery),
+        (ScanPhase::PocCompiler, ScanPhase::ExploitSynth),
+        (ScanPhase::ExploitSynth, ScanPhase::VariantSearch),
+    ];
+
+    for (from, expected_next) in transitions {
+        let path = tmp.path().join(format!("{:?}.json", from));
+        let now = chrono::Utc::now();
+        let mut cp = baco::checkpoint::Checkpoint::new("test", "/tmp/p", now);
+        cp.current_phase = from.clone();
+        cp.save(path.to_str().unwrap()).unwrap();
+
+        let next = baco::checkpoint::Checkpoint::resume_from(path.to_str().unwrap()).unwrap();
+        assert_eq!(
+            next, expected_next,
+            "Phase {:?} should transition to {:?}",
+            from, expected_next
         );
     }
 }

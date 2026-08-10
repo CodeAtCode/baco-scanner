@@ -102,12 +102,14 @@ impl Checkpoint {
         let checkpoint = Self::load(path)?;
 
         Ok(match checkpoint.current_phase {
-            // Parallel phases (run concurrently: Indexing, Semgrep, LlmStaticAnalysis)
+            // Parallel phases (run concurrently: Indexing, Semgrep, CpgSlice, LlmStaticAnalysis)
             ScanPhase::Indexing => ScanPhase::Semgrep,
-            ScanPhase::Semgrep => ScanPhase::LlmStaticAnalysis,
+            ScanPhase::Semgrep => ScanPhase::CpgSlice,
+            ScanPhase::CpgSlice => ScanPhase::LlmStaticAnalysis,
             ScanPhase::LlmStaticAnalysis => ScanPhase::CweRouting,
-            // Sequential phases (match sequential_phases array in orchestrator.rs lines 215-234)
-            ScanPhase::CweRouting => ScanPhase::LlmDiscovery,
+            // Sequential phases (match sequential_phases array in orchestrator.rs)
+            ScanPhase::CweRouting => ScanPhase::RuleSynthesis,
+            ScanPhase::RuleSynthesis => ScanPhase::LlmDiscovery,
             ScanPhase::LlmDiscovery => ScanPhase::LlmVerification,
             ScanPhase::LlmVerification => ScanPhase::SecurityAgentVerification,
             ScanPhase::SecurityAgentVerification => ScanPhase::TicketCrossRef,
@@ -121,16 +123,14 @@ impl Checkpoint {
             ScanPhase::MultiVerifier => ScanPhase::AutoPatching,
             ScanPhase::AutoPatching => ScanPhase::CveBootstrap,
             ScanPhase::CveBootstrap => ScanPhase::PocCompiler,
-            ScanPhase::PocCompiler => ScanPhase::VariantSearch,
+            ScanPhase::PocCompiler => ScanPhase::ExploitSynth,
+            ScanPhase::ExploitSynth => ScanPhase::VariantSearch,
             ScanPhase::VariantSearch => ScanPhase::Reporting,
             ScanPhase::Reporting => ScanPhase::Complete,
             // Orphaned phases (never executed, fallback routing for old checkpoints)
-            ScanPhase::CpgSlice => ScanPhase::CweRouting,
             ScanPhase::Hunt => ScanPhase::LlmDiscovery,
             ScanPhase::Validate => ScanPhase::LlmDiscovery,
             ScanPhase::IndependentVerify => ScanPhase::LlmDiscovery,
-            ScanPhase::ExploitSynth => ScanPhase::LlmDiscovery,
-            ScanPhase::RuleSynthesis => ScanPhase::Complete,
             ScanPhase::Complete | ScanPhase::Error => ScanPhase::Indexing,
         })
     }
@@ -496,12 +496,14 @@ mod tests {
     fn test_resume_from_all_phase_transitions() {
         // Test all phase transitions explicitly
         let test_cases = vec![
-            // Parallel phases
+            // Parallel phases (Indexing, Semgrep, CpgSlice, LlmStaticAnalysis)
             (ScanPhase::Indexing, ScanPhase::Semgrep),
-            (ScanPhase::Semgrep, ScanPhase::LlmStaticAnalysis),
+            (ScanPhase::Semgrep, ScanPhase::CpgSlice),
+            (ScanPhase::CpgSlice, ScanPhase::LlmStaticAnalysis),
             (ScanPhase::LlmStaticAnalysis, ScanPhase::CweRouting),
             // Sequential phases (matches sequential_phases array in orchestrator.rs)
-            (ScanPhase::CweRouting, ScanPhase::LlmDiscovery),
+            (ScanPhase::CweRouting, ScanPhase::RuleSynthesis),
+            (ScanPhase::RuleSynthesis, ScanPhase::LlmDiscovery),
             (ScanPhase::LlmDiscovery, ScanPhase::LlmVerification),
             (
                 ScanPhase::LlmVerification,
@@ -521,16 +523,14 @@ mod tests {
             (ScanPhase::MultiVerifier, ScanPhase::AutoPatching),
             (ScanPhase::AutoPatching, ScanPhase::CveBootstrap),
             (ScanPhase::CveBootstrap, ScanPhase::PocCompiler),
-            (ScanPhase::PocCompiler, ScanPhase::VariantSearch),
+            (ScanPhase::PocCompiler, ScanPhase::ExploitSynth),
+            (ScanPhase::ExploitSynth, ScanPhase::VariantSearch),
             (ScanPhase::VariantSearch, ScanPhase::Reporting),
             (ScanPhase::Reporting, ScanPhase::Complete),
-            // Orphaned phases (fallback routing)
-            (ScanPhase::CpgSlice, ScanPhase::CweRouting),
+            // Orphaned phases (fallback routing for old checkpoints)
             (ScanPhase::Hunt, ScanPhase::LlmDiscovery),
             (ScanPhase::Validate, ScanPhase::LlmDiscovery),
             (ScanPhase::IndependentVerify, ScanPhase::LlmDiscovery),
-            (ScanPhase::ExploitSynth, ScanPhase::LlmDiscovery),
-            (ScanPhase::RuleSynthesis, ScanPhase::Complete),
             // Terminal states
             (ScanPhase::Complete, ScanPhase::Indexing),
             (ScanPhase::Error, ScanPhase::Indexing),

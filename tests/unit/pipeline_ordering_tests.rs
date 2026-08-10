@@ -6,8 +6,8 @@ use crate::pipeline_test_helpers::{actual_pipeline_phases, sequential_pipeline_p
 #[test]
 fn test_pipeline_has_expected_phase_count() {
     let phases = actual_pipeline_phases();
-    // 3 parallel + 17 sequential = 20 total
-    assert_eq!(phases.len(), 20, "Pipeline should have 20 phases");
+    // 4 parallel + 19 sequential = 23 total
+    assert_eq!(phases.len(), 23, "Pipeline should have 23 phases");
 }
 
 #[test]
@@ -90,8 +90,8 @@ fn test_pipeline_root_cause_dedup_before_reporting() {
 fn test_phase_graph_metadata_phase_count() {
     let graph = PhaseGraph::new();
     let phases = graph.phases();
-    // PhaseGraph has 20 phases (matches the runtime pipeline)
-    assert_eq!(phases.len(), 20, "PhaseGraph should have 20 phases");
+    // PhaseGraph has 23 phases (matches the runtime pipeline)
+    assert_eq!(phases.len(), 23, "PhaseGraph should have 23 phases");
 }
 
 #[test]
@@ -142,6 +142,7 @@ fn test_resume_from_covers_all_sequential_phases() {
     let sequential_phases = sequential_pipeline_phases();
 
     let expected_next = vec![
+        ScanPhase::RuleSynthesis,
         ScanPhase::LlmDiscovery,
         ScanPhase::LlmVerification,
         ScanPhase::SecurityAgentVerification,
@@ -156,6 +157,7 @@ fn test_resume_from_covers_all_sequential_phases() {
         ScanPhase::AutoPatching,
         ScanPhase::CveBootstrap,
         ScanPhase::PocCompiler,
+        ScanPhase::ExploitSynth,
         ScanPhase::VariantSearch,
         ScanPhase::Reporting,
         ScanPhase::Complete,

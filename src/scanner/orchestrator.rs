@@ -210,9 +210,10 @@ async fn run_parallel_phases(
 }
 
 /// Return the list of sequential scan phases
-fn sequential_phases() -> [ScanPhase; 17] {
+fn sequential_phases() -> [ScanPhase; 19] {
     [
         ScanPhase::CweRouting,
+        ScanPhase::RuleSynthesis,
         ScanPhase::LlmDiscovery,
         ScanPhase::LlmVerification,
         ScanPhase::SecurityAgentVerification,
@@ -228,6 +229,7 @@ fn sequential_phases() -> [ScanPhase; 17] {
         ScanPhase::AutoPatching,
         ScanPhase::CveBootstrap,
         ScanPhase::PocCompiler,
+        ScanPhase::ExploitSynth,
         ScanPhase::VariantSearch,
         ScanPhase::Reporting,
     ]
