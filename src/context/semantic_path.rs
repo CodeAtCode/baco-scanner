@@ -1,7 +1,6 @@
 //! Semantic path extraction using LLM-powered functional summarization.
 //!
 //! Uses a small LLM call to generate a functional summary of the code.
-//! Note: The full async LLM integration requires LlmClient chat API setup.
 
 use std::fmt;
 
@@ -32,17 +31,32 @@ pub struct SemanticPath {
 }
 
 /// Generate functional summary using LLM
-///
-/// Note: This is a placeholder that returns an error. The full implementation
-/// requires integrating with the LlmClient chat API.
 pub async fn summarize(
-    _source: &str,
-    _llm: &crate::llm::LlmClient,
+    source: &str,
+    llm: &crate::llm::LlmClient,
 ) -> Result<SemanticPath, ContextError> {
-    // Placeholder - full implementation requires LlmClient chat integration
-    Err(ContextError::LlmError(
-        "LLM summary not yet implemented - requires chat API integration".to_string(),
-    ))
+    if source.trim().is_empty() {
+        return Err(ContextError::EmptySource);
+    }
+
+    let truncated = if source.len() > 2000 {
+        &source[..2000]
+    } else {
+        source
+    };
+
+    let messages = vec![
+        crate::llm::ChatMessage::system(
+            "You are a code analysis assistant. Summarize the following code's functionality in 2-3 sentences. Focus on: what it does, key inputs/outputs, and any security-relevant behavior.",
+        ),
+        crate::llm::ChatMessage::user(truncated),
+    ];
+
+    let response = llm.chat(&messages).await.map_err(ContextError::LlmError)?;
+
+    Ok(SemanticPath {
+        summary: response.content,
+    })
 }
 
 /// Generate summary without actual LLM call (for testing)

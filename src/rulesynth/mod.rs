@@ -6,6 +6,17 @@
 mod prompt;
 mod validator;
 
+pub mod emitter;
+pub mod pattern_dsl;
+pub mod proposer;
+pub mod symbolic_validator;
+
+pub use emitter::emit_yaml;
+pub use pattern_dsl::{Pattern, PatternError, Severity, TaintSink, TaintSource};
+pub use proposer::run_proposer_loop;
+pub use symbolic_validator::{
+    format_feedback, load_corpus, validate, LabelledTrace, ValidationOutcome,
+};
 pub use validator::{validate_rule, RuleError};
 
 use crate::config::RuleSynthConfig;

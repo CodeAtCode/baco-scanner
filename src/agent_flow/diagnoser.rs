@@ -1,0 +1,228 @@
+//! Diagnoser for AgentFlow execution results (P5.4).
+//!
+//! Analyzes execution outputs and external feedback signals (coverage,
+//! sanitizer crashes, traces) to produce structured diagnostic feedback
+//! that the proposer uses to rewrite the harness.
+
+use super::dsl::FeedbackChannel;
+use super::executor::{AgentOutput, ExecutionResult};
+use std::collections::BTreeSet;
+
+/// A signal collected from the test environment after harness execution.
+#[derive(Debug, Clone, PartialEq)]
+pub enum FeedbackSignal {
+    CoverageIncrease(f64),
+    BranchHit(u32),
+    SanitizerCrash { kind: String, location: String },
+    TraceEvent { label: String, value: String },
+    Pass,
+    Fail(String),
+}
+
+/// Diagnostic feedback produced by the diagnoser.
+#[derive(Debug, Clone)]
+pub struct Diagnostic {
+    pub signals: Vec<FeedbackSignal>,
+    pub summary: String,
+    pub should_rewrite: bool,
+}
+
+impl Diagnostic {
+    pub fn is_success(&self) -> bool {
+        !self.should_rewrite
+    }
+}
+
+/// Diagnose an execution result given the set of feedback channels that fired.
+pub fn diagnose(
+    execution: &ExecutionResult,
+    feedback_channels: &BTreeSet<FeedbackChannel>,
+    signals: Vec<FeedbackSignal>,
+) -> Diagnostic {
+    let all_succeeded = execution.is_success();
+
+    let has_crash = signals
+        .iter()
+        .any(|s| matches!(s, FeedbackSignal::SanitizerCrash { .. }));
+    let has_coverage = signals
+        .iter()
+        .any(|s| matches!(s, FeedbackSignal::CoverageIncrease(_)));
+    let has_pass = signals.iter().any(|s| matches!(s, FeedbackSignal::Pass));
+    let has_fail = signals.iter().any(|s| matches!(s, FeedbackSignal::Fail(_)));
+
+    let channels_referenced = feedback_channels.iter().any(|c| {
+        matches!(
+            c,
+            FeedbackChannel::Coverage | FeedbackChannel::Sanitizer | FeedbackChannel::Outcome
+        )
+    });
+
+    let should_rewrite =
+        !all_succeeded || has_fail || (channels_referenced && !has_pass && !has_crash);
+
+    let summary = build_summary(
+        all_succeeded,
+        has_crash,
+        has_coverage,
+        has_pass,
+        &execution.outputs,
+    );
+
+    Diagnostic {
+        signals,
+        summary,
+        should_rewrite,
+    }
+}
+
+fn build_summary(
+    all_succeeded: bool,
+    has_crash: bool,
+    has_coverage: bool,
+    has_pass: bool,
+    outputs: &[AgentOutput],
+) -> String {
+    let mut parts = Vec::new();
+
+    if all_succeeded {
+        parts.push("all agents completed".to_string());
+    } else {
+        let failed: Vec<&str> = outputs
+            .iter()
+            .filter(|o| !o.success)
+            .map(|o| o.role.as_str())
+            .collect();
+        parts.push(format!("failed agents: {}", failed.join(", ")));
+    }
+
+    if has_crash {
+        parts.push("sanitizer crash observed".to_string());
+    }
+    if has_coverage {
+        parts.push("coverage increased".to_string());
+    }
+    if has_pass {
+        parts.push("test passed".to_string());
+    }
+
+    parts.join("; ")
+}
+
+/// Format a diagnostic for the LLM proposer.
+pub fn format_diagnostic(diagnostic: &Diagnostic) -> String {
+    let signal_str: Vec<String> = diagnostic
+        .signals
+        .iter()
+        .map(|s| match s {
+            FeedbackSignal::CoverageIncrease(v) => format!("coverage +{:.1}%", v * 100.0),
+            FeedbackSignal::BranchHit(n) => format!("branches hit: {}", n),
+            FeedbackSignal::SanitizerCrash { kind, location } => {
+                format!("crash: {} at {}", kind, location)
+            }
+            FeedbackSignal::TraceEvent { label, value } => format!("trace {}: {}", label, value),
+            FeedbackSignal::Pass => "test passed".to_string(),
+            FeedbackSignal::Fail(msg) => format!("test failed: {}", msg),
+        })
+        .collect();
+
+    format!(
+        "Diagnostic:\n  Signals: {}\n  Summary: {}\n  Rewrite needed: {}",
+        signal_str.join(", "),
+        diagnostic.summary,
+        if diagnostic.should_rewrite {
+            "yes"
+        } else {
+            "no"
+        }
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::agent_flow::dsl::FeedbackChannel;
+    use crate::agent_flow::executor::AgentOutput;
+    use std::collections::BTreeSet;
+
+    fn success_outputs() -> Vec<AgentOutput> {
+        vec![
+            AgentOutput {
+                role: "analyst".into(),
+                content: "found".into(),
+                success: true,
+            },
+            AgentOutput {
+                role: "validator".into(),
+                content: "ok".into(),
+                success: true,
+            },
+        ]
+    }
+
+    #[test]
+    fn test_diagnose_success_no_rewrite() {
+        let execution = ExecutionResult {
+            outputs: success_outputs(),
+            rounds: 1,
+        };
+        let mut channels = BTreeSet::new();
+        channels.insert(FeedbackChannel::Outcome);
+        let signals = vec![FeedbackSignal::Pass];
+        let diag = diagnose(&execution, &channels, signals);
+        assert!(!diag.should_rewrite);
+        assert!(diag.is_success());
+    }
+
+    #[test]
+    fn test_diagnose_crash_no_rewrite() {
+        let execution = ExecutionResult {
+            outputs: success_outputs(),
+            rounds: 1,
+        };
+        let mut channels = BTreeSet::new();
+        channels.insert(FeedbackChannel::Sanitizer);
+        let signals = vec![FeedbackSignal::SanitizerCrash {
+            kind: "heap-buffer-overflow".into(),
+            location: "main.c:42".into(),
+        }];
+        let diag = diagnose(&execution, &channels, signals);
+        assert!(!diag.should_rewrite);
+    }
+
+    #[test]
+    fn test_diagnose_fail_triggers_rewrite() {
+        let mut outputs = success_outputs();
+        outputs[1].success = false;
+        let execution = ExecutionResult { outputs, rounds: 1 };
+        let channels = BTreeSet::new();
+        let signals = vec![];
+        let diag = diagnose(&execution, &channels, signals);
+        assert!(diag.should_rewrite);
+    }
+
+    #[test]
+    fn test_diagnose_channels_referenced_no_result() {
+        let execution = ExecutionResult {
+            outputs: success_outputs(),
+            rounds: 1,
+        };
+        let mut channels = BTreeSet::new();
+        channels.insert(FeedbackChannel::Coverage);
+        let signals = vec![FeedbackSignal::CoverageIncrease(0.05)];
+        let diag = diagnose(&execution, &channels, signals);
+        assert!(diag.should_rewrite);
+    }
+
+    #[test]
+    fn test_format_diagnostic() {
+        let diag = Diagnostic {
+            signals: vec![FeedbackSignal::Pass, FeedbackSignal::BranchHit(5)],
+            summary: "test passed".into(),
+            should_rewrite: false,
+        };
+        let s = format_diagnostic(&diag);
+        assert!(s.contains("test passed"));
+        assert!(s.contains("branches hit: 5"));
+        assert!(s.contains("Rewrite needed: no"));
+    }
+}

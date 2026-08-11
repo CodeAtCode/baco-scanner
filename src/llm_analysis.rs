@@ -218,6 +218,9 @@ pub struct LlmAnalyzer {
     max_file_size: usize,
     prompt_template: String,
     cwe_kb: Option<CweKnowledgeBase>,
+    /// Optional context prefix prepended to the user prompt for RAG-augmented analysis
+    /// (VulTriage triple-path + PacVD primitive-API abstraction).
+    context_prefix: Option<String>,
 }
 
 impl LlmAnalyzer {
@@ -259,6 +262,7 @@ impl LlmAnalyzer {
             max_file_size: max_file_size_kb * 1024,
             prompt_template,
             cwe_kb,
+            context_prefix: None,
         }
     }
 
@@ -310,6 +314,15 @@ impl LlmAnalyzer {
             .to_string()
     }
 
+    /// Set a context prefix prepended to the user prompt.
+    ///
+    /// Used by VulTriage (triple-path context) and PacVD (primitive-API abstraction)
+    /// to inject RAG context before the code-under-analysis.
+    pub fn with_context_prefix(mut self, prefix: impl Into<String>) -> Self {
+        self.context_prefix = Some(prefix.into());
+        self
+    }
+
     /// Analyze a single file for vulnerabilities
     pub async fn analyze_file(&self, path: &Path) -> Result<Vec<VulnerabilityFinding>, String> {
         let content = match self.read_file_content(path) {
@@ -340,11 +353,18 @@ impl LlmAnalyzer {
             &self.prompt_template.chars().take(300).collect::<String>()
         );
 
+        // Prepend optional RAG context (VulTriage triple-path + PacVD abstraction)
+        let user_prompt = if let Some(ref prefix) = self.context_prefix {
+            format!("{}\n\n{}", prefix, prompt)
+        } else {
+            prompt
+        };
+
         let messages = vec![
             crate::llm::ChatMessage::system(
                 "You are a security expert analyzing code for vulnerabilities. Return ONLY valid JSON array."
             ),
-            crate::llm::ChatMessage::user(&prompt)
+            crate::llm::ChatMessage::user(&user_prompt)
         ];
 
         let response = self.client.chat(&messages).await;

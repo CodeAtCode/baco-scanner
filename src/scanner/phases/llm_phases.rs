@@ -1,5 +1,8 @@
 use super::PhaseConfig;
 use crate::agent;
+use crate::context::callee_walker::extract_call_sites;
+use crate::context::pacvd_extractor::{self, AbstractionLevel};
+use crate::context::triple_path::TriplePathContext;
 use crate::cve_bootstrap::CveBootstrapper;
 use crate::error::ScanResult;
 use crate::findings::VerificationStatus;
@@ -9,9 +12,22 @@ use crate::llm_analysis::LlmAnalyzer;
 use crate::poc_compiler::PocCompiler;
 use crate::poc_generation::PoCFormat;
 use crate::poc_generation::PoCGenerationEngine;
+use crate::retrieval::CweKnowledgeBase;
 
 /// Run LLM static analysis phase (Phase 3/20)
 use std::sync::Arc;
+
+/// Detect language from file path
+fn detect_language(path: &std::path::Path) -> crate::context::control_path::Language {
+    match path.extension().and_then(|e| e.to_str()) {
+        Some("c" | "h") => crate::context::control_path::Language::C,
+        Some("rs") => crate::context::control_path::Language::Rust,
+        Some("py") => crate::context::control_path::Language::Python,
+        Some("js" | "jsx" | "ts" | "tsx") => crate::context::control_path::Language::JavaScript,
+        _ => crate::context::control_path::Language::C, // Default fallback
+    }
+}
+
 pub async fn run_llm_static_analysis(
     _scanner: &super::super::Scanner,
     cfg: PhaseConfig<'_>,
@@ -77,7 +93,7 @@ pub async fn run_llm_static_analysis(
 
         let client =
             crate::llm::LlmClient::with_metrics(llm_config.clone(), Some(metrics_tracker.clone()));
-        let analyzer = LlmAnalyzer::new(
+        let mut analyzer = LlmAnalyzer::new(
             client,
             config.project.languages.clone(),
             config.scanner.max_file_size_kb as usize,
@@ -86,6 +102,12 @@ pub async fn run_llm_static_analysis(
 
         let mut llm_findings = Vec::new();
         let mut new_analyzed_files: Vec<String> = analyzed_files.to_vec();
+
+        // Load CWE knowledge base for triple-path context
+        let cwe_kb = CweKnowledgeBase::load_embedded().ok();
+
+        // Get max_context_tokens for PacVD auto-level selection
+        let max_context_tokens = config.llm.max_reasoning_tokens.unwrap_or(32768);
 
         for (i, file_info) in files.iter().enumerate() {
             let file_path_str = file_info.path.to_string_lossy().to_string();
@@ -109,6 +131,53 @@ pub async fn run_llm_static_analysis(
             );
             pb.set_message(msg);
             pb.set_position(base + progress_pct);
+
+            // Build context if enabled
+            let context_prefix = if config.vultriage.enabled || config.pacvd.enabled {
+                let mut prefix_parts = Vec::new();
+
+                if let Some(ref kb) = cwe_kb {
+                    if let Ok(source) = std::fs::read_to_string(&file_info.path) {
+                        // Triple path context
+                        if config.vultriage.enabled {
+                            let lang = detect_language(&file_info.path);
+                            if let Ok(triple_ctx) = TriplePathContext::build(&source, lang, kb, 3) {
+                                prefix_parts.push(triple_ctx.to_prompt_section());
+                            }
+                        }
+
+                        // PacVD context
+                        if config.pacvd.enabled {
+                            let sites = extract_call_sites(&source);
+                            let level = if config.pacvd.auto_level {
+                                pacvd_extractor::auto_level(max_context_tokens)
+                            } else {
+                                match config.pacvd.level {
+                                    1 => AbstractionLevel::Primitive,
+                                    2 => AbstractionLevel::Typed,
+                                    3 => AbstractionLevel::Grouped,
+                                    _ => AbstractionLevel::Semantic,
+                                }
+                            };
+                            let av = pacvd_extractor::extract(&sites, level);
+                            prefix_parts.push(av.to_prompt_section());
+                        }
+                    }
+                }
+
+                if prefix_parts.is_empty() {
+                    None
+                } else {
+                    Some(prefix_parts.join("\n\n"))
+                }
+            } else {
+                None
+            };
+
+            // Inject context into analyzer if built
+            if let Some(ctx) = context_prefix {
+                analyzer = analyzer.with_context_prefix(ctx);
+            }
 
             match analyzer.analyze_file(&file_info.path).await {
                 Ok(file_findings) => {
