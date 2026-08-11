@@ -72,6 +72,7 @@ pub async fn run_llm_static_analysis(
             max_retries: config.llm.max_retries as u32,
             retry_backoff_ms: config.llm.retry_backoff_ms,
             temperature: 0.5,
+            max_reasoning_tokens: config.llm.max_reasoning_tokens,
         };
 
         let client =

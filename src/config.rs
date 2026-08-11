@@ -33,6 +33,16 @@ pub struct ScannerConfig {
     pub exploit: ExploitConfig,
     #[serde(default)]
     pub validate: ValidateConfig,
+    #[serde(default)]
+    pub vultriage: VultriageConfig,
+    #[serde(default)]
+    pub policy_sampling: PolicySamplingConfig,
+    #[serde(default)]
+    pub agent_scaffold: AgentScaffoldConfig,
+    #[serde(default)]
+    pub pacvd: PacvdConfig,
+    #[serde(default)]
+    pub agent_flow: AgentFlowConfig,
 }
 
 /// Config error with field path and TOML location information
@@ -262,6 +272,8 @@ pub struct LlmConfig {
     pub phases: LlmPhasesConfig,
     #[serde(default)]
     pub tgi: TgiConfig,
+    #[serde(default)]
+    pub max_reasoning_tokens: Option<usize>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -653,6 +665,149 @@ impl Default for ExploitConfig {
 pub struct ValidateConfig {
     /// Whether the Validate phase is enabled
     pub enabled: bool,
+}
+
+/// Configuration for VulTriage triple-path context augmentation (P1).
+/// Augments LLM input with control path (AST/CFG/DFG), knowledge path
+/// (CWE pattern RAG), and semantic path (function summary) before judgement.
+#[derive(Debug, Clone, Default, serde::Deserialize, serde::Serialize)]
+pub struct VultriageConfig {
+    /// Whether triple-path context augmentation is enabled
+    #[serde(default)]
+    pub enabled: bool,
+    /// Whether to include the control path (AST/CFG/DFG verbalisation)
+    #[serde(default = "default_true")]
+    pub control_path: bool,
+    /// Whether to include the knowledge path (CWE pattern RAG)
+    #[serde(default = "default_true")]
+    pub knowledge_path: bool,
+    /// Whether to include the semantic path (function summary)
+    #[serde(default = "default_true")]
+    pub semantic_path: bool,
+}
+
+/// Configuration for policy-based generation (P2.2 — VulnLLM-R).
+/// Queries the LLM N times to get a CWE candidate set ("policy"),
+/// then a final call with the policy as context to pick one label.
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct PolicySamplingConfig {
+    /// Whether policy-based generation is enabled
+    #[serde(default)]
+    pub enabled: bool,
+    /// Number of sampling rounds to build the policy (default: 4)
+    #[serde(default = "default_policy_samples")]
+    pub samples: u8,
+}
+
+impl Default for PolicySamplingConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            samples: default_policy_samples(),
+        }
+    }
+}
+
+/// Configuration for the VulnLLM-R agent scaffold (P2.5).
+/// Builds 3-path call-graph context + function-lookup tool per target.
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct AgentScaffoldConfig {
+    /// Whether the agent scaffold is enabled
+    #[serde(default)]
+    pub enabled: bool,
+    /// Maximum interaction rounds per target function
+    #[serde(default = "default_agent_max_rounds")]
+    pub max_rounds: u8,
+    /// Number of call-graph paths to sample per target
+    #[serde(default = "default_agent_paths_per_target")]
+    pub paths_per_target: u8,
+}
+
+impl Default for AgentScaffoldConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            max_rounds: default_agent_max_rounds(),
+            paths_per_target: default_agent_paths_per_target(),
+        }
+    }
+}
+
+/// Configuration for PacVD primitive-API abstraction (P4).
+/// Appends callee abstraction at one of four granularity levels to the
+/// LLM prompt. With `auto_level = true`, the level is chosen based on
+/// the configured model name.
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct PacvdConfig {
+    /// Whether PacVD abstraction is enabled
+    #[serde(default)]
+    pub enabled: bool,
+    /// Abstraction level 1-4 (1 = fuzzy branches only; 4 = concrete branches + key variables)
+    #[serde(default = "default_pacvd_level")]
+    pub level: u8,
+    /// Whether to auto-select the level based on the configured LLM model
+    #[serde(default)]
+    pub auto_level: bool,
+}
+
+impl Default for PacvdConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            level: default_pacvd_level(),
+            auto_level: false,
+        }
+    }
+}
+
+/// Configuration for AgentFlow multi-agent harness synthesis (P5).
+/// Represents the harness as a typed graph DSL; search loop proposes,
+/// executes, observes, and diagnoses harness rewrites.
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct AgentFlowConfig {
+    /// Whether AgentFlow is enabled
+    #[serde(default)]
+    pub enabled: bool,
+    /// Maximum search-loop iterations
+    #[serde(default = "default_agent_flow_max_iterations")]
+    pub max_iterations: u8,
+    /// Whether the target must be built with coverage/sanitizer instrumentation
+    #[serde(default)]
+    pub requires_instrumented_target: bool,
+}
+
+impl Default for AgentFlowConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            max_iterations: default_agent_flow_max_iterations(),
+            requires_instrumented_target: false,
+        }
+    }
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_policy_samples() -> u8 {
+    4
+}
+
+fn default_agent_max_rounds() -> u8 {
+    5
+}
+
+fn default_agent_paths_per_target() -> u8 {
+    3
+}
+
+fn default_pacvd_level() -> u8 {
+    2
+}
+
+fn default_agent_flow_max_iterations() -> u8 {
+    10
 }
 
 fn load_env_api_keys() -> HashMap<String, Option<String>> {

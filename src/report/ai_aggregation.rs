@@ -548,6 +548,7 @@ mod tests {
             max_retries: 3,
             retry_backoff_ms: 1000,
             temperature: 0.5,
+            max_reasoning_tokens: None,
         }
     }
 
@@ -940,6 +941,7 @@ mod tests {
             max_retries: 1,
             retry_backoff_ms: 0,
             temperature: 0.5,
+            max_reasoning_tokens: None,
         };
         let phase = AiAggregationPhase::new(config);
 

@@ -52,6 +52,11 @@ fn create_test_scanner_config() -> ScannerConfig {
         cpg: Default::default(),
         exploit: Default::default(),
         validate: Default::default(),
+        vultriage: Default::default(),
+        policy_sampling: Default::default(),
+        agent_scaffold: Default::default(),
+        pacvd: Default::default(),
+        agent_flow: Default::default(),
     }
 }
 

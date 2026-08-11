@@ -19,6 +19,7 @@ mod tests {
             max_retries: 1,
             retry_backoff_ms: 1000,
             temperature: 0.5,
+            max_reasoning_tokens: None,
         };
 
         let client = LlmClient::new(llm_config);
@@ -71,6 +72,7 @@ mod tests {
             max_retries: 1,
             retry_backoff_ms: 1000,
             temperature: 0.5,
+            max_reasoning_tokens: None,
         };
 
         let client = LlmClient::new(llm_config);
@@ -123,6 +125,7 @@ mod tests {
             max_retries: 1,
             retry_backoff_ms: 1000,
             temperature: 0.5,
+            max_reasoning_tokens: None,
         };
 
         let client = LlmClient::new(llm_config);

@@ -80,6 +80,7 @@ enable_cve_bootstrap = true
 enable_variant_search = true
 
 # LLM configuration with per-phase settings
+# LLM configuration with per-phase settings
 [llm]
 # Timeout in seconds for LLM API requests
 timeout_secs = 60
@@ -92,6 +93,8 @@ max_concurrent = 4
 # LLM temperature for response randomness (0.0 = deterministic, 1.0 = creative)
 # Default: 0.0 for security scanner determinism
 temperature = 0.5
+# P2.1: Truncated generation — caps reasoning tokens before forcing final answer
+# max_reasoning_tokens = 2048
 
 # Per-phase LLM configuration
 # Each phase can use a single model or multiple models (round-robin)
@@ -138,7 +141,58 @@ project = "libxml2"
 #[agent]
 # enabled = false       # Set to true to enable the agent
 # max_turns = 10        # Maximum agent conversation turns per issue
-# tool_timeout_secs = 30  # Timeout for individual tool executions
+# keep_artifacts = false  # Keep agent work artifacts (logs, temp files)
+
+# --- Paper-Integration Research Flags (P1-P5) ---
+# All flags default to disabled. Enable to opt in to experimental
+# research-backed analysis augmentations. See todo.md for details.
+
+# P1: VulTriage triple-path context augmentation — arXiv:2605.09461
+# Augments LLM input with control path (AST/CFG/DFG), knowledge path
+# (CWE pattern RAG), and semantic path (function summary) before judgement.
+#[vultriage]
+#enabled = false
+#control_path = true
+#knowledge_path = true
+#semantic_path = true
+
+# P2.2: VulnLLM-R policy-based generation — arXiv:2605.09461
+# Queries the LLM N times to build a CWE candidate set, then a final
+# call picks one label. Increases LLM cost ~5x.
+#[policy_sampling]
+#enabled = false
+#samples = 4
+
+# P2.5: VulnLLM-R agent scaffold — arXiv:2605.09461
+# Builds 3-path call-graph context + function-lookup tool per target.
+#[agent_scaffold]
+#enabled = false
+#max_rounds = 5
+#paths_per_target = 3
+
+# P3: MoCQ neuro-symbolic rule synthesis (RuleSynthesis 2.0) — arXiv:2605.13918
+# LLM proposes patterns in a DSL → symbolic validator gives feedback → loop.
+# Extends [scanner.rulesynth] with these fields:
+#[scanner.rulesynth]
+#mocq_mode = false
+#max_iterations = 5
+#corpus_path = "tests/fixtures/"
+
+# P4: PacVD primitive-API abstraction — arXiv:2605.07785
+# Appends callee abstraction at one of four granularity levels to the
+# LLM prompt. Level 1 = fuzzy branches only; 4 = concrete branches + key vars.
+#[pacvd]
+#enabled = false
+#level = 2
+#auto_level = false
+
+# P5: AgentFlow multi-agent harness synthesis — arXiv:2605.11835
+# Represents the harness as a typed graph DSL with a search loop.
+# Most invasive integration — static harness only until P5.5.
+#[agent_flow]
+#enabled = false
+#max_iterations = 10
+#requires_instrumented_target = false
 # trusted_paths = ["."] # Filesystem paths the agent is allowed to access
 # keep_artifacts = false  # Keep agent work artifacts (logs, temp files)
 

@@ -57,6 +57,11 @@ fn create_test_config() -> baco::config::ScannerConfig {
         cpg: baco::config::CpgConfig::default(),
         exploit: baco::config::ExploitConfig::default(),
         validate: Default::default(),
+        vultriage: Default::default(),
+        policy_sampling: Default::default(),
+        agent_scaffold: Default::default(),
+        pacvd: Default::default(),
+        agent_flow: Default::default(),
     }
 }
 

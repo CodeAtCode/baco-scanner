@@ -394,6 +394,7 @@ fn make_llm_config(models: Vec<&str>) -> LlmConfig {
         max_retries: 3,
         retry_backoff_ms: 1000,
         temperature: 0.5,
+        max_reasoning_tokens: None,
     }
 }
 

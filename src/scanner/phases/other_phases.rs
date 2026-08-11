@@ -369,6 +369,7 @@ pub async fn run_ai_aggregation(
         max_retries: config.llm.max_retries as u32,
         retry_backoff_ms: config.llm.retry_backoff_ms,
         temperature: 0.5,
+        max_reasoning_tokens: None,
     };
 
     let aggregation = crate::report::ai_aggregation::AiAggregationPhase::new(llm_config);
@@ -986,6 +987,7 @@ pub async fn run_rule_synthesis(
         max_retries: config.llm.max_retries as u32,
         retry_backoff_ms: config.llm.retry_backoff_ms,
         temperature: config.llm.temperature,
+        max_reasoning_tokens: config.llm.max_reasoning_tokens,
     };
     let client = crate::llm::LlmClient::with_metrics(llm_config, Some(metrics_tracker.clone()));
 
@@ -1072,6 +1074,7 @@ pub async fn run_exploit_synth(
         max_retries: config.llm.max_retries as u32,
         retry_backoff_ms: config.llm.retry_backoff_ms,
         temperature: config.llm.temperature,
+        max_reasoning_tokens: config.llm.max_reasoning_tokens,
     };
     let client = crate::llm::LlmClient::with_metrics(llm_config, Some(metrics_tracker.clone()));
 
@@ -1175,6 +1178,7 @@ pub async fn run_validate(
         max_retries: config.llm.max_retries as u32,
         retry_backoff_ms: config.llm.retry_backoff_ms,
         temperature: config.llm.temperature,
+        max_reasoning_tokens: config.llm.max_reasoning_tokens,
     };
     let client = crate::llm::LlmClient::with_metrics(llm_config, Some(metrics_tracker.clone()));
 

@@ -56,6 +56,7 @@ fn test_llm_config_get_models_single_model() {
         model: "gpt-4".to_string(),
         models: vec![],
         temperature: 0.5,
+        max_reasoning_tokens: None,
         ..Default::default()
     };
 
@@ -70,6 +71,7 @@ fn test_llm_config_get_models_multiple_models() {
         model: "".to_string(),
         models: vec!["gpt-4".to_string(), "gpt-3.5".to_string()],
         temperature: 0.5,
+        max_reasoning_tokens: None,
         ..Default::default()
     };
 
@@ -85,6 +87,7 @@ fn test_llm_config_get_models_empty() {
         model: "".to_string(),
         models: vec![],
         temperature: 0.5,
+        max_reasoning_tokens: None,
         ..Default::default()
     };
 
@@ -99,6 +102,7 @@ fn test_llm_config_models_priority() {
         model: "legacy-model".to_string(),
         models: vec!["new-model".to_string()],
         temperature: 0.5,
+        max_reasoning_tokens: None,
         ..Default::default()
     };
 
@@ -247,6 +251,7 @@ fn test_llm_client_get_all_models_multiple() {
         model: "".to_string(),
         models: vec!["gpt-4".to_string(), "gpt-3.5".to_string()],
         temperature: 0.5,
+        max_reasoning_tokens: None,
         ..Default::default()
     };
 
@@ -261,6 +266,7 @@ fn test_llm_client_empty_model() {
         model: "".to_string(),
         models: vec![],
         temperature: 0.5,
+        max_reasoning_tokens: None,
         ..Default::default()
     };
 

@@ -504,6 +504,7 @@ async fn run_verify(input: &Path, quiet: bool) -> Result<(), Box<dyn std::error:
         max_retries: config.llm.max_retries as u32,
         retry_backoff_ms: config.llm.retry_backoff_ms,
         temperature: 0.5,
+        max_reasoning_tokens: config.llm.max_reasoning_tokens,
     });
     for finding in findings.iter_mut() {
         tracing::info!("Verifying finding: {}", finding.id);

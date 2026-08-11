@@ -52,6 +52,7 @@ impl ScanPhase for LlmStaticAnalysisPhase {
                 max_retries: 1,
                 retry_backoff_ms: 0,
                 temperature: 0.5,
+                max_reasoning_tokens: None,
             };
 
             let test_client = LlmClient::new(llm_config);
@@ -125,6 +126,7 @@ impl ScanPhase for LlmStaticAnalysisPhase {
                 max_retries: ctx.scanner.config.llm.max_retries as u32,
                 retry_backoff_ms: ctx.scanner.config.llm.retry_backoff_ms,
                 temperature: 0.5,
+                max_reasoning_tokens: None,
             };
 
             let client =

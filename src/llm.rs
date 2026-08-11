@@ -20,6 +20,8 @@ pub struct LlmConfig {
     pub retry_backoff_ms: u64,
     #[serde(default = "default_runtime_temperature")]
     pub temperature: f32,
+    #[serde(default)]
+    pub max_reasoning_tokens: Option<usize>,
 }
 
 fn default_runtime_temperature() -> f32 {
@@ -123,6 +125,7 @@ impl Default for LlmConfig {
             max_retries: 3,
             retry_backoff_ms: 1000,
             temperature: 0.5,
+            max_reasoning_tokens: None,
         }
     }
 }
@@ -510,11 +513,16 @@ impl LlmClient {
     }
 
     pub async fn chat(&self, messages: &[ChatMessage]) -> Result<ChatResponseWithModel, String> {
-        let payload = serde_json::json!({
+        let mut payload = serde_json::json!({
             "model": self.get_current_model(),
             "messages": messages,
             "temperature": self.config.temperature
         });
+
+        if let Some(max_tokens) = self.config.max_reasoning_tokens {
+            payload["max_tokens"] = serde_json::json!(max_tokens);
+        }
+
         let tokens_prompt: usize = messages.iter().map(|m| m.content.len() / 4).sum();
 
         let chat_url = format!("{}/v1/chat/completions", self.config.base_url);
@@ -539,7 +547,7 @@ impl LlmClient {
         tools: &[ToolSchema],
     ) -> Result<ChatResponse, String> {
         let model = self.get_current_model();
-        let payload = if tools.is_empty() {
+        let mut payload = if tools.is_empty() {
             serde_json::json!({
                 "model": model,
                 "messages": messages,
@@ -554,6 +562,10 @@ impl LlmClient {
                 "temperature": self.config.temperature
             })
         };
+
+        if let Some(max_tokens) = self.config.max_reasoning_tokens {
+            payload["max_tokens"] = serde_json::json!(max_tokens);
+        }
 
         let chat_url = format!("{}/v1/chat/completions", self.config.base_url);
         tracing::info!("Trying LLM API (with tools) at: {}", chat_url);
@@ -649,6 +661,7 @@ mod tests {
             max_retries: 3,
             retry_backoff_ms: 1000,
             temperature: 0.5,
+            ..Default::default()
         };
         assert_eq!(config.base_url, "https://api.test.com/v1");
         assert_eq!(config.model, "test-model");
@@ -665,6 +678,7 @@ mod tests {
             max_retries: 3,
             retry_backoff_ms: 1000,
             temperature: 0.5,
+            ..Default::default()
         };
         let client = LlmClient::new(config);
         assert!(client.config.base_url.contains("api.test.com"));
@@ -802,6 +816,7 @@ pub fn create_llm_client_with_metrics(
         max_retries: scanner.config.llm.max_retries as u32,
         retry_backoff_ms: scanner.config.llm.retry_backoff_ms,
         temperature: 0.5,
+        max_reasoning_tokens: scanner.config.llm.max_reasoning_tokens,
     };
 
     Some(LlmClient::with_metrics(

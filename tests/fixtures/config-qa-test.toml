@@ -39,3 +39,47 @@ model = "test-model"
 system_type = "github"
 url = "https://api.github.com"
 project = "test-repo"
+
+# --- Paper-Integration Research Flags (P1-P5) ---
+# All flags default to disabled. Enable to opt in to experimental
+# research-backed analysis augmentations. See todo.md for details.
+
+# P1: VulTriage triple-path context augmentation — arXiv:2605.09461
+#[vultriage]
+#enabled = false
+#control_path = true
+#knowledge_path = true
+#semantic_path = true
+
+# P2.2: VulnLLM-R policy-based generation — arXiv:2605.09461
+#[policy_sampling]
+#enabled = false
+#samples = 4
+
+# P2.5: VulnLLM-R agent scaffold — arXiv:2605.09461
+#[agent_scaffold]
+#enabled = false
+#max_rounds = 5
+#paths_per_target = 3
+
+# P3: MoCQ neuro-symbolic rule synthesis (RuleSynthesis 2.0) — arXiv:2605.13918
+#[scanner.rulesynth]
+#mocq_mode = false
+#max_iterations = 5
+#corpus_path = "tests/fixtures/"
+
+# P4: PacVD primitive-API abstraction — arXiv:2605.07785
+#[pacvd]
+#enabled = false
+#level = 2
+#auto_level = false
+
+# P5: AgentFlow multi-agent harness synthesis — arXiv:2605.11835
+#[agent_flow]
+#enabled = false
+#max_iterations = 10
+#requires_instrumented_target = false
+
+# P2.1: Truncated generation (extends [llm]) — arXiv:2605.09461
+# In [llm] section above, add:
+# max_reasoning_tokens = 2048

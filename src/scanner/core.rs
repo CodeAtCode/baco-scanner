@@ -188,6 +188,7 @@ mod tests {
                 phases: LlmPhasesConfig::default(),
                 tgi: crate::config::TgiConfig::default(),
                 temperature: 0.5,
+                max_reasoning_tokens: None,
             },
             tickets: crate::config::TicketConfig::default(),
             agent: crate::config::AgentConfig::default(),
@@ -198,6 +199,11 @@ mod tests {
             cpg: crate::config::CpgConfig::default(),
             exploit: crate::config::ExploitConfig::default(),
             validate: Default::default(),
+            vultriage: Default::default(),
+            policy_sampling: Default::default(),
+            agent_scaffold: Default::default(),
+            pacvd: Default::default(),
+            agent_flow: Default::default(),
         }
     }
 

@@ -241,6 +241,7 @@ pub fn create_test_config() -> ScannerConfig {
             },
             tgi: baco::config::TgiConfig::default(),
             temperature: 0.5,
+            max_reasoning_tokens: None,
         },
         tickets: TicketConfig::default(),
         agent: AgentConfig {
@@ -254,6 +255,11 @@ pub fn create_test_config() -> ScannerConfig {
         cpg: Default::default(),
         exploit: Default::default(),
         validate: Default::default(),
+        vultriage: Default::default(),
+        policy_sampling: Default::default(),
+        agent_scaffold: Default::default(),
+        pacvd: Default::default(),
+        agent_flow: Default::default(),
     }
 }
 
@@ -300,6 +306,11 @@ pub fn create_minimal_config() -> ScannerConfig {
         cpg: Default::default(),
         exploit: Default::default(),
         validate: Default::default(),
+        vultriage: Default::default(),
+        policy_sampling: Default::default(),
+        agent_scaffold: Default::default(),
+        pacvd: Default::default(),
+        agent_flow: Default::default(),
     }
 }
 

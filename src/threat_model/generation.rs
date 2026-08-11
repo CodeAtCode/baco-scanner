@@ -542,6 +542,7 @@ mod tests {
             max_retries: 0,
             retry_backoff_ms: 0,
             temperature: 0.5,
+            max_reasoning_tokens: None,
         };
         let client = crate::llm::LlmClient::new(config);
 
@@ -579,6 +580,7 @@ mod tests {
             max_retries: 0,
             retry_backoff_ms: 0,
             temperature: 0.5,
+            max_reasoning_tokens: None,
         };
         let client = crate::llm::LlmClient::new(config);
 
@@ -615,6 +617,7 @@ mod tests {
             max_retries: 0,
             retry_backoff_ms: 0,
             temperature: 0.5,
+            max_reasoning_tokens: None,
         };
         let client = crate::llm::LlmClient::new(config);
 
@@ -656,6 +659,7 @@ mod tests {
             max_retries: 0,
             retry_backoff_ms: 0,
             temperature: 0.5,
+            max_reasoning_tokens: None,
         };
         let client = crate::llm::LlmClient::new(config);
 
@@ -695,6 +699,7 @@ mod tests {
             max_retries: 0,
             retry_backoff_ms: 0,
             temperature: 0.5,
+            max_reasoning_tokens: None,
         };
         let client = crate::llm::LlmClient::new(config);
 

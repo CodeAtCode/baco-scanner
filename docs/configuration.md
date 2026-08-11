@@ -190,4 +190,133 @@ credentials.token = "${GITHUB_TOKEN}"
 
 - **findings.json**: Complete vulnerability data with all 16 fields
 - **report.html**: Visual report with severity colors, code snippets, AI summary
+- **findings.json**: Complete vulnerability data with all 16 fields
+- **report.html**: Visual report with severity colors, code snippets, AI summary
 - **report.sarif**: SARIF format for CI/CD integration
+
+## Paper-Integration Research Flags
+
+The following flags enable experimental research-backed analysis augmentations.
+All default to disabled. See `todo.md` for full implementation details.
+
+### VulTriage (P1) — arXiv:2605.09461
+
+Triple-path context augmentation. Prepends control path (AST/CFG/DFG), knowledge
+path (CWE pattern RAG), and semantic path (function summary) to the LLM prompt
+before the vulnerability judgement.
+
+| Field          | Type | Default | Description                          |
+|----------------|------|---------|--------------------------------------|
+| `enabled`      | bool | false   | Enable triple-path augmentation      |
+| `control_path` | bool | true    | Include AST/CFG/DFG verbalisation    |
+| `knowledge_path`| bool | true    | Include CWE pattern RAG              |
+| `semantic_path`| bool | true    | Include function summary             |
+
+```toml
+[vultriage]
+enabled = false
+control_path = true
+knowledge_path = true
+semantic_path = true
+```
+
+### VulnLLM-R Policy Sampling (P2.2) — arXiv:2605.09461
+
+Policy-based CWE generation. Queries the LLM N times to build a candidate set,
+then a final call picks one label. Increases LLM cost ~5x.
+
+| Field     | Type | Default | Description                    |
+|-----------|------|---------|--------------------------------|
+| `enabled` | bool | false   | Enable policy sampling         |
+| `samples` | int  | 4       | Number of candidate samples    |
+
+```toml
+[policy_sampling]
+enabled = false
+samples = 4
+```
+
+### VulnLLM-R Agent Scaffold (P2.5) — arXiv:2605.09461
+
+Builds 3-path call-graph context + function-lookup tool per target for
+agent-assisted analysis.
+
+| Field            | Type | Default | Description                    |
+|------------------|------|---------|--------------------------------|
+| `enabled`        | bool | false   | Enable agent scaffold          |
+| `max_rounds`     | int  | 5       | Max agent conversation rounds  |
+| `paths_per_target`| int | 3       | Call-graph paths per target    |
+
+```toml
+[agent_scaffold]
+enabled = false
+max_rounds = 5
+paths_per_target = 3
+```
+
+### Truncated Generation (P2.1) — arXiv:2605.09461
+
+Caps reasoning tokens before forcing the final answer. Configured in the `[llm]` section.
+
+| Field                | Type | Default | Description                    |
+|----------------------|------|---------|--------------------------------|
+| `max_reasoning_tokens`| int | 2048   | Max tokens for reasoning phase |
+
+```toml
+[llm]
+max_reasoning_tokens = 2048
+```
+
+### MoCQ Neuro-Symbolic Rule Synthesis (P3) — arXiv:2605.13918
+
+RuleSynthesis 2.0: LLM proposes patterns in a DSL → symbolic validator gives
+feedback → iterative loop. Extends the `[scanner.rulesynth]` section.
+
+| Field           | Type | Default | Description                    |
+|-----------------|------|---------|--------------------------------|
+| `mocq_mode`     | bool | false   | Enable MoCQ neuro-symbolic mode|
+| `max_iterations`| int  | 5       | Max synthesis iterations       |
+| `corpus_path`   | str  | "tests/fixtures/" | Path to pattern corpus   |
+
+```toml
+[scanner.rulesynth]
+mocq_mode = false
+max_iterations = 5
+corpus_path = "tests/fixtures/"
+```
+
+### PacVD Primitive-API Abstraction (P4) — arXiv:2605.07785
+
+Appends callee abstraction at one of four granularity levels to the LLM prompt.
+Level 1 = fuzzy branches only; Level 4 = concrete branches + key variables.
+
+| Field         | Type | Default | Description                    |
+|---------------|------|---------|--------------------------------|
+| `enabled`     | bool | false   | Enable primitive-API abstraction|
+| `level`       | int  | 2       | Abstraction granularity (1-4)  |
+| `auto_level`  | bool | false   | Auto-select optimal level      |
+
+```toml
+[pacvd]
+enabled = false
+level = 2
+auto_level = false
+```
+
+### AgentFlow Multi-Agent Harness Synthesis (P5) — arXiv:2605.11835
+
+Represents the harness as a typed graph DSL with a search loop. Most invasive
+integration — static harness only until P5.5.
+
+| Field                      | Type | Default | Description                    |
+|----------------------------|------|---------|--------------------------------|
+| `enabled`                  | bool | false   | Enable AgentFlow harness       |
+| `max_iterations`           | int  | 10      | Max synthesis iterations       |
+| `requires_instrumented_target`| bool | false | Require instrumented target   |
+
+```toml
+[agent_flow]
+enabled = false
+max_iterations = 10
+requires_instrumented_target = false
+```

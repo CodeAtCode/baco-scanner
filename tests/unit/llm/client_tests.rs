@@ -43,6 +43,7 @@ fn test_llm_config_custom_values() {
         max_retries: 5,
         retry_backoff_ms: 2000,
         temperature: 0.7,
+        max_reasoning_tokens: None,
     };
     assert_eq!(config.base_url, "https://custom.api.com/v1");
     assert_eq!(config.api_key, "secret-key");
@@ -60,6 +61,7 @@ fn test_llm_config_get_models_with_models_vec() {
         max_retries: 3,
         retry_backoff_ms: 1000,
         temperature: 0.7,
+        max_reasoning_tokens: None,
     };
     let models = config.get_models();
     assert_eq!(models.len(), 2);
@@ -78,6 +80,7 @@ fn test_llm_config_get_models_with_single_model() {
         max_retries: 3,
         retry_backoff_ms: 1000,
         temperature: 0.7,
+        max_reasoning_tokens: None,
     };
     let models = config.get_models();
     assert_eq!(models.len(), 1);
@@ -95,6 +98,7 @@ fn test_llm_config_get_models_empty() {
         max_retries: 3,
         retry_backoff_ms: 1000,
         temperature: 0.7,
+        max_reasoning_tokens: None,
     };
     let models = config.get_models();
     assert!(models.is_empty());
@@ -111,6 +115,7 @@ fn test_llm_config_get_models_models_vec_takes_priority() {
         max_retries: 3,
         retry_backoff_ms: 1000,
         temperature: 0.7,
+        max_reasoning_tokens: None,
     };
     let models = config.get_models();
     assert_eq!(models.len(), 1);
@@ -132,6 +137,7 @@ fn test_llm_client_new_basic() {
         max_retries: 3,
         retry_backoff_ms: 1000,
         temperature: 0.7,
+        max_reasoning_tokens: None,
     };
     let client = LlmClient::new(config);
     assert_eq!(client.model_name(), "test-model");
@@ -148,6 +154,7 @@ fn test_llm_client_with_metrics_none() {
         max_retries: 3,
         retry_backoff_ms: 1000,
         temperature: 0.7,
+        max_reasoning_tokens: None,
     };
     let client = LlmClient::with_metrics(config, None);
     assert_eq!(client.model_name(), "test-model");
@@ -164,6 +171,7 @@ fn test_llm_client_with_multiple_models_creates_selector() {
         max_retries: 3,
         retry_backoff_ms: 1000,
         temperature: 0.7,
+        max_reasoning_tokens: None,
     };
     let client = LlmClient::new(config);
     // With multiple models, a ModelSelector should be created
@@ -183,6 +191,7 @@ fn test_llm_client_get_all_models_single() {
         max_retries: 3,
         retry_backoff_ms: 1000,
         temperature: 0.7,
+        max_reasoning_tokens: None,
     };
     let client = LlmClient::new(config);
     let models = client.get_all_models();
@@ -201,6 +210,7 @@ fn test_llm_client_model_name_with_models_vec() {
         max_retries: 3,
         retry_backoff_ms: 1000,
         temperature: 0.7,
+        max_reasoning_tokens: None,
     };
     let client = LlmClient::new(config);
     // First call should return first model
@@ -425,6 +435,7 @@ fn test_llm_config_clone() {
         max_retries: 3,
         retry_backoff_ms: 1000,
         temperature: 0.5,
+        max_reasoning_tokens: None,
     };
     let cloned = config.clone();
     assert_eq!(cloned.base_url, config.base_url);
@@ -450,6 +461,7 @@ fn test_llm_config_full_serialization_roundtrip() {
         max_retries: 5,
         retry_backoff_ms: 2000,
         temperature: 0.5,
+        max_reasoning_tokens: None,
     };
     let serialized = serde_json::to_string(&config).unwrap();
     let deserialized: LlmConfig = serde_json::from_str(&serialized).unwrap();
