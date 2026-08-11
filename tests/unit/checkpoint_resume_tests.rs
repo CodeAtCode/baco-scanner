@@ -159,15 +159,6 @@ fn test_resume_from_error_restarts() {
 }
 
 #[test]
-fn test_resume_from_orphaned_hunt() {
-    let tmp = tempfile::tempdir().unwrap();
-    let path = make_checkpoint_path(&tmp, ScanPhase::Hunt);
-    let next = Checkpoint::resume_from(path.to_str().unwrap()).unwrap();
-    // Orphaned phases should route to safe fallback
-    assert_eq!(next, ScanPhase::LlmDiscovery);
-}
-
-#[test]
 fn test_resume_from_cpgslice() {
     let tmp = tempfile::tempdir().unwrap();
     let path = make_checkpoint_path(&tmp, ScanPhase::CpgSlice);
@@ -192,10 +183,8 @@ fn test_resume_full_sequential_chain() {
         (ScanPhase::CweRouting, ScanPhase::RuleSynthesis),
         (ScanPhase::RuleSynthesis, ScanPhase::LlmDiscovery),
         (ScanPhase::LlmDiscovery, ScanPhase::LlmVerification),
-        (
-            ScanPhase::LlmVerification,
-            ScanPhase::SecurityAgentVerification,
-        ),
+        (ScanPhase::LlmVerification, ScanPhase::Validate),
+        (ScanPhase::Validate, ScanPhase::SecurityAgentVerification),
         (
             ScanPhase::SecurityAgentVerification,
             ScanPhase::TicketCrossRef,

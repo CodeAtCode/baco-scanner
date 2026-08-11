@@ -56,6 +56,7 @@ fn create_test_config() -> baco::config::ScannerConfig {
         normalization: baco::config::NormalizationConfig::default(),
         cpg: baco::config::CpgConfig::default(),
         exploit: baco::config::ExploitConfig::default(),
+        validate: Default::default(),
     }
 }
 

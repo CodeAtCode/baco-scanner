@@ -132,6 +132,7 @@ mod tests {
             normalization: crate::config::NormalizationConfig::default(),
             cpg: crate::config::CpgConfig::default(),
             exploit: crate::config::ExploitConfig::default(),
+            validate: Default::default(),
         }
     }
 
@@ -140,9 +141,12 @@ mod tests {
         let phases = vec![
             ScanPhase::Indexing,
             ScanPhase::Semgrep,
+            ScanPhase::CweRouting,
+            ScanPhase::CpgSlice,
             ScanPhase::LlmStaticAnalysis,
             ScanPhase::LlmDiscovery,
             ScanPhase::LlmVerification,
+            ScanPhase::Validate,
             ScanPhase::TicketCrossRef,
             ScanPhase::GitAnalysis,
             ScanPhase::CrossFileAnalysis,
@@ -158,14 +162,12 @@ mod tests {
             ScanPhase::VariantSearch,
             ScanPhase::SecurityAgentVerification,
             ScanPhase::RuleSynthesis,
-            ScanPhase::Hunt,
-            ScanPhase::Validate,
-            ScanPhase::IndependentVerify,
+            ScanPhase::ExploitSynth,
             ScanPhase::Complete,
             ScanPhase::Error,
         ];
 
-        assert_eq!(phases.len(), 25);
+        assert_eq!(phases.len(), 26);
     }
 
     #[test]

@@ -31,6 +31,8 @@ pub struct ScannerConfig {
     pub cpg: CpgConfig,
     #[serde(default)]
     pub exploit: ExploitConfig,
+    #[serde(default)]
+    pub validate: ValidateConfig,
 }
 
 /// Config error with field path and TOML location information
@@ -641,6 +643,16 @@ impl Default for ExploitConfig {
             max_exploits_per_finding: 1,
         }
     }
+}
+
+/// Configuration for the Validate phase (CORRECT paper arxiv:2504.13474)
+///
+/// LLM-as-judge rationale validation: evaluates the soundness of reasoning
+/// behind each finding and adjusts confidence accordingly (+0.10 sound, -0.20 flawed).
+#[derive(Debug, Clone, Default, serde::Deserialize, serde::Serialize)]
+pub struct ValidateConfig {
+    /// Whether the Validate phase is enabled
+    pub enabled: bool,
 }
 
 fn load_env_api_keys() -> HashMap<String, Option<String>> {

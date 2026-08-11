@@ -1,4 +1,4 @@
-//! PhaseGraph tests — verify the 23-phase pipeline ordering and navigation.
+//! PhaseGraph tests — verify the 24-phase pipeline ordering and navigation.
 //!
 //! The PhaseGraph must mirror the real orchestrator pipeline exactly:
 //! Indexing → Semgrep → CpgSlice → LlmStaticAnalysis → CweRouting → RuleSynthesis → … → Reporting.
@@ -7,7 +7,7 @@ use baco::checkpoint::ScanPhase;
 use baco::config::ScannerConfig;
 use baco::scanner::{Orchestrator, PhaseGraph};
 
-const EXPECTED_PHASES: [ScanPhase; 23] = [
+const EXPECTED_PHASES: [ScanPhase; 24] = [
     ScanPhase::Indexing,
     ScanPhase::Semgrep,
     ScanPhase::CpgSlice,
@@ -16,6 +16,7 @@ const EXPECTED_PHASES: [ScanPhase; 23] = [
     ScanPhase::RuleSynthesis,
     ScanPhase::LlmDiscovery,
     ScanPhase::LlmVerification,
+    ScanPhase::Validate,
     ScanPhase::SecurityAgentVerification,
     ScanPhase::TicketCrossRef,
     ScanPhase::GitAnalysis,
@@ -34,9 +35,9 @@ const EXPECTED_PHASES: [ScanPhase; 23] = [
 ];
 
 #[test]
-fn test_phase_count_is_23() {
+fn test_phase_count_is_24() {
     let graph = PhaseGraph::new();
-    assert_eq!(graph.phases().len(), 23);
+    assert_eq!(graph.phases().len(), 24);
 }
 
 #[test]
@@ -71,9 +72,9 @@ fn test_rule_synthesis_at_index_5() {
 }
 
 #[test]
-fn test_exploit_synth_at_index_20() {
+fn test_exploit_synth_at_index_21() {
     let graph = PhaseGraph::new();
-    assert_eq!(graph.phases()[20], ScanPhase::ExploitSynth);
+    assert_eq!(graph.phases()[21], ScanPhase::ExploitSynth);
 }
 
 #[test]
@@ -211,11 +212,11 @@ fn test_previous_phase_rule_synthesis_to_cwe_routing() {
 }
 
 #[test]
-fn test_metadata_total_phases_is_23() {
+fn test_metadata_total_phases_is_24() {
     let graph = PhaseGraph::new();
     for phase in graph.phases() {
         let meta = graph.get_metadata(phase).unwrap();
-        assert_eq!(meta.total_phases, 23, "total_phases mismatch for {phase:?}");
+        assert_eq!(meta.total_phases, 24, "total_phases mismatch for {phase:?}");
     }
 }
 
@@ -255,7 +256,11 @@ fn test_metadata_display_names() {
 
     let reporting_meta = graph.get_metadata(&ScanPhase::Reporting).unwrap();
     assert_eq!(reporting_meta.display_name, "Reporting");
-    assert_eq!(reporting_meta.phase_number, 23);
+    assert_eq!(reporting_meta.phase_number, 24);
+
+    let validate_meta = graph.get_metadata(&ScanPhase::Validate).unwrap();
+    assert_eq!(validate_meta.display_name, "Validate");
+    assert_eq!(validate_meta.phase_number, 9);
 }
 
 #[test]
@@ -271,14 +276,14 @@ fn test_default_equals_new() {
 }
 
 #[test]
-fn test_orchestrator_phase_graph_has_23_phases() {
+fn test_orchestrator_phase_graph_has_24_phases() {
     let config = ScannerConfig::default();
     let orchestrator = Orchestrator::new(&config);
     let phase_graph = orchestrator.phase_graph();
 
-    assert_eq!(phase_graph.phases().len(), 23);
+    assert_eq!(phase_graph.phases().len(), 24);
     assert_eq!(phase_graph.phases()[0], ScanPhase::Indexing);
-    assert_eq!(phase_graph.phases()[22], ScanPhase::Reporting);
+    assert_eq!(phase_graph.phases()[23], ScanPhase::Reporting);
 }
 
 #[test]

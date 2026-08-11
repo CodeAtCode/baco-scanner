@@ -19,10 +19,8 @@ const PHASE_TRANSITION_TEST_CASES: &[(ScanPhase, ScanPhase)] = &[
     (ScanPhase::CweRouting, ScanPhase::RuleSynthesis),
     (ScanPhase::RuleSynthesis, ScanPhase::LlmDiscovery),
     (ScanPhase::LlmDiscovery, ScanPhase::LlmVerification),
-    (
-        ScanPhase::LlmVerification,
-        ScanPhase::SecurityAgentVerification,
-    ),
+    (ScanPhase::LlmVerification, ScanPhase::Validate),
+    (ScanPhase::Validate, ScanPhase::SecurityAgentVerification),
     (
         ScanPhase::SecurityAgentVerification,
         ScanPhase::TicketCrossRef,
@@ -41,10 +39,6 @@ const PHASE_TRANSITION_TEST_CASES: &[(ScanPhase, ScanPhase)] = &[
     (ScanPhase::ExploitSynth, ScanPhase::VariantSearch),
     (ScanPhase::VariantSearch, ScanPhase::Reporting),
     (ScanPhase::Reporting, ScanPhase::Complete),
-    // Orphaned phases (fallback routing for old checkpoints)
-    (ScanPhase::Hunt, ScanPhase::LlmDiscovery),
-    (ScanPhase::Validate, ScanPhase::LlmDiscovery),
-    (ScanPhase::IndependentVerify, ScanPhase::LlmDiscovery),
     // Terminal states
     (ScanPhase::Complete, ScanPhase::Indexing),
     (ScanPhase::Error, ScanPhase::Indexing),

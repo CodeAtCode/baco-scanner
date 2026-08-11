@@ -6,8 +6,8 @@ use crate::pipeline_test_helpers::{actual_pipeline_phases, sequential_pipeline_p
 #[test]
 fn test_pipeline_has_expected_phase_count() {
     let phases = actual_pipeline_phases();
-    // 4 parallel + 19 sequential = 23 total
-    assert_eq!(phases.len(), 23, "Pipeline should have 23 phases");
+    // 4 parallel + 20 sequential = 24 total
+    assert_eq!(phases.len(), 24, "Pipeline should have 24 phases");
 }
 
 #[test]
@@ -90,8 +90,8 @@ fn test_pipeline_root_cause_dedup_before_reporting() {
 fn test_phase_graph_metadata_phase_count() {
     let graph = PhaseGraph::new();
     let phases = graph.phases();
-    // PhaseGraph has 23 phases (matches the runtime pipeline)
-    assert_eq!(phases.len(), 23, "PhaseGraph should have 23 phases");
+    // PhaseGraph has 24 phases (matches the runtime pipeline)
+    assert_eq!(phases.len(), 24, "PhaseGraph should have 24 phases");
 }
 
 #[test]
@@ -145,6 +145,7 @@ fn test_resume_from_covers_all_sequential_phases() {
         ScanPhase::RuleSynthesis,
         ScanPhase::LlmDiscovery,
         ScanPhase::LlmVerification,
+        ScanPhase::Validate,
         ScanPhase::SecurityAgentVerification,
         ScanPhase::TicketCrossRef,
         ScanPhase::GitAnalysis,

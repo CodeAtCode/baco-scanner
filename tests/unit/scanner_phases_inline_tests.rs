@@ -80,6 +80,7 @@ mod tests {
             normalization: baco::config::NormalizationConfig::default(),
             cpg: baco::config::CpgConfig::default(),
             exploit: baco::config::ExploitConfig::default(),
+            validate: Default::default(),
         }
     }
 

@@ -33,6 +33,7 @@ pub async fn run_phase(
         ScanPhase::LlmStaticAnalysis => llm_phases::run_llm_static_analysis(scanner, cfg).await,
         ScanPhase::LlmDiscovery => llm_phases::run_llm_discovery(scanner, cfg).await,
         ScanPhase::LlmVerification => llm_phases::run_llm_verification(scanner, cfg).await,
+        ScanPhase::Validate => other_phases::run_validate(scanner, cfg).await,
         ScanPhase::SecurityAgentVerification => {
             llm_phases::run_security_agent_verification(scanner, cfg).await
         }

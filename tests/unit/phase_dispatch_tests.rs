@@ -7,7 +7,7 @@ use crate::pipeline_test_helpers::{
 #[test]
 fn test_all_active_phases_exist() {
     let phases = active_phases();
-    assert_eq!(phases.len(), 23, "Should have 23 active phases");
+    assert_eq!(phases.len(), 24, "Should have 24 active phases");
 }
 
 #[test]
@@ -74,11 +74,11 @@ fn test_scan_phase_completeness() {
     all.extend(orphaned_phases());
     all.extend(terminal_phases());
 
-    // ScanPhase has 28 variants total
+    // ScanPhase has 26 variants total
     assert_eq!(
         all.len(),
-        28,
-        "All 28 ScanPhase variants must be categorized"
+        26,
+        "All 26 ScanPhase variants must be categorized"
     );
 }
 
@@ -92,32 +92,6 @@ fn test_sequential_phases_first_is_cwe_routing() {
 fn test_sequential_phases_last_is_reporting() {
     let phases = sequential_pipeline_phases();
     assert_eq!(*phases.last().unwrap(), ScanPhase::Reporting);
-}
-
-#[test]
-fn test_orphaned_phases_have_safe_fallback() {
-    // Verify each orphaned phase has a safe fallback in resume_from
-    let tmp = tempfile::tempdir().unwrap();
-    let fallbacks = vec![
-        (ScanPhase::Hunt, ScanPhase::LlmDiscovery),
-        (ScanPhase::Validate, ScanPhase::LlmDiscovery),
-        (ScanPhase::IndependentVerify, ScanPhase::LlmDiscovery),
-    ];
-
-    for (orphan, expected_fallback) in fallbacks {
-        let path = tmp.path().join(format!("{:?}.json", orphan));
-        let now = chrono::Utc::now();
-        let mut cp = baco::checkpoint::Checkpoint::new("test", "/tmp/p", now);
-        cp.current_phase = orphan.clone();
-        cp.save(path.to_str().unwrap()).unwrap();
-
-        let next = baco::checkpoint::Checkpoint::resume_from(path.to_str().unwrap()).unwrap();
-        assert_eq!(
-            next, expected_fallback,
-            "Orphan {:?} should fallback to {:?}",
-            orphan, expected_fallback
-        );
-    }
 }
 
 #[test]

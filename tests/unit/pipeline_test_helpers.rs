@@ -17,6 +17,7 @@ pub fn active_phases() -> Vec<ScanPhase> {
         ScanPhase::RuleSynthesis,
         ScanPhase::LlmDiscovery,
         ScanPhase::LlmVerification,
+        ScanPhase::Validate,
         ScanPhase::SecurityAgentVerification,
         ScanPhase::TicketCrossRef,
         ScanPhase::GitAnalysis,
@@ -38,11 +39,7 @@ pub fn active_phases() -> Vec<ScanPhase> {
 /// Orphaned phases that should fall through to the _ catch-all.
 /// These have no implementation and should be skipped gracefully.
 pub fn orphaned_phases() -> Vec<ScanPhase> {
-    vec![
-        ScanPhase::Hunt,
-        ScanPhase::Validate,
-        ScanPhase::IndependentVerify,
-    ]
+    vec![]
 }
 
 /// Terminal states.
@@ -57,6 +54,7 @@ pub fn sequential_pipeline_phases() -> Vec<ScanPhase> {
         ScanPhase::RuleSynthesis,
         ScanPhase::LlmDiscovery,
         ScanPhase::LlmVerification,
+        ScanPhase::Validate,
         ScanPhase::SecurityAgentVerification,
         ScanPhase::TicketCrossRef,
         ScanPhase::GitAnalysis,

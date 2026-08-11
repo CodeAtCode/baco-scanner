@@ -31,10 +31,8 @@ pub enum ScanPhase {
     SecurityAgentVerification,
     // T2.3: MoCQ LLM→semgrep rule synthesis phase
     RuleSynthesis,
-    // T2.5: Six-phase orchestration (Cloudflare pattern)
-    Hunt,
+    // CORRECT paper (arxiv:2504.13474) — LLM-as-judge rationale validation
     Validate,
-    IndependentVerify,
     // T3.2: Exploit synthesis with sandbox
     ExploitSynth,
     Complete,
@@ -111,7 +109,8 @@ impl Checkpoint {
             ScanPhase::CweRouting => ScanPhase::RuleSynthesis,
             ScanPhase::RuleSynthesis => ScanPhase::LlmDiscovery,
             ScanPhase::LlmDiscovery => ScanPhase::LlmVerification,
-            ScanPhase::LlmVerification => ScanPhase::SecurityAgentVerification,
+            ScanPhase::LlmVerification => ScanPhase::Validate,
+            ScanPhase::Validate => ScanPhase::SecurityAgentVerification,
             ScanPhase::SecurityAgentVerification => ScanPhase::TicketCrossRef,
             ScanPhase::TicketCrossRef => ScanPhase::GitAnalysis,
             ScanPhase::GitAnalysis => ScanPhase::CrossFileAnalysis,
@@ -127,10 +126,6 @@ impl Checkpoint {
             ScanPhase::ExploitSynth => ScanPhase::VariantSearch,
             ScanPhase::VariantSearch => ScanPhase::Reporting,
             ScanPhase::Reporting => ScanPhase::Complete,
-            // Orphaned phases (never executed, fallback routing for old checkpoints)
-            ScanPhase::Hunt => ScanPhase::LlmDiscovery,
-            ScanPhase::Validate => ScanPhase::LlmDiscovery,
-            ScanPhase::IndependentVerify => ScanPhase::LlmDiscovery,
             ScanPhase::Complete | ScanPhase::Error => ScanPhase::Indexing,
         })
     }
@@ -159,9 +154,7 @@ impl Checkpoint {
             ScanPhase::VariantSearch => "🔍 Variant Search".to_string(),
             ScanPhase::SecurityAgentVerification => "🤖 SecurityAgent Verification".to_string(),
             ScanPhase::RuleSynthesis => "⚗️ Rule Synthesis".to_string(),
-            ScanPhase::Hunt => "🏹 Hunt Phase".to_string(),
-            ScanPhase::Validate => "🛡️ Validate Phase".to_string(),
-            ScanPhase::IndependentVerify => "🔍 Independent Verification".to_string(),
+            ScanPhase::Validate => "🛡️ Validate (Rationale Check)".to_string(),
             ScanPhase::ExploitSynth => "💉 Exploit Synthesis".to_string(),
             ScanPhase::Complete => "✨ Complete".to_string(),
             ScanPhase::Error => "❌ Error".to_string(),
@@ -200,14 +193,17 @@ pub async fn save_checkpoint(
     }
 
     // Get completed phases (all phases up to and including current)
-    // Must match the pipeline order: 3 parallel + 17 sequential, Reporting last
+    // Must match the pipeline order: 4 parallel + 20 sequential, Reporting last
     let all_phases = [
         ScanPhase::Indexing,
         ScanPhase::Semgrep,
+        ScanPhase::CpgSlice,
         ScanPhase::LlmStaticAnalysis,
         ScanPhase::CweRouting,
+        ScanPhase::RuleSynthesis,
         ScanPhase::LlmDiscovery,
         ScanPhase::LlmVerification,
+        ScanPhase::Validate,
         ScanPhase::SecurityAgentVerification,
         ScanPhase::TicketCrossRef,
         ScanPhase::GitAnalysis,
@@ -220,6 +216,7 @@ pub async fn save_checkpoint(
         ScanPhase::AutoPatching,
         ScanPhase::CveBootstrap,
         ScanPhase::PocCompiler,
+        ScanPhase::ExploitSynth,
         ScanPhase::VariantSearch,
         ScanPhase::Reporting,
     ];
@@ -505,10 +502,8 @@ mod tests {
             (ScanPhase::CweRouting, ScanPhase::RuleSynthesis),
             (ScanPhase::RuleSynthesis, ScanPhase::LlmDiscovery),
             (ScanPhase::LlmDiscovery, ScanPhase::LlmVerification),
-            (
-                ScanPhase::LlmVerification,
-                ScanPhase::SecurityAgentVerification,
-            ),
+            (ScanPhase::LlmVerification, ScanPhase::Validate),
+            (ScanPhase::Validate, ScanPhase::SecurityAgentVerification),
             (
                 ScanPhase::SecurityAgentVerification,
                 ScanPhase::TicketCrossRef,
@@ -527,10 +522,6 @@ mod tests {
             (ScanPhase::ExploitSynth, ScanPhase::VariantSearch),
             (ScanPhase::VariantSearch, ScanPhase::Reporting),
             (ScanPhase::Reporting, ScanPhase::Complete),
-            // Orphaned phases (fallback routing for old checkpoints)
-            (ScanPhase::Hunt, ScanPhase::LlmDiscovery),
-            (ScanPhase::Validate, ScanPhase::LlmDiscovery),
-            (ScanPhase::IndependentVerify, ScanPhase::LlmDiscovery),
             // Terminal states
             (ScanPhase::Complete, ScanPhase::Indexing),
             (ScanPhase::Error, ScanPhase::Indexing),

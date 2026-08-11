@@ -40,6 +40,7 @@ impl PhaseGraph {
             ScanPhase::RuleSynthesis,
             ScanPhase::LlmDiscovery,
             ScanPhase::LlmVerification,
+            ScanPhase::Validate,
             ScanPhase::SecurityAgentVerification,
             ScanPhase::TicketCrossRef,
             ScanPhase::GitAnalysis,
@@ -118,90 +119,96 @@ impl PhaseGraph {
             8
         );
         add_metadata!(
+            ScanPhase::Validate,
+            "Validate",
+            "LLM-as-judge rationale check (CORRECT paper arxiv:2504.13474)",
+            9
+        );
+        add_metadata!(
             ScanPhase::SecurityAgentVerification,
             "SecurityAgent Verification",
             "Tool-based verification",
-            9
+            10
         );
         add_metadata!(
             ScanPhase::TicketCrossRef,
             "Ticket Cross-Reference",
             "Cross-reference with ticket systems",
-            10
+            11
         );
         add_metadata!(
             ScanPhase::GitAnalysis,
             "Git Analysis",
             "Analyze Git history",
-            11
+            12
         );
         add_metadata!(
             ScanPhase::CrossFileAnalysis,
             "Cross-File Analysis",
             "Analyze cross-file references",
-            12
+            13
         );
         add_metadata!(
             ScanPhase::ConfidenceScoring,
             "Confidence Scoring",
             "Refine confidence scores",
-            13
+            14
         );
         add_metadata!(
             ScanPhase::AiAggregation,
             "AI Aggregation",
             "Aggregate findings with AI",
-            14
+            15
         );
         add_metadata!(
             ScanPhase::ThreatModeling,
             "Threat Modeling",
             "Generate threat model",
-            15
+            16
         );
         add_metadata!(
             ScanPhase::RootCauseDedup,
             "Root Cause Deduplication",
             "Deduplicate by root cause",
-            16
+            17
         );
         add_metadata!(
             ScanPhase::MultiVerifier,
             "Multi-Verifier",
             "Verify with multiple agents",
-            17
+            18
         );
         add_metadata!(
             ScanPhase::AutoPatching,
             "Auto-Patching",
             "Generate patches automatically",
-            18
+            19
         );
         add_metadata!(
             ScanPhase::CveBootstrap,
             "CVE Bootstrap",
             "Enrich with CVE data",
-            19
+            20
         );
         add_metadata!(
             ScanPhase::PocCompiler,
             "PoC Compiler",
             "Compile and validate PoCs",
-            20
+            21
         );
         add_metadata!(
             ScanPhase::ExploitSynth,
             "Exploit Synthesis",
             "Sandbox-verified exploit generation",
-            21
+            22
         );
         add_metadata!(
             ScanPhase::VariantSearch,
             "Variant Search",
             "Search for code variants",
-            22
+            23
         );
-        add_metadata!(ScanPhase::Reporting, "Reporting", "Generate reports", 23);
+        add_metadata!(ScanPhase::Reporting, "Reporting", "Generate reports", 24);
 
         Self { phases, metadata }
     }

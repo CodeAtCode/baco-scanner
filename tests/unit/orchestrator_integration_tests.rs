@@ -51,6 +51,7 @@ fn create_test_scanner_config() -> ScannerConfig {
         normalization: Default::default(),
         cpg: Default::default(),
         exploit: Default::default(),
+        validate: Default::default(),
     }
 }
 
