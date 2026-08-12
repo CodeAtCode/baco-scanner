@@ -991,8 +991,6 @@ pub async fn run_rule_synthesis(
     };
     let client = crate::llm::LlmClient::with_metrics(llm_config, Some(metrics_tracker.clone()));
 
-    let synthesizer = crate::rulesynth::RuleSynthesizer::new(&client, &config.rulesynth);
-
     let mut seen_cwes: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
     for finding in &findings {
         if let Some(cwe) = &finding.cwe_id {
@@ -1001,31 +999,76 @@ pub async fn run_rule_synthesis(
     }
 
     let total = seen_cwes.len();
-    for (i, cwe) in seen_cwes.iter().enumerate() {
-        for language in &config.project.languages {
-            match synthesizer.generate(cwe, language).await {
-                Ok(rules) => {
-                    if rules.is_empty() {
-                        tracing::debug!(
-                            "Rule synthesis: no valid rules for {} ({})",
-                            cwe,
-                            language
-                        );
+
+    if config.rulesynth.mocq_mode {
+        // MoCQ path: use proposer loop with symbolic validation
+        use crate::rulesynth::{emitter, proposer::run_proposer_loop};
+
+        // Load traces from corpus_path if configured
+        let traces: Vec<crate::rulesynth::symbolic_validator::LabelledTrace> =
+            if let Some(ref corpus) = config.rulesynth.corpus_path {
+                // Load from directory using load_corpus (one .txt file per trace)
+                crate::rulesynth::symbolic_validator::load_corpus(corpus.as_path())
+            } else {
+                Vec::new()
+            };
+
+        for (i, cwe) in seen_cwes.iter().enumerate() {
+            match run_proposer_loop(&client, cwe, &traces, config.rulesynth.max_iterations).await {
+                Some((pattern, outcome)) => {
+                    // Emit the pattern as YAML
+                    let yaml = emitter::emit_yaml(&pattern);
+                    let output_dir = std::path::PathBuf::from(&config.rulesynth.output_dir);
+                    std::fs::create_dir_all(&output_dir).ok();
+                    let filename = format!("{}_mocq.yml", cwe);
+                    let filepath = output_dir.join(&filename);
+                    if let Err(e) = std::fs::write(&filepath, &yaml) {
+                        tracing::warn!("MoCQ emit failed for {}: {}", cwe, e);
                     } else {
                         tracing::info!(
-                            "Rule synthesis: generated {} valid rule(s) for {} ({})",
-                            rules.len(),
+                            "MoCQ: emitted pattern for {} to {}",
                             cwe,
-                            language
+                            filepath.display()
                         );
                     }
+                    tracing::info!("MoCQ: pattern for {} converged (F1={:.2})", cwe, outcome.f1);
                 }
-                Err(e) => {
-                    tracing::warn!("Rule synthesis failed for {} ({}): {}", cwe, language, e);
+                None => {
+                    tracing::warn!("MoCQ: no valid pattern produced for {}", cwe);
                 }
             }
+            pb.set_position(pb.position() + (i as u64 * 100 / total.max(1) as u64));
         }
-        pb.set_position(pb.position() + (i as u64 * 100 / total.max(1) as u64));
+    } else {
+        // Original path: use old RuleSynthesizer
+        let synthesizer = crate::rulesynth::RuleSynthesizer::new(&client, &config.rulesynth);
+
+        for (i, cwe) in seen_cwes.iter().enumerate() {
+            for language in &config.project.languages {
+                match synthesizer.generate(cwe, language).await {
+                    Ok(rules) => {
+                        if rules.is_empty() {
+                            tracing::debug!(
+                                "Rule synthesis: no valid rules for {} ({})",
+                                cwe,
+                                language
+                            );
+                        } else {
+                            tracing::info!(
+                                "Rule synthesis: generated {} valid rule(s) for {} ({})",
+                                rules.len(),
+                                cwe,
+                                language
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!("Rule synthesis failed for {} ({}): {}", cwe, language, e);
+                    }
+                }
+            }
+            pb.set_position(pb.position() + (i as u64 * 100 / total.max(1) as u64));
+        }
     }
 
     pb.set_position(pb.position() + 100);

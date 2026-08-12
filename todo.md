@@ -4,7 +4,7 @@ Progress banner
 - Tier 2 (T2.1-T2.5): COMPLETE [x]
 - Tier 3 (T3.1 CPG/Joern, T3.2 exploit synthesis, T3.3 TGI reasoning LLM): PARTIAL (T3.2 done via ExploitSynth phase; T3.1 + T3.3 pending external infra)
 - Cross-Cutting (X.1-X.5): X.1, X.2, X.3, X.5 done [x]; X.4 done [x]
-- Paper-Integration Roadmap (P1-P5): PLANNED [ ] — this document
+ - Paper-Integration Roadmap: P1 DONE [x], P2 DONE [x], P3 DONE [x], P4 DONE [x], P5 DONE [x]
 - Pipeline: 24 phases (Indexing → Semgrep → CweRouting → LlmStaticAnalysis → Validate → LlmDiscovery → SecurityAgentVerification → RuleSynthesis → CpgSlice → ExploitSynth → Complete)
 -->
 
@@ -29,7 +29,11 @@ clippy warnings before merge).
 | T2 (T2.1-T2.5) | COMPLETE [x]    |
 | T3 (T3.1-T3.3) | PARTIAL         |
 | X  (X.1-X.5)   | COMPLETE [x]    |
-| P  (P1-P5)     | PLANNED [ ]     |
+| P1 (P1.1-P1.5) | COMPLETE [x]    |
+| P2 (P2.1-P2.5) | COMPLETE [x]    |
+| P3 (P3.1-P3.5) | COMPLETE [x]    |
+| P4 (P4.1-P4.5) | COMPLETE [x]    |
+| P5 (P5.1-P5.5) | COMPLETE [x]    |
 
 ---
 
@@ -90,7 +94,7 @@ assembled before the LLM call and appended to the existing prompt.
 
 **Sub-tasks.**
 
-#### P1.1 — Control Path extractor
+#### P1.1 — Control Path extractor [x]
 - **Files to modify:**
   - `src/scanner/phases/llm_phases.rs` — add `build_control_path(fn_body, cpg)` call site before LLM dispatch
   - `src/llm_analysis.rs` (or new `src/context/control_path.rs`) — implement extractor
@@ -106,7 +110,7 @@ assembled before the LLM call and appended to the existing prompt.
   structured string; unit test asserts CFG nodes appear for an `if` statement.
 - **Risk:** low.
 
-#### P1.2 — Knowledge Path RAG over CWE patterns
+#### P1.2 — Knowledge Path RAG over CWE patterns [x]
 - **Files to modify:**
   - `src/scanner/phases/llm_phases.rs` — call `retrieve_cwe_patterns(cwe_id, fn_signature)` before LLM call
   - new `src/context/knowledge_path.rs` — hybrid dense-sparse retriever
@@ -120,7 +124,7 @@ assembled before the LLM call and appended to the existing prompt.
 - **Risk:** medium — needs embedding index; can be stubbed with sparse-only
   retrieval (BM25) as MVP.
 
-#### P1.3 — Semantic Path summariser
+#### P1.3 — Semantic Path summariser [x]
 - **Files to modify:**
   - `src/scanner/phases/llm_phases.rs` — call `summarise_function(fn_body)` before final judgement
   - new `src/context/semantic_path.rs` — LLM summariser
@@ -131,7 +135,7 @@ assembled before the LLM call and appended to the existing prompt.
   function returns a non-empty English summary.
 - **Risk:** low — extra LLM call per function; gate behind `enabled` flag.
 
-#### P1.4 — Config + docs
+#### P1.4 — Config + docs [x]
 - **Files to modify:**
   - `src/config.rs` — add `VultriageConfig { enabled: bool, control_path: bool, knowledge_path: bool, semantic_path: bool }` after `ValidateConfig`. Default all `false`.
   - `config/*.toml` example files — add `[vultriage]` section
@@ -140,7 +144,7 @@ assembled before the LLM call and appended to the existing prompt.
   (flag default off).
 - **Risk:** low.
 
-#### P1.5 — Wire triple-path into LlmStaticAnalysis prompt
+#### P1.5 — Wire triple-path into LlmStaticAnalysis prompt [x]
 - **Files to modify:**
   - `src/scanner/phases/llm_phases.rs::run_llm_static_analysis` — when
     `config.vultriage.enabled`, assemble prompt as
@@ -257,7 +261,7 @@ is the natural home — MoCQ is its upgrade.
 
 **Sub-tasks.**
 
-#### P3.1 — Pattern DSL
+#### P3.1 — Pattern DSL [x]
 - **Files to modify:**
   - new `src/rulesynth/dsl.rs` — define the pattern DSL as Rust types
     (sink, source, sanitizer, path constraints, metavariables)
@@ -266,7 +270,7 @@ is the natural home — MoCQ is its upgrade.
   lossless for the 12 supported vuln types.
 - **Risk:** medium.
 
-#### P3.2 — Symbolal validator against trace corpus
+#### P3.2 — Symbolal validator against trace corpus [x]
 - **Files to modify:**
   - new `src/rulesynth/validator.rs` — given a candidate pattern, run it against
     a labelled trace corpus and return `{matched, missed, false_positives}`
@@ -275,7 +279,7 @@ is the natural home — MoCQ is its upgrade.
   and `false_positives == 0` on the corpus.
 - **Risk:** medium — needs a labelled corpus; start small (CWE-78, CWE-89).
 
-#### P3.3 — LLM proposer with feedback loop
+#### P3.3 — LLM proposer with feedback loop [x]
 - **Files to modify:**
   - `src/scanner/phases/other_phases.rs::run_rule_synthesis` — replace the
     current body with the propose→validate→rewrite loop
@@ -285,7 +289,7 @@ is the natural home — MoCQ is its upgrade.
 - **Depends on:** P3.1, P3.2.
 - **Risk:** medium.
 
-#### P3.4 — Emit accepted rules to disk
+#### P3.4 — Emit accepted rules to disk [x]
 - **Files to modify:**
   - `src/rulesynth/emitter.rs` — write accepted patterns to
     `output/synthesised_rules/<cwe>_<timestamp>.yml`
@@ -295,7 +299,7 @@ is the natural home — MoCQ is its upgrade.
   run picks it up.
 - **Risk:** low.
 
-#### P3.5 — Config + tests
+#### P3.5 — Config + tests [x]
 - **Files to modify:**
   - `src/config.rs` — extend `RulesynthConfig` with `mocq_mode: bool`,
     `max_iterations: u8`, `corpus_path: PathBuf`
@@ -345,7 +349,7 @@ fallback provides the call graph. This is a strict superset of P1's Control Path
 
 **Sub-tasks.**
 
-#### P4.1 — Primitive API catalogue
+#### P4.1 — Primitive API catalogue [x]
 - **Files to modify:**
   - new `src/context/primitive_api.rs` — const table of primitive APIs grouped
     by targeted vuln type (from the paper table above)
@@ -353,7 +357,7 @@ fallback provides the call graph. This is a strict superset of P1's Control Path
 - **Acceptance criteria.** `lookup("free")` returns `MemoryLeak | UAF | DoubleFree`.
 - **Risk:** low.
 
-#### P4.2 — Call-depth-3 callee walker
+#### P4.2 — Call-depth-3 callee walker [x]
 - **Files to modify:**
   - new `src/context/callees.rs` — given a target function, return all callees
     within depth 3 via the call graph from `Indexing`/`CpgSlice`
@@ -362,7 +366,7 @@ fallback provides the call graph. This is a strict superset of P1's Control Path
     `blk_put_request`, `mempool_free`, `free` within depth 3.
 - **Risk:** medium — depends on call-graph quality.
 
-#### P4.3 — Four-dimension extractor
+#### P4.3 — Four-dimension extractor [x]
 - **Files to modify:**
   - new `src/context/api_abstraction.rs` — for each callee, extract fuzzy
     branches, concrete branches, call counts, key variables
@@ -372,7 +376,7 @@ fallback provides the call graph. This is a strict superset of P1's Control Path
   `In blk_end_request_all: free called on all branches, malloc on no branch.`
 - **Risk:** medium.
 
-#### P4.4 — Level selector + prompt integration
+#### P4.4 — Level selector + prompt integration [x]
 - **Files to modify:**
   - `src/scanner/phases/llm_phases.rs::run_llm_static_analysis` — when
     `config.pacvd.enabled`, assemble the abstraction at the configured level
@@ -384,7 +388,7 @@ fallback provides the call graph. This is a strict superset of P1's Control Path
 - **Depends on:** P4.1, P4.2, P4.3.
 - **Risk:** low.
 
-#### P4.5 — Model-aware level auto-selection
+#### P4.5 — Model-aware level auto-selection [x]
 - **Files to modify:**
   - `src/config.rs` — add `auto_level: bool` to `PacvdConfig`
   - `src/scanner/phases/llm_phases.rs` — when `auto_level = true`, pick level
@@ -438,7 +442,7 @@ DSL, then add the search loop as a follow-up.
 
 **Sub-tasks.**
 
-#### P5.1 — Harness DSL types
+#### P5.1 — Harness DSL types [x]
 - **Files to modify:**
   - new `src/agent_flow/dsl.rs` — `Harness`, `Node`, `Edge`, `FeedbackChannel`,
     `Agent { role, prompt, model, tools }`, `Fanout(node, k)`
@@ -448,7 +452,7 @@ DSL, then add the search loop as a follow-up.
   can be constructed in Rust.
 - **Risk:** low.
 
-#### P5.2 — Well-formedness checker
+#### P5.2 — Well-formedness checker [x]
 - **Files to modify:**
   - `src/agent_flow/typecheck.rs` — implement rules T-Agent, T-Edge, T-Branch,
     T-Conn, T-Pipe from Figure 2 of the paper
@@ -456,7 +460,7 @@ DSL, then add the search loop as a follow-up.
   variable; rejects a disconnected node; accepts the Figure 3 example.
 - **Risk:** medium.
 
-#### P5.3 — Runtime executor
+#### P5.3 — Runtime executor [x]
 - **Files to modify:**
   - new `src/agent_flow/runtime.rs` — execute a well-formed harness: schedule
     agents per topology, bind template vars, dispatch tool calls, collect
@@ -472,7 +476,7 @@ DSL, then add the search loop as a follow-up.
   that baco does not have today. Gate behind a `requires_instrumented_target`
   flag; fall back to stdout/stderr-only feedback when coverage is unavailable.
 
-#### P5.4 — Diagnoser
+#### P5.4 — Diagnoser [x]
 - **Files to modify:**
   - new `src/agent_flow/diagnose.rs` — given a failed run + feedback bundle,
     produce a structured diagnosis (e.g. "input never reached vulnerable
@@ -482,7 +486,7 @@ DSL, then add the search loop as a follow-up.
 - **Depends on:** P5.3.
 - **Risk:** medium.
 
-#### P5.5 — Proposer (search loop)
+#### P5.5 — Proposer (search loop) [x]
 - **Files to modify:**
   - new `src/agent_flow/propose.rs` — LLM-driven proposer that reads the
     diagnosis + archive of prior trials and emits a rewritten harness

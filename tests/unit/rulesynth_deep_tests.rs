@@ -513,6 +513,9 @@ fn test_rulesynth_config_all_enabled_true() {
         enabled: true,
         output_dir: PathBuf::from("/custom/path"),
         max_rules_per_cwe: 10,
+        mocq_mode: false,
+        max_iterations: 5,
+        corpus_path: None,
     };
 
     assert!(config.enabled);
@@ -526,6 +529,9 @@ fn test_rulesynth_config_zero_max_rules() {
         enabled: true,
         output_dir: PathBuf::from("/tmp"),
         max_rules_per_cwe: 0,
+        mocq_mode: false,
+        max_iterations: 5,
+        corpus_path: None,
     };
 
     assert_eq!(config.max_rules_per_cwe, 0);
@@ -537,6 +543,9 @@ fn test_rulesynth_config_very_large_max_rules() {
         enabled: true,
         output_dir: PathBuf::from("/tmp"),
         max_rules_per_cwe: 10000,
+        mocq_mode: false,
+        max_iterations: 5,
+        corpus_path: None,
     };
 
     assert_eq!(config.max_rules_per_cwe, 10000);
@@ -548,6 +557,9 @@ fn test_rulesynth_config_relative_path() {
         enabled: true,
         output_dir: PathBuf::from("./relative/path/to/rules"),
         max_rules_per_cwe: 5,
+        mocq_mode: false,
+        max_iterations: 5,
+        corpus_path: None,
     };
 
     assert_eq!(config.output_dir, PathBuf::from("./relative/path/to/rules"));
@@ -559,6 +571,9 @@ fn test_rulesynth_config_json_serialization_all_fields() {
         enabled: true,
         output_dir: PathBuf::from("/test/path"),
         max_rules_per_cwe: 7,
+        mocq_mode: false,
+        max_iterations: 5,
+        corpus_path: None,
     };
 
     let json = serde_json::to_string(&config).unwrap();
@@ -781,6 +796,9 @@ fn test_config_persistence_simulation() {
         enabled: true,
         output_dir: PathBuf::from("/tmp/test_rules"),
         max_rules_per_cwe: 3,
+        mocq_mode: false,
+        max_iterations: 5,
+        corpus_path: None,
     };
 
     // Simulate creating a file path
@@ -921,6 +939,9 @@ fn test_rulesynth_config_trait_implementations() {
         enabled: true,
         output_dir: PathBuf::from("/test"),
         max_rules_per_cwe: 5,
+        mocq_mode: false,
+        max_iterations: 5,
+        corpus_path: None,
     };
 
     // Debug
@@ -946,6 +967,9 @@ fn test_rulesynthesizer_new_with_custom_config() {
         enabled: true,
         output_dir: PathBuf::from("/tmp/custom_rules_output"),
         max_rules_per_cwe: 0,
+        mocq_mode: false,
+        max_iterations: 5,
+        corpus_path: None,
     };
 
     assert_eq!(config.max_rules_per_cwe, 0);
@@ -1014,6 +1038,9 @@ fn test_rulesynth_config_enabled_with_custom_output_dir() {
         enabled: true,
         output_dir: temp_dir.clone(),
         max_rules_per_cwe: 10,
+        mocq_mode: false,
+        max_iterations: 5,
+        corpus_path: None,
     };
 
     assert!(config.enabled);

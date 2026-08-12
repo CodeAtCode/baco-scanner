@@ -245,6 +245,9 @@ mod tests {
             enabled: true,
             output_dir: PathBuf::from("/tmp/test_rules"),
             max_rules_per_cwe: 10,
+            mocq_mode: false,
+            max_iterations: 5,
+            corpus_path: None,
         };
         assert!(config.enabled);
         assert_eq!(config.output_dir, PathBuf::from("/tmp/test_rules"));
@@ -257,6 +260,9 @@ mod tests {
             enabled: true,
             output_dir: PathBuf::from("/tmp/rules"),
             max_rules_per_cwe: 3,
+            mocq_mode: false,
+            max_iterations: 5,
+            corpus_path: None,
         };
 
         let json = serde_json::to_string(&config).unwrap();
@@ -391,6 +397,9 @@ rules:
             enabled: false,
             output_dir: PathBuf::from("/tmp/test"),
             max_rules_per_cwe: 5,
+            mocq_mode: false,
+            max_iterations: 5,
+            corpus_path: None,
         };
 
         assert!(!config.enabled);
@@ -457,6 +466,9 @@ rules:
             enabled: true,
             output_dir: PathBuf::from("/custom/path/to/rules"),
             max_rules_per_cwe: 15,
+            mocq_mode: false,
+            max_iterations: 5,
+            corpus_path: None,
         };
 
         let json = serde_json::to_string_pretty(&original).unwrap();

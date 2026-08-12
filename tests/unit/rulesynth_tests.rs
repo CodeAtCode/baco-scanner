@@ -115,6 +115,9 @@ fn test_rulesynth_config_custom_construction() {
         enabled: true,
         output_dir: PathBuf::from("/tmp/custom_rules"),
         max_rules_per_cwe: 10,
+        mocq_mode: false,
+        max_iterations: 5,
+        corpus_path: None,
     };
 
     assert!(config.enabled);
@@ -148,6 +151,9 @@ fn test_rulesynth_config_pretty_serialization() {
         enabled: false,
         output_dir: PathBuf::from("./output"),
         max_rules_per_cwe: 1,
+        mocq_mode: false,
+        max_iterations: 5,
+        corpus_path: None,
     };
 
     let json = serde_json::to_string_pretty(&config).unwrap();
@@ -586,16 +592,25 @@ fn test_rulesynth_config_all_field_variations() {
             enabled: true,
             output_dir: PathBuf::from("/tmp/a"),
             max_rules_per_cwe: 1,
+            mocq_mode: false,
+            max_iterations: 5,
+            corpus_path: None,
         },
         RuleSynthConfig {
             enabled: false,
             output_dir: PathBuf::from("/tmp/b"),
             max_rules_per_cwe: 100,
+            mocq_mode: false,
+            max_iterations: 5,
+            corpus_path: None,
         },
         RuleSynthConfig {
             enabled: true,
             output_dir: PathBuf::from("./relative/path"),
             max_rules_per_cwe: 50,
+            mocq_mode: false,
+            max_iterations: 5,
+            corpus_path: None,
         },
     ];
 

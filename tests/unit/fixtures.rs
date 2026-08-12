@@ -653,6 +653,9 @@ pub fn make_rulesynth_config() -> RuleSynthConfig {
         enabled: true,
         output_dir: PathBuf::from("/tmp/rules"),
         max_rules_per_cwe: 3,
+        mocq_mode: false,
+        max_iterations: 5,
+        corpus_path: None,
     }
 }
 

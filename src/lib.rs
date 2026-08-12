@@ -21,6 +21,7 @@
 
 pub mod agent;
 pub mod agent_flow;
+pub mod agent_scaffold;
 pub mod analysis_context; // AnalysisContext persistence (renamed from context.rs)
 pub mod chain_analysis;
 pub mod checkpoint;

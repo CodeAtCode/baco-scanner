@@ -42,6 +42,9 @@ fn test_rule_synthesis_end_to_end() {
         enabled: true,
         output_dir: temp_dir.clone(),
         max_rules_per_cwe: 3,
+        mocq_mode: false,
+        max_iterations: 5,
+        corpus_path: None,
     };
 
     // Check if we have an LLM client available
@@ -97,6 +100,9 @@ fn test_rule_synthesis_config_custom() {
         enabled: true,
         output_dir: PathBuf::from("/tmp/custom_rules"),
         max_rules_per_cwe: 10,
+        mocq_mode: false,
+        max_iterations: 5,
+        corpus_path: None,
     };
 
     assert!(config.enabled);

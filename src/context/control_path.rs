@@ -7,7 +7,7 @@ use thiserror::Error;
 use tree_sitter::{Language as TsLanguage, Parser, TreeCursor};
 
 /// Language enumeration for supported languages
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Language {
     C,
     Rust,
@@ -16,7 +16,7 @@ pub enum Language {
 }
 
 impl Language {
-    fn ts_language(&self) -> TsLanguage {
+    pub fn ts_language(&self) -> TsLanguage {
         match self {
             Language::C => tree_sitter_c::LANGUAGE.into(),
             Language::Rust => tree_sitter_rust::LANGUAGE.into(),

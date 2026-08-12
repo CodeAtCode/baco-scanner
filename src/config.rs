@@ -493,6 +493,15 @@ pub struct RuleSynthConfig {
     /// Maximum rules to generate per CWE
     #[serde(default = "default_max_rules_per_cwe")]
     pub max_rules_per_cwe: usize,
+    /// Use MoCQ proposer loop with symbolic validation (vs old RuleSynthesizer)
+    #[serde(default)]
+    pub mocq_mode: bool,
+    /// Max iterations for the proposer loop
+    #[serde(default = "default_mocq_max_iterations")]
+    pub max_iterations: u8,
+    /// Path to labelled trace corpus for symbolic validation
+    #[serde(default)]
+    pub corpus_path: Option<PathBuf>,
 }
 
 impl Default for RuleSynthConfig {
@@ -501,6 +510,9 @@ impl Default for RuleSynthConfig {
             enabled: false,
             output_dir: default_rulesynth_output_dir(),
             max_rules_per_cwe: default_max_rules_per_cwe(),
+            mocq_mode: false,
+            max_iterations: default_mocq_max_iterations(),
+            corpus_path: None,
         }
     }
 }
@@ -510,6 +522,10 @@ fn default_rulesynth_output_dir() -> PathBuf {
 }
 
 fn default_max_rules_per_cwe() -> usize {
+    5
+}
+
+fn default_mocq_max_iterations() -> u8 {
     5
 }
 
