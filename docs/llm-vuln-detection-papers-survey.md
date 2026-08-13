@@ -4,6 +4,11 @@
 > Survey date: 2026-08-11
 > Purpose: Identify papers worth integrating into baco's scanner phases or documentation.
 
+## Scope
+
+This document is the **full survey** of 36 papers from the Awesome-LLMs-for-Vulnerability-Detection repository, with selection criteria for the 5 papers chosen for P1–P5 integration.
+
+
 ## 1. Repository Overview
 
 - **Total papers surveyed:** 36 (2025–2026)

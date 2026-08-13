@@ -1523,4 +1523,151 @@ async fn test_deduplicate_findings_without_line_numbers() {
 
     // Without line numbers, they can't be considered duplicates
     assert_eq!(result.len(), 2);
+    // Without line numbers, they can't be considered duplicates
+    assert_eq!(result.len(), 2);
+}
+
+// ============================================================================
+// Private Method Tests (now public for testing)
+// ============================================================================
+
+#[test]
+fn test_group_findings_by_location() {
+    let config = make_config();
+    let phase = AiAggregationPhase::new(config);
+
+    let findings = vec![
+        make_finding(
+            "f1",
+            Severity::High,
+            0.8,
+            "src/main.rs",
+            Some(42),
+            Some("CWE-79"),
+            None,
+        ),
+        make_finding(
+            "f2",
+            Severity::High,
+            0.9,
+            "src/main.rs",
+            Some(42),
+            Some("CWE-79"),
+            None,
+        ),
+        make_finding(
+            "f3",
+            Severity::Critical,
+            0.95,
+            "src/lib.rs",
+            Some(100),
+            Some("CWE-89"),
+            None,
+        ),
+    ];
+
+    let grouped = phase.group_findings_by_location(&findings);
+
+    assert_eq!(grouped.get("src/main.rs:42").unwrap().len(), 2);
+    assert_eq!(grouped.get("src/lib.rs:100").unwrap().len(), 1);
+}
+
+#[test]
+fn test_conflict_detection_severity() {
+    let config = make_config();
+    let phase = AiAggregationPhase::new(config);
+
+    let findings = vec![
+        make_finding(
+            "f1",
+            Severity::Critical,
+            0.9,
+            "src/main.rs",
+            Some(42),
+            Some("CWE-79"),
+            None,
+        ),
+        make_finding(
+            "f2",
+            Severity::Low,
+            0.8,
+            "src/main.rs",
+            Some(42),
+            Some("CWE-79"),
+            None,
+        ),
+    ];
+
+    let grouped = phase.group_findings_by_location(&findings);
+    let conflicts = phase.detect_conflicts(&grouped);
+
+    assert!(!conflicts.is_empty());
+    assert_eq!(
+        conflicts[0].conflict_type,
+        baco::report::ai_aggregation::ConflictType::SeverityMismatch
+    );
+}
+
+#[test]
+fn test_consensus_algorithms() {
+    let config = make_config();
+    let phase = AiAggregationPhase::new(config);
+
+    let findings = vec![
+        make_finding(
+            "f1",
+            Severity::Critical,
+            0.9,
+            "src/main.rs",
+            Some(42),
+            Some("CWE-79"),
+            Some(VerificationStatus::Confirmed),
+        ),
+        make_finding(
+            "f2",
+            Severity::Critical,
+            0.3,
+            "src/main.rs",
+            Some(42),
+            Some("CWE-79"),
+            Some(VerificationStatus::FalsePositive),
+        ),
+    ];
+
+    let conflicts = Vec::new();
+    let consensus_results = phase.apply_consensus_algorithms(&findings, &conflicts);
+
+    assert_eq!(consensus_results.len(), 2);
+}
+
+#[test]
+fn test_ai_confidence_calculation() {
+    let config = make_config();
+    let phase = AiAggregationPhase::new(config);
+
+    let finding = make_finding(
+        "f1",
+        Severity::Critical,
+        0.9,
+        "src/main.rs",
+        Some(42),
+        Some("CWE-79"),
+        Some(VerificationStatus::Confirmed),
+    );
+
+    let consensus = ConsensusResult {
+        finding: finding.clone(),
+        agreement_count: 2,
+        total_sources: 2,
+        consensus_score: 0.8,
+        confirming_sources: vec![FindingSource::LlmDiscovery, FindingSource::LlmVerification],
+        contradicting_sources: vec![],
+        likely_false_positive: false,
+        recommendation: ConsensusRecommendation::IncludeHighConfidence,
+    };
+
+    let ai_confidence = phase.calculate_ai_confidence(&consensus);
+
+    assert!(ai_confidence.overall > 0.0);
+    assert!(!ai_confidence.positive_factors.is_empty());
 }

@@ -16,9 +16,6 @@ mod report_fixtures;
 // Include agent module tests
 mod agent;
 
-// TGI client unit tests (pre-existing errors - TODO: fix)
-// mod tgi_client;
-
 // Validation function tests
 mod validation_success_path_tests;
 mod validation_tests;
@@ -151,11 +148,10 @@ mod cve_client_tests;
 mod scanner_sequential_tests;
 mod worktree_staging_tests;
 
-// Additional coverage: enrichment, exploit harness, tgi, parallel
+// Additional coverage: enrichment, exploit harness, parallel
 mod ai_aggregation_enrichment_tests;
 mod exploit_harness_tests;
 mod html_report_dir_creation_tests;
-mod llm_tgi_tests;
 mod scanner_parallel_tests;
 
 // Final coverage push: cve_client deep coverage
@@ -201,8 +197,18 @@ mod confidence_refinement_inline_tests;
 mod llm_verification_inline_tests;
 mod prompt_templates_inline_tests;
 mod scanner_orchestrator_inline_tests;
-mod scanner_phases_inline_tests;
+mod scanner_other_phases_tests;
 mod tickets_inline_tests;
 
 // Additional exploit coverage
 mod exploit_coverage;
+
+// P1-P5 paper integration module tests
+mod agent_flow_tests;
+mod agent_scaffold_call_graph_paths_tests;
+mod agent_scaffold_coverage_tests;
+mod agent_scaffold_fn_lookup_tests;
+mod agent_scaffold_tests;
+mod agent_scaffold_tree_sitter_parser_tests;
+mod context_pacvd_tests;
+mod rulesynth_validator_tests;

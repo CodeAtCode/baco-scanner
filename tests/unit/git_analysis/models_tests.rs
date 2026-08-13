@@ -121,6 +121,19 @@ fn test_git_analysis_result_creation() {
 }
 
 #[test]
+fn test_vulnerability_pattern_creation() {
+    let pattern = VulnerabilityPattern {
+        pattern_type: VulnerabilityPatternType::SecurityFix,
+        description: "Security fix detected".to_string(),
+        cwe_id: Some("CWE-79".to_string()),
+        commit: "abc123".to_string(),
+        confidence: 0.85,
+    };
+    assert_eq!(pattern.pattern_type_to_string(), "Security Fix");
+    assert_eq!(pattern.confidence, 0.85);
+}
+
+#[test]
 fn test_commit_reference_serialization() {
     let commit = CommitReference {
         commit_hash: "abc12345".to_string(),
@@ -175,6 +188,44 @@ fn test_risky_pattern_type_equality() {
 
     assert_eq!(large1, large2);
     assert_ne!(large1, revert);
+}
+
+#[test]
+fn test_json_roundtrip_commit_reference() {
+    let commit = CommitReference {
+        commit_hash: "abc123".to_string(),
+        commit_message: "Fix security issue".to_string(),
+        author: "Test Author".to_string(),
+        author_email: "test@example.com".to_string(),
+        timestamp: 1234567890,
+        modified_files: vec!["test.c".to_string(), "src/main.rs".to_string()],
+        lines_added: 10,
+        lines_deleted: 5,
+        is_security_fix: true,
+        cwe_references: vec!["CWE-79".to_string(), "CWE-89".to_string()],
+    };
+
+    let json = serde_json::to_string(&commit).unwrap();
+    let deserialized: CommitReference = serde_json::from_str(&json).unwrap();
+    assert_eq!(commit.commit_hash, deserialized.commit_hash);
+    assert_eq!(commit.modified_files, deserialized.modified_files);
+    assert_eq!(commit.cwe_references, deserialized.cwe_references);
+}
+
+#[test]
+fn test_json_roundtrip_vulnerability_pattern() {
+    let pattern = VulnerabilityPattern {
+        pattern_type: VulnerabilityPatternType::InjectionRisk,
+        description: "SQL injection risk".to_string(),
+        cwe_id: Some("CWE-89".to_string()),
+        commit: "def456".to_string(),
+        confidence: 0.92,
+    };
+
+    let json = serde_json::to_string(&pattern).unwrap();
+    let deserialized: VulnerabilityPattern = serde_json::from_str(&json).unwrap();
+    assert_eq!(pattern.description, deserialized.description);
+    assert_eq!(pattern.confidence, deserialized.confidence);
 }
 
 #[test]

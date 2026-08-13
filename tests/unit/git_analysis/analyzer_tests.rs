@@ -45,6 +45,15 @@ fn setup_test_repo() -> TempDir {
 }
 
 #[test]
+fn test_git_history_analyzer_new() {
+    let tmp_dir = setup_test_repo();
+    let repo_path = tmp_dir.path().to_string_lossy().to_string();
+
+    let analyzer = GitHistoryAnalyzer::new(&repo_path);
+    assert!(analyzer.is_ok());
+}
+
+#[test]
 fn test_analyzer_initialization_success() {
     let tmp_dir = setup_test_repo();
     let repo_path = tmp_dir.path().to_string_lossy().to_string();
@@ -109,6 +118,20 @@ fn test_find_related_commits_with_line_number() {
         commits[0].commit_hash.len() == 8,
         "Commit hash should be abbreviated to 8 chars"
     );
+}
+
+#[test]
+fn test_find_related_commits_nonexistent_file() {
+    let tmp_dir = setup_test_repo();
+    let repo_path = tmp_dir.path().to_string_lossy().to_string();
+
+    let analyzer = GitHistoryAnalyzer::new(&repo_path).unwrap();
+    let result = analyzer.find_related_commits("nonexistent.txt", None, 10);
+
+    assert!(result.is_ok());
+    let commits = result.unwrap();
+    // Should return empty or commits that don't match the file
+    assert!(commits.is_empty());
 }
 
 #[test]

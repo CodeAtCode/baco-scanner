@@ -1,6 +1,12 @@
 # Research-Backed Design
 
-Baco's LLM integration is informed by a survey of 30 papers from [Awesome-LLMs-for-Vulnerability-Detection](https://github.com/huhusmang/Awesome-LLMs-for-Vulnerability-Detection). This document details the 18 papers integrated into baco's architecture and what each contributes.
+Baco's LLM integration is informed by a survey of 36 papers from [Awesome-LLMs-for-Vulnerability-Detection](https://github.com/huhusmang/Awesome-LLMs-for-Vulnerability-Detection). This document details the 16 papers integrated into baco's architecture and what each contributes.
+
+## Scope
+
+This document covers the **16 papers already integrated** into baco's architecture — what each contributes, where it's wired in, and the config flag that enables it.
+
+For the broader survey of 36 surveyed papers and the selection criteria for the P1–P5 integration tracks, see [Paper Survey](llm-vuln-detection-papers-survey.md).
 
 ## Agentic & Multi-Agent Approaches
 
@@ -118,7 +124,6 @@ Baco's LLM integration is informed by a survey of 30 papers from [Awesome-LLMs-f
 
 **Key Result:** Specialized reasoning models significantly improved explainability and root-cause analysis quality compared to general-purpose LLMs.
 
-**Baco Integration:** Baco supports optional specialized reasoning models served via TGI for improved explainability and root-cause analysis.
 
 ## Quality & Evaluation
 

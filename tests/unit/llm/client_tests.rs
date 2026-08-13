@@ -3,7 +3,7 @@
 //! Tests cover:
 //! 1. LlmConfig creation, defaults, and validation
 //! 2. ModelSelector integration with LlmClient
-//! 3. LlmClient construction (new, with_metrics, with_tgi)
+//! 3. LlmClient construction (new, with_metrics)
 //! 4. ChatMessage creation and serialization
 //! 5. ChatResponseWithModel and ChatResponse structures
 //! 6. FunctionToolDefinition and ToolSchema

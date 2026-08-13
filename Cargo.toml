@@ -2,12 +2,15 @@
 name = "baco"
 version = "1.1.0"
 edition = "2021"
-description = "CLI Vulnerability Scanner"
+homepage = "https://github.com/CodeAtCode/baco-scanner"
+documentation = "https://github.com/CodeAtCode/baco-scanner/tree/master/docs"
+description = "LLM-augmented SAST scanner: 24-phase pipeline combining semgrep, CWE-aware MoE routing, and research-backed LLM verification"
 authors = ["MTE90"]
-repository = "https://github.com/mte90/baco"
-license = "MIT"
-keywords = ["security", "vulnerability", "scanner", "cli", "sast"]
+repository = "https://github.com/CodeAtCode/baco-scanner"
+license = "GPL-3.0"
+keywords = ["security", "vulnerability", "scanner", "sast", "llm"]
 categories = ["command-line-utilities", "development-tools"]
+rust-version = "1.74"
 
 [dependencies]
 # Async trait support

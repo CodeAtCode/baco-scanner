@@ -9,6 +9,7 @@ use tempfile::TempDir;
 
 /// Set up a test git repository with initial commit
 #[cfg(test)]
+#[allow(dead_code)]
 pub fn setup_test_repo() -> TempDir {
     let tmp_dir = TempDir::new().expect("Failed to create temp dir");
     let repo_path = tmp_dir.path();

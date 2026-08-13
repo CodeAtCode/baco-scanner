@@ -11,8 +11,9 @@
 
 use baco::prompt::templates::{
     auth_hunt_prompt, crypto_hunt_prompt, deserialization_hunt_prompt, get_all_defaults,
-    get_default_prompt, injection_hunt_prompt, path_traversal_hunt_prompt, resource_hunt_prompt,
-    xss_hunt_prompt, BacoPhase, ProjectType, TemplateVariables,
+    get_default_prompt, get_template_variables, injection_hunt_prompt, path_traversal_hunt_prompt,
+    render_template, resource_hunt_prompt, xss_hunt_prompt, BacoPhase, ProjectType,
+    TemplateVariables,
 };
 
 use crate::prompt_test_fixtures::default_template_variables;
@@ -517,4 +518,134 @@ fn test_hunt_prompts_json_format_specified() {
     let prompt = injection_hunt_prompt("test");
     assert!(prompt.contains("Return JSON array"));
     assert!(prompt.contains("\"severity\""));
+}
+
+// ============================================================================
+// Template Rendering Tests (moved from inline #[cfg(test)] block)
+// ============================================================================
+
+#[test]
+fn test_render_template_single_variable() {
+    let template = "Hello {{NAME}}, welcome to {{PLACE}}!";
+    let mut vars = TemplateVariables::new();
+    vars.insert("NAME".to_string(), "Alice".to_string());
+    vars.insert("PLACE".to_string(), "Rustland".to_string());
+    let result = render_template(template, &vars);
+    assert_eq!(result, "Hello Alice, welcome to Rustland!");
+}
+
+#[test]
+fn test_render_template_percent_format() {
+    let template = "Project: %%PROJECT_NAME%%, Path: %%PROJECT_PATH%%";
+    let mut vars = TemplateVariables::new();
+    vars.insert("PROJECT_NAME".to_string(), "baco".to_string());
+    vars.insert("PROJECT_PATH".to_string(), "/src/baco".to_string());
+    let result = render_template(template, &vars);
+    assert_eq!(result, "Project: baco, Path: /src/baco");
+}
+
+#[test]
+fn test_render_template_multiple_same_name() {
+    let template = "{{VAR}} appears {{VAR}} twice";
+    let mut vars = TemplateVariables::new();
+    vars.insert("VAR".to_string(), "X".to_string());
+    let result = render_template(template, &vars);
+    assert_eq!(result, "X appears X twice");
+}
+
+#[test]
+fn test_render_template_empty_variables() {
+    let template = "Hello {{NAME}}!";
+    let vars = TemplateVariables::new();
+    let result = render_template(template, &vars);
+    assert_eq!(result, "Hello {{NAME}}!");
+}
+
+#[test]
+fn test_render_template_missing_variable() {
+    let template = "Hello {{NAME}}!";
+    let mut vars = TemplateVariables::new();
+    vars.insert("OTHER".to_string(), "World".to_string());
+    let result = render_template(template, &vars);
+    assert_eq!(result, "Hello {{NAME}}!");
+}
+
+#[test]
+fn test_render_template_empty_template() {
+    let result = render_template("", &TemplateVariables::new());
+    assert_eq!(result, "");
+}
+
+#[test]
+fn test_render_template_single_var_only() {
+    let mut vars = TemplateVariables::new();
+    vars.insert("ONLY".to_string(), "val".to_string());
+    let result = render_template("{{ONLY}}", &vars);
+    assert_eq!(result, "val");
+}
+
+#[test]
+fn test_render_template_no_vars() {
+    let result = render_template("Static text", &TemplateVariables::new());
+    assert_eq!(result, "Static text");
+}
+
+#[test]
+fn test_render_template_empty_value() {
+    let mut vars = TemplateVariables::new();
+    vars.insert("NAME".to_string(), "".to_string());
+    let result = render_template("Hello {{NAME}}!", &vars);
+    assert_eq!(result, "Hello !");
+}
+
+#[test]
+fn test_get_template_variables_braces() {
+    let template = "Hello {{NAME}}, welcome to {{PLACE}}!";
+    let vars = get_template_variables(template);
+    assert_eq!(vars.len(), 2);
+    assert!(vars.contains(&"NAME".to_string()));
+    assert!(vars.contains(&"PLACE".to_string()));
+}
+
+#[test]
+fn test_get_template_variables_percent() {
+    let template = "Project: %%PROJECT%%, Path: %%PATH%%";
+    let vars = get_template_variables(template);
+    assert_eq!(vars.len(), 2);
+    assert!(vars.contains(&"PROJECT".to_string()));
+    assert!(vars.contains(&"PATH".to_string()));
+}
+
+#[test]
+fn test_get_template_variables_no_vars() {
+    let vars = get_template_variables("No variables here");
+    assert!(vars.is_empty());
+}
+
+#[test]
+fn test_cwe_79_xss_template() {
+    let template = xss_hunt_prompt("<div>{{user_input}}</div>");
+    assert!(template.contains("XSS VULNERABILITIES"));
+    assert!(template.contains("CWE-79"));
+}
+
+#[test]
+fn test_cwe_89_sql_injection_template() {
+    let template = injection_hunt_prompt("SELECT * FROM users");
+    assert!(template.contains("INJECTION VULNERABILITIES"));
+    assert!(template.contains("SQL injection"));
+}
+
+#[test]
+fn test_cwe_78_command_injection_template() {
+    let template = injection_hunt_prompt("system(user_input)");
+    assert!(template.contains("command injection"));
+}
+
+#[test]
+fn test_default_prompts_contain_variables() {
+    let prompts = get_all_defaults();
+    assert!(prompts.indexing.contains("%%PROJECT_PATH%%"));
+    assert!(prompts.semgrep.contains("%%PROJECT_PATH%%"));
+    assert!(prompts.llm_static_analysis.contains("%%FILE_PATH%%"));
 }

@@ -1,0 +1,176 @@
+use std::path::PathBuf;
+
+use crate::error::ScanResult;
+use crate::findings::VulnerabilityFinding;
+use crate::scanner::phases::PhaseConfig;
+
+/// Run threat modeling phase (Phase 13/20)
+pub async fn run_threat_modeling(
+    _scanner: &crate::scanner::Scanner,
+    cfg: PhaseConfig<'_>,
+) -> ScanResult<(Vec<VulnerabilityFinding>, Vec<String>)> {
+    let PhaseConfig {
+        phase: _,
+        mut findings,
+        pb: _,
+        analyzed_files,
+        metrics_tracker: _,
+        target_path: _,
+        config,
+        project_stack: _,
+    } = cfg;
+
+    if !config.scanner.performance.enable_threat_modeling {
+        tracing::info!("Threat modeling phase disabled via config, skipping");
+        return Ok((findings, analyzed_files.to_vec()));
+    }
+
+    tracing::info!("Running threat modeling phase");
+
+    // Load or create analysis context
+    let output_path = PathBuf::from(&config.output.dir);
+    let context = if output_path.exists() {
+        match crate::analysis_context::AnalysisContext::load(&output_path) {
+            Ok(ctx) => ctx,
+            Err(e) => {
+                tracing::warn!("Failed to load analysis context: {}, creating new one", e);
+                crate::analysis_context::AnalysisContext::default()
+            }
+        }
+    } else {
+        crate::analysis_context::AnalysisContext::default()
+    };
+
+    // Run threat modeling
+    match crate::threat_model::ThreatModelingPhase::run(&output_path, &context, None).await {
+        Ok(threat_model) => {
+            // If threat model generated, add it as a finding
+            if !threat_model.is_empty() {
+                let finding = VulnerabilityFinding {
+                    id: format!("threat-model-{}", chrono::Utc::now().format("%Y%m%d%H%M%S")),
+                    title: "Threat Model Generated".to_string(),
+                    severity: crate::findings::Severity::Medium,
+                    confidence_score: 0.9,
+                    file_path: "THREAT_MODEL.md".to_string(),
+                    line_number: Some(1),
+                    code_snippet: Some(threat_model.clone()),
+                    description: threat_model,
+                    cwe_id: None,
+                    verification_status: None,
+                    sources: vec!["threat-modeling".to_string()],
+                    cross_file_references: None,
+                    diff_hunk: None,
+                    recommendation: None,
+                    code_location: None,
+                    already_reported: false,
+                    commit_reference: None,
+                    ticket_reference: None,
+                    priority_score: None,
+                    verification_notes: None,
+                    verification_error: None,
+                    agent_evidence_path: None,
+                    security_issue: None,
+                    poc_code: None,
+                    mitigation_code: None,
+                    poc_format: None,
+                    llm_model: None,
+                    agent_mode: false,
+                    statement_range: None,
+                    triage_verdict: None,
+                };
+                findings.push(finding);
+            }
+
+            Ok((findings, analyzed_files.to_vec()))
+        }
+        Err(e) => {
+            tracing::warn!("Threat modeling phase failed: {}", e);
+            Ok((findings, analyzed_files.to_vec()))
+        }
+    }
+}
+
+/// Run root cause deduplication phase (Phase 14/20)
+pub async fn run_root_cause_dedup(
+    _scanner: &crate::scanner::Scanner,
+    cfg: PhaseConfig<'_>,
+) -> ScanResult<(Vec<VulnerabilityFinding>, Vec<String>)> {
+    let PhaseConfig {
+        phase: _,
+        findings,
+        pb: _,
+        analyzed_files,
+        metrics_tracker: _,
+        target_path: _,
+        config,
+        project_stack: _,
+    } = cfg;
+
+    // Skip if disabled via performance settings
+    if !config.scanner.performance.enable_root_cause_dedup {
+        tracing::info!("Root cause deduplication phase disabled via config, skipping");
+        return Ok((findings, analyzed_files.to_vec()));
+    }
+
+    tracing::info!("Running root cause deduplication phase");
+
+    let mut dedup = crate::root_cause_dedup::RootCauseDeduplicator::new();
+    let deduped_groups = dedup.deduplicate(findings.clone());
+
+    // Keep one finding per group (the first one encountered)
+    let mut kept_findings = Vec::new();
+    for group in deduped_groups {
+        if let Some(finding_id) = group.findings.first() {
+            // Find the original finding by ID
+            if let Some(finding) = findings.iter().find(|f| f.id == *finding_id) {
+                kept_findings.push(finding.clone());
+            }
+        }
+    }
+
+    tracing::info!(
+        "Deduplicated: {} findings → {} findings",
+        findings.len(),
+        kept_findings.len()
+    );
+    Ok((kept_findings, analyzed_files.to_vec()))
+}
+
+/// Run multi verifier phase (Phase 15/20)
+pub async fn run_multi_verifier(
+    _scanner: &crate::scanner::Scanner,
+    cfg: PhaseConfig<'_>,
+) -> ScanResult<(Vec<VulnerabilityFinding>, Vec<String>)> {
+    let PhaseConfig {
+        phase: _,
+        findings,
+        pb: _,
+        analyzed_files,
+        metrics_tracker: _,
+        target_path: _,
+        config,
+        project_stack: _,
+    } = cfg;
+
+    // Skip if disabled via performance settings
+    if !config.scanner.performance.enable_multi_verifier {
+        tracing::info!("Multi verifier phase disabled via config, skipping");
+        return Ok((findings, analyzed_files.to_vec()));
+    }
+
+    tracing::info!("Running multi verifier phase");
+
+    let config_verifier = crate::multi_verifier::VerifierConfig {
+        num_verifiers: 3,
+        circuit_breaker_threshold: 0.5,
+    };
+    let verifier = crate::multi_verifier::MultiVerifier::new(config_verifier);
+    let verified_findings = verifier.verify_batch(&findings);
+
+    tracing::info!(
+        "Multi verifier: {} findings → {} findings",
+        findings.len(),
+        verified_findings.len()
+    );
+    Ok((verified_findings, analyzed_files.to_vec()))
+}

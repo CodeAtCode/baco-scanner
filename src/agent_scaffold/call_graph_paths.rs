@@ -5,15 +5,15 @@
 
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
-use tree_sitter::Parser;
 
+use crate::agent_scaffold::tree_sitter_parser::parse_source;
 use crate::context::control_path::Language;
 
 /// A call graph representing function call relationships.
 #[derive(Debug, Clone)]
 pub struct CallGraph {
-    adjacency: HashMap<String, Vec<String>>,
-    entry_points: Vec<String>,
+    pub adjacency: HashMap<String, Vec<String>>,
+    pub entry_points: Vec<String>,
 }
 
 /// A path of function names from an entry point to a target.
@@ -51,31 +51,13 @@ impl CallGraphBuilder {
             }
         };
 
-        let mut parser = Parser::new();
-        let ts_lang = language.ts_language();
-        if let Err(e) = parser.set_language(&ts_lang) {
-            tracing::warn!("Failed to set language for {:?}: {}", path, e);
-            return;
-        }
-
-        let tree = match parser.parse(&content, None) {
-            Some(t) => t,
-            None => {
-                tracing::warn!("Failed to parse file {:?}", path);
-                return;
-            }
+        let parsed = match parse_source(&content, language) {
+            Some(p) => p,
+            None => return,
         };
 
-        let root = tree.root_node();
-        if root.has_error() {
-            tracing::warn!("Parse error in file {:?}", path);
-            return;
-        }
-
-        let source_bytes = content.as_bytes();
-
         // Extract function definitions and their call sites
-        self.extract_functions(&root, source_bytes);
+        self.extract_functions(&parsed.root_node(), &parsed.source_bytes);
     }
 
     fn extract_functions(&mut self, node: &tree_sitter::Node, source: &[u8]) {
@@ -181,7 +163,7 @@ impl CallGraph {
 /// Perform a random DFS from `current` toward `target`.
 ///
 /// Uses a simple random walk with backtracking and a visited set to avoid cycles.
-fn random_dfs(
+pub fn random_dfs(
     current: &str,
     target: &str,
     adjacency: &HashMap<String, Vec<String>>,
@@ -227,7 +209,7 @@ fn random_dfs(
 }
 
 /// Simple hash function for seeding random walks.
-fn hash_string(s: &str) -> u32 {
+pub fn hash_string(s: &str) -> u32 {
     let mut hash = 0u32;
     for byte in s.bytes() {
         hash = hash.wrapping_mul(31).wrapping_add(byte as u32);
@@ -277,7 +259,10 @@ fn get_function_name(node: &tree_sitter::Node, source: &[u8]) -> Option<String> 
         }
 
         // Python/Rust function_definition with name child
-        if child_kind == "function_definition" || child_kind == "declarator" {
+        if child_kind == "function_definition"
+            || child_kind == "declarator"
+            || child_kind == "function_declarator"
+        {
             for name_child in child.children(&mut child.walk()) {
                 if name_child.kind() == "identifier" {
                     return name_child.utf8_text(source).ok().map(|s| s.to_string());
@@ -349,66 +334,4 @@ fn extract_callee_name(node: &tree_sitter::Node, source: &[u8]) -> Option<String
     }
 
     None
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_builder_empty() {
-        let builder = CallGraphBuilder::new();
-        let graph = builder.build();
-
-        assert!(graph.entry_points.is_empty());
-        assert!(graph.adjacency.is_empty());
-    }
-
-    #[test]
-    fn test_sample_zero_count() {
-        let graph = CallGraph {
-            adjacency: HashMap::new(),
-            entry_points: vec!["main".to_string()],
-        };
-
-        let paths = graph.sample_paths_to("target", 0);
-        assert!(paths.is_empty());
-    }
-
-    #[test]
-    fn test_hash_deterministic() {
-        let h1 = hash_string("test");
-        let h2 = hash_string("test");
-        assert_eq!(h1, h2);
-    }
-
-    #[test]
-    fn test_random_dfs_no_path() {
-        let mut adj = HashMap::new();
-        adj.insert("a".to_string(), vec!["b".to_string()]);
-        adj.insert("b".to_string(), vec!["c".to_string()]);
-
-        let mut visited = HashSet::new();
-        let mut path = vec!["a".to_string()];
-
-        let result = random_dfs("a", "z", &adj, &mut visited, &mut path, 10);
-        assert!(result.is_none());
-    }
-
-    #[test]
-    fn test_random_dfs_found_path() {
-        let mut adj = HashMap::new();
-        adj.insert("a".to_string(), vec!["b".to_string()]);
-        adj.insert("b".to_string(), vec!["c".to_string()]);
-
-        let mut visited = HashSet::new();
-        let mut path = vec!["a".to_string()];
-
-        let result = random_dfs("a", "c", &adj, &mut visited, &mut path, 10);
-        assert!(result.is_some());
-        let path = result.unwrap();
-        assert!(path.contains(&"a".to_string()));
-        assert!(path.contains(&"b".to_string()));
-        assert!(path.contains(&"c".to_string()));
-    }
 }

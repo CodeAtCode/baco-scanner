@@ -39,8 +39,8 @@ impl Default for VerifierConfig {
 
 pub struct MultiVerifier {
     config: VerifierConfig,
-    api_failure_count: Arc<AtomicU32>,
-    total_verifications: Arc<AtomicU32>,
+    pub api_failure_count: Arc<AtomicU32>,
+    pub total_verifications: Arc<AtomicU32>,
 }
 
 impl MultiVerifier {
@@ -88,7 +88,7 @@ impl MultiVerifier {
         Ok(majority)
     }
 
-    fn run_single_verifier(
+    pub fn run_single_verifier(
         &self,
         _verifier_id: u32,
         finding_id: &str,
@@ -107,7 +107,7 @@ impl MultiVerifier {
             return Ok(VerifierVerdict::Confirmed);
         }
 
-        if hash.is_multiple_of(3) {
+        if hash % 3 == 0 {
             Ok(VerifierVerdict::Confirmed)
         } else if hash % 3 == 1 {
             Ok(VerifierVerdict::Rejected)
@@ -116,7 +116,7 @@ impl MultiVerifier {
         }
     }
 
-    fn compute_majority(&self, verdicts: &[VerifierVerdict]) -> MajorityVerdict {
+    pub fn compute_majority(&self, verdicts: &[VerifierVerdict]) -> MajorityVerdict {
         let mut vote_counts: HashMap<VerifierVerdict, u32> = HashMap::new();
 
         for v in verdicts {
@@ -146,7 +146,7 @@ impl MultiVerifier {
         MajorityVerdict::new(final_verdict, confidence, verdicts.to_vec())
     }
 
-    fn is_circuit_broken(&self) -> bool {
+    pub fn is_circuit_broken(&self) -> bool {
         let failures = self.api_failure_count.load(Ordering::SeqCst);
         let total = self.total_verifications.load(Ordering::SeqCst);
 
@@ -158,7 +158,7 @@ impl MultiVerifier {
         failure_rate > self.config.circuit_breaker_threshold
     }
 
-    fn simple_hash(s: &str) -> u32 {
+    pub fn simple_hash(s: &str) -> u32 {
         s.bytes().fold(0u32, |acc, b| acc.wrapping_add(b as u32))
     }
 
@@ -205,155 +205,5 @@ impl MultiVerifier {
         }
 
         verified_findings
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_majority_vote_confirmed() {
-        let verifier = MultiVerifier::new(VerifierConfig::default());
-
-        let finding_id = "finding-123";
-        let code_snippet = "let result = Command::new(cmd).spawn();";
-
-        let result = verifier.verify(finding_id, code_snippet).unwrap();
-
-        // With unsafe/spawn, should be confirmed by most verifiers
-        assert!(matches!(
-            result.final_verdict,
-            VerifierVerdict::Confirmed | VerifierVerdict::Inconclusive
-        ));
-    }
-
-    #[test]
-    fn test_tie_returns_inconclusive() {
-        let verifier = MultiVerifier::new(VerifierConfig::default());
-
-        // Use a finding that produces mixed results
-        let finding_id = "test-finding";
-        let code_snippet = "println!(\"Hello\")";
-
-        // Run multiple times to hit edge cases
-        for _ in 0..10 {
-            let result = verifier.verify(finding_id, code_snippet).unwrap();
-
-            if result.final_verdict == VerifierVerdict::Inconclusive {
-                // This is acceptable - tied votes go to inconclusive
-                return;
-            }
-        }
-    }
-
-    #[test]
-    fn test_rejected_for_todo_code() {
-        let verifier = MultiVerifier::new(VerifierConfig::default());
-
-        let finding_id = "finding-456";
-        let code_snippet = "// TODO: fix this later";
-
-        let result = verifier.verify(finding_id, code_snippet).unwrap();
-
-        assert_eq!(result.final_verdict, VerifierVerdict::Rejected);
-    }
-
-    #[test]
-    fn test_circuit_breaker_triggers() {
-        let mut config = VerifierConfig::default();
-        config.num_verifiers = 5;
-
-        let verifier = MultiVerifier::new(config);
-
-        // Force circuit breaker by having too many failures
-        verifier.api_failure_count.store(10, Ordering::SeqCst);
-        verifier.total_verifications.store(15, Ordering::SeqCst);
-
-        let result = verifier.verify("finding", "code").unwrap();
-
-        assert_eq!(result.final_verdict, VerifierVerdict::Inconclusive);
-        assert!(verifier.is_circuit_broken());
-    }
-
-    #[test]
-    fn test_configurable_verifier_count() {
-        let verifier = MultiVerifier::new(VerifierConfig::default()).with_verifiers(5);
-
-        let result = verifier.verify("find", "code").unwrap();
-
-        assert_eq!(result.verdicts.len(), 5);
-    }
-
-    #[test]
-    fn test_reset_circuit_breaker() {
-        let verifier = MultiVerifier::new(VerifierConfig::default());
-
-        verifier.api_failure_count.store(10, Ordering::SeqCst);
-        verifier.total_verifications.store(15, Ordering::SeqCst);
-
-        assert!(verifier.is_circuit_broken());
-
-        verifier.reset_circuit_breaker();
-
-        assert!(!verifier.is_circuit_broken());
-    }
-
-    #[test]
-    fn test_confidence_calculation() {
-        let verifier = MultiVerifier::new(VerifierConfig::default());
-
-        // Use code that triggers consistent verdicts
-        let code = "unsafe { *ptr }";
-        let result = verifier.verify("id", code).unwrap();
-
-        // Confidence should be between 0 and 1
-        assert!(result.confidence >= 0.0);
-        assert!(result.confidence <= 1.0);
-
-        // Check vote counts sum to number of verifiers
-        let total_votes: u32 = result.vote_count.values().sum();
-        assert_eq!(total_votes, 3); // default num_verifiers
-    }
-
-    #[test]
-    fn test_vote_count_tracking() {
-        let verifier = MultiVerifier::new(VerifierConfig::default());
-
-        let result = verifier.verify("test-id", "code").unwrap();
-
-        // Vote count should have at least one entry
-        assert!(
-            !result.vote_count.is_empty(),
-            "vote_count should not be empty"
-        );
-
-        // Sum of all votes should equal number of verifiers
-        let total_votes: u32 = result.vote_count.values().sum();
-        assert_eq!(total_votes, 3); // default num_verifiers
-    }
-
-    #[test]
-    fn test_verifiers_produces_valid_output() {
-        let config = VerifierConfig {
-            num_verifiers: 5,
-            circuit_breaker_threshold: 0.3,
-        };
-
-        let verifier = MultiVerifier::new(config);
-
-        let result = verifier
-            .verify("vuln-find", "let x = unsafe { *ptr }; spawn();")
-            .unwrap();
-
-        // All verifiers should return valid verdicts
-        for v in &result.verdicts {
-            assert!(matches!(
-                v,
-                VerifierVerdict::Confirmed
-                    | VerifierVerdict::Rejected
-                    | VerifierVerdict::Inconclusive
-            ));
-        }
     }
 }

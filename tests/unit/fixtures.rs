@@ -34,7 +34,7 @@
 use baco::analysis_context::AnalysisContext;
 use baco::config::{
     AgentConfig, LlmConfig, LlmPhaseConfig, OutputConfig, PerformanceSettings, ProjectConfig,
-    RuleSynthConfig, ScannerConfig, ScannerSettings, SemgrepSettings, TgiConfig, TicketConfig,
+    RuleSynthConfig, ScannerConfig, ScannerSettings, SemgrepSettings, TicketConfig,
 };
 use baco::findings::{Severity, VerificationStatus, VulnerabilityFinding};
 pub use baco::phase::helpers::{
@@ -239,7 +239,6 @@ pub fn create_test_config() -> ScannerConfig {
                 indexing: Default::default(),
                 prompt_overrides: Default::default(),
             },
-            tgi: baco::config::TgiConfig::default(),
             temperature: 0.5,
             max_reasoning_tokens: None,
         },
@@ -402,6 +401,7 @@ pub fn create_default_test_scanner() -> (Scanner, TempDir) {
 /// - Write to the same filenames (will cause collisions)
 /// - Need complete filesystem isolation
 /// - Test cleanup/deletion behavior
+#[allow(clippy::incompatible_msrv)]
 static SHARED_TEMP_DIR: LazyLock<TempDir> =
     LazyLock::new(|| tempfile::tempdir().expect("Failed to create shared temp directory"));
 
@@ -704,30 +704,6 @@ pub fn make_aggregation_finding(
         agent_mode: false,
         statement_range: None,
         triage_verdict: None,
-    }
-}
-
-// ============================================================================
-// LLM TGI Test Helpers
-// ============================================================================
-
-/// Create TGI config for missing endpoint test.
-pub fn make_tgi_config_missing_endpoint() -> TgiConfig {
-    TgiConfig {
-        enabled: true,
-        endpoint: String::new(),
-        model: "test-model".to_string(),
-        ..Default::default()
-    }
-}
-
-/// Create TGI config for missing model test.
-pub fn make_tgi_config_missing_model() -> TgiConfig {
-    TgiConfig {
-        enabled: true,
-        endpoint: "http://localhost:8080".to_string(),
-        model: String::new(),
-        ..Default::default()
     }
 }
 

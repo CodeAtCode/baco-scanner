@@ -32,7 +32,7 @@ pub async fn run_proposer_loop(
         let outcome = validate(&pattern, traces);
         if best
             .as_ref()
-            .is_none_or(|(_, o)| outcome.score() > o.score())
+            .map_or(true, |(_, o)| outcome.score() > o.score())
         {
             best = Some((pattern.clone(), outcome.clone()));
         }

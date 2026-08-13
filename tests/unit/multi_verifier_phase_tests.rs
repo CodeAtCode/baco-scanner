@@ -266,3 +266,120 @@ fn test_multi_verifier_tie_breaker() {
 
     assert!(has_tie, "Should produce inconclusive verdict on tied votes");
 }
+#[test]
+fn test_rejected_for_todo_code() {
+    let verifier = MultiVerifier::new(VerifierConfig::default());
+
+    let finding_id = "finding-456";
+    let code_snippet = "// TODO: fix this later";
+
+    let result = verifier.verify(finding_id, code_snippet).unwrap();
+
+    assert_eq!(result.final_verdict, VerifierVerdict::Rejected);
+}
+
+#[test]
+fn test_circuit_breaker_triggers() {
+    let config = VerifierConfig {
+        num_verifiers: 5,
+        ..Default::default()
+    };
+
+    let verifier = MultiVerifier::new(config);
+
+    // Force circuit breaker by having too many failures
+    verifier
+        .api_failure_count
+        .store(10, std::sync::atomic::Ordering::SeqCst);
+    verifier
+        .total_verifications
+        .store(15, std::sync::atomic::Ordering::SeqCst);
+
+    let result = verifier.verify("finding", "code").unwrap();
+
+    assert_eq!(result.final_verdict, VerifierVerdict::Inconclusive);
+    assert!(verifier.is_circuit_broken());
+}
+
+#[test]
+fn test_configurable_verifier_count() {
+    let verifier = MultiVerifier::new(VerifierConfig::default()).with_verifiers(5);
+
+    let result = verifier.verify("find", "code").unwrap();
+
+    assert_eq!(result.verdicts.len(), 5);
+}
+
+#[test]
+fn test_reset_circuit_breaker() {
+    let verifier = MultiVerifier::new(VerifierConfig::default());
+
+    verifier
+        .api_failure_count
+        .store(10, std::sync::atomic::Ordering::SeqCst);
+    verifier
+        .total_verifications
+        .store(15, std::sync::atomic::Ordering::SeqCst);
+
+    assert!(verifier.is_circuit_broken());
+
+    verifier.reset_circuit_breaker();
+
+    assert!(!verifier.is_circuit_broken());
+}
+
+#[test]
+fn test_confidence_calculation() {
+    let verifier = MultiVerifier::new(VerifierConfig::default());
+
+    // Use code that triggers consistent verdicts
+    let code = "unsafe { *ptr }";
+    let result = verifier.verify("id", code).unwrap();
+
+    // Confidence should be between 0 and 1
+    assert!(result.confidence >= 0.0);
+    assert!(result.confidence <= 1.0);
+
+    // Check vote counts sum to number of verifiers
+    let total_votes: u32 = result.vote_count.values().sum();
+    assert_eq!(total_votes, 3); // default num_verifiers
+}
+
+#[test]
+fn test_vote_count_tracking() {
+    let verifier = MultiVerifier::new(VerifierConfig::default());
+
+    let result = verifier.verify("test-id", "code").unwrap();
+
+    // Vote count should have at least one entry
+    assert!(
+        !result.vote_count.is_empty(),
+        "vote_count should not be empty"
+    );
+
+    // Sum of all votes should equal number of verifiers
+    let total_votes: u32 = result.vote_count.values().sum();
+    assert_eq!(total_votes, 3); // default num_verifiers
+}
+
+#[test]
+fn test_verifiers_produces_valid_output() {
+    let config = VerifierConfig {
+        num_verifiers: 5,
+        circuit_breaker_threshold: 0.3,
+    };
+
+    let verifier = MultiVerifier::new(config);
+
+    let result = verifier
+        .verify("vuln-find", "let x = unsafe { *ptr }; spawn();")
+        .unwrap();
+
+    // All verifiers should return valid verdicts
+    for v in &result.verdicts {
+        assert!(matches!(
+            v,
+            VerifierVerdict::Confirmed | VerifierVerdict::Rejected | VerifierVerdict::Inconclusive
+        ));
+    }
+}

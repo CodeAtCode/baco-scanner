@@ -141,7 +141,7 @@ pub fn load_corpus(path: &Path) -> Vec<LabelledTrace> {
     if let Ok(entries) = std::fs::read_dir(path) {
         for entry in entries.flatten() {
             let p = entry.path();
-            if p.extension().is_none_or(|ext| ext != "txt") {
+            if p.extension().map_or(true, |ext| ext != "txt") {
                 continue;
             }
             let filename = p

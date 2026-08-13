@@ -6,9 +6,10 @@
 use baco::config::ScannerConfig;
 use baco::llm::LlmConfig;
 use baco::llm_analysis::{
-    extract_cwe_id, generate_mitigation_code, generate_poc_code, generate_recommendation,
-    LlmAnalyzer,
+    extract_cwe_id, format_cwe_specs, generate_mitigation_code, generate_poc_code,
+    generate_recommendation, LlmAnalyzer,
 };
+use baco::retrieval::CweDocument;
 use std::path::Path;
 
 // ============================================================================
@@ -873,4 +874,246 @@ fn test_severity_mapping_unknown_defaults_low() {
     let result = analyzer.parse_llm_response(json_response, "test.c", "test-model");
     assert!(result.is_ok());
     assert_eq!(result.unwrap()[0].severity, baco::findings::Severity::Low);
+}
+
+// ============================================================================
+// parse_code_snippet Tests (from inline tests)
+// ============================================================================
+
+#[test]
+fn test_parse_code_snippet_with_before_after() {
+    let config = LlmConfig::default();
+    let client = baco::llm::LlmClient::new(config.clone());
+    let scanner_config = ScannerConfig::default();
+    let analyzer = LlmAnalyzer::new(client, vec!["c".to_string()], 512, &scanner_config);
+
+    let json_response = r#"[
+        {
+            "severity": "high",
+            "title": "SQL Injection",
+            "description": "Potential SQL injection detected",
+            "line": 42,
+            "cwe_id": "CWE-89",
+            "fix_code": "Use parameterized queries",
+            "recommendation": "Validate input",
+            "code_snippet": {
+                "before": "let query = \"SELECT * FROM users\";\nlet id = get_input();\nlet full = query + id;",
+                "code": "db.execute(&full);",
+                "after": "let result = db.execute(&full);\nprocess(result);\nreturn Ok(());"
+            }
+        }
+    ]"#;
+
+    let result = analyzer.parse_llm_response(json_response, "src/db.rs", "test-model");
+    assert!(result.is_ok());
+    let findings = result.unwrap();
+    assert_eq!(findings.len(), 1);
+
+    let finding = &findings[0];
+    assert_eq!(finding.cwe_id, Some("CWE-89".to_string()));
+    assert!(finding.diff_hunk.is_some());
+}
+
+#[test]
+fn test_parse_code_snippet_empty_before_after() {
+    let config = LlmConfig::default();
+    let client = baco::llm::LlmClient::new(config.clone());
+    let scanner_config = ScannerConfig::default();
+    let analyzer = LlmAnalyzer::new(client, vec!["c".to_string()], 512, &scanner_config);
+
+    let json_response = r#"[
+        {
+            "severity": "medium",
+            "title": "Hardcoded Password",
+            "description": "Password hardcoded",
+            "line": 15,
+            "cwe_id": "CWE-798",
+            "fix_code": "Use env vars",
+            "recommendation": "Move to config",
+            "code_snippet": {
+                "before": "",
+                "code": "const PW = \"admin123\";",
+                "after": ""
+            }
+        }
+    ]"#;
+
+    let result = analyzer.parse_llm_response(json_response, "src/config.rs", "test-model");
+    assert!(result.is_ok());
+    let findings = result.unwrap();
+    assert_eq!(findings.len(), 1);
+
+    let finding = &findings[0];
+    assert_eq!(finding.diff_hunk, Some("Use env vars".to_string()));
+}
+
+#[test]
+fn test_parse_code_snippet_missing() {
+    let config = LlmConfig::default();
+    let client = baco::llm::LlmClient::new(config.clone());
+    let scanner_config = ScannerConfig::default();
+    let analyzer = LlmAnalyzer::new(client, vec!["c".to_string()], 512, &scanner_config);
+
+    let json_response = r#"[
+        {
+            "severity": "low",
+            "title": "Unused Variable",
+            "description": "Variable not used",
+            "line": 8,
+            "cwe_id": null,
+            "fix_code": "Remove var",
+            "recommendation": "Clean up"
+        }
+    ]"#;
+
+    let result = analyzer.parse_llm_response(json_response, "src/main.rs", "test-model");
+    assert!(result.is_ok());
+    let findings = result.unwrap();
+    assert_eq!(findings.len(), 1);
+
+    let finding = &findings[0];
+    assert_eq!(finding.diff_hunk, Some("Remove var".to_string()));
+}
+
+// ============================================================================
+// generate_mitigation_code Tests (from inline tests)
+// ============================================================================
+
+#[test]
+fn test_generate_mitigation_code_cwe79_xss() {
+    let mit = generate_mitigation_code("XSS Vulnerability", "test.js", 42);
+    assert!(mit.is_none());
+}
+
+#[test]
+fn test_generate_mitigation_code_cwe89_sqli() {
+    let mit = generate_mitigation_code("SQL Injection", "db.c", 10);
+    assert!(mit.is_none());
+}
+
+#[test]
+fn test_generate_mitigation_code_cwe78_os_command_injection() {
+    let mit = generate_mitigation_code("OS Command Injection", "shell.c", 25);
+    assert!(mit.is_none());
+}
+
+#[test]
+fn test_generate_mitigation_code_empty_cwe() {
+    let mit = generate_mitigation_code("", "test.c", 0);
+    assert!(mit.is_none());
+}
+
+#[test]
+fn test_generate_mitigation_code_invalid_cwe() {
+    let mit = generate_mitigation_code("Unknown Vulnerability", "test.c", 10);
+    assert!(mit.is_none());
+}
+
+// ============================================================================
+// format_cwe_specs Tests (from inline tests)
+// ============================================================================
+
+#[test]
+fn test_format_cwe_specs_empty_list() {
+    let results: Vec<&CweDocument> = vec![];
+    let formatted = format_cwe_specs(&results);
+    assert!(formatted.is_empty());
+}
+
+#[test]
+fn test_format_cwe_specs_single_cwe() {
+    let doc = CweDocument {
+        cwe_id: "CWE-79".to_string(),
+        name: "Cross-site Scripting".to_string(),
+        description: "Basic XSS vulnerability".to_string(),
+        examples: vec!["Example 1".to_string()],
+        mitigation: "Escape output".to_string(),
+    };
+
+    let formatted = format_cwe_specs(&[&doc]);
+
+    assert!(formatted.contains("CWE-79: Cross-site Scripting"));
+    assert!(formatted.contains("Description: Basic XSS vulnerability"));
+    assert!(formatted.contains("Examples:"));
+    assert!(formatted.contains("  - Example 1"));
+    assert!(formatted.contains("Mitigation: Escape output"));
+}
+
+#[test]
+fn test_format_cwe_specs_multiple_cwes() {
+    let doc1 = CweDocument {
+        cwe_id: "CWE-79".to_string(),
+        name: "Cross-site Scripting".to_string(),
+        description: "XSS desc".to_string(),
+        examples: vec![],
+        mitigation: "Escape".to_string(),
+    };
+
+    let doc2 = CweDocument {
+        cwe_id: "CWE-89".to_string(),
+        name: "SQL Injection".to_string(),
+        description: "SQLi desc".to_string(),
+        examples: vec!["SQL example".to_string()],
+        mitigation: "Parameterized queries".to_string(),
+    };
+
+    let formatted = format_cwe_specs(&[&doc1, &doc2]);
+
+    assert!(formatted.contains("CWE-79: Cross-site Scripting"));
+    assert!(formatted.contains("CWE-89: SQL Injection"));
+    assert!(formatted.contains("XSS desc"));
+    assert!(formatted.contains("SQLi desc"));
+    assert!(formatted.contains("\n\n"));
+}
+
+#[test]
+fn test_format_cwe_specs_malformed_cwe_strings() {
+    let doc = CweDocument {
+        cwe_id: "INVALID".to_string(),
+        name: "Invalid CWE".to_string(),
+        description: "Bad format".to_string(),
+        examples: vec![],
+        mitigation: "Fix it".to_string(),
+    };
+
+    let formatted = format_cwe_specs(&[&doc]);
+
+    assert!(formatted.contains("INVALID: Invalid CWE"));
+    assert!(formatted.contains("Bad format"));
+}
+
+#[test]
+fn test_format_cwe_specs_no_examples() {
+    let doc = CweDocument {
+        cwe_id: "CWE-79".to_string(),
+        name: "XSS".to_string(),
+        description: "No examples".to_string(),
+        examples: vec![],
+        mitigation: "Mitigation".to_string(),
+    };
+
+    let formatted = format_cwe_specs(&[&doc]);
+
+    assert!(formatted.contains("CWE-79: XSS"));
+    assert!(!formatted.contains("Examples:"));
+    assert!(formatted.contains("Mitigation: Mitigation"));
+}
+
+// ============================================================================
+// LlmAnalyzer Construction Tests (from inline tests)
+// ============================================================================
+
+#[test]
+fn test_llm_analyzer_new_with_various_file_sizes() {
+    let config = LlmConfig::default();
+    let client = baco::llm::LlmClient::new(config.clone());
+    let scanner_config = ScannerConfig::default();
+
+    let analyzer = LlmAnalyzer::new(client, vec!["c".to_string()], 1, &scanner_config);
+    assert!(analyzer.should_analyze(Path::new("test.c")));
+
+    let config = LlmConfig::default();
+    let client = baco::llm::LlmClient::new(config.clone());
+    let analyzer = LlmAnalyzer::new(client, vec!["c".to_string()], 10240, &scanner_config);
+    assert!(analyzer.should_analyze(Path::new("test.c")));
 }

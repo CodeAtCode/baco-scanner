@@ -186,7 +186,6 @@ mod tests {
                 retry_backoff_ms: 1000,
                 max_concurrent: 4,
                 phases: LlmPhasesConfig::default(),
-                tgi: crate::config::TgiConfig::default(),
                 temperature: 0.5,
                 max_reasoning_tokens: None,
             },

@@ -16,9 +16,6 @@ mod semgrep;
 mod sv_trusteval;
 mod triage_pipeline;
 
-// TGI integration tests
-mod tgi_integration;
-
 // Triple path context integration tests (T2.2)
 mod triple_path;
 
