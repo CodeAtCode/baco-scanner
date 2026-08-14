@@ -617,9 +617,9 @@ impl Default for ConfidenceRefinementPhase {
 
 /// Helper struct for code context analysis.
 pub struct ContextAnalysis {
-    supports: bool,
-    contradicts: bool,
-    explanation: String,
+    pub supports: bool,
+    pub contradicts: bool,
+    pub explanation: String,
 }
 
 /// Project baseline for confidence normalization.
