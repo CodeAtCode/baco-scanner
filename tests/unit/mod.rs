@@ -212,3 +212,20 @@ mod agent_scaffold_tests;
 mod agent_scaffold_tree_sitter_parser_tests;
 mod context_pacvd_tests;
 mod rulesynth_validator_tests;
+
+// Standalone unit test modules for core types
+mod analysis_context_tests;
+mod confidence_tests;
+mod severity_rubric_tests;
+
+// HTML renderer unit tests
+mod html_finding_renderer_tests;
+mod html_renderer_tests;
+
+// Coverage gap closure: indexer, file_hash, incremental_scan, rate_limiter, phases
+mod confidence_aggregation_tests;
+mod file_hash_tests;
+mod incremental_scan_tests;
+mod indexer_tests;
+mod rate_limiter_tests;
+mod ticket_git_cross_tests;
