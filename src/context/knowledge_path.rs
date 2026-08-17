@@ -70,7 +70,7 @@ pub fn retrieve(
 }
 
 /// Extract searchable keywords from code
-fn extract_keywords(code: &str) -> String {
+pub fn extract_keywords(code: &str) -> String {
     // Simple keyword extraction: keep alphanumeric words, filter common terms
     let common_terms = [
         "the", "and", "for", "with", "this", "that", "from", "have", "has", "int", "void", "char",
@@ -91,11 +91,13 @@ fn extract_keywords(code: &str) -> String {
 }
 
 /// Truncate text to max length with ellipsis
-fn truncate_text(text: &str, max_len: usize) -> String {
+pub fn truncate_text(text: &str, max_len: usize) -> String {
     if text.len() <= max_len {
         text.to_string()
     } else {
-        format!("{}...", &text[..max_len.saturating_sub(3)])
+        // Use char-based truncation for unicode safety
+        let trunc_len = (max_len.saturating_sub(3)).min(text.chars().count());
+        format!("{}...", text.chars().take(trunc_len).collect::<String>())
     }
 }
 

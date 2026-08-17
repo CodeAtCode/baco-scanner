@@ -68,7 +68,7 @@ impl AbstractionVector {
     }
 }
 
-fn categorize(callee: &str) -> &'static str {
+pub fn categorize(callee: &str) -> &'static str {
     let c = callee.to_lowercase();
     if matches!(
         c.as_str(),
@@ -138,7 +138,7 @@ fn categorize(callee: &str) -> &'static str {
     }
 }
 
-fn tag_cwe(callee: &str) -> Option<(&'static str, &'static str)> {
+pub fn tag_cwe(callee: &str) -> Option<(&'static str, &'static str)> {
     let c = callee.to_lowercase();
     match c.as_str() {
         "strcpy" | "strcat" | "gets" | "sprintf" | "vsprintf" => {

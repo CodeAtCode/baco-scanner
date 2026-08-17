@@ -137,8 +137,7 @@ mod chain_analysis_tests;
 mod core_utils_tests;
 mod cve_misc_tests;
 
-// Additional coverage: prompt templates, context summary, report aggregation, rulesynth
-mod context_summary_tests;
+// Additional coverage: prompt templates, report aggregation, rulesynth
 mod prompt_templates_tests;
 mod report_aggregation_tests;
 mod rulesynth_tests;
@@ -217,6 +216,16 @@ mod rulesynth_validator_tests;
 mod analysis_context_tests;
 mod confidence_tests;
 mod severity_rubric_tests;
+
+// Context module tests
+mod context_summary_tests;
+mod context_control_path_tests;
+mod context_callee_walker_tests;
+mod context_triple_path_tests;
+mod context_primitive_api_tests;
+mod context_knowledge_path_tests;
+mod context_semantic_path_tests;
+mod context_pacvd_extractor_tests;
 
 // HTML renderer unit tests
 mod html_finding_renderer_tests;
