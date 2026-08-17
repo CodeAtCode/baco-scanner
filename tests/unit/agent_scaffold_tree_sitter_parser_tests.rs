@@ -196,7 +196,9 @@ fn complex_function(x: i32, y: &str) -> Result<String, String> {
 fn test_parsed_file_new_constructor() {
     let content = "test".to_string();
     let mut parser = tree_sitter::Parser::new();
-    parser.set_language(&tree_sitter_rust::LANGUAGE.into()).unwrap();
+    parser
+        .set_language(&tree_sitter_rust::LANGUAGE.into())
+        .unwrap();
     let tree = parser.parse(&content, None).unwrap();
 
     let parsed = ParsedFile::new(content.clone(), parser, tree);

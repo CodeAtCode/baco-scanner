@@ -46,16 +46,16 @@ fn test_call_site_hash_and_ord() {
 
     // Same callee and arg_count should be equal
     assert_eq!(site1, site2);
-    
+
     // Different arg_count should not be equal
     assert_ne!(site1, site3);
-    
+
     // Should be usable in BTreeSet
     let mut set = BTreeSet::new();
     set.insert(site1);
     set.insert(site2); // Should not add duplicate
     set.insert(site3); // Should add different site
-    
+
     assert_eq!(set.len(), 2);
 }
 
@@ -67,7 +67,7 @@ fn test_call_site_hash_and_ord() {
 fn test_no_calls() {
     let source = "let x = 42;";
     let sites = extract_call_sites(source);
-    
+
     assert!(sites.is_empty());
 }
 
@@ -75,7 +75,7 @@ fn test_no_calls() {
 fn test_simple_single_call() {
     let source = "foo(1, 2)";
     let sites = extract_call_sites(source);
-    
+
     assert_eq!(sites.len(), 1);
     let site = sites.iter().next().unwrap();
     assert_eq!(site.callee, "foo");
@@ -86,7 +86,7 @@ fn test_simple_single_call() {
 fn test_zero_args() {
     let source = "getpid()";
     let sites = extract_call_sites(source);
-    
+
     assert_eq!(sites.len(), 1);
     let site = sites.iter().next().unwrap();
     assert_eq!(site.callee, "getpid");
@@ -97,7 +97,7 @@ fn test_zero_args() {
 fn test_one_arg() {
     let source = "printf(\"hello\")";
     let sites = extract_call_sites(source);
-    
+
     assert_eq!(sites.len(), 1);
     let site = sites.iter().next().unwrap();
     assert_eq!(site.callee, "printf");
@@ -108,7 +108,7 @@ fn test_one_arg() {
 fn test_many_args() {
     let source = "func(a, b, c, d, e)";
     let sites = extract_call_sites(source);
-    
+
     assert_eq!(sites.len(), 1);
     let site = sites.iter().next().unwrap();
     assert_eq!(site.callee, "func");
@@ -123,7 +123,7 @@ fn test_many_args() {
 fn test_nested_call_outer() {
     let source = "outer(inner(1), 2)";
     let sites = extract_call_sites(source);
-    
+
     assert!(sites.contains(&CallSite {
         callee: "outer".to_string(),
         arg_count: 2
@@ -134,7 +134,7 @@ fn test_nested_call_outer() {
 fn test_nested_call_inner() {
     let source = "outer(inner(1), 2)";
     let sites = extract_call_sites(source);
-    
+
     assert!(sites.contains(&CallSite {
         callee: "inner".to_string(),
         arg_count: 1
@@ -145,20 +145,38 @@ fn test_nested_call_inner() {
 fn test_deeply_nested_calls() {
     let source = "a(b(c(d())))";
     let sites = extract_call_sites(source);
-    
-    assert!(sites.contains(&CallSite { callee: "a".to_string(), arg_count: 1 }));
-    assert!(sites.contains(&CallSite { callee: "b".to_string(), arg_count: 1 }));
-    assert!(sites.contains(&CallSite { callee: "c".to_string(), arg_count: 1 }));
-    assert!(sites.contains(&CallSite { callee: "d".to_string(), arg_count: 0 }));
+
+    assert!(sites.contains(&CallSite {
+        callee: "a".to_string(),
+        arg_count: 1
+    }));
+    assert!(sites.contains(&CallSite {
+        callee: "b".to_string(),
+        arg_count: 1
+    }));
+    assert!(sites.contains(&CallSite {
+        callee: "c".to_string(),
+        arg_count: 1
+    }));
+    assert!(sites.contains(&CallSite {
+        callee: "d".to_string(),
+        arg_count: 0
+    }));
 }
 
 #[test]
 fn test_nested_with_multiple_args() {
     let source = "outer(1, inner(2, 3), 4)";
     let sites = extract_call_sites(source);
-    
-    assert!(sites.contains(&CallSite { callee: "outer".to_string(), arg_count: 3 }));
-    assert!(sites.contains(&CallSite { callee: "inner".to_string(), arg_count: 2 }));
+
+    assert!(sites.contains(&CallSite {
+        callee: "outer".to_string(),
+        arg_count: 3
+    }));
+    assert!(sites.contains(&CallSite {
+        callee: "inner".to_string(),
+        arg_count: 2
+    }));
 }
 
 // ============================================================================
@@ -169,7 +187,7 @@ fn test_nested_with_multiple_args() {
 fn test_dedup_same_callee_same_args() {
     let source = "foo(1)\nfoo(1)\nfoo(1)";
     let sites = extract_call_sites(source);
-    
+
     // Should only have one entry for foo(1)
     assert_eq!(sites.len(), 1);
     assert!(sites.contains(&CallSite {
@@ -182,10 +200,10 @@ fn test_dedup_same_callee_same_args() {
 fn test_same_callee_different_args() {
     let source = "foo(1)\nfoo(2, 3)\nfoo(4, 5, 6)";
     let sites = extract_call_sites(source);
-    
+
     // Should have three entries (different arg counts)
     assert_eq!(sites.len(), 3);
-    
+
     let foo_sites: Vec<_> = sites.iter().filter(|s| s.callee == "foo").collect();
     assert_eq!(foo_sites.len(), 3);
 }
@@ -198,7 +216,7 @@ fn test_same_callee_different_args() {
 fn test_method_call_colons() {
     let source = "obj::method(a)";
     let sites = extract_call_sites(source);
-    
+
     assert!(!sites.is_empty());
     let names: Vec<_> = sites.iter().map(|c| c.callee.as_str()).collect();
     assert!(names.iter().any(|n| n.contains("method")));
@@ -208,7 +226,7 @@ fn test_method_call_colons() {
 fn test_rust_method_call() {
     let source = "vec.push(1)";
     let sites = extract_call_sites(source);
-    
+
     // Implementation may detect vec or push - just verify no panic
     let _ = sites;
 }
@@ -221,7 +239,7 @@ fn test_rust_method_call() {
 fn test_call_with_complex_args() {
     let source = "func(a + b, c * d, e)";
     let sites = extract_call_sites(source);
-    
+
     assert_eq!(sites.len(), 1);
     let site = sites.iter().next().unwrap();
     assert_eq!(site.callee, "func");
@@ -232,7 +250,7 @@ fn test_call_with_complex_args() {
 fn test_call_with_nested_parens() {
     let source = "func((a + b))";
     let sites = extract_call_sites(source);
-    
+
     // Implementation may vary - just verify we detect calls or accept empty
     let _ = sites;
 }
@@ -241,7 +259,7 @@ fn test_call_with_nested_parens() {
 fn test_call_with_brackets() {
     let source = "func(arr[0])";
     let sites = extract_call_sites(source);
-    
+
     assert_eq!(sites.len(), 1);
     let site = sites.iter().next().unwrap();
     assert_eq!(site.callee, "func");
@@ -252,7 +270,7 @@ fn test_call_with_brackets() {
 fn test_call_with_braces() {
     let source = "func(Struct { a: 1 })";
     let sites = extract_call_sites(source);
-    
+
     assert_eq!(sites.len(), 1);
     let site = sites.iter().next().unwrap();
     assert_eq!(site.callee, "func");
@@ -271,19 +289,34 @@ fn test_multiple_statements() {
         baz(3);
     ";
     let sites = extract_call_sites(source);
-    
-    assert!(sites.contains(&CallSite { callee: "foo".to_string(), arg_count: 1 }));
-    assert!(sites.contains(&CallSite { callee: "bar".to_string(), arg_count: 1 }));
-    assert!(sites.contains(&CallSite { callee: "baz".to_string(), arg_count: 1 }));
+
+    assert!(sites.contains(&CallSite {
+        callee: "foo".to_string(),
+        arg_count: 1
+    }));
+    assert!(sites.contains(&CallSite {
+        callee: "bar".to_string(),
+        arg_count: 1
+    }));
+    assert!(sites.contains(&CallSite {
+        callee: "baz".to_string(),
+        arg_count: 1
+    }));
 }
 
 #[test]
 fn test_multiple_calls_same_line() {
     let source = "foo(1); bar(2);";
     let sites = extract_call_sites(source);
-    
-    assert!(sites.contains(&CallSite { callee: "foo".to_string(), arg_count: 1 }));
-    assert!(sites.contains(&CallSite { callee: "bar".to_string(), arg_count: 1 }));
+
+    assert!(sites.contains(&CallSite {
+        callee: "foo".to_string(),
+        arg_count: 1
+    }));
+    assert!(sites.contains(&CallSite {
+        callee: "bar".to_string(),
+        arg_count: 1
+    }));
 }
 
 // ============================================================================
@@ -294,7 +327,7 @@ fn test_multiple_calls_same_line() {
 fn test_empty_source() {
     let source = "";
     let sites = extract_call_sites(source);
-    
+
     assert!(sites.is_empty());
 }
 
@@ -302,7 +335,7 @@ fn test_empty_source() {
 fn test_whitespace_only() {
     let source = "   \n\n   ";
     let sites = extract_call_sites(source);
-    
+
     assert!(sites.is_empty());
 }
 
@@ -310,7 +343,7 @@ fn test_whitespace_only() {
 fn test_underscore_identifier() {
     let source = "_func(1)";
     let sites = extract_call_sites(source);
-    
+
     assert!(sites.contains(&CallSite {
         callee: "_func".to_string(),
         arg_count: 1
@@ -321,7 +354,7 @@ fn test_underscore_identifier() {
 fn test_underscore_in_name() {
     let source = "my_func_name(1, 2)";
     let sites = extract_call_sites(source);
-    
+
     assert!(sites.contains(&CallSite {
         callee: "my_func_name".to_string(),
         arg_count: 2
@@ -332,7 +365,7 @@ fn test_underscore_in_name() {
 fn test_numeric_in_name() {
     let source = "func123(1)";
     let sites = extract_call_sites(source);
-    
+
     assert!(sites.contains(&CallSite {
         callee: "func123".to_string(),
         arg_count: 1
@@ -345,7 +378,7 @@ fn test_call_in_string_literal() {
     // So "foo()" in a string might be detected
     let source = r#"let s = "foo(1)";"#;
     let sites = extract_call_sites(source);
-    
+
     // May or may not detect - this is expected behavior for regex-based scanning
     // Just verify we don't panic
     let _ = sites;
@@ -356,7 +389,7 @@ fn test_call_in_comment() {
     // Similar limitation - comments may contain detected patterns
     let source = "// foo(1)";
     let sites = extract_call_sites(source);
-    
+
     // May or may not detect - expected for regex-based scanning
     let _ = sites;
 }
@@ -365,7 +398,7 @@ fn test_call_in_comment() {
 fn test_unicode_identifiers() {
     let source = "函数 (1)";
     let sites = extract_call_sites(source);
-    
+
     // Unicode identifiers may or may not be detected depending on implementation
     let _ = sites;
 }
@@ -385,7 +418,7 @@ fn main() {
 "#;
 
     let sites = extract_call_sites(source);
-    
+
     // Implementation may vary for real code - just verify no panic
     let _ = sites;
 }
@@ -403,19 +436,40 @@ int main() {
 "#;
 
     let sites = extract_call_sites(source);
-    
-    assert!(sites.contains(&CallSite { callee: "fopen".to_string(), arg_count: 2 }));
-    assert!(sites.contains(&CallSite { callee: "fgets".to_string(), arg_count: 3 }));
-    assert!(sites.contains(&CallSite { callee: "fclose".to_string(), arg_count: 1 }));
+
+    assert!(sites.contains(&CallSite {
+        callee: "fopen".to_string(),
+        arg_count: 2
+    }));
+    assert!(sites.contains(&CallSite {
+        callee: "fgets".to_string(),
+        arg_count: 3
+    }));
+    assert!(sites.contains(&CallSite {
+        callee: "fclose".to_string(),
+        arg_count: 1
+    }));
 }
 
 #[test]
 fn test_complex_nested_expression() {
     let source = "result = outer(inner1(a, b), inner2(c, d(e, f)))";
     let sites = extract_call_sites(source);
-    
-    assert!(sites.contains(&CallSite { callee: "outer".to_string(), arg_count: 2 }));
-    assert!(sites.contains(&CallSite { callee: "inner1".to_string(), arg_count: 2 }));
-    assert!(sites.contains(&CallSite { callee: "inner2".to_string(), arg_count: 2 }));
-    assert!(sites.contains(&CallSite { callee: "d".to_string(), arg_count: 2 }));
+
+    assert!(sites.contains(&CallSite {
+        callee: "outer".to_string(),
+        arg_count: 2
+    }));
+    assert!(sites.contains(&CallSite {
+        callee: "inner1".to_string(),
+        arg_count: 2
+    }));
+    assert!(sites.contains(&CallSite {
+        callee: "inner2".to_string(),
+        arg_count: 2
+    }));
+    assert!(sites.contains(&CallSite {
+        callee: "d".to_string(),
+        arg_count: 2
+    }));
 }

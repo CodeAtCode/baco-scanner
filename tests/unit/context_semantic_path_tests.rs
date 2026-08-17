@@ -1,6 +1,6 @@
 //! Unit tests for src/context/semantic_path.rs - SemanticPath extraction
 
-use baco::context::semantic_path::{summarize_mock, SemanticPath, ContextError};
+use baco::context::semantic_path::{summarize_mock, ContextError, SemanticPath};
 
 // ============================================================================
 // SemanticPath tests

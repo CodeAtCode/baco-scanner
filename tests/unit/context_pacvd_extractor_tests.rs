@@ -1,8 +1,6 @@
 //! Unit tests for src/context/pacvd_extractor.rs - PacVD primitive-API abstraction
 
-use baco::context::pacvd_extractor::{
-    extract, auto_level, AbstractionLevel, categorize, tag_cwe,
-};
+use baco::context::pacvd_extractor::{auto_level, categorize, extract, tag_cwe, AbstractionLevel};
 
 use baco::context::callee_walker::{extract_call_sites, CallSite};
 use std::collections::BTreeSet;
@@ -107,8 +105,14 @@ fn test_auto_level_zero() {
 #[test]
 fn test_extract_primitive_level() {
     let mut sites = BTreeSet::new();
-    sites.insert(CallSite { callee: "strcpy".to_string(), arg_count: 2 });
-    sites.insert(CallSite { callee: "malloc".to_string(), arg_count: 1 });
+    sites.insert(CallSite {
+        callee: "strcpy".to_string(),
+        arg_count: 2,
+    });
+    sites.insert(CallSite {
+        callee: "malloc".to_string(),
+        arg_count: 1,
+    });
 
     let vector = extract(&sites, AbstractionLevel::Primitive);
 
@@ -122,7 +126,10 @@ fn test_extract_primitive_level() {
 #[test]
 fn test_extract_primitive_format() {
     let mut sites = BTreeSet::new();
-    sites.insert(CallSite { callee: "foo".to_string(), arg_count: 3 });
+    sites.insert(CallSite {
+        callee: "foo".to_string(),
+        arg_count: 3,
+    });
 
     let vector = extract(&sites, AbstractionLevel::Primitive);
 
@@ -137,8 +144,14 @@ fn test_extract_primitive_format() {
 #[test]
 fn test_extract_typed_level() {
     let mut sites = BTreeSet::new();
-    sites.insert(CallSite { callee: "foo".to_string(), arg_count: 1 });
-    sites.insert(CallSite { callee: "bar".to_string(), arg_count: 2 });
+    sites.insert(CallSite {
+        callee: "foo".to_string(),
+        arg_count: 1,
+    });
+    sites.insert(CallSite {
+        callee: "bar".to_string(),
+        arg_count: 2,
+    });
 
     let vector = extract(&sites, AbstractionLevel::Typed);
 
@@ -151,7 +164,10 @@ fn test_extract_typed_level() {
 #[test]
 fn test_extract_typed_contains_unknown() {
     let mut sites = BTreeSet::new();
-    sites.insert(CallSite { callee: "foo".to_string(), arg_count: 1 });
+    sites.insert(CallSite {
+        callee: "foo".to_string(),
+        arg_count: 1,
+    });
 
     let vector = extract(&sites, AbstractionLevel::Typed);
 
@@ -165,9 +181,18 @@ fn test_extract_typed_contains_unknown() {
 #[test]
 fn test_extract_grouped_level() {
     let mut sites = BTreeSet::new();
-    sites.insert(CallSite { callee: "strcpy".to_string(), arg_count: 2 });
-    sites.insert(CallSite { callee: "system".to_string(), arg_count: 1 });
-    sites.insert(CallSite { callee: "printf".to_string(), arg_count: 1 });
+    sites.insert(CallSite {
+        callee: "strcpy".to_string(),
+        arg_count: 2,
+    });
+    sites.insert(CallSite {
+        callee: "system".to_string(),
+        arg_count: 1,
+    });
+    sites.insert(CallSite {
+        callee: "printf".to_string(),
+        arg_count: 1,
+    });
 
     let vector = extract(&sites, AbstractionLevel::Grouped);
 
@@ -179,9 +204,18 @@ fn test_extract_grouped_level() {
 #[test]
 fn test_extract_grouped_memory_category() {
     let mut sites = BTreeSet::new();
-    sites.insert(CallSite { callee: "strcpy".to_string(), arg_count: 2 });
-    sites.insert(CallSite { callee: "memcpy".to_string(), arg_count: 3 });
-    sites.insert(CallSite { callee: "malloc".to_string(), arg_count: 1 });
+    sites.insert(CallSite {
+        callee: "strcpy".to_string(),
+        arg_count: 2,
+    });
+    sites.insert(CallSite {
+        callee: "memcpy".to_string(),
+        arg_count: 3,
+    });
+    sites.insert(CallSite {
+        callee: "malloc".to_string(),
+        arg_count: 1,
+    });
 
     let vector = extract(&sites, AbstractionLevel::Grouped);
 
@@ -191,9 +225,18 @@ fn test_extract_grouped_memory_category() {
 #[test]
 fn test_extract_grouped_io_category() {
     let mut sites = BTreeSet::new();
-    sites.insert(CallSite { callee: "printf".to_string(), arg_count: 1 });
-    sites.insert(CallSite { callee: "fopen".to_string(), arg_count: 2 });
-    sites.insert(CallSite { callee: "read".to_string(), arg_count: 3 });
+    sites.insert(CallSite {
+        callee: "printf".to_string(),
+        arg_count: 1,
+    });
+    sites.insert(CallSite {
+        callee: "fopen".to_string(),
+        arg_count: 2,
+    });
+    sites.insert(CallSite {
+        callee: "read".to_string(),
+        arg_count: 3,
+    });
 
     let vector = extract(&sites, AbstractionLevel::Grouped);
 
@@ -203,8 +246,14 @@ fn test_extract_grouped_io_category() {
 #[test]
 fn test_extract_grouped_control_flow_category() {
     let mut sites = BTreeSet::new();
-    sites.insert(CallSite { callee: "system".to_string(), arg_count: 1 });
-    sites.insert(CallSite { callee: "execve".to_string(), arg_count: 3 });
+    sites.insert(CallSite {
+        callee: "system".to_string(),
+        arg_count: 1,
+    });
+    sites.insert(CallSite {
+        callee: "execve".to_string(),
+        arg_count: 3,
+    });
 
     let vector = extract(&sites, AbstractionLevel::Grouped);
 
@@ -214,8 +263,14 @@ fn test_extract_grouped_control_flow_category() {
 #[test]
 fn test_extract_grouped_crypto_category() {
     let mut sites = BTreeSet::new();
-    sites.insert(CallSite { callee: "aes_encrypt".to_string(), arg_count: 2 });
-    sites.insert(CallSite { callee: "sha256_hash".to_string(), arg_count: 1 });
+    sites.insert(CallSite {
+        callee: "aes_encrypt".to_string(),
+        arg_count: 2,
+    });
+    sites.insert(CallSite {
+        callee: "sha256_hash".to_string(),
+        arg_count: 1,
+    });
 
     let vector = extract(&sites, AbstractionLevel::Grouped);
 
@@ -225,8 +280,14 @@ fn test_extract_grouped_crypto_category() {
 #[test]
 fn test_extract_grouped_database_category() {
     let mut sites = BTreeSet::new();
-    sites.insert(CallSite { callee: "sql_query".to_string(), arg_count: 2 });
-    sites.insert(CallSite { callee: "db_connect".to_string(), arg_count: 1 });
+    sites.insert(CallSite {
+        callee: "sql_query".to_string(),
+        arg_count: 2,
+    });
+    sites.insert(CallSite {
+        callee: "db_connect".to_string(),
+        arg_count: 1,
+    });
 
     let vector = extract(&sites, AbstractionLevel::Grouped);
 
@@ -236,7 +297,10 @@ fn test_extract_grouped_database_category() {
 #[test]
 fn test_extract_grouped_other_category() {
     let mut sites = BTreeSet::new();
-    sites.insert(CallSite { callee: "unknown_func".to_string(), arg_count: 1 });
+    sites.insert(CallSite {
+        callee: "unknown_func".to_string(),
+        arg_count: 1,
+    });
 
     let vector = extract(&sites, AbstractionLevel::Grouped);
 
@@ -250,8 +314,14 @@ fn test_extract_grouped_other_category() {
 #[test]
 fn test_extract_semantic_level() {
     let mut sites = BTreeSet::new();
-    sites.insert(CallSite { callee: "strcpy".to_string(), arg_count: 2 });
-    sites.insert(CallSite { callee: "system".to_string(), arg_count: 1 });
+    sites.insert(CallSite {
+        callee: "strcpy".to_string(),
+        arg_count: 2,
+    });
+    sites.insert(CallSite {
+        callee: "system".to_string(),
+        arg_count: 1,
+    });
 
     let vector = extract(&sites, AbstractionLevel::Semantic);
 
@@ -262,37 +332,58 @@ fn test_extract_semantic_level() {
 #[test]
 fn test_extract_semantic_buffer_overflow() {
     let mut sites = BTreeSet::new();
-    sites.insert(CallSite { callee: "strcpy".to_string(), arg_count: 2 });
+    sites.insert(CallSite {
+        callee: "strcpy".to_string(),
+        arg_count: 2,
+    });
 
     let vector = extract(&sites, AbstractionLevel::Semantic);
 
-    assert!(vector.semantic.iter().any(|(k, _)| k.contains("buffer_overflow")));
+    assert!(vector
+        .semantic
+        .iter()
+        .any(|(k, _)| k.contains("buffer_overflow")));
 }
 
 #[test]
 fn test_extract_semantic_command_injection() {
     let mut sites = BTreeSet::new();
-    sites.insert(CallSite { callee: "system".to_string(), arg_count: 1 });
+    sites.insert(CallSite {
+        callee: "system".to_string(),
+        arg_count: 1,
+    });
 
     let vector = extract(&sites, AbstractionLevel::Semantic);
 
-    assert!(vector.semantic.iter().any(|(k, _)| k.contains("command_injection")));
+    assert!(vector
+        .semantic
+        .iter()
+        .any(|(k, _)| k.contains("command_injection")));
 }
 
 #[test]
 fn test_extract_semantic_double_free() {
     let mut sites = BTreeSet::new();
-    sites.insert(CallSite { callee: "free".to_string(), arg_count: 1 });
+    sites.insert(CallSite {
+        callee: "free".to_string(),
+        arg_count: 1,
+    });
 
     let vector = extract(&sites, AbstractionLevel::Semantic);
 
-    assert!(vector.semantic.iter().any(|(k, _)| k.contains("double_free")));
+    assert!(vector
+        .semantic
+        .iter()
+        .any(|(k, _)| k.contains("double_free")));
 }
 
 #[test]
 fn test_extract_semantic_mem_mgmt() {
     let mut sites = BTreeSet::new();
-    sites.insert(CallSite { callee: "malloc".to_string(), arg_count: 1 });
+    sites.insert(CallSite {
+        callee: "malloc".to_string(),
+        arg_count: 1,
+    });
 
     let vector = extract(&sites, AbstractionLevel::Semantic);
 
@@ -302,17 +393,26 @@ fn test_extract_semantic_mem_mgmt() {
 #[test]
 fn test_extract_semantic_off_by_one() {
     let mut sites = BTreeSet::new();
-    sites.insert(CallSite { callee: "strncpy".to_string(), arg_count: 3 });
+    sites.insert(CallSite {
+        callee: "strncpy".to_string(),
+        arg_count: 3,
+    });
 
     let vector = extract(&sites, AbstractionLevel::Semantic);
 
-    assert!(vector.semantic.iter().any(|(k, _)| k.contains("off_by_one")));
+    assert!(vector
+        .semantic
+        .iter()
+        .any(|(k, _)| k.contains("off_by_one")));
 }
 
 #[test]
 fn test_extract_semantic_unknown_funcs_not_tagged() {
     let mut sites = BTreeSet::new();
-    sites.insert(CallSite { callee: "unknown_func".to_string(), arg_count: 1 });
+    sites.insert(CallSite {
+        callee: "unknown_func".to_string(),
+        arg_count: 1,
+    });
 
     let vector = extract(&sites, AbstractionLevel::Semantic);
 
@@ -327,7 +427,10 @@ fn test_extract_semantic_unknown_funcs_not_tagged() {
 #[test]
 fn test_to_prompt_section_primitive() {
     let mut sites = BTreeSet::new();
-    sites.insert(CallSite { callee: "strcpy".to_string(), arg_count: 2 });
+    sites.insert(CallSite {
+        callee: "strcpy".to_string(),
+        arg_count: 2,
+    });
 
     let vector = extract(&sites, AbstractionLevel::Primitive);
     let section = vector.to_prompt_section();
@@ -344,7 +447,10 @@ fn test_to_prompt_section_primitive() {
 #[test]
 fn test_to_prompt_section_typed() {
     let mut sites = BTreeSet::new();
-    sites.insert(CallSite { callee: "foo".to_string(), arg_count: 1 });
+    sites.insert(CallSite {
+        callee: "foo".to_string(),
+        arg_count: 1,
+    });
 
     let vector = extract(&sites, AbstractionLevel::Typed);
     let section = vector.to_prompt_section();
@@ -359,7 +465,10 @@ fn test_to_prompt_section_typed() {
 #[test]
 fn test_to_prompt_section_grouped() {
     let mut sites = BTreeSet::new();
-    sites.insert(CallSite { callee: "strcpy".to_string(), arg_count: 2 });
+    sites.insert(CallSite {
+        callee: "strcpy".to_string(),
+        arg_count: 2,
+    });
 
     let vector = extract(&sites, AbstractionLevel::Grouped);
     let section = vector.to_prompt_section();
@@ -374,7 +483,10 @@ fn test_to_prompt_section_grouped() {
 #[test]
 fn test_to_prompt_section_semantic() {
     let mut sites = BTreeSet::new();
-    sites.insert(CallSite { callee: "strcpy".to_string(), arg_count: 2 });
+    sites.insert(CallSite {
+        callee: "strcpy".to_string(),
+        arg_count: 2,
+    });
 
     let vector = extract(&sites, AbstractionLevel::Semantic);
     let section = vector.to_prompt_section();
@@ -402,39 +514,68 @@ fn test_to_prompt_section_empty() {
 
 #[test]
 fn test_categorize_io_functions() {
-    let io_funcs = ["fopen", "fclose", "fread", "fwrite", "open", "close", "read", "write",
-                    "printf", "fprintf", "sprintf", "scanf", "fgets", "fputs", "puts"];
-    
+    let io_funcs = [
+        "fopen", "fclose", "fread", "fwrite", "open", "close", "read", "write", "printf",
+        "fprintf", "sprintf", "scanf", "fgets", "fputs", "puts",
+    ];
+
     for func in io_funcs {
-            assert_eq!(categorize(func), "I/O");
+        assert_eq!(categorize(func), "I/O");
     }
 }
 
 #[test]
 fn test_categorize_memory_functions() {
-    let mem_funcs = ["memcpy", "memset", "memmove", "strcpy", "strncpy", "strcat", "strncat",
-                     "strlen", "strcmp", "strncmp", "malloc", "calloc", "realloc", "free", "alloca"];
-    
+    let mem_funcs = [
+        "memcpy", "memset", "memmove", "strcpy", "strncpy", "strcat", "strncat", "strlen",
+        "strcmp", "strncmp", "malloc", "calloc", "realloc", "free", "alloca",
+    ];
+
     for func in mem_funcs {
-        assert_eq!(categorize(func), "memory", "Function {} should be categorized as memory", func);
+        assert_eq!(
+            categorize(func),
+            "memory",
+            "Function {} should be categorized as memory",
+            func
+        );
     }
 }
 
 #[test]
 fn test_categorize_string_functions() {
-    let str_funcs = ["strtok", "strstr", "strchr", "strrchr", "sscanf", "snprintf", "vsnprintf"];
-    
+    let str_funcs = [
+        "strtok",
+        "strstr",
+        "strchr",
+        "strrchr",
+        "sscanf",
+        "snprintf",
+        "vsnprintf",
+    ];
+
     for func in str_funcs {
-        assert_eq!(categorize(func), "string", "Function {} should be categorized as string", func);
+        assert_eq!(
+            categorize(func),
+            "string",
+            "Function {} should be categorized as string",
+            func
+        );
     }
 }
 
 #[test]
 fn test_categorize_control_flow_functions() {
-    let cf_funcs = ["system", "execve", "execl", "execvp", "popen", "fork", "exec", "eval"];
-    
+    let cf_funcs = [
+        "system", "execve", "execl", "execvp", "popen", "fork", "exec", "eval",
+    ];
+
     for func in cf_funcs {
-        assert_eq!(categorize(func), "control_flow", "Function {} should be categorized as control_flow", func);
+        assert_eq!(
+            categorize(func),
+            "control_flow",
+            "Function {} should be categorized as control_flow",
+            func
+        );
     }
 }
 

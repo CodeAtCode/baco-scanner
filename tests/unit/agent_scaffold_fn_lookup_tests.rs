@@ -243,4 +243,3 @@ fn test_index_directory_excludes_patterns() {
     assert!(ext_map.contains_key("py"));
     assert!(!ext_map.contains_key("js"));
 }
-

@@ -252,7 +252,11 @@ mod tests {
         let result = analyzer.parse_llm_response(json_response, "test.c", "test-model");
         assert!(result.is_ok());
         let findings = result.unwrap();
-        assert_eq!(findings.len(), 0, "Invalid JSON should return empty findings");
+        assert_eq!(
+            findings.len(),
+            0,
+            "Invalid JSON should return empty findings"
+        );
     }
 
     #[tokio::test]
@@ -290,7 +294,11 @@ mod tests {
         let result = analyzer.parse_llm_response(json_response, "test.c", "test-model");
         assert!(result.is_ok());
         let findings = result.unwrap();
-        assert_eq!(findings.len(), 0, "Missing required fields should skip finding");
+        assert_eq!(
+            findings.len(),
+            0,
+            "Missing required fields should skip finding"
+        );
     }
 
     #[test]
@@ -544,7 +552,9 @@ mod tests {
         );
 
         // Test with a non-existent file (should return empty, not error)
-        let result = analyzer.analyze_file(std::path::Path::new("/nonexistent/file.c")).await;
+        let result = analyzer
+            .analyze_file(std::path::Path::new("/nonexistent/file.c"))
+            .await;
         assert!(result.is_ok());
         assert!(result.unwrap().is_empty());
     }

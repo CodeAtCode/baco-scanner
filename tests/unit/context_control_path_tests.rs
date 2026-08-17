@@ -1,6 +1,6 @@
 //! Unit tests for src/context/control_path.rs - ControlPath extraction
 
-use baco::context::control_path::{extract, Language, ContextError};
+use baco::context::control_path::{extract, ContextError, Language};
 
 // ============================================================================
 // Language tests
@@ -45,7 +45,7 @@ void simple_func() {
 
     let result = extract(source, Language::C);
     assert!(result.is_ok());
-    
+
     let control = result.unwrap();
     assert!(!control.ast_text.is_empty());
 }
@@ -64,7 +64,7 @@ void process(int x) {
 
     let result = extract(source, Language::C);
     assert!(result.is_ok());
-    
+
     let control = result.unwrap();
     assert!(control.cfg_text.contains("if") || control.cfg_text.contains("if_statement"));
 }
@@ -81,7 +81,7 @@ void iterate() {
 
     let result = extract(source, Language::C);
     assert!(result.is_ok());
-    
+
     let control = result.unwrap();
     // CFG should contain for/while statement info
     assert!(!control.cfg_text.is_empty());
@@ -97,7 +97,7 @@ void func3() {}
 
     let result = extract(source, Language::C);
     assert!(result.is_ok());
-    
+
     let control = result.unwrap();
     // May or may not detect function names - just verify extraction works
     assert!(!control.cfg_text.is_empty() || control.cfg_text.is_empty());
@@ -114,7 +114,7 @@ void assign() {
 
     let result = extract(source, Language::C);
     assert!(result.is_ok());
-    
+
     let control = result.unwrap();
     // DFG should contain assignment info
     assert!(!control.dfg_text.is_empty() || control.dfg_text.contains("(no assignments"));
@@ -134,7 +134,7 @@ fn simple_func() {
 
     let result = extract(source, Language::Rust);
     assert!(result.is_ok());
-    
+
     let control = result.unwrap();
     assert!(!control.ast_text.is_empty());
 }
@@ -152,7 +152,7 @@ fn process(x: i32) {
 
     let result = extract(source, Language::Rust);
     assert!(result.is_ok());
-    
+
     let control = result.unwrap();
     // Should detect match expression
     assert!(!control.cfg_text.is_empty());
@@ -170,7 +170,7 @@ fn bindings() {
 
     let result = extract(source, Language::Rust);
     assert!(result.is_ok());
-    
+
     let control = result.unwrap();
     // DFG should capture let bindings
     assert!(!control.dfg_text.is_empty());
@@ -189,7 +189,7 @@ def simple_func():
 
     let result = extract(source, Language::Python);
     assert!(result.is_ok());
-    
+
     let control = result.unwrap();
     assert!(!control.ast_text.is_empty());
 }
@@ -204,7 +204,7 @@ def iterate():
 
     let result = extract(source, Language::Python);
     assert!(result.is_ok());
-    
+
     let control = result.unwrap();
     // Should detect for statement
     assert!(!control.cfg_text.is_empty());
@@ -221,7 +221,7 @@ def count():
 
     let result = extract(source, Language::Python);
     assert!(result.is_ok());
-    
+
     let control = result.unwrap();
     // Should detect while statement
     assert!(!control.cfg_text.is_empty());
@@ -238,7 +238,7 @@ def multi_assign():
 
     let result = extract(source, Language::Python);
     assert!(result.is_ok());
-    
+
     let control = result.unwrap();
     // DFG should contain assignments
     assert!(!control.dfg_text.is_empty());
@@ -258,7 +258,7 @@ function simpleFunc() {
 
     let result = extract(source, Language::JavaScript);
     assert!(result.is_ok());
-    
+
     let control = result.unwrap();
     assert!(!control.ast_text.is_empty());
 }
@@ -276,7 +276,7 @@ function process(x) {
 
     let result = extract(source, Language::JavaScript);
     assert!(result.is_ok());
-    
+
     let control = result.unwrap();
     // Should detect switch statement
     assert!(!control.cfg_text.is_empty());
@@ -290,7 +290,7 @@ function process(x) {
 fn test_extract_empty_source() {
     let source = "";
     let result = extract(source, Language::C);
-    
+
     // Empty source may still produce a valid (minimal) AST
     assert!(result.is_ok());
     let control = result.unwrap();
@@ -301,7 +301,7 @@ fn test_extract_empty_source() {
 fn test_extract_whitespace_only() {
     let source = "   \n\n   \n   ";
     let result = extract(source, Language::C);
-    
+
     assert!(result.is_ok());
 }
 
@@ -323,7 +323,7 @@ void broken( {
 fn test_extract_very_long_source() {
     let source = "fn test() { let x = 1; }\n".repeat(1000);
     let result = extract(&source, Language::Rust);
-    
+
     assert!(result.is_ok());
     let control = result.unwrap();
     assert!(!control.ast_text.is_empty());
@@ -339,7 +339,7 @@ fn unicode_test() {
 
     let result = extract(source, Language::Rust);
     assert!(result.is_ok());
-    
+
     let control = result.unwrap();
     assert!(!control.ast_text.is_empty());
 }
@@ -353,9 +353,9 @@ fn test_control_path_has_all_fields() {
     let source = "fn test() { let x = 1; }";
     let result = extract(source, Language::Rust);
     assert!(result.is_ok());
-    
+
     let _control = result.unwrap();
-    
+
     // All three fields should exist (even if empty)
     // Note: len() >= 0 is always true for usize, so we just verify the fields exist
 }
@@ -365,14 +365,16 @@ fn test_ast_text_contains_node_types() {
     let source = "fn test() { let x = 1; }";
     let result = extract(source, Language::Rust);
     assert!(result.is_ok());
-    
+
     let control = result.unwrap();
-    
+
     // AST should contain recognizable node types
-    assert!(control.ast_text.contains("function") || 
-            control.ast_text.contains("declaration") ||
-            control.ast_text.contains("let") ||
-            !control.ast_text.is_empty());
+    assert!(
+        control.ast_text.contains("function")
+            || control.ast_text.contains("declaration")
+            || control.ast_text.contains("let")
+            || !control.ast_text.is_empty()
+    );
 }
 
 #[test]
@@ -380,9 +382,9 @@ fn test_cfg_text_format() {
     let source = "fn test() { if (true) {} }";
     let result = extract(source, Language::C);
     assert!(result.is_ok());
-    
+
     let control = result.unwrap();
-    
+
     // CFG text should have some structure
     assert!(!control.cfg_text.is_empty() || control.cfg_text.contains("(no functions"));
 }
@@ -392,9 +394,9 @@ fn test_dfg_text_format() {
     let source = "fn test() { let x = 1; }";
     let result = extract(source, Language::Rust);
     assert!(result.is_ok());
-    
+
     let control = result.unwrap();
-    
+
     // DFG should have some content
     assert!(!control.dfg_text.is_empty() || control.dfg_text.contains("(no assignments"));
 }
@@ -407,7 +409,7 @@ fn test_dfg_text_format() {
 fn test_context_error_display_parse_error() {
     let err = ContextError::ParseError { line: 42 };
     let displayed = format!("{}", err);
-    
+
     assert!(displayed.contains("Parse error"));
     assert!(displayed.contains("42"));
 }
@@ -416,7 +418,7 @@ fn test_context_error_display_parse_error() {
 fn test_context_error_display_unsupported_language() {
     let err = ContextError::UnsupportedLanguage("Unknown".to_string());
     let displayed = format!("{}", err);
-    
+
     assert!(displayed.contains("Unsupported language"));
     assert!(displayed.contains("Unknown"));
 }
@@ -425,7 +427,7 @@ fn test_context_error_display_unsupported_language() {
 fn test_context_error_display_no_functions() {
     let err = ContextError::NoFunctions;
     let displayed = format!("{}", err);
-    
+
     assert!(displayed.contains("No functions"));
 }
 
@@ -433,7 +435,7 @@ fn test_context_error_display_no_functions() {
 fn test_context_error_display_tree_sitter_error() {
     let err = ContextError::TreeSitterError("test error".to_string());
     let displayed = format!("{}", err);
-    
+
     assert!(displayed.contains("Tree-sitter error"));
     assert!(displayed.contains("test error"));
 }

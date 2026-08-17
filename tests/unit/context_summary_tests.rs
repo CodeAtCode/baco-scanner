@@ -1,8 +1,8 @@
 //! Unit tests for src/context/summary.rs - ContextExtractor and ContextSummary
 
 use baco::context::summary::{ContextExtractor, ContextSummary, FunctionSummary};
-use std::path::PathBuf;
 use std::fs;
+use std::path::PathBuf;
 
 // ============================================================================
 // ContextSummary tests
@@ -48,14 +48,12 @@ fn test_format_for_prompt_with_functions() {
     let summary = ContextSummary {
         file_path: PathBuf::from("test.rs"),
         language: "rust".to_string(),
-        functions: vec![
-            FunctionSummary {
-                name: "main".to_string(),
-                signature: "fn main()".to_string(),
-                start_line: 1,
-                end_line: 10,
-            },
-        ],
+        functions: vec![FunctionSummary {
+            name: "main".to_string(),
+            signature: "fn main()".to_string(),
+            start_line: 1,
+            end_line: 10,
+        }],
         imports: vec![],
         exports: vec![],
         call_relationships: vec![],
@@ -315,7 +313,10 @@ use crate::utils::helper;
     let summary = ContextExtractor::extract(&tmp_path);
 
     assert_eq!(summary.imports.len(), 3);
-    assert!(summary.imports.iter().any(|i: &String| i.contains("std::io")));
+    assert!(summary
+        .imports
+        .iter()
+        .any(|i: &String| i.contains("std::io")));
 }
 
 #[test]
@@ -395,8 +396,14 @@ from utils import helper, helper2
     let summary = ContextExtractor::extract(&tmp_path);
 
     assert!(summary.imports.len() >= 4);
-    assert!(summary.imports.iter().any(|i: &String| i.contains("import os")));
-    assert!(summary.imports.iter().any(|i: &String| i.contains("from pathlib import Path")));
+    assert!(summary
+        .imports
+        .iter()
+        .any(|i: &String| i.contains("import os")));
+    assert!(summary
+        .imports
+        .iter()
+        .any(|i: &String| i.contains("from pathlib import Path")));
 }
 
 #[test]
@@ -476,7 +483,10 @@ import { useState, useEffect } from 'react';
     let summary = ContextExtractor::extract(&tmp_path);
 
     assert!(summary.imports.len() >= 2);
-    assert!(summary.imports.iter().any(|i: &String| i.contains("import React")));
+    assert!(summary
+        .imports
+        .iter()
+        .any(|i: &String| i.contains("import React")));
 }
 
 #[test]
@@ -493,7 +503,10 @@ const fs = require('fs');
     let summary = ContextExtractor::extract(&tmp_path);
 
     assert!(summary.imports.len() >= 2);
-    assert!(summary.imports.iter().any(|i: &String| i.contains("require('express')")));
+    assert!(summary
+        .imports
+        .iter()
+        .any(|i: &String| i.contains("require('express')")));
 }
 
 #[test]
@@ -538,9 +551,9 @@ fn test_detect_language_c() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let path = tmp_dir.path().join("test.c");
     fs::write(&path, "int main() { return 0; }").unwrap();
-    
+
     let summary = ContextExtractor::extract(&path);
-    
+
     // Language detection depends on implementation - just verify extraction works
     assert!(summary.language == "c" || summary.language.is_empty());
 }
@@ -550,7 +563,7 @@ fn test_detect_language_cpp() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let path = tmp_dir.path().join("test.cpp");
     fs::write(&path, "int main() { return 0; }").unwrap();
-    
+
     let summary = ContextExtractor::extract(&path);
     assert!(summary.language == "cpp" || summary.language.is_empty());
 }
@@ -560,7 +573,7 @@ fn test_detect_language_python() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let path = tmp_dir.path().join("test.py");
     fs::write(&path, "def main(): pass").unwrap();
-    
+
     let summary = ContextExtractor::extract(&path);
     assert!(summary.language == "python" || summary.language.is_empty());
 }
@@ -570,7 +583,7 @@ fn test_detect_language_javascript() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let path = tmp_dir.path().join("test.js");
     fs::write(&path, "function main() {}").unwrap();
-    
+
     let summary = ContextExtractor::extract(&path);
     assert!(summary.language == "javascript" || summary.language.is_empty());
 }
@@ -580,7 +593,7 @@ fn test_detect_language_typescript() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let path = tmp_dir.path().join("test.ts");
     fs::write(&path, "function main(): void {}").unwrap();
-    
+
     let summary = ContextExtractor::extract(&path);
     assert!(summary.language == "typescript" || summary.language.is_empty());
 }
@@ -588,7 +601,7 @@ fn test_detect_language_typescript() {
 #[test]
 fn test_detect_language_unknown() {
     let tmp_dir = tempfile::tempdir().unwrap();
-    
+
     let summary = ContextExtractor::extract(&tmp_dir.path().join("test.xyz"));
     assert!(summary.language.is_empty() || summary.language == "unknown");
     assert!(summary.functions.is_empty());
@@ -639,7 +652,10 @@ fn main() {
     let summary = ContextExtractor::extract(&tmp_path);
 
     // Should detect that main calls helper
-    assert!(summary.call_relationships.iter().any(|r: &String| r.contains("main") && r.contains("helper")));
+    assert!(summary
+        .call_relationships
+        .iter()
+        .any(|r: &String| r.contains("main") && r.contains("helper")));
 }
 
 #[test]
@@ -685,8 +701,12 @@ fn second() {
     let summary = ContextExtractor::extract(&tmp_path);
 
     assert!(summary.functions.len() >= 2);
-    
+
     // First function should start at line 1
-    let first_func = summary.functions.iter().find(|f| f.name == "first").unwrap();
+    let first_func = summary
+        .functions
+        .iter()
+        .find(|f| f.name == "first")
+        .unwrap();
     assert_eq!(first_func.start_line, 1);
 }

@@ -20,9 +20,11 @@ pub use callee_walker::{extract_call_sites, CallSite};
 pub use control_path::{
     extract as extract_control_path, ContextError as ControlPathError, ControlPath, Language,
 };
-pub use knowledge_path::{retrieve as retrieve_knowledge, truncate_text, KnowledgePath, RetrievedRule};
+pub use knowledge_path::{
+    retrieve as retrieve_knowledge, truncate_text, KnowledgePath, RetrievedRule,
+};
 pub use pacvd_extractor::{
-    auto_level, extract as extract_pacvd, AbstractionLevel, AbstractionVector, categorize, tag_cwe,
+    auto_level, categorize, extract as extract_pacvd, tag_cwe, AbstractionLevel, AbstractionVector,
 };
 pub use primitive_api::{lookup as lookup_primitive_api, PrimitiveApiEntry, PrimitiveApiVulnType};
 pub use semantic_path::{summarize as summarize_semantic, SemanticPath};

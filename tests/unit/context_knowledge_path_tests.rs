@@ -1,6 +1,8 @@
 //! Unit tests for src/context/knowledge_path.rs - KnowledgePath retrieval
 
-use baco::context::knowledge_path::{retrieve, extract_keywords, truncate_text, ContextError, KnowledgePath, RetrievedRule};
+use baco::context::knowledge_path::{
+    extract_keywords, retrieve, truncate_text, ContextError, KnowledgePath, RetrievedRule,
+};
 use baco::retrieval::CweKnowledgeBase;
 
 // ============================================================================
