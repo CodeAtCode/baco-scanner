@@ -238,3 +238,6 @@ mod incremental_scan_tests;
 mod indexer_tests;
 mod rate_limiter_tests;
 mod ticket_git_cross_tests;
+
+// VulInSpec module tests
+mod vuln_spec_tests;

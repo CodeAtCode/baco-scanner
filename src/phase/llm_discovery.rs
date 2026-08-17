@@ -1,6 +1,7 @@
 use super::{PhaseContext, PhaseError, ScanPhase};
 use crate::findings::VulnerabilityFinding;
 use crate::llm::ChatMessage;
+use crate::vuln_spec::retriever;
 use async_trait::async_trait;
 
 pub struct LlmDiscoveryPhase;
@@ -60,6 +61,13 @@ impl ScanPhase for LlmDiscoveryPhase {
                 let source_code = std::fs::read_to_string(&source_path)
                     .unwrap_or_else(|_| "Unable to read source file".to_string());
 
+                // Retrieve relevant specifications if enabled
+                let spec_context = if ctx.scanner.config.scanner.performance.vuln_spec.enabled {
+                    build_specification_context(&source_code, &finding.cwe_id)
+                } else {
+                    String::new()
+                };
+
                 let mut all_descriptions: Vec<String> = Vec::new();
                 let mut all_fixes: Vec<String> = Vec::new();
 
@@ -73,6 +81,7 @@ FILE: {}:{}
 VULNERABILITY: {}
 CURRENT DESCRIPTION: {}
 MODEL: {}
+{}
 
 SOURCE CODE:
 ```
@@ -89,6 +98,7 @@ Respond with ONLY a JSON object (no other text):
                         finding.title,
                         finding.description,
                         model,
+                        spec_context,
                         &source_code[..source_code.len().min(8000)]
                     );
 
@@ -128,6 +138,16 @@ Respond with ONLY a JSON object (no other text):
                     models
                 );
 
+                // Retrieve relevant specifications if enabled
+                let source_path = target_path.join(&finding.file_path);
+                let source_code = std::fs::read_to_string(&source_path)
+                    .unwrap_or_else(|_| "Unable to read source file".to_string());
+                let spec_context = if ctx.scanner.config.scanner.performance.vuln_spec.enabled {
+                    build_specification_context(&source_code, &finding.cwe_id)
+                } else {
+                    String::new()
+                };
+
                 let mut all_descriptions: Vec<String> = Vec::new();
                 let mut all_fixes: Vec<String> = Vec::new();
 
@@ -143,6 +163,7 @@ Respond with ONLY a JSON object (no other text):
 Location: {}:{}
 Current description: {}
 Model: {}
+{}
 
 Respond with ONLY JSON:
 {{
@@ -153,7 +174,8 @@ Respond with ONLY JSON:
                             finding.file_path,
                             finding.line_number.unwrap_or(0),
                             finding.description,
-                            model
+                            model,
+                            spec_context
                         )),
                     ];
 
@@ -213,4 +235,46 @@ fn parse_llm_response(
     } else {
         tracing::warn!("  Failed to parse JSON response from model {}", model);
     }
+}
+
+/// Build specification context for LLM prompt augmentation
+fn build_specification_context(source_code: &str, cwe_id: &Option<String>) -> String {
+    if source_code.is_empty() {
+        return String::new();
+    }
+
+    // Get CWE ID or use generic
+    let cwe = cwe_id.as_deref().unwrap_or("CWE-000");
+
+    // Retrieve relevant specifications
+    let specs = retriever::retrieve_relevant_specs(source_code, cwe, 3);
+
+    if specs.is_empty() {
+        return String::new();
+    }
+
+    // Build context string
+    let mut context = String::from("\n");
+    context.push_str("==========================================================\n");
+    context.push_str("SECURITY SPECIFICATION CONTEXT (VulInSpec)\n");
+    context.push_str("==========================================================\n");
+    context.push_str("Based on similar vulnerabilities, expected safe behaviors include:\n\n");
+
+    for (i, spec) in specs.iter().enumerate() {
+        context.push_str(&format!("[Specification {}]\n", i + 1));
+        context.push_str(&format!("  Type: {}\n", spec.vuln_type));
+        context.push_str(&format!("  Description: {}\n", spec.description));
+        context.push_str(&format!("  Safe Pattern: {}\n", spec.safe_behavior_pattern));
+        context.push_str(&format!("  Domain: {}\n", spec.project_domain));
+        context.push('\n');
+    }
+
+    context.push_str("==========================================================\n");
+    context.push_str("VERIFICATION TASK:\n");
+    context.push_str("When analyzing this code, verify it follows these safe\n");
+    context.push_str("behavior patterns. If the code violates any specification,\n");
+    context.push_str("explicitly note which specification is violated.\n");
+    context.push_str("==========================================================\n");
+
+    context
 }

@@ -2,12 +2,14 @@ mod env;
 mod llm;
 mod phases;
 mod scanner;
+mod specifications;
 mod tickets;
 
 pub use env::*;
 pub use llm::*;
 pub use phases::*;
 pub use scanner::*;
+pub use specifications::*;
 pub use tickets::*;
 
 use serde::{Deserialize, Serialize};

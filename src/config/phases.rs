@@ -58,7 +58,7 @@ pub fn default_mocq_max_iterations() -> u8 {
 }
 
 pub fn default_enable_threat_modeling() -> bool {
-    true
+    false
 }
 
 pub fn default_enable_root_cause_dedup() -> bool {

@@ -67,4 +67,5 @@ pub mod tickets;
 pub mod tools;
 pub mod validation;
 pub mod variant_search;
+pub mod vuln_spec; // VulInSpec specification-guided detection
 pub mod worktree_staging;

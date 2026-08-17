@@ -1,0 +1,268 @@
+//! VulInSpec security specification data structures.
+//!
+//! This module defines the core data structures for the VulInSpec approach
+//! (arXiv:2511.04014), which extracts security specifications from historical
+//! vulnerabilities and patches to enhance vulnerability detection.
+
+use chrono::Utc;
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+
+/// Unique identifier for a security specification
+pub type SpecId = String;
+
+/// CWE (Common Weakness Enumeration) identifier
+pub type CweId = String;
+
+/// Domain category distinguishing general vs domain-specific specifications
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub enum DomainCategory {
+    /// General specifications: fundamental safe behaviors across all projects
+    #[default]
+    General,
+    /// Domain-specific: repeated violations in particular repositories/domains
+    DomainSpecific(String),
+}
+
+/// A security specification extracted from historical vulnerabilities/patches
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SecuritySpecification {
+    /// Unique identifier for this specification
+    pub id: SpecId,
+    /// CWE category of the vulnerability this specification addresses
+    pub vuln_type: CweId,
+    /// Human-readable description of the vulnerability pattern
+    pub description: String,
+    /// Pattern describing the safe behavior that prevents this vulnerability
+    pub safe_behavior_pattern: String,
+    /// Project domain context (e.g., "web-server", "database", "crypto")
+    pub project_domain: String,
+    /// Hash of the source patch this specification was extracted from
+    pub source_patch_hash: String,
+    /// Category indicating if this is general or domain-specific
+    #[serde(default)]
+    pub category: DomainCategory,
+}
+
+/// Source information for a specification (the patch it came from)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpecificationSource {
+    /// Path to the project where this patch originated
+    pub project_path: String,
+    /// Git commit hash containing the patch
+    pub commit_hash: String,
+    /// The actual diff content
+    pub patch_diff: String,
+    /// Timestamp when this specification was extracted
+    pub extracted_at: String,
+}
+
+/// Configuration for the VulInSpec module
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VulnSpecConfig {
+    /// Whether VulInSpec is enabled (default: false)
+    #[serde(default = "default_false")]
+    pub enabled: bool,
+
+    /// Path to the specification database (JSON file)
+    #[serde(default = "default_db_path")]
+    pub db_path: String,
+
+    /// Whether to automatically extract specs from incoming patches
+    #[serde(default = "default_false")]
+    pub auto_extract_from_patches: bool,
+}
+
+impl Default for VulnSpecConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_false(),
+            db_path: default_db_path(),
+            auto_extract_from_patches: default_false(),
+        }
+    }
+}
+
+fn default_false() -> bool {
+    false
+}
+
+fn default_db_path() -> String {
+    "baco-output/vuln_spec_db.json".to_string()
+}
+
+/// Specification database storing all extracted security specifications
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SpecificationDatabase {
+    /// All stored specifications
+    #[serde(default)]
+    pub specifications: Vec<SecuritySpecification>,
+
+    /// Source metadata for specifications
+    #[serde(default)]
+    pub sources: Vec<SpecificationSource>,
+
+    /// Last updated timestamp
+    #[serde(default = "default_now")]
+    pub last_updated: String,
+}
+
+fn default_now() -> String {
+    Utc::now().to_rfc3339()
+}
+
+impl SpecificationDatabase {
+    /// Create a new empty specification database
+    pub fn new() -> Self {
+        Self {
+            specifications: Vec::new(),
+            sources: Vec::new(),
+            last_updated: Utc::now().to_rfc3339(),
+        }
+    }
+
+    /// Load database from JSON file
+    pub fn load(path: &str) -> Result<Self, std::io::Error> {
+        let content = std::fs::read_to_string(path)?;
+        let db: SpecificationDatabase = serde_json::from_str(&content)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        Ok(db)
+    }
+
+    /// Save database to JSON file
+    pub fn save(&self, path: &str) -> Result<(), std::io::Error> {
+        // Ensure parent directory exists
+        if let Some(parent) = PathBuf::from(path).parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        let content = serde_json::to_string_pretty(self)?;
+        std::fs::write(path, content)?;
+        Ok(())
+    }
+
+    /// Add a new specification to the database
+    pub fn add_specification(&mut self, spec: SecuritySpecification) {
+        self.specifications.push(spec);
+        self.last_updated = Utc::now().to_rfc3339();
+    }
+
+    /// Add a new source to the database
+    pub fn add_source(&mut self, source: SpecificationSource) {
+        self.sources.push(source);
+        self.last_updated = Utc::now().to_rfc3339();
+    }
+
+    /// Get specifications by CWE type
+    pub fn get_by_cwe(&self, cwe_id: &str) -> Vec<&SecuritySpecification> {
+        self.specifications
+            .iter()
+            .filter(|spec| spec.vuln_type == cwe_id)
+            .collect()
+    }
+
+    /// Get specifications by domain
+    pub fn get_by_domain(&self, domain: &str) -> Vec<&SecuritySpecification> {
+        self.specifications
+            .iter()
+            .filter(|spec| spec.project_domain == domain)
+            .collect()
+    }
+
+    /// Get general specifications (non-domain-specific)
+    pub fn get_general_specs(&self) -> Vec<&SecuritySpecification> {
+        self.specifications
+            .iter()
+            .filter(|spec| matches!(spec.category, DomainCategory::General))
+            .collect()
+    }
+
+    /// Get domain-specific specifications
+    pub fn get_domain_specs(&self) -> Vec<&SecuritySpecification> {
+        self.specifications
+            .iter()
+            .filter(|spec| matches!(spec.category, DomainCategory::DomainSpecific(_)))
+            .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_create_specification() {
+        let spec = SecuritySpecification {
+            id: "spec-001".to_string(),
+            vuln_type: "CWE-79".to_string(),
+            description: "Cross-site scripting vulnerability".to_string(),
+            safe_behavior_pattern: "Sanitize all user input before rendering".to_string(),
+            project_domain: "web-server".to_string(),
+            source_patch_hash: "abc123".to_string(),
+            category: DomainCategory::General,
+        };
+
+        assert_eq!(spec.id, "spec-001");
+        assert_eq!(spec.vuln_type, "CWE-79");
+        assert!(matches!(spec.category, DomainCategory::General));
+    }
+
+    #[test]
+    fn test_database_operations() {
+        let mut db = SpecificationDatabase::new();
+
+        let spec = SecuritySpecification {
+            id: "spec-001".to_string(),
+            vuln_type: "CWE-79".to_string(),
+            description: "XSS vulnerability".to_string(),
+            safe_behavior_pattern: "Sanitize input".to_string(),
+            project_domain: "web".to_string(),
+            source_patch_hash: "abc123".to_string(),
+            category: DomainCategory::General,
+        };
+
+        db.add_specification(spec.clone());
+
+        assert_eq!(db.specifications.len(), 1);
+        assert!(!db.get_by_cwe("CWE-79").is_empty());
+    }
+
+    #[test]
+    fn test_save_load_database() {
+        let mut db = SpecificationDatabase::new();
+
+        let spec = SecuritySpecification {
+            id: "spec-001".to_string(),
+            vuln_type: "CWE-89".to_string(),
+            description: "SQL injection".to_string(),
+            safe_behavior_pattern: "Use parameterized queries".to_string(),
+            project_domain: "database".to_string(),
+            source_patch_hash: "def456".to_string(),
+            category: DomainCategory::DomainSpecific("database".to_string()),
+        };
+
+        db.add_specification(spec);
+
+        let temp_file = "/tmp/test_vuln_spec_db.json";
+        db.save(temp_file).expect("Should save database");
+
+        let loaded = SpecificationDatabase::load(temp_file).expect("Should load database");
+
+        assert_eq!(loaded.specifications.len(), 1);
+        assert_eq!(loaded.specifications[0].id, "spec-001");
+
+        std::fs::remove_file(temp_file).ok();
+    }
+
+    #[test]
+    fn test_domain_category_serialization() {
+        let general = DomainCategory::General;
+        let domain = DomainCategory::DomainSpecific("rust".to_string());
+
+        let general_json = serde_json::to_string(&general).unwrap();
+        let domain_json = serde_json::to_string(&domain).unwrap();
+
+        assert_eq!(general_json, "\"General\"");
+        assert!(domain_json.contains("rust"));
+    }
+}

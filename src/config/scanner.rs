@@ -1,3 +1,4 @@
+use crate::vuln_spec::schema::VulnSpecConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -41,6 +42,9 @@ pub struct PerformanceSettings {
     pub enable_cve_bootstrap: bool,
     #[serde(default = "crate::config::default_enable_variant_search")]
     pub enable_variant_search: bool,
+    /// VulInSpec configuration
+    #[serde(default)]
+    pub vuln_spec: VulnSpecConfig,
 }
 
 impl Default for PerformanceSettings {
@@ -56,6 +60,7 @@ impl Default for PerformanceSettings {
             enable_confidence_refinement: crate::config::default_enable_confidence_refinement(),
             enable_cve_bootstrap: crate::config::default_enable_cve_bootstrap(),
             enable_variant_search: crate::config::default_enable_variant_search(),
+            vuln_spec: VulnSpecConfig::default(),
         }
     }
 }
