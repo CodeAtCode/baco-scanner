@@ -118,6 +118,7 @@ dependencies = [
  "indicatif",
  "mockall",
  "mockito",
+ "once_cell",
  "pulldown-cmark",
  "regex",
  "reqwest",

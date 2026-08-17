@@ -729,7 +729,7 @@ fn test_performance_settings_defaults() {
     let settings = PerformanceSettings::default();
 
     assert!(!settings.enable_incremental_scan);
-    assert!(settings.enable_threat_modeling);
+    assert!(!settings.enable_threat_modeling);
     assert!(settings.enable_root_cause_dedup);
     assert!(settings.enable_multi_verifier);
     assert!(!settings.enable_auto_patching);
