@@ -19,11 +19,13 @@ Each phase has its own markdown file:
 
 ## How It Works
 
-1. At runtime, BACO loads these markdown files from `prompts/phases/`
-2. Markdown headers (lines starting with `#`) are stripped
-3. The clean prompt text is embedded in the binary
-4. Template variables (e.g., `%%FILE_PATH%%`, `%%CODE_CONTENT%%`) are substituted during execution
-5. Users can override any prompt via `config.toml`
+BACO supports two prompt loading mechanisms:
+
+1. **Runtime loading from markdown files**: At startup, BACO loads markdown files from `prompts/phases/` and `prompts/hunt/` directories. Markdown headers (lines starting with `#`) are stripped, and the clean prompt text is used. Changes to these files are loaded on the next run.
+
+2. **Embedded via include_str!**: Some components (e.g., exploit prompts in src/exploit/prompt.rs) use Rust's `include_str!` macro to embed prompt content at compile time. This provides a fallback when runtime loading is not available.
+
+Template variables (e.g., `%%FILE_PATH%%`, `%%CODE_CONTENT%%`) are substituted during execution. Users can override any prompt via `config.toml`.
 
 ## Customization
 

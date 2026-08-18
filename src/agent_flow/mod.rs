@@ -1,4 +1,4 @@
-//! AgentFlow multi-agent harness synthesis (P5).
+//! AgentFlow multi-agent harness synthesis.
 //!
 //! Represents a multi-agent harness as a typed graph DSL. Five components:
 //! A (agent set), G (communication topology), Σ (message schemas),

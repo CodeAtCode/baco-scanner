@@ -1,3 +1,53 @@
+# Injection Vulnerability Hunt Prompt
+
+## Hunt Instructions
+
+HUNT FOR INJECTION VULNERABILITIES ONLY.
+
+Attack class: Injection (SQL injection, command injection, LDAP injection, format strings)
+Task: Analyze this code and report ONLY injection vulnerabilities.
+
+DANGEROUS APIs BY LANGUAGE:
+- C/C++: system(), popen(), exec*(), sprintf() with user input, printf(user_input)
+- Python: os.system(), subprocess.call(shell=True), eval(), exec(), render_template_string()
+- Java: Statement.executeQuery() with concatenation, Runtime.exec(), context.search()
+- Go: db.Query() with Sprintf, exec.Command("sh", "-c"), template.HTML()
+- Node.js: exec(), spawn("sh", "-c"), query() with concatenation, innerHTML
+
+SAFE PATTERNS (DO NOT REPORT):
+- Parameterized queries: cursor.execute("SELECT * FROM users WHERE id=?", (user_id,))
+- Prepared statements: PreparedStatement with ? placeholders
+- ORM methods: User.objects.get(id=user_id), db.users.find({id: userId})
+- Proper escaping: htmlspecialchars(), mysql_real_escape_string()
+
+BYPASS DETECTION PATTERNS:
+- Encoding: %27 for ', %22 for ", double encoding %2527
+- Comments: --, #, /* */ in SQL, null bytes %00
+- Concatenation: ' OR '1'='1, type confusion 1 OR 1=1
+
+CHAIN OPPORTUNITIES:
+- SQLi → Auth bypass, command execution via xp_cmdshell
+- Command injection → File read, SSRF, lateral movement
+- Stored injection → XSS, data exfiltration
+
+Return JSON array with format:
+[
+  {
+    "severity": "critical|high|medium|low",
+    "title": "injection vulnerability title",
+    "description": "detailed explanation of the injection flaw",
+    "line": line_number,
+    "cwe_id": "CWE-XXX",
+    "confidence": 0.0-1.0
+  }
+]
+
+CRITICAL: ONLY report injection vulnerabilities. Ignore all other attack classes.
+
+Code input will be provided at runtime.
+
+---
+
 # Injection Vulnerability Hunt Guide
 
 ## Dangerous API Patterns by Language

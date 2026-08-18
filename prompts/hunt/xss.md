@@ -1,3 +1,57 @@
+# Cross-Site Scripting (XSS) Vulnerability Hunt Prompt
+
+## Hunt Instructions
+
+HUNT FOR XSS VULNERABILITIES ONLY.
+
+Attack class: Cross-Site Scripting (reflected, stored, DOM-based)
+Task: Analyze this code and report ONLY XSS vulnerabilities.
+
+DANGEROUS APIs BY LANGUAGE:
+- C/C++: printf("<div>%s</div>", user_input), custom templates without auto-escape
+- Python: render_template_string(user_input), Markup(user_input), print(f"<p>{user_input}</p>")
+- Java: <%= request.getParameter("q") %>, response.getWriter().println("<div>" + input)
+- Go: tmpl.ExecuteTemplate() with user HTML, template.HTML(userInput), fmt.Fprintf(w, "<div>%s</div>", input)
+- Node.js: element.innerHTML = userInput, document.write(), dangerouslySetInnerHTML, .html(userInput)
+
+SAFE PATTERNS (DO NOT REPORT):
+- Auto-escaping: Go html/template, Django templates with default auto-escape
+- Proper encoding: htmlspecialchars(), escapeHtml(), textContent instead of innerHTML
+- CSP: default-src 'self' headers
+- React: Using children prop instead of dangerouslySetInnerHTML
+- Sanitization: DOMPurify.sanitize(), bleach.clean()
+
+BYPASS DETECTION PATTERNS:
+- HTML entities: &#60;script&#62;
+- Unicode: \u003cscript\u003e
+- Case variation: <ScRiPt>
+- Event handlers: <img src=x onerror=alert(1)>
+- Context escape: "><script>alert(1)</script> in attribute context
+
+CHAIN OPPORTUNITIES:
+- XSS → Cookie theft, session hijacking
+- DOM XSS → Keylogging, phishing
+- Stored XSS → Malware delivery, reconnaissance
+- XSS + CSRF → Authenticated action execution
+
+Return JSON array with format:
+[
+  {
+    "severity": "critical|high|medium|low",
+    "title": "XSS vulnerability title",
+    "description": "detailed explanation of the XSS flaw",
+    "line": line_number,
+    "cwe_id": "CWE-79",
+    "confidence": 0.0-1.0
+  }
+]
+
+CRITICAL: ONLY report XSS vulnerabilities. Ignore all other attack classes.
+
+Code input will be provided at runtime.
+
+---
+
 # Cross-Site Scripting (XSS) Vulnerability Hunt Guide
 
 ## Dangerous API Patterns by Language

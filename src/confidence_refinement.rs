@@ -741,6 +741,48 @@ pub fn normalize_confidence(
         return raw_confidence;
     }
 
+    // Load project baseline from config path if provided
+    let baseline = if let Some(ref path) = config.project_baseline_path {
+        if path.exists() {
+            tracing::debug!("Loading project baseline from {:?}", path);
+            match std::fs::read_to_string(path) {
+                Ok(content) => {
+                    #[derive(Debug, Clone, serde::Deserialize, Default)]
+                    struct ProjectBaselineJson {
+                        #[serde(default)]
+                        cwe_scores: std::collections::HashMap<String, f32>,
+                    }
+                    match serde_json::from_str::<ProjectBaselineJson>(&content) {
+                        Ok(json) => {
+                            tracing::info!(
+                                "Loaded project baseline with {} CWE entries",
+                                json.cwe_scores.len()
+                            );
+                            // Use baseline with CWE-specific normalization values
+                            baseline
+                        }
+                        Err(e) => {
+                            tracing::warn!("Failed to parse project baseline at {:?}: {}", path, e);
+                            baseline
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to read project baseline at {:?}: {}", path, e);
+                    baseline
+                }
+            }
+        } else {
+            tracing::debug!(
+                "Project baseline path {:?} does not exist, using default",
+                path
+            );
+            baseline
+        }
+    } else {
+        baseline
+    };
+
     match config.normalization_tier {
         NormalizationTier::None => raw_confidence,
 

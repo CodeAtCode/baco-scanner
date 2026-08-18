@@ -101,41 +101,90 @@ async fn run_parallel_phases(
             None
         };
 
+    let cpg_slice_handle = if !is_phase_completed(&ScanPhase::CpgSlice) {
+        let this = scanner;
+        let pb = pb.clone();
+        let initial_findings = findings.clone();
+        Some(async move {
+            this.run_phase(&ScanPhase::CpgSlice, initial_findings, &pb, &[])
+                .await
+        })
+    } else {
+        tracing::info!("Skipping CpgSlice phase (already completed in previous run)");
+        None
+    };
+
     let start_time = Instant::now();
 
-    // Execute all spawned tasks in true parallel using tokio::join!
-    let (indexing_result, semgrep_result, llm_static_result) =
-        match (indexing_handle, semgrep_handle, llm_static_handle) {
-            (Some(i), Some(s), Some(l)) => {
-                let (ir, sr, lr) = tokio::join!(i, s, l);
-                (Some(ir), Some(sr), Some(lr))
-            }
-            (Some(i), Some(s), None) => {
-                let (ir, sr) = tokio::join!(i, s);
-                (Some(ir), Some(sr), None)
-            }
-            (Some(i), None, Some(l)) => {
-                let (ir, lr) = tokio::join!(i, l);
-                (Some(ir), None, Some(lr))
-            }
-            (Some(i), None, None) => {
-                let ir = i.await;
-                (Some(ir), None, None)
-            }
-            (None, Some(s), Some(l)) => {
-                let (sr, lr) = tokio::join!(s, l);
-                (None, Some(sr), Some(lr))
-            }
-            (None, Some(s), None) => {
-                let sr = s.await;
-                (None, Some(sr), None)
-            }
-            (None, None, Some(l)) => {
-                let lr = l.await;
-                (None, None, Some(lr))
-            }
-            (None, None, None) => (None, None, None),
-        };
+    // Execute all spawned tasks in true parallel using tokio::join! with 4-tuple match
+    let (indexing_result, semgrep_result, llm_static_result, cpg_slice_result) = match (
+        indexing_handle,
+        semgrep_handle,
+        llm_static_handle,
+        cpg_slice_handle,
+    ) {
+        (Some(i), Some(s), Some(l), Some(c)) => {
+            let (ir, sr, lr, cr) = tokio::join!(i, s, l, c);
+            (Some(ir), Some(sr), Some(lr), Some(cr))
+        }
+        (Some(i), Some(s), Some(l), None) => {
+            let (ir, sr, lr) = tokio::join!(i, s, l);
+            (Some(ir), Some(sr), Some(lr), None)
+        }
+        (Some(i), Some(s), None, Some(c)) => {
+            let (ir, sr, cr) = tokio::join!(i, s, c);
+            (Some(ir), Some(sr), None, Some(cr))
+        }
+        (Some(i), Some(s), None, None) => {
+            let (ir, sr) = tokio::join!(i, s);
+            (Some(ir), Some(sr), None, None)
+        }
+        (Some(i), None, Some(l), Some(c)) => {
+            let (ir, lr, cr) = tokio::join!(i, l, c);
+            (Some(ir), None, Some(lr), Some(cr))
+        }
+        (Some(i), None, Some(l), None) => {
+            let (ir, lr) = tokio::join!(i, l);
+            (Some(ir), None, Some(lr), None)
+        }
+        (Some(i), None, None, Some(c)) => {
+            let (ir, cr) = tokio::join!(i, c);
+            (Some(ir), None, None, Some(cr))
+        }
+        (Some(i), None, None, None) => {
+            let ir = i.await;
+            (Some(ir), None, None, None)
+        }
+        (None, Some(s), Some(l), Some(c)) => {
+            let (sr, lr, cr) = tokio::join!(s, l, c);
+            (None, Some(sr), Some(lr), Some(cr))
+        }
+        (None, Some(s), Some(l), None) => {
+            let (sr, lr) = tokio::join!(s, l);
+            (None, Some(sr), Some(lr), None)
+        }
+        (None, Some(s), None, Some(c)) => {
+            let (sr, cr) = tokio::join!(s, c);
+            (None, Some(sr), None, Some(cr))
+        }
+        (None, Some(s), None, None) => {
+            let sr = s.await;
+            (None, Some(sr), None, None)
+        }
+        (None, None, Some(l), Some(c)) => {
+            let (lr, cr) = tokio::join!(l, c);
+            (None, None, Some(lr), Some(cr))
+        }
+        (None, None, Some(l), None) => {
+            let lr = l.await;
+            (None, None, Some(lr), None)
+        }
+        (None, None, None, Some(c)) => {
+            let cr = c.await;
+            (None, None, None, Some(cr))
+        }
+        (None, None, None, None) => (None, None, None, None),
+    };
 
     let parallel_duration = start_time.elapsed();
     tracing::info!("Parallel phases completed in {:?}", parallel_duration);
@@ -146,12 +195,15 @@ async fn run_parallel_phases(
     if let Some(Ok((mut semgrep_findings, _))) = semgrep_result {
         findings.append(&mut semgrep_findings);
     }
+    if let Some(Ok((mut cpg_findings, _))) = cpg_slice_result {
+        findings.append(&mut cpg_findings);
+    }
     log_and_aggregate_llm_results(&llm_static_result, &mut findings, &mut analyzed_files);
 
     tracing::info!("After parallel phases: {} findings total", findings.len());
 
     scanner.state.send_modify(|s| {
-        s.current_phase = ScanPhase::LlmStaticAnalysis;
+        s.current_phase = ScanPhase::CpgSlice;
         s.findings = findings.clone();
     });
 
@@ -210,12 +262,13 @@ async fn run_parallel_phases(
 }
 
 /// Return the list of sequential scan phases
-fn sequential_phases() -> [ScanPhase; 19] {
+fn sequential_phases() -> [ScanPhase; 20] {
     [
         ScanPhase::CweRouting,
         ScanPhase::RuleSynthesis,
         ScanPhase::LlmDiscovery,
         ScanPhase::LlmVerification,
+        ScanPhase::Validate,
         ScanPhase::SecurityAgentVerification,
         ScanPhase::TicketCrossRef,
         ScanPhase::GitAnalysis,
@@ -466,8 +519,8 @@ pub(super) async fn run_scanner(
     };
 
     let enable_parallel = true;
-    let sequential_phase_count = 17; // Including v3 features (17 sequential phases)
-    let total_phases = 3 + sequential_phase_count; // 3 parallel + 17 sequential = 20
+    let sequential_phase_count = 20; // 20 sequential phases including Validate
+    let total_phases = 4 + sequential_phase_count; // 4 parallel + 20 sequential = 24
 
     let pb = scanner
         .progress

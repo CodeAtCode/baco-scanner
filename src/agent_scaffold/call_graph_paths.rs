@@ -6,7 +6,7 @@
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
-use crate::agent_scaffold::tree_sitter_parser::parse_source;
+use crate::agent_scaffold::tree_sitter_parser::{get_function_name, parse_source};
 use crate::context::control_path::Language;
 
 /// A call graph representing function call relationships.
@@ -220,58 +220,6 @@ pub fn hash_string(s: &str) -> u32 {
 /// Get the function node kind for language-specific handling.
 fn get_function_node_kind(kind: &str) -> &str {
     kind
-}
-
-/// Extract function name from a function definition node.
-fn get_function_name(node: &tree_sitter::Node, source: &[u8]) -> Option<String> {
-    let kind = node.kind();
-
-    // Check if this is a function definition node for any supported language
-    let is_func_def = matches!(
-        kind,
-        "function_definition"
-            | "function_item"
-            | "function_declaration"
-            | "method_definition"
-            | "declaration"
-    );
-
-    if !is_func_def {
-        return None;
-    }
-
-    // Find the name child node
-    for child in node.children(&mut node.walk()) {
-        let child_kind = child.kind();
-
-        // Direct identifier
-        if child_kind == "identifier" {
-            return child.utf8_text(source).ok().map(|s| s.to_string());
-        }
-
-        // Rust: visibility + name pattern
-        if child_kind == "name" {
-            if let Some(name_node) = child.child(0) {
-                if name_node.kind() == "identifier" {
-                    return name_node.utf8_text(source).ok().map(|s| s.to_string());
-                }
-            }
-        }
-
-        // Python/Rust function_definition with name child
-        if child_kind == "function_definition"
-            || child_kind == "declarator"
-            || child_kind == "function_declarator"
-        {
-            for name_child in child.children(&mut child.walk()) {
-                if name_child.kind() == "identifier" {
-                    return name_child.utf8_text(source).ok().map(|s| s.to_string());
-                }
-            }
-        }
-    }
-
-    None
 }
 
 /// Collect all call site callee names within a function body.

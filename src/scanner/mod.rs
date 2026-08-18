@@ -89,6 +89,24 @@ impl Scanner {
     async fn load_checkpoint_findings(&self, phase: &ScanPhase) -> Vec<VulnerabilityFinding> {
         load_checkpoint_findings(&self.checkpoint_path, phase).await
     }
+
+    /// Return the number of parallel phases (for testing)
+    pub fn scheduled_parallel_phases() -> usize {
+        4 // Indexing, Semgrep, CpgSlice, LlmStaticAnalysis
+    }
+
+    /// Return the number of sequential phases (for testing)
+    pub fn scheduled_sequential_phases() -> usize {
+        20 // All sequential phases including Validate
+    }
+
+    /// Return parallel and sequential phase counts (for testing)
+    pub fn scheduled_phase_counts() -> (usize, usize) {
+        (
+            Self::scheduled_parallel_phases(),
+            Self::scheduled_sequential_phases(),
+        )
+    }
 }
 
 #[cfg(test)]

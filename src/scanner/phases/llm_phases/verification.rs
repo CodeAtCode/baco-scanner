@@ -5,6 +5,7 @@ use crate::findings::VulnerabilityFinding;
 use crate::llm;
 use crate::poc_compiler::PocCompiler;
 use crate::poc_generation::{PoCFormat, PoCGenerationEngine};
+use crate::prompt::templates::cwe_to_hunt_domain;
 use crate::scanner::phases::PhaseConfig;
 use std::sync::Arc;
 
@@ -102,18 +103,35 @@ pub async fn run_llm_verification(
                     finding.title
                 ));
 
+                // Build verification prompt with optional hunt context
+                let mut prompt_text = format!(
+                    "Vulnerability: {}\nLocation: {}:{}\nDescription: {}\nSources: {:?}",
+                    finding.title,
+                    finding.file_path,
+                    finding.line_number.unwrap_or(0),
+                    finding.description,
+                    finding.sources
+                );
+
+                // Append hunt domain context if CWE maps to a hunt domain
+                if let Some(domain) = finding
+                    .cwe_id
+                    .as_ref()
+                    .and_then(|cwe| cwe_to_hunt_domain(cwe))
+                {
+                    // Note: hunt_prompts would need to be loaded and passed in - for now we add a placeholder
+                    // In a full implementation, hunt_prompts would be loaded via load_hunt_prompts()
+                    prompt_text.push_str(&format!(
+                        "\n\n[Hunt context: {} vulnerability - analyze with domain-specific patterns]",
+                        domain
+                    ));
+                }
+
                 let messages = vec![
                     llm::ChatMessage::system(
                         "You are a security vulnerability verifier. Analyze the finding and determine if it's a true positive, false positive, or needs review. Return JSON with verification_status (confirmed/false_positive/needs_review) and verification_notes."
                     ),
-                    llm::ChatMessage::user(&format!(
-                        "Vulnerability: {}\nLocation: {}:{}\nDescription: {}\nSources: {:?}",
-                        finding.title,
-                        finding.file_path,
-                        finding.line_number.unwrap_or(0),
-                        finding.description,
-                        finding.sources
-                    ))
+                    llm::ChatMessage::user(&prompt_text)
                 ];
                 let result = client.chat(&messages).await;
 

@@ -11,39 +11,36 @@ BACO uses a **data-driven PhaseGraph** (`src/scanner/pipeline/orchestrator.rs`) 
 
 ## Pipeline Phases
 
-**Core Pipeline (20 phases):**
+**Core Pipeline (24 phases):**
 
-### Parallel Detection (3 phases)
-1. **Indexing**: Build file list and call graph
-2. **Semgrep**: Static analysis with predefined rules
-3. **LLM Static Analysis**: Independent LLM-based code analysis
+Phase order is defined once in `PhaseGraph::new()` (src/scanner/pipeline/orchestrator.rs); this table mirrors it and must be updated when that changes.
 
-### Sequential Discovery (3 phases)
-4. **CWE Routing**: Mixture-of-experts routing to appropriate analyzers
-5. **LLM Discovery**: Multi-model vulnerability detection with CVE enrichment
-6. **LLM Verification**: Validation with PoC generation and mitigation code
-
-### Triage (5 phases)
-7. **SecurityAgent Verification**: Tool-based agent verification using file_read, pattern_search, file_write, run_test
-8. **Ticket Cross-Ref**: Search GitHub/GitLab for existing reports
-9. **Git Analysis**: Check commit history for related fixes
-10. **Cross-File Analysis**: Trace data flow between files
-11. **Confidence Scoring**: Calculate composite reliability score
-
-### Aggregation (2 phases)
-12. **AI Aggregation**: Generate executive summary, semantic deduplication, and LLM-enriched descriptions
-13. **Threat Modeling**: Generate THREAT_MODEL.md with attack surface analysis
-
-### Post-Processing (6 phases)
-14. **Root Cause Dedup**: Deduplicate findings by root cause instead of location
-15. **Multi-Verifier**: Multiple verification methods with majority voting
-16. **Auto-Patching**: Generate and validate patches with staging
-17. **CVE Bootstrap**: Enrich findings with NVD/CISA KEV data
-18. **PoC Compiler**: Verify PoC code compiles successfully
-19. **Variant Search**: Search for related vulnerability variants
-
-### Output (1 phase)
-20. **Reporting**: Generate JSON, HTML, and SARIF outputs
+| Phase # | Name | Parallel/Sequential | Config gate (default) |
+|---------|------|---------------------|----------------------|
+| 1 | Indexing | Parallel | Always-on |
+| 2 | Semgrep | Parallel | Always-on |
+| 3 | CPG Slice | Parallel | `cpg.enabled=false` |
+| 4 | LLM Static Analysis | Parallel | `llm.phases.indexing` (API key present) |
+| 5 | CWE Routing | Sequential | Always-on |
+| 6 | Rule Synthesis | Sequential | `rulesynth.enabled=false` |
+| 7 | LLM Discovery | Sequential | `llm.phases.discovery` (API key present) |
+| 8 | LLM Verification | Sequential | `llm.phases.verification` (API key present) |
+| 9 | Validate | Sequential | `validate.enabled=false` |
+| 10 | SecurityAgent Verification | Sequential | `agent.enabled=false` |
+| 11 | Ticket Cross-Reference | Sequential | `llm.phases.ticket_crossref` (API key present) |
+| 12 | Git Analysis | Sequential | `llm.phases.git_analysis` (API key present) |
+| 13 | Cross-File Analysis | Sequential | `llm.phases.cross_file_analysis` (API key present) |
+| 14 | Confidence Scoring | Sequential | `normalization.enabled=false` |
+| 15 | AI Aggregation | Sequential | `llm.phases.aggregation` (API key present) |
+| 16 | Threat Modeling | Sequential | `aggregation.tier_2_features.enabled=false` |
+| 17 | Root Cause Deduplication | Sequential | `aggregation.root_cause_dedup=true` |
+| 18 | Multi-Verifier | Sequential | `aggregation.multi_verifier=true` |
+| 19 | Auto-Patching | Sequential | `aggregation.auto_patching=false` |
+| 20 | CVE Bootstrap | Sequential | `aggregation.cve_bootstrap=true` |
+| 21 | PoC Compilation | Sequential | `aggregation.poc_compilation=false` |
+| 22 | Exploit Synthesis | Sequential | `exploit.enabled=false` |
+| 23 | Variant Search | Sequential | `aggregation.variant_search=true` |
+| 24 | Reporting | Sequential | Always-on |
 
 ## Data Flow
 
@@ -96,4 +93,3 @@ flowchart LR
 
 **Checkpoint markers**: Checkpoints are saved after each major phase, enabling resume from any point in the pipeline.
 
-**Orphaned phases**: The following modules exist but are NOT wired into the pipeline and do NOT run: CpgSlice, Hunt, Validate, IndependentVerify, ExploitSynth, RuleSynthesis.

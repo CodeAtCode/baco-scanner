@@ -90,20 +90,20 @@ mod router_tests;
 // Rule synthesis tests (T2.3)
 mod rule_validator;
 
-// T2.5 six-phase orchestration tests
+// Six-phase orchestration tests
 mod phase_graph;
 
 // Triple path context tests (T2.2)
 mod control_path;
 mod semantic_path;
 
-// Rationale check tests (X.1)
+// Rationale check tests
 mod rationale_check;
 
-// Statement-level localization tests (X.2)
+// Statement-level localization tests
 mod statement_range;
 
-// Confidence normalization tests (X.4)
+// Confidence normalization tests
 mod confidence_normalization;
 
 // T3.1: CPG-guided slicing tests
@@ -137,8 +137,7 @@ mod chain_analysis_tests;
 mod core_utils_tests;
 mod cve_misc_tests;
 
-// Additional coverage: prompt templates, report aggregation, rulesynth
-mod prompt_templates_tests;
+// Additional coverage: report aggregation, rulesynth
 mod report_aggregation_tests;
 mod rulesynth_tests;
 
@@ -194,7 +193,6 @@ mod multi_verifier_phase_tests;
 mod agent_session_inline_tests;
 mod confidence_refinement_inline_tests;
 mod llm_verification_inline_tests;
-mod prompt_templates_inline_tests;
 mod scanner_orchestrator_inline_tests;
 mod scanner_other_phases_tests;
 mod tickets_inline_tests;
@@ -241,3 +239,9 @@ mod ticket_git_cross_tests;
 
 // VulInSpec module tests
 mod vuln_spec_tests;
+
+// Inert config field wiring tests
+mod inert_config_wiring_tests;
+
+// Phase scheduling tests
+mod phase_scheduling_tests;

@@ -6,7 +6,7 @@ use crate::scanner::phases::PhaseConfig;
 
 /// Run threat modeling phase (Phase 13/20)
 pub async fn run_threat_modeling(
-    _scanner: &crate::scanner::Scanner,
+    scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,
 ) -> ScanResult<(Vec<VulnerabilityFinding>, Vec<String>)> {
     let PhaseConfig {
@@ -41,8 +41,17 @@ pub async fn run_threat_modeling(
         crate::analysis_context::AnalysisContext::default()
     };
 
-    // Run threat modeling
-    match crate::threat_model::ThreatModelingPhase::run(&output_path, &context, None).await {
+    // Create LLM client for threat modeling using verification phase config
+    let llm_client = crate::llm::create_llm_client_with_metrics(scanner, "verification");
+
+    if llm_client.is_none() {
+        tracing::warn!("No API key configured for threat modeling (llm.phases.verification.api_key); falling back to static STRIDE template");
+    }
+
+    // Run threat modeling with LLM client if available
+    match crate::threat_model::ThreatModelingPhase::run(&output_path, &context, llm_client.as_ref())
+        .await
+    {
         Ok(threat_model) => {
             // If threat model generated, add it as a finding
             if !threat_model.is_empty() {

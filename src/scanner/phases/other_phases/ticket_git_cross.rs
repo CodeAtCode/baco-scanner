@@ -118,7 +118,7 @@ pub async fn run_git_analysis(
     Ok((findings, analyzed_files.to_vec()))
 }
 
-/// Run cross-file analysis phase (Phase 12/23)
+/// Run cross-file analysis phase (Phase 13/24)
 pub async fn run_cross_file_analysis(
     _scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,

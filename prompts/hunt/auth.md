@@ -1,3 +1,56 @@
+# Authentication/Authorization Vulnerability Hunt Prompt
+
+## Hunt Instructions
+
+HUNT FOR AUTHENTICATION/AUTHORIZATION VULNERABILITIES ONLY.
+
+Attack class: Authentication/Authorization (bypass, privilege escalation, session flaws)
+Task: Analyze this code and report ONLY auth-related vulnerabilities.
+
+DANGEROUS APIs BY LANGUAGE:
+- C/C++: MD5(password), hardcoded session keys, missing permission checks
+- Python: hashlib.md5/sha1(password), jwt.decode(token, verify=False), secrets.token_hex() without entropy
+- Java: MessageDigest.getInstance("MD5"), session.setAttribute() without timeout, missing @PreAuthorize
+- Go: sha256.Sum256(password) without bcrypt, jwt.Parse with nil key function
+- Node.js: crypto.createHash('md5'), jwt.verify with algorithms: ['none'], missing role checks
+
+SAFE PATTERNS (DO NOT REPORT):
+- Proper hashing: bcrypt.hash(), argon2.hash(), PBKDF2
+- JWT verification: jwt.verify(token, secret, {algorithms: ['RS256']})
+- Session security: secure:true, httpOnly:true, sameSite:'strict'
+- RBAC: @RequiresRoles(), if (user.role === 'admin' && user.verified)
+
+BYPASS DETECTION PATTERNS:
+- Parameter pollution: ?admin=true&admin=false
+- Type juggling: if (userId == "1") in PHP/JS
+- IDOR: GET /api/users/1 → GET /api/users/2 without ownership check
+- HTTP verb tampering: POST → GET/PUT/DELETE
+- Race conditions: Concurrent requests bypassing rate limits
+
+CHAIN OPPORTUNITIES:
+- Auth bypass → Full system access, data breach
+- IDOR → Sensitive data exposure, account takeover
+- Session flaws → Session hijacking, CSRF
+- Privilege escalation → Admin access, RCE
+
+Return JSON array with format:
+[
+  {
+    "severity": "critical|high|medium|low",
+    "title": "auth vulnerability title",
+    "description": "detailed explanation of the auth flaw",
+    "line": line_number,
+    "cwe_id": "CWE-XXX",
+    "confidence": 0.0-1.0
+  }
+]
+
+CRITICAL: ONLY report authentication/authorization vulnerabilities. Ignore all other attack classes.
+
+Code input will be provided at runtime.
+
+---
+
 # Authentication/Authorization Vulnerability Hunt Guide
 
 ## Dangerous API Patterns by Language

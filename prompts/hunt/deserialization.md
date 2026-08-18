@@ -1,3 +1,55 @@
+# Insecure Deserialization/Configuration Vulnerability Hunt Prompt
+
+## Hunt Instructions
+
+HUNT FOR INSECURE DESERIALIZATION/CONFIG VULNERABILITIES ONLY.
+
+Attack class: Insecure Deserialization / Configuration
+Task: Analyze this code and report ONLY deserialization or config vulnerabilities.
+
+DANGEROUS APIs BY LANGUAGE:
+- C/C++: memcpy() from network/buffer without validation, custom binary format parsing
+- Python: pickle.loads(user_input), yaml.load(user_input) without SafeLoader, marshal.loads()
+- Java: ObjectInputStream.readObject(), xstream.fromXML(), ObjectMapper.readValue() with polymorphic types
+- Go: gob.NewDecoder().Decode() with untrusted data, json.Unmarshal() with interface{}
+- Node.js: JSON.parse() with __proto__ pollution, yaml.parse() without safe options, msgpack.decode()
+
+SAFE PATTERNS (DO NOT REPORT):
+- Safe loaders: yaml.safe_load(), yaml.load(..., SafeLoader)
+- Type allowlists: XStream.allowTypesByWildcard(["com.example.safe.*"])
+- Schema validation: JSON Schema validation before parsing
+- Immutable types: Deserializing only to immutable data structures
+- JSON only: Using JSON instead of binary serialization formats
+
+BYPASS DETECTION PATTERNS:
+- Gadget chains: Known exploit chains (Apache Commons, Java Serialization)
+- Type confusion: Casting to unexpected types after deserialization
+- Prototype pollution: {"__proto__": {"admin": true}}
+- Polymorphic abuse: Deserializing to unexpected subclasses
+- Metadata manipulation: Modifying version/length fields
+
+CHAIN OPPORTUNITIES:
+- Deserialization → Remote code execution, auth bypass, privilege escalation
+- Config flaws → Credential theft, reconnaissance, bypass, DoS, lateral movement
+
+Return JSON array with format:
+[
+  {
+    "severity": "critical|high|medium|low",
+    "title": "deserialization/config vulnerability title",
+    "description": "detailed explanation of the flaw",
+    "line": line_number,
+    "cwe_id": "CWE-XXX",
+    "confidence": 0.0-1.0
+  }
+]
+
+CRITICAL: ONLY report deserialization/config vulnerabilities. Ignore all other attack classes.
+
+Code input will be provided at runtime.
+
+---
+
 # Insecure Deserialization/Configuration Vulnerability Hunt Guide
 
 ## Dangerous API Patterns by Language

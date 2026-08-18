@@ -1,3 +1,57 @@
+# Path Traversal/SSRF Vulnerability Hunt Prompt
+
+## Hunt Instructions
+
+HUNT FOR PATH TRAVERSAL/SSRF VULNERABILITIES ONLY.
+
+Attack class: Path Traversal / Server-Side Request Forgery
+Task: Analyze this code and report ONLY path traversal or SSRF vulnerabilities.
+
+DANGEROUS APIs BY LANGUAGE:
+- C/C++: fopen(user_input), open(user_input), sprintf(path, "/home/%s/file", username)
+- Python: open("/home/" + username), Path(user_input).read_text(), urllib.request.urlopen(user_url)
+- Java: new FileInputStream(user_input), Paths.get(user_input), new URL(userUrl).openStream()
+- Go: os.Open(userInput), filepath.Join(basePath, userInput) without Clean(), http.Get(userInput)
+- Node.js: fs.readFileSync(userInput), path.join(basePath, userInput), axios.get(userInput)
+
+SAFE PATTERNS (DO NOT REPORT):
+- Path normalization: os.path.realpath(), filepath.Clean(), Path.resolve()
+- Whitelist validation: File paths validated against allowed list
+- Chroot/jail: Operations confined to sandboxed directory
+- SSRF protection: URL allowlist, internal IP blocking, scheme validation
+
+BYPASS DETECTION PATTERNS:
+- Double encoding: %252f%252f → %2f%2f → //
+- Unicode: ..%u2215 (Unicode for /)
+- Null bytes: file.txt%00.jpg
+- Dot tricks: ....// → ../ after filter removal
+- IP obfuscation: 0x7f00001, 2130706433 for 127.0.0.1
+- URL tricks: http://127.1@external.com
+
+CHAIN OPPORTUNITIES:
+- Path traversal → Source code disclosure, config theft, RCE via file overwrite
+- SSRF → Internal network recon, cloud metadata access (169.254.169.254)
+- SSRF → Internal admin panels (Redis, MongoDB), port scanning
+- Symlink attacks → Sensitive file access
+
+Return JSON array with format:
+[
+  {
+    "severity": "critical|high|medium|low",
+    "title": "path traversal/SSRF vulnerability title",
+    "description": "detailed explanation of the flaw",
+    "line": line_number,
+    "cwe_id": "CWE-22",
+    "confidence": 0.0-1.0
+  }
+]
+
+CRITICAL: ONLY report path traversal or SSRF vulnerabilities. Ignore all other attack classes.
+
+Code input will be provided at runtime.
+
+---
+
 # Path Traversal/SSRF Vulnerability Hunt Guide
 
 ## Dangerous API Patterns by Language

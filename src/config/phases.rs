@@ -177,7 +177,7 @@ pub struct ValidateConfig {
     pub enabled: bool,
 }
 
-/// Configuration for VulTriage triple-path context augmentation (P1).
+/// Configuration for VulTriage triple-path context augmentation.
 /// Augments LLM input with control path (AST/CFG/DFG), knowledge path
 /// (CWE pattern RAG), and semantic path (function summary) before judgement.
 #[derive(Debug, Clone, Default, serde::Deserialize, serde::Serialize)]
@@ -243,7 +243,7 @@ impl Default for AgentScaffoldConfig {
     }
 }
 
-/// Configuration for PacVD primitive-API abstraction (P4).
+/// Configuration for PacVD primitive-API abstraction.
 /// Appends callee abstraction at one of four granularity levels to the
 /// LLM prompt. With `auto_level = true`, the level is chosen based on
 /// the configured model name.
@@ -270,7 +270,7 @@ impl Default for PacvdConfig {
     }
 }
 
-/// Configuration for AgentFlow multi-agent harness synthesis (P5).
+/// Configuration for AgentFlow multi-agent harness synthesis.
 /// Represents the harness as a typed graph DSL; search loop proposes,
 /// executes, observes, and diagnoses harness rewrites.
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]

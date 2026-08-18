@@ -1,10 +1,35 @@
 # Research-Backed Design
 
-Baco's LLM integration is informed by a survey of 36 papers from [Awesome-LLMs-for-Vulnerability-Detection](https://github.com/huhusmang/Awesome-LLMs-for-Vulnerability-Detection). This document details the 16 papers integrated into baco's architecture and what each contributes.
+Baco's LLM integration is informed by a survey of 36 papers from [Awesome-LLMs-for-Vulnerability-Detection](https://github.com/huhusmang/Awesome-LLMs-for-Vulnerability-Detection). This document details the 20 papers integrated into baco's architecture and what each contributes.
 
 ## Scope
 
-This document covers the **16 papers already integrated** into baco's architecture — what each contributes, where it's wired in, and the config flag that enables it.
+This document covers the **20 papers already integrated** into baco's architecture — what each contributes, where it's wired in, and the config flag that enables it.
+
+## Integration Status Summary
+
+| Paper | Contribution | Status |
+|-------|--------------|--------|
+| Sifting the Noise (ISSTA 2026) | Triage filter to reduce false positives | Integrated |
+| AutoCVE | Multi-agent deduplication pipeline | Integrated |
+| Cloudflare Security-Audit-Skill | Six-phase parallel orchestration | Pending |
+| Context-Enhanced Vulnerability Detection | Multi-level context injection | Integrated |
+| VulIn (BM25 RAG) | Specification RAG with BM25 retrieval | Integrated |
+| VulnTriage | Triple-path context augmentation | Integrated |
+| LLMxCPG (Usenix 2025) | CPG-guided code slicing | Integrated |
+| MoCQ | LLM-generated semgrep rules | Integrated |
+| QRS | LLM-to-CodeQL with adversarial validation | Integrated |
+| MoEVD (FSE 2025) | Per-CWE model routing | Integrated |
+| R2Vul + VULPO | Reasoning distillation + RL | Integrated |
+| SV-TrustEval-C | Structure-oriented regression suite | Integrated |
+| CORRECT | Rationale validation via LLM-as-judge | Opt-in |
+| SecVulEval | Statement-level localization benchmark | Integrated |
+| PrimeVul (ICSE 2025) | Chronological dataset hygiene | Integrated |
+| Closing the Gap (ICSE 2025) | Confidence calibration | Integrated |
+| AgentFlow | Multi-agent synthesis | Opt-in |
+| VulnLLM-R | Policy sampling + reasoning budget | Opt-in |
+| PacVD | Four-dimension context abstraction | Opt-in |
+| VulInInstruct | Specification-guided detection | Opt-in |
 
 For the broader survey of 36 surveyed papers and the selection criteria for the P1–P5 integration tracks, see [Paper Survey](llm-vuln-detection-papers-survey.md).
 
@@ -20,7 +45,7 @@ For the broader survey of 36 surveyed papers and the selection criteria for the 
 
 **Baco Integration:** Baco implements a triage filter phase before final vulnerability reporting, applying the same lightweight validation pattern to reduce noise in the output.
 
-### AutoCVE — [code](https://github.com/larlarua/AutoCVE)
+### AutoCVE (larlarua/AutoCVE)
 
 **Problem:** Vulnerability detection pipelines generate redundant findings across multiple scans, requiring manual deduplication and causing alert fatigue.
 
@@ -30,7 +55,7 @@ For the broader survey of 36 surveyed papers and the selection criteria for the 
 
 **Baco Integration:** Baco adopts the multi-agent deduplication pattern as a global false positive suppression stage, consolidating findings across aggregation boundaries.
 
-### Cloudflare Security-Audit-Skill — [code](https://github.com/cloudflare/security-audit-skill)
+### Cloudflare Security-Audit-Skill (cloudflare/security-audit-skill)
 
 **Problem:** Security audit workflows suffer from sequential bottlenecks and lack independent verification at each stage.
 
@@ -38,11 +63,11 @@ For the broader survey of 36 surveyed papers and the selection criteria for the 
 
 **Key Result:** The parallel orchestration pattern doubled discovery rates compared to sequential approaches while maintaining accuracy through independent verification.
 
-**Baco Integration:** Baco restructured its pipeline to a six-step graph with independent verification, implementing the Cloudflare pattern for higher discovery rates.
+**Baco Integration:** Planned; hunt prompt templates are being wired back into the pipeline to implement the six-phase parallel orchestration pattern.
 
 ## Context & Program Analysis
 
-### Context-Enhanced Vulnerability Detection — [arxiv](https://arxiv.org/abs/2504.16877)
+### Context-Enhanced Vulnerability Detection (2504.16877)
 
 **Problem:** LLMs analyzing code lack sufficient context to understand vulnerability patterns, leading to poor performance on zero-shot tasks.
 
@@ -52,7 +77,7 @@ For the broader survey of 36 surveyed papers and the selection criteria for the 
 
 **Baco Integration:** Baco implements multi-level context injection into LLM prompts, using hierarchical extraction to provide relevant context without overwhelming the model.
 
-### VulIn (BM25 RAG) — [arxiv](https://arxiv.org/abs/2511.04014)
+### VulIn (BM25 RAG) (2511.04014)
 
 **Problem:** Retrieval-augmented generation for vulnerability detection typically requires expensive vector stores and complex infrastructure.
 
@@ -62,7 +87,7 @@ For the broader survey of 36 surveyed papers and the selection criteria for the 
 
 **Baco Integration:** Baco uses CWE knowledge base RAG with BM25 retrieval for security specifications, avoiding vector stores while maintaining high-quality context.
 
-### VulTriage — [arxiv](https://arxiv.org/abs/2605.09461)
+### VulnTriage (2605.09461)
 
 **Problem:** Vulnerability analysis lacks proper data-flow grounding, causing LLMs to miss critical execution paths and control dependencies.
 
@@ -72,7 +97,7 @@ For the broader survey of 36 surveyed papers and the selection criteria for the 
 
 **Baco Integration:** Baco implements triple-path context extraction with program analysis grounding, using the control path to address data-flow grounding gaps.
 
-### LLMxCPG (Usenix 2025) — [arxiv](https://arxiv.org/abs/2507.16585)
+### LLMxCPG (Usenix 2025) (2507.16585)
 
 **Problem:** LLMs analyzing full codebases face context window limits and performance degradation from excessive code volume.
 
@@ -84,7 +109,7 @@ For the broader survey of 36 surveyed papers and the selection criteria for the 
 
 ## Rule Synthesis & Exploit Generation
 
-### MoCQ — [arxiv](https://arxiv.org/abs/2504.16057)
+### MoCQ (2504.16057)
 
 **Problem:** Manual rule creation for static analysis is slow and cannot keep pace with emerging vulnerability patterns.
 
@@ -94,7 +119,7 @@ For the broader survey of 36 surveyed papers and the selection criteria for the 
 
 **Baco Integration:** Baco implements LLM-driven semgrep rule synthesis with validation, using the cargo-based build system for rapid rule iteration.
 
-### QRS — [arxiv](https://arxiv.org/abs/2602.09774)
+### QRS (2602.09774)
 
 **Problem:** Static analysis rules are limited by manual creation and cannot adapt quickly to new vulnerability patterns.
 
@@ -106,7 +131,7 @@ For the broader survey of 36 surveyed papers and the selection criteria for the 
 
 ## Model Specialization & Routing
 
-### MoEVD (FSE 2025) — [arxiv](https://arxiv.org/abs/2501.16454)
+### MoEVD (FSE 2025) (2501.16454)
 
 **Problem:** Monolithic LLMs collapse on long-tailed CWEs, failing to detect less common vulnerability patterns.
 
@@ -116,7 +141,7 @@ For the broader survey of 36 surveyed papers and the selection criteria for the 
 
 **Baco Integration:** Baco implements per-CWE and per-language routing with specialized prompts and models, using the MoEVD pattern for phase-based dispatch.
 
-### R2Vul + VULPO — [arxiv](https://arxiv.org/abs/2504.04699) + [arxiv](https://arxiv.org/abs/2511.11896)
+### R2Vul + VULPO (2504.04699, 2511.11896)
 
 **Problem:** Vulnerability explanations lack clarity and root-cause analysis, reducing developer trust in findings.
 
@@ -127,7 +152,7 @@ For the broader survey of 36 surveyed papers and the selection criteria for the 
 
 ## Quality & Evaluation
 
-### SV-TrustEval-C (SP 2025) — [arxiv](https://arxiv.org/abs/2505.20630)
+### SV-TrustEval-C (SP 2025) (2505.20630)
 
 **Problem:** LLM-based vulnerability detectors can regress to pattern-matching behavior without proper evaluation metrics.
 
@@ -137,7 +162,7 @@ For the broader survey of 36 surveyed papers and the selection criteria for the 
 
 **Baco Integration:** Baco uses SV-TrustEval-C as a regression suite to validate LLM phase quality and detect performance degradation.
 
-### CORRECT — [arxiv](https://arxiv.org/abs/2504.13474)
+### CORRECT (2504.13474)
 
 **Problem:** LLM-generated vulnerability rationales often contain hallucinations that undermine trust in findings.
 
@@ -145,9 +170,9 @@ For the broader survey of 36 surveyed papers and the selection criteria for the 
 
 **Key Result:** Rationale validation significantly reduced hallucination rates while maintaining true positive coverage.
 
-**Baco Integration:** Baco implements rationale validation to reduce reasoning errors and hallucinations in vulnerability explanations.
+**Baco Integration:** Baco implements the Validate phase (LLM-as-judge rationale check, disabled by default via `validate.enabled`) to reduce reasoning errors and hallucinations in vulnerability explanations.
 
-### SecVulEval — [arxiv](https://arxiv.org/abs/2505.19828)
+### SecVulEval (2505.19828)
 
 **Problem:** Vulnerability localization at statement-level granularity is extremely difficult, with best LLMs achieving only 23.83% F1.
 
@@ -169,7 +194,7 @@ For the broader survey of 36 surveyed papers and the selection criteria for the 
 
 ## Confidence & Calibration
 
-### Closing the Gap (ICSE 2025) — [arxiv](https://arxiv.org/abs/2412.14306)
+### Closing the Gap (ICSE 2025) (2412.14306)
 
 **Problem:** High false positive rates and non-applicable fixes destroyed developer adoption of LLM vulnerability detectors.
 
@@ -183,11 +208,13 @@ For the broader survey of 36 surveyed papers and the selection criteria for the 
 
 Papers assessed but deferred or skipped:
 
-| Paper | Verdict | Rationale |
-|-------|---------|-----------|
-| AgentFlow (2604.20801) | Defer | Python-only; revisit once Rust interop stabilizes |
+| Paper | Integration Status | Rationale |
+|-------|-------------------|----------|
+| AgentFlow (2604.20801) | Opt-in | Multi-agent synthesis implemented but gated by `agent_flow.enabled=false` |
+| VulnLLM-R (2512.07533) | Opt-in | Policy sampling and max_reasoning_tokens implemented but gated by `policy_sampling.enabled=false` |
+| PacVD (P4.3/P4.4) | Opt-in | Four-dimension context abstraction implemented but gated by `pacvd.enabled=false` |
+| VulInInstruct (P1.2) | Opt-in | Specification-guided detection implemented but gated by `vuln_spec.enabled=false` |
 | AgenticSCR (2601.19138) | Defer | Niche pre-commit case; wait for phase loop stabilization |
-| VulnLLM-R (2512.07533) | Skip | GPU cluster required; consume as external service if needed |
 | OpenAnt | Defer | Heavy UniFFI build; architectural impact too large |
 | DeepAudit | Skip | Full platform, diverges from baco's monolithic Rust design |
 | FocusVul (2505.17460) | Skip | Paper withdrawn; code inaccessible |

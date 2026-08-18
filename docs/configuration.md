@@ -1,5 +1,37 @@
 # Configuration
 
+## Quick Start
+
+Minimal working configuration — copy-paste this block and fill in your API key:
+
+```toml
+[project]
+name = "my-project"
+path = "/path/to/target"
+languages = ["c"]
+
+[llm.phases.discovery]
+base_url = "https://api.mistral.ai/v1"
+api_key = "${MISTRAL_API_KEY}"
+model = "mistral-small"
+
+[scanner.performance]
+enable_incremental_scan = false
+max_parallel_tasks = 4
+enable_llm_cache = false
+enable_file_filtering = true
+```
+
+**Experimental sections** (disabled by default):
+- `[cpg]` — CPG-guided slicing (requires Joern binary)
+- `[validate]` — LLM-as-judge rationale validation
+- `[vuln_spec]` — VulTriage triple-path, policy sampling, agent scaffold
+- `[agent_scaffold]` — Agent-assisted analysis
+- `[agent_flow]` — Multi-agent harness synthesis
+- `[threat_modeling]` — STRIDE threat modeling (now under `[scanner.performance]`)
+
+Enable only after reviewing the detailed sections below.
+
 ## Project Settings
 
 ```toml
@@ -28,7 +60,7 @@ enable_file_filtering = true
 # Each flag controls whether a specific analysis phase runs during the scan.
 
 # Threat modeling using STRIDE analysis (adds LLM-based threat identification)
-enable_threat_modeling = true
+enable_threat_modeling = false
 # Root-cause deduplication (collapses findings that share the same root cause)
 enable_root_cause_dedup = true
 # Multi-verifier cross-checking (runs additional LLM verification passes)
@@ -49,7 +81,7 @@ enable_variant_search = true
 
 | Flag | Default | Side effects |
 | --- | --- | --- |
-| `enable_threat_modeling` | `true` | None (read-only analysis) |
+| `enable_threat_modeling` | `false` | None (read-only analysis) |
 | `enable_root_cause_dedup` | `true` | None |
 | `enable_multi_verifier` | `true` | Additional LLM API calls |
 | `enable_auto_patching` | `false` | Writes code files, runs git commands in a staging worktree |
@@ -64,7 +96,9 @@ See [`docs/architecture.md`](architecture.md) for the full 20-phase pipeline des
 
 BACO supports single or multiple models per phase. When multiple models are configured, they are used in round-robin fashion to distribute load across different models/providers.
 
-**Detailed error logging**: When LLM requests fail, BACO reports the HTTP status code, error type (timeout, connection, request, body, decode), and the actual URL for easier debugging.
+**Default temperature:** `0.5` (controlled randomness for better security analysis)
+
+**Default max_reasoning_tokens:** `2048` (caps reasoning phase before forcing final answer)
 
 **Single model:**
 ```toml
@@ -72,6 +106,8 @@ BACO supports single or multiple models per phase. When multiple models are conf
 base_url = "https://api.mistral.ai/v1"
 api_key = "${MISTRAL_API_KEY}"  # or set env var
 model = "mistral-small"
+temperature = 0.5
+max_reasoning_tokens = 2048
 ```
 
 **Multiple models:**
@@ -104,9 +140,10 @@ When enabled, the LLM Discovery phase reads source files directly before analyzi
 
 ```toml
 [agent]
-enabled = true
+enabled = false
 max_turns = 10           # Max conversation turns with tools
 tool_timeout_secs = 60   # Timeout for tool execution
+trusted_paths = ["."]    # Paths allowed for tool operations
 keep_artifacts = false   # Keep generated test files
 ```
 
@@ -158,22 +195,41 @@ Code:
 llm_discovery = """Given this finding, determine if it's a true vulnerability:
 Title: %%FINDING_TITLE%%
 Location: %%FILE_PATH%%:%%LINE_NUMBER%%
+Current Description: %%CURRENT_DESCRIPTION%%
 Description: %%VULNERABILITY_DESCRIPTION%%
 """
 ```
 
 **Available template variables:**
 - `%%PROJECT_PATH%%` - Target project path
+- `%%PROJECT_NAME%%` - Project name
 - `%%FILE_EXTENSIONS%%` - Detected file extensions
 - `%%LANGUAGES%%` - Target languages
 - `%%CODE_CONTENT%%` - Code snippet being analyzed
 - `%%LANGUAGE%%` - Programming language of the file
 - `%%FILE_PATH%%` - File path
-- `%%LINE_RANGE%%` - Line numbers
+- `%%LINE_NUMBER%%` - Specific line number
+- `%%LINE_RANGE%%` - Line numbers range
+- `%%CURRENT_DESCRIPTION%%` - Current vulnerability description (for iterative phases)
 - `%%FINDING_TITLE%%` - Vulnerability title
 - `%%VULNERABILITY_DESCRIPTION%%` - Description text
 - `%%FINDINGS_COUNT%%` - Total findings count
 - `%%SCAN_DATE%%` - Scan date
+- `%%TOTAL_FINDINGS%%` - Total findings count (alias)
+- `%%TOTAL_FILES%%` - Total files scanned
+- `%%FILES_COUNT%%` - Files count (alias)
+- `%%SOURCE_LIST%%` - List of source files
+- `%%CONTEXT_LINES%%` - Context lines around finding
+- `%%CWE_SPECS%%` - CWE specification details
+- `%%EXCLUDE_PATHS%%` - Excluded paths
+- `%%MAX_FILE_SIZE%%` - Maximum file size limit
+- `%%PROJECT_TYPE%%` - Project type
+- `%%SCAN_DURATION%%` - Scan duration
+- `%%TICKET_SYSTEMS%%` - Configured ticket systems
+- `%%TOOLS_USED%%` - Tools used in analysis
+- `%%VULNERABILITY_LIST%%` - List of vulnerabilities
+- `%%VULNERABILITY_TITLE%%` - Vulnerability title
+- `%%FINDINGS_LIST%%` - Full findings list
 
 Prompts are validated (max 10,000 characters, no null bytes) before use.
 
@@ -190,14 +246,24 @@ credentials.token = "${GITHUB_TOKEN}"
 
 - **findings.json**: Complete vulnerability data with all 16 fields
 - **report.html**: Visual report with severity colors, code snippets, AI summary
-- **findings.json**: Complete vulnerability data with all 16 fields
-- **report.html**: Visual report with severity colors, code snippets, AI summary
 - **report.sarif**: SARIF format for CI/CD integration
 
 ## Paper-Integration Research Flags
 
-The following flags enable experimental research-backed analysis augmentations.
-All default to disabled. See `todo.md` for full implementation details.
+> **Experimental — disabled by default.** These sections enable research-backed analysis augmentations. Enable only after understanding the tradeoffs.
+
+### Validate (CORRECT paper arxiv:2504.13474)
+
+LLM-as-judge rationale validation: evaluates the soundness of reasoning behind each finding and adjusts confidence accordingly (+0.10 sound, -0.20 flawed).
+
+| Field    | Type | Default | Description                    |
+|----------|------|---------|--------------------------------|
+| `enabled`| bool | false   | Enable Validate phase          |
+
+```toml
+[validate]
+enabled = false
+```
 
 ### VulTriage (P1) — arXiv:2605.09461
 
@@ -276,13 +342,31 @@ feedback → iterative loop. Extends the `[scanner.rulesynth]` section.
 |-----------------|------|---------|--------------------------------|
 | `mocq_mode`     | bool | false   | Enable MoCQ neuro-symbolic mode|
 | `max_iterations`| int  | 5       | Max synthesis iterations       |
-| `corpus_path`   | str  | "tests/fixtures/" | Path to pattern corpus   |
+| `corpus_path`   | str  | None    | Path to pattern corpus         |
 
 ```toml
 [scanner.rulesynth]
+enabled = false
 mocq_mode = false
 max_iterations = 5
 corpus_path = "tests/fixtures/"
+```
+
+### CPG-Guided Slicing (T3.1)
+
+CPG (Code Property Graph) slicing using Joern. Requires Joern binary in PATH or specify path.
+
+| Field         | Type | Default | Description                    |
+|---------------|------|---------|--------------------------------|
+| `enabled`     | bool | false   | Enable CPG slicing             |
+| `joern_path`  | str  | None    | Path to Joern binary           |
+| `slice_budget_lines`| int | 200  | Maximum lines per slice      |
+
+```toml
+[cpg]
+enabled = false
+joern_path = null
+slice_budget_lines = 200
 ```
 
 ### PacVD Primitive-API Abstraction (P4) — arXiv:2605.07785
@@ -319,4 +403,40 @@ integration — static harness only until P5.5.
 enabled = false
 max_iterations = 10
 requires_instrumented_target = false
+```
+
+### Exploit Synthesis (T3.2)
+
+Automated exploit generation to verify findings. Runs in sandboxed Docker containers.
+
+| Field                        | Type | Default | Description                    |
+|------------------------------|------|---------|--------------------------------|
+| `enabled`                    | bool | false   | Enable exploit synthesis       |
+| `sandbox_image`              | str  | "python:3.11-slim" | Docker image for sandbox |
+| `timeout_secs`               | int  | 30      | Timeout for exploit execution  |
+| `max_exploits_per_finding`   | int  | 1       | Max attempts per finding       |
+
+```toml
+[exploit]
+enabled = false
+sandbox_image = "python:3.11-slim"
+timeout_secs = 30
+max_exploits_per_finding = 1
+```
+
+### Confidence Normalization
+
+Normalizes confidence scores using project baselines or isotonic regression.
+
+| Field                  | Type | Default | Description                    |
+|------------------------|------|---------|--------------------------------|
+| `enabled`              | bool | false   | Enable normalization           |
+| `normalization_tier`   | str  | "None"  | Normalization tier (None, ProjectRelative, Isotonic) |
+| `project_baseline_path`| str  | None    | Path to project baseline file  |
+
+```toml
+[normalization]
+enabled = false
+normalization_tier = "None"
+project_baseline_path = null
 ```

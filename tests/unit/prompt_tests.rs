@@ -12,11 +12,9 @@
 
 use baco::prompt::{
     BacoPhase, ProjectType, PromptEngine, PromptOverrides,
-    load_phase_prompts, get_prompt, sanitize_prompt_override, validate_prompt_override,
+    load_phase_prompts, load_hunt_prompts, get_prompt, cwe_to_hunt_domain, get_hunt_prompt,
+    sanitize_prompt_override, validate_prompt_override,
     MAX_PROMPT_OVERRIDE_LENGTH, get_default_prompt,
-    injection_hunt_prompt, auth_hunt_prompt, xss_hunt_prompt,
-    path_traversal_hunt_prompt, crypto_hunt_prompt, resource_hunt_prompt,
-    deserialization_hunt_prompt,
 };
 use std::collections::HashMap;
 
@@ -68,7 +66,6 @@ fn test_prompt_engine_all_phases_non_empty() {
         BacoPhase::Reporting,
         BacoPhase::Hunt,
         BacoPhase::Validate,
-        BacoPhase::IndependentVerify,
     ];
 
     for phase in phases {
@@ -413,11 +410,6 @@ fn test_baco_phase_display_validate() {
 }
 
 #[test]
-fn test_baco_phase_display_independent_verify() {
-    assert_eq!(BacoPhase::IndependentVerify.to_string(), "independent_verify");
-}
-
-#[test]
 fn test_baco_phase_all_variants_unique() {
     let phases = vec![
         BacoPhase::Indexing,
@@ -433,7 +425,6 @@ fn test_baco_phase_all_variants_unique() {
         BacoPhase::Reporting,
         BacoPhase::Hunt,
         BacoPhase::Validate,
-        BacoPhase::IndependentVerify,
     ];
     
     let strings: Vec<String> = phases.iter().map(|p| p.to_string()).collect();
@@ -591,7 +582,6 @@ fn test_get_default_prompt_all_phases() {
         BacoPhase::Reporting,
         BacoPhase::Hunt,
         BacoPhase::Validate,
-        BacoPhase::IndependentVerify,
     ];
     
     for phase in phases {
@@ -601,131 +591,71 @@ fn test_get_default_prompt_all_phases() {
 }
 
 // ============================================================================
-// Hunt Prompt Tests
+// Hunt Prompt Loader Tests
 // ============================================================================
 
 #[test]
-fn test_injection_hunt_prompt_content() {
-    let source = "SELECT * FROM users WHERE id = $input";
-    let prompt = injection_hunt_prompt(source);
+fn test_load_hunt_prompts() {
+    let hunt_prompts = load_hunt_prompts(None);
+    assert!(hunt_prompts.contains_key("injection"));
+    assert!(hunt_prompts.contains_key("auth"));
+    assert!(hunt_prompts.contains_key("xss"));
+    assert!(hunt_prompts.contains_key("path_traversal"));
+    assert!(hunt_prompts.contains_key("crypto"));
+    assert!(hunt_prompts.contains_key("resource"));
+    assert!(hunt_prompts.contains_key("deserialization"));
+}
+
+#[test]
+fn test_hunt_prompts_non_empty() {
+    let hunt_prompts = load_hunt_prompts(None);
     
-    assert!(prompt.contains("INJECTION VULNERABILITIES"));
-    assert!(prompt.contains(source));
-    assert!(prompt.contains("DANGEROUS APIs"));
-    assert!(prompt.contains("CWE-XXX"));
+    assert!(!hunt_prompts.get("injection").unwrap_or(&String::new()).is_empty());
+    assert!(!hunt_prompts.get("auth").unwrap_or(&String::new()).is_empty());
+    assert!(!hunt_prompts.get("xss").unwrap_or(&String::new()).is_empty());
+    assert!(!hunt_prompts.get("path_traversal").unwrap_or(&String::new()).is_empty());
+    assert!(!hunt_prompts.get("crypto").unwrap_or(&String::new()).is_empty());
+    assert!(!hunt_prompts.get("resource").unwrap_or(&String::new()).is_empty());
+    assert!(!hunt_prompts.get("deserialization").unwrap_or(&String::new()).is_empty());
 }
 
 #[test]
-fn test_injection_hunt_prompt_empty_source() {
-    let prompt = injection_hunt_prompt("");
-    assert!(prompt.contains("INJECTION VULNERABILITIES"));
-    assert!(!prompt.is_empty());
-}
-
-#[test]
-fn test_auth_hunt_prompt_content() {
-    let source = "if (user.isAdmin) { grantAccess() }";
-    let prompt = auth_hunt_prompt(source);
+fn test_hunt_prompts_contain_expected_placeholders() {
+    let hunt_prompts = load_hunt_prompts(None);
     
-    assert!(prompt.contains("AUTHENTICATION/AUTHORIZATION"));
-    assert!(prompt.contains(source));
-    assert!(prompt.contains("DANGEROUS APIs"));
-}
-
-#[test]
-fn test_auth_hunt_prompt_empty_source() {
-    let prompt = auth_hunt_prompt("");
-    assert!(prompt.contains("AUTHENTICATION/AUTHORIZATION"));
-}
-
-#[test]
-fn test_xss_hunt_prompt_content() {
-    let source = "<div>{{ user_input }}</div>";
-    let prompt = xss_hunt_prompt(source);
+    let injection = hunt_prompts.get("injection").unwrap();
+    assert!(injection.contains("DANGEROUS APIs"));
+    assert!(injection.contains("HUNT FOR"));
     
-    assert!(prompt.contains("XSS VULNERABILITIES"));
-    assert!(prompt.contains("CWE-79"));
-    assert!(prompt.contains(source));
-}
-
-#[test]
-fn test_xss_hunt_prompt_empty_source() {
-    let prompt = xss_hunt_prompt("");
-    assert!(prompt.contains("XSS VULNERABILITIES"));
-}
-
-#[test]
-fn test_path_traversal_hunt_prompt_content() {
-    let source = "fs.open(user_path)";
-    let prompt = path_traversal_hunt_prompt(source);
+    let xss = hunt_prompts.get("xss").unwrap();
+    assert!(xss.contains("CWE-79"));
     
-    assert!(prompt.contains("PATH TRAVERSAL/SSRF"));
-    assert!(prompt.contains("CWE-22"));
-    assert!(prompt.contains(source));
+    let path_traversal = hunt_prompts.get("path_traversal").unwrap();
+    assert!(path_traversal.contains("CWE-22"));
 }
 
 #[test]
-fn test_path_traversal_hunt_prompt_empty_source() {
-    let prompt = path_traversal_hunt_prompt("");
-    assert!(prompt.contains("PATH TRAVERSAL/SSRF"));
-}
-
-#[test]
-fn test_crypto_hunt_prompt_content() {
-    let source = "MD5(password)";
-    let prompt = crypto_hunt_prompt(source);
+fn test_get_hunt_prompt() {
+    let hunt_prompts = load_hunt_prompts(None);
     
-    assert!(prompt.contains("CRYPTOGRAPHIC VULNERABILITIES"));
-    assert!(prompt.contains(source));
-}
-
-#[test]
-fn test_crypto_hunt_prompt_empty_source() {
-    let prompt = crypto_hunt_prompt("");
-    assert!(prompt.contains("CRYPTOGRAPHIC VULNERABILITIES"));
-}
-
-#[test]
-fn test_resource_hunt_prompt_content() {
-    let source = "malloc(size)";
-    let prompt = resource_hunt_prompt(source);
+    let injection_prompt = get_hunt_prompt("injection", &hunt_prompts);
+    assert!(injection_prompt.is_some());
+    assert!(injection_prompt.unwrap().contains("INJECTION"));
     
-    assert!(prompt.contains("RESOURCE HANDLING"));
-    assert!(prompt.contains(source));
+    let nonexistent = get_hunt_prompt("nonexistent", &hunt_prompts);
+    assert!(nonexistent.is_none());
 }
 
 #[test]
-fn test_resource_hunt_prompt_empty_source() {
-    let prompt = resource_hunt_prompt("");
-    assert!(prompt.contains("RESOURCE HANDLING"));
-}
-
-#[test]
-fn test_deserialization_hunt_prompt_content() {
-    let source = "yaml.load(user_input)";
-    let prompt = deserialization_hunt_prompt(source);
-    
-    assert!(prompt.contains("DESERIALIZATION/CONFIG"));
-    assert!(prompt.contains(source));
-}
-
-#[test]
-fn test_deserialization_hunt_prompt_empty_source() {
-    let prompt = deserialization_hunt_prompt("");
-    assert!(prompt.contains("DESERIALIZATION/CONFIG"));
-}
-
-#[test]
-fn test_all_hunt_prompts_with_same_source() {
-    let source = "test_code";
-    
-    assert!(injection_hunt_prompt(source).contains(source));
-    assert!(auth_hunt_prompt(source).contains(source));
-    assert!(xss_hunt_prompt(source).contains(source));
-    assert!(path_traversal_hunt_prompt(source).contains(source));
-    assert!(crypto_hunt_prompt(source).contains(source));
-    assert!(resource_hunt_prompt(source).contains(source));
-    assert!(deserialization_hunt_prompt(source).contains(source));
+fn test_cwe_to_hunt_domain_mapping() {
+    assert_eq!(cwe_to_hunt_domain("CWE-89"), Some("injection"));
+    assert_eq!(cwe_to_hunt_domain("CWE-79"), Some("xss"));
+    assert_eq!(cwe_to_hunt_domain("CWE-287"), Some("auth"));
+    assert_eq!(cwe_to_hunt_domain("CWE-22"), Some("path_traversal"));
+    assert_eq!(cwe_to_hunt_domain("CWE-327"), Some("crypto"));
+    assert_eq!(cwe_to_hunt_domain("CWE-400"), Some("resource"));
+    assert_eq!(cwe_to_hunt_domain("CWE-502"), Some("deserialization"));
+    assert_eq!(cwe_to_hunt_domain("CWE-999"), None);
 }
 
 // ============================================================================

@@ -1,3 +1,56 @@
+# Cryptographic Weakness Vulnerability Hunt Prompt
+
+## Hunt Instructions
+
+HUNT FOR CRYPTOGRAPHIC VULNERABILITIES ONLY.
+
+Attack class: Cryptographic Weakness (weak algo, hardcoded keys, predictable randomness)
+Task: Analyze this code and report ONLY cryptographic vulnerabilities.
+
+DANGEROUS APIs BY LANGUAGE:
+- C/C++: rand()/srand() for security, MD5()/SHA1() for passwords, DES/RC4 encryption, hardcoded keys
+- Python: random.random() for tokens, hashlib.md5/sha1(password), Crypto.Cipher.DES/RC4, SECRET_KEY hardcode
+- Java: java.util.Random for tokens, MessageDigest("MD5"/"SHA-1"), DES/RC4/EBC mode, TrustAllManager
+- Go: math/rand instead of crypto/rand, crypto/md5/sha1 for security, cipher.NewRC4(), InsecureSkipVerify:true
+- Node.js: Math.random() for tokens, createHash('md5'/'sha1'), createCipher('des-ecb'), weak JWT algorithms
+
+SAFE PATTERNS (DO NOT REPORT):
+- Secure RNG: secrets.token_hex(), crypto.getRandomValues(), crypto/rand
+- Modern hashing: bcrypt, argon2, scrypt, PBKDF2 for passwords
+- Strong encryption: AES-GCM, AES-256-CBC with HMAC, ChaCha20-Poly1305
+- Proper TLS: Valid certificate verification, strong cipher suites
+
+BYPASS DETECTION PATTERNS:
+- Hash collisions: MD5 collision attacks for certificate forgery
+- Rainbow tables: Unsalted hashes vulnerable to precomputation
+- Timing attacks: Non-constant-time string comparison for tokens
+- Padding oracle: CBC padding oracle attacks
+- ECB mode: Patterns visible in encrypted data
+
+CHAIN OPPORTUNITIES:
+- Weak hashing → Credential cracking, password recovery
+- Weak RNG → Session token prediction, session hijacking
+- Hardcoded keys → Data decryption, full system compromise
+- Timing attacks → Token recovery, authentication bypass
+
+Return JSON array with format:
+[
+  {
+    "severity": "critical|high|medium|low",
+    "title": "crypto vulnerability title",
+    "description": "detailed explanation of the crypto flaw",
+    "line": line_number,
+    "cwe_id": "CWE-XXX",
+    "confidence": 0.0-1.0
+  }
+]
+
+CRITICAL: ONLY report cryptographic vulnerabilities. Ignore all other attack classes.
+
+Code input will be provided at runtime.
+
+---
+
 # Cryptographic Weakness Vulnerability Hunt Guide
 
 ## Dangerous API Patterns by Language

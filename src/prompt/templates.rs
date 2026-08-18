@@ -3,7 +3,27 @@
 
 use std::collections::HashMap;
 
-/// All 11 BACO phases plus T2.5 six-phase orchestration
+/// Map CWE ID to hunt domain name
+/// Returns Some(domain_name) if the CWE has a corresponding hunt prompt, None otherwise
+pub fn cwe_to_hunt_domain(cwe_id: &str) -> Option<&'static str> {
+    match cwe_id {
+        "CWE-89" | "CWE-78" | "CWE-90" | "CWE-119" => Some("injection"), // SQL, command, LDAP injection
+        "CWE-79" | "CWE-80" => Some("xss"),                              // Cross-Site Scripting
+        "CWE-287" | "CWE-285" | "CWE-290" => Some("auth"), // Authentication/Authorization
+        "CWE-22" | "CWE-23" | "CWE-36" => Some("path_traversal"), // Path traversal
+        "CWE-327" | "CWE-328" | "CWE-757" => Some("crypto"), // Cryptographic weaknesses
+        "CWE-400" | "CWE-770" | "CWE-190" => Some("resource"), // Resource handling
+        "CWE-502" | "CWE-503" | "CWE-20" => Some("deserialization"), // Insecure deserialization
+        _ => None,
+    }
+}
+
+/// Get hunt prompt content for a domain from loaded hunt prompts
+pub fn get_hunt_prompt(domain: &str, hunt_prompts: &HashMap<String, String>) -> Option<String> {
+    hunt_prompts.get(domain).filter(|s| !s.is_empty()).cloned()
+}
+
+/// All 11 core BACO phases plus the six-phase orchestration variants
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum BacoPhase {
     Indexing,
@@ -17,10 +37,9 @@ pub enum BacoPhase {
     ConfidenceScoring,
     AiAggregation,
     Reporting,
-    // T2.5 six-phase orchestration
+    // six-phase orchestration variants
     Hunt,
     Validate,
-    IndependentVerify,
 }
 
 /// All project type categories
@@ -48,10 +67,9 @@ impl std::fmt::Display for BacoPhase {
             BacoPhase::ConfidenceScoring => write!(f, "confidence_scoring"),
             BacoPhase::AiAggregation => write!(f, "ai_aggregation"),
             BacoPhase::Reporting => write!(f, "reporting"),
-            // T2.5 six-phase orchestration
+            // six-phase orchestration variants
             BacoPhase::Hunt => write!(f, "hunt"),
             BacoPhase::Validate => write!(f, "validate"),
-            BacoPhase::IndependentVerify => write!(f, "independent_verify"),
         }
     }
 }
@@ -502,10 +520,9 @@ pub fn get_default_prompt(phase: &BacoPhase, _project_type: &ProjectType) -> Str
         BacoPhase::ConfidenceScoring => defaults.confidence_scoring,
         BacoPhase::AiAggregation => defaults.ai_aggregation,
         BacoPhase::Reporting => defaults.reporting,
-        // T2.5 six-phase orchestration - use generic prompts
+        // six-phase orchestration - use generic prompts
         BacoPhase::Hunt => defaults.llm_discovery,
         BacoPhase::Validate => defaults.llm_verification,
-        BacoPhase::IndependentVerify => defaults.llm_discovery,
     }
 }
 
@@ -515,402 +532,8 @@ pub fn get_all_defaults() -> DefaultPrompts {
 }
 
 // ============================================================================
-// T2.5 Six-Phase Hunt Templates (Cloudflare pattern)
+// Domain-specific hunt prompts loaded from prompts/hunt/
 // ============================================================================
-
-/// Injection hunt prompt (SQL, command, LDAP)
-pub fn injection_hunt_prompt(source: &str) -> String {
-    format!(
-        r#"HUNT FOR INJECTION VULNERABILITIES ONLY.
-
-Attack class: Injection (SQL injection, command injection, LDAP injection, format strings)
-Task: Analyze this code and report ONLY injection vulnerabilities.
-
-DANGEROUS APIs BY LANGUAGE:
-- C/C++: system(), popen(), exec*(), sprintf() with user input, printf(user_input)
-- Python: os.system(), subprocess.call(shell=True), eval(), exec(), render_template_string()
-- Java: Statement.executeQuery() with concatenation, Runtime.exec(), context.search()
-- Go: db.Query() with Sprintf, exec.Command("sh", "-c"), template.HTML()
-- Node.js: exec(), spawn("sh", "-c"), query() with concatenation, innerHTML
-
-SAFE PATTERNS (DO NOT REPORT):
-- Parameterized queries: cursor.execute("SELECT * FROM users WHERE id=?", (user_id,))
-- Prepared statements: PreparedStatement with ? placeholders
-- ORM methods: User.objects.get(id=user_id), db.users.find({{id: userId}})
-- Proper escaping: htmlspecialchars(), mysql_real_escape_string()
-
-BYPASS DETECTION PATTERNS:
-- Encoding: %27 for ', %22 for ", double encoding %2527
-- Comments: --, #, /* */ in SQL, null bytes %00
-- Concatenation: ' OR '1'='1, type confusion 1 OR 1=1
-
-CHAIN OPPORTUNITIES:
-- SQLi → Auth bypass, command execution via xp_cmdshell
-- Command injection → File read, SSRF, lateral movement
-- Stored injection → XSS, data exfiltration
-
-Return JSON array with format:
-[
-  {{
-    "severity": "critical|high|medium|low",
-    "title": "injection vulnerability title",
-    "description": "detailed explanation of the injection flaw",
-    "line": line_number,
-    "cwe_id": "CWE-XXX",
-    "confidence": 0.0-1.0
-  }}
-]
-
-CRITICAL: ONLY report injection vulnerabilities. Ignore all other attack classes.
-
-Code:
-```
-{}
-```"#,
-        source
-    )
-}
-
-/// Authentication/Authorization hunt prompt
-pub fn auth_hunt_prompt(source: &str) -> String {
-    format!(
-        r#"HUNT FOR AUTHENTICATION/AUTHORIZATION VULNERABILITIES ONLY.
-
-Attack class: Authentication/Authorization (bypass, privilege escalation, session flaws)
-Task: Analyze this code and report ONLY auth-related vulnerabilities.
-
-DANGEROUS APIs BY LANGUAGE:
-- C/C++: MD5(password), hardcoded session keys, missing permission checks
-- Python: hashlib.md5/sha1(password), jwt.decode(token, verify=False), secrets.token_hex() without entropy
-- Java: MessageDigest.getInstance("MD5"), session.setAttribute() without timeout, missing @PreAuthorize
-- Go: sha256.Sum256(password) without bcrypt, jwt.Parse with nil key function
-- Node.js: crypto.createHash('md5'), jwt.verify with algorithms: ['none'], missing role checks
-
-SAFE PATTERNS (DO NOT REPORT):
-- Proper hashing: bcrypt.hash(), argon2.hash(), PBKDF2
-- JWT verification: jwt.verify(token, secret, {{algorithms: ['RS256']}})
-- Session security: secure:true, httpOnly:true, sameSite:'strict'
-- RBAC: @RequiresRoles(), if (user.role === 'admin' && user.verified)
-
-BYPASS DETECTION PATTERNS:
-- Parameter pollution: ?admin=true&admin=false
-- Type juggling: if (userId == "1") in PHP/JS
-- IDOR: GET /api/users/1 → GET /api/users/2 without ownership check
-- HTTP verb tampering: POST → GET/PUT/DELETE
-- Race conditions: Concurrent requests bypassing rate limits
-
-CHAIN OPPORTUNITIES:
-- Auth bypass → Full system access, data breach
-- IDOR → Sensitive data exposure, account takeover
-- Session flaws → Session hijacking, CSRF
-- Privilege escalation → Admin access, RCE
-
-Return JSON array with format:
-[
-  {{
-    "severity": "critical|high|medium|low",
-    "title": "auth vulnerability title",
-    "description": "detailed explanation of the auth flaw",
-    "line": line_number,
-    "cwe_id": "CWE-XXX",
-    "confidence": 0.0-1.0
-  }}
-]
-
-CRITICAL: ONLY report authentication/authorization vulnerabilities. Ignore all other attack classes.
-
-Code:
-```
-{}
-```"#,
-        source
-    )
-}
-
-/// XSS hunt prompt
-pub fn xss_hunt_prompt(source: &str) -> String {
-    format!(
-        r#"HUNT FOR XSS VULNERABILITIES ONLY.
-
-Attack class: Cross-Site Scripting (reflected, stored, DOM-based)
-Task: Analyze this code and report ONLY XSS vulnerabilities.
-
-DANGEROUS APIs BY LANGUAGE:
-- C/C++: printf("<div>%s</div>", user_input), custom templates without auto-escape
-- Python: render_template_string(user_input), Markup(user_input), print(f"<p>{{user_input}}</p>")
-- Java: <%= request.getParameter("q") %>, response.getWriter().println("<div>" + input)
-- Go: tmpl.ExecuteTemplate() with user HTML, template.HTML(userInput), fmt.Fprintf(w, "<div>%s</div>", input)
-- Node.js: element.innerHTML = userInput, document.write(), dangerouslySetInnerHTML, .html(userInput)
-
-SAFE PATTERNS (DO NOT REPORT):
-- Auto-escaping: Go html/template, Django templates with default auto-escape
-- Proper encoding: htmlspecialchars(), escapeHtml(), textContent instead of innerHTML
-- CSP: default-src 'self' headers
-- React: Using children prop instead of dangerouslySetInnerHTML
-- Sanitization: DOMPurify.sanitize(), bleach.clean()
-
-BYPASS DETECTION PATTERNS:
-- HTML entities: &#60;script&#62;
-- Unicode: \u003cscript\u003e
-- Case variation: <ScRiPt>
-- Event handlers: <img src=x onerror=alert(1)>
-- Context escape: "><script>alert(1)</script> in attribute context
-
-CHAIN OPPORTUNITIES:
-- XSS → Cookie theft, session hijacking
-- DOM XSS → Keylogging, phishing
-- Stored XSS → Malware delivery, reconnaissance
-- XSS + CSRF → Authenticated action execution
-
-Return JSON array with format:
-[
-  {{
-    "severity": "critical|high|medium|low",
-    "title": "XSS vulnerability title",
-    "description": "detailed explanation of the XSS flaw",
-    "line": line_number,
-    "cwe_id": "CWE-79",
-    "confidence": 0.0-1.0
-  }}
-]
-
-CRITICAL: ONLY report XSS vulnerabilities. Ignore all other attack classes.
-
-Code:
-```
-{}
-```"#,
-        source
-    )
-}
-
-/// Path traversal/SSRF hunt prompt
-pub fn path_traversal_hunt_prompt(source: &str) -> String {
-    format!(
-        r#"HUNT FOR PATH TRAVERSAL/SSRF VULNERABILITIES ONLY.
-
-Attack class: Path Traversal / Server-Side Request Forgery
-Task: Analyze this code and report ONLY path traversal or SSRF vulnerabilities.
-
-DANGEROUS APIs BY LANGUAGE:
-- C/C++: fopen(user_input), open(user_input), sprintf(path, "/home/%s/file", username)
-- Python: open("/home/" + username), Path(user_input).read_text(), urllib.request.urlopen(user_url)
-- Java: new FileInputStream(user_input), Paths.get(user_input), new URL(userUrl).openStream()
-- Go: os.Open(userInput), filepath.Join(basePath, userInput) without Clean(), http.Get(userInput)
-- Node.js: fs.readFileSync(userInput), path.join(basePath, userInput), axios.get(userInput)
-
-SAFE PATTERNS (DO NOT REPORT):
-- Path normalization: os.path.realpath(), filepath.Clean(), Path.resolve()
-- Whitelist validation: File paths validated against allowed list
-- Chroot/jail: Operations confined to sandboxed directory
-- SSRF protection: URL allowlist, internal IP blocking, scheme validation
-
-BYPASS DETECTION PATTERNS:
-- Double encoding: %252f%252f → %2f%2f → //
-- Unicode: ..%u2215 (Unicode for /)
-- Null bytes: file.txt%00.jpg
-- Dot tricks: ....// → ../ after filter removal
-- IP obfuscation: 0x7f00001, 2130706433 for 127.0.0.1
-- URL tricks: http://127.1@external.com
-
-CHAIN OPPORTUNITIES:
-- Path traversal → Source code disclosure, config theft, RCE via file overwrite
-- SSRF → Internal network recon, cloud metadata access (169.254.169.254)
-- SSRF → Internal admin panels (Redis, MongoDB), port scanning
-- Symlink attacks → Sensitive file access
-
-Return JSON array with format:
-[
-  {{
-    "severity": "critical|high|medium|low",
-    "title": "path traversal/SSRF vulnerability title",
-    "description": "detailed explanation of the flaw",
-    "line": line_number,
-    "cwe_id": "CWE-22",
-    "confidence": 0.0-1.0
-  }}
-]
-
-CRITICAL: ONLY report path traversal or SSRF vulnerabilities. Ignore all other attack classes.
-
-Code:
-```
-{}
-```"#,
-        source
-    )
-}
-
-/// Cryptographic weakness hunt prompt
-pub fn crypto_hunt_prompt(source: &str) -> String {
-    format!(
-        r#"HUNT FOR CRYPTOGRAPHIC VULNERABILITIES ONLY.
-
-Attack class: Cryptographic Weakness (weak algo, hardcoded keys, predictable randomness)
-Task: Analyze this code and report ONLY cryptographic vulnerabilities.
-
-DANGEROUS APIs BY LANGUAGE:
-- C/C++: rand()/srand() for security, MD5()/SHA1() for passwords, DES/RC4 encryption, hardcoded keys
-- Python: random.random() for tokens, hashlib.md5/sha1(password), Crypto.Cipher.DES/RC4, SECRET_KEY hardcode
-- Java: java.util.Random for tokens, MessageDigest("MD5"/"SHA-1"), DES/RC4/EBC mode, TrustAllManager
-- Go: math/rand instead of crypto/rand, crypto/md5/sha1 for security, cipher.NewRC4(), InsecureSkipVerify:true
-- Node.js: Math.random() for tokens, createHash('md5'/'sha1'), createCipher('des-ecb'), weak JWT algorithms
-
-SAFE PATTERNS (DO NOT REPORT):
-- Secure RNG: secrets.token_hex(), crypto.getRandomValues(), crypto/rand
-- Modern hashing: bcrypt, argon2, scrypt, PBKDF2 for passwords
-- Strong encryption: AES-GCM, AES-256-CBC with HMAC, ChaCha20-Poly1305
-- Proper TLS: Valid certificate verification, strong cipher suites
-
-BYPASS DETECTION PATTERNS:
-- Hash collisions: MD5 collision attacks for certificate forgery
-- Rainbow tables: Unsalted hashes vulnerable to precomputation
-- Timing attacks: Non-constant-time string comparison for tokens
-- Padding oracle: CBC padding oracle attacks
-- ECB mode: Patterns visible in encrypted data
-
-CHAIN OPPORTUNITIES:
-- Weak hashing → Credential cracking, password recovery
-- Weak RNG → Session token prediction, session hijacking
-- Hardcoded keys → Data decryption, full system compromise
-- Timing attacks → Token recovery, authentication bypass
-
-Return JSON array with format:
-[
-  {{
-    "severity": "critical|high|medium|low",
-    "title": "crypto vulnerability title",
-    "description": "detailed explanation of the crypto flaw",
-    "line": line_number,
-    "cwe_id": "CWE-XXX",
-    "confidence": 0.0-1.0
-  }}
-]
-
-CRITICAL: ONLY report cryptographic vulnerabilities. Ignore all other attack classes.
-
-Code:
-```
-{}
-```"#,
-        source
-    )
-}
-
-/// Resource handling hunt prompt
-pub fn resource_hunt_prompt(source: &str) -> String {
-    format!(
-        r#"HUNT FOR RESOURCE HANDLING VULNERABILITIES ONLY.
-
-Attack class: Resource Handling (memory safety, integer overflow, DoS)
-Task: Analyze this code and report ONLY resource handling vulnerabilities.
-
-DANGEROUS APIs BY LANGUAGE:
-- C/C++: malloc(size*count) without overflow check, strcpy/strcat/sprintf without bounds, large stack allocations
-- Python: Unbounded list.append(), io.BytesIO() with large data, subprocess.call() blocking, json.loads() massive payloads
-- Java: ArrayList.add() without bounds, unbounded thread creation, FileInputStream without try-with-resources, ReDoS in Pattern.compile()
-- Go: make([]byte, userControlledSize), go func() without limits, ioutil.ReadAll() unbounded, deep recursion
-- Node.js: Unbounded array push, Buffer.alloc(userSize), sync blocking operations, ReDoS in regex.test()
-
-SAFE PATTERNS (DO NOT REPORT):
-- Bounded allocation: Size validation before malloc, max limits on collections
-- Context cancellation: context.WithTimeout(), signal.NotifyContext()
-- Resource pools: Connection pools, thread pools with limits
-- Try-with-resources: Python with open(), Java try-with-resources
-- Rate limiting: Request throttling, queue limits
-
-BYPASS DETECTION PATTERNS:
-- Integer overflow: size*count wrapping, signed to unsigned conversion
-- Memory exhaustion: Large JSON payloads, deeply nested structures
-- CPU exhaustion: ReDoS patterns ^(a+)+$, infinite loops
-- File descriptor leaks: Opening many files without closing
-- Goroutine/thread leaks: Creating many concurrent workers
-
-CHAIN OPPORTUNITIES:
-- DoS → Service unavailability, crash exploitation
-- Integer overflow → Buffer overflow, crash exploits
-- Use-after-free → Information leak, code execution
-- Race conditions → Privilege escalation, file operation bypass
-
-Return JSON array with format:
-[
-  {{
-    "severity": "critical|high|medium|low",
-    "title": "resource handling vulnerability title",
-    "description": "detailed explanation of the flaw",
-    "line": line_number,
-    "cwe_id": "CWE-XXX",
-    "confidence": 0.0-1.0
-  }}
-]
-
-CRITICAL: ONLY report resource handling vulnerabilities. Ignore all other attack classes.
-
-Code:
-```
-{}
-```"#,
-        source
-    )
-}
-
-/// Deserialization/config hunt prompt
-pub fn deserialization_hunt_prompt(source: &str) -> String {
-    format!(
-        r#"HUNT FOR INSECURE DESERIALIZATION/CONFIG VULNERABILITIES ONLY.
-
-Attack class: Insecure Deserialization / Configuration
-Task: Analyze this code and report ONLY deserialization or config vulnerabilities.
-
-DANGEROUS APIs BY LANGUAGE:
-- C/C++: memcpy() from network without validation, read(fd, &struct) from untrusted source
-- Python: pickle.loads(user_input), yaml.load(user_input) without SafeLoader, marshal.loads()
-- Java: ObjectInputStream.readObject() from untrusted, xstream.fromXML() without allowlist, Jackson with polymorphic types
-- Go: gob.NewDecoder().Decode() with untrusted data, json.Unmarshal() with interface{{}}
-- Node.js: JSON.parse() with __proto__ pollution, yaml.parse() without safe options, serialize-javascript without strict
-
-SAFE PATTERNS (DO NOT REPORT):
-- Safe loaders: yaml.safe_load(), yaml.load(..., SafeLoader)
-- Type allowlists: xstream.allowTypesByWildcard(["com.example.safe.*"])
-- Schema validation: JSON Schema validation before parsing
-- Immutable types: Deserializing only to immutable data structures
-- JSON only: Using JSON instead of binary serialization formats
-
-BYPASS DETECTION PATTERNS:
-- Gadget chains: Apache Commons, Java Serialization RCE chains
-- Type confusion: Casting to unexpected types after deserialization
-- Prototype pollution: {{"__proto__": {{"admin": true}}}}
-- Polymorphic abuse: Deserializing to unexpected subclasses
-- Config issues: Hardcoded secrets, DEBUG=True, weak CORS, chmod 777
-
-CHAIN OPPORTUNITIES:
-- RCE via gadgets → Full system compromise, lateral movement
-- Auth bypass → Deserializing admin session objects
-- Privilege escalation → Modifying serialized permission objects
-- Data tampering → Altering business logic state
-- Config exposure → Credential theft, reconnaissance
-
-Return JSON array with format:
-[
-  {{
-    "severity": "critical|high|medium|low",
-    "title": "deserialization/config vulnerability title",
-    "description": "detailed explanation of the flaw",
-    "line": line_number,
-    "cwe_id": "CWE-XXX",
-    "confidence": 0.0-1.0
-  }}
-]
-
-CRITICAL: ONLY report deserialization or configuration vulnerabilities. Ignore all other attack classes.
-
-Code:
-```
-{}
-```"#,
-        source
-    )
-}
 
 /// Render a template string by substituting {{VAR}} placeholders with values from TemplateVariables
 pub fn render_template(template: &str, variables: &TemplateVariables) -> String {

@@ -44,14 +44,7 @@ pub struct LlmPhasesConfig {
     pub prompt_overrides: PromptOverrides,
 }
 
-impl LlmPhasesConfig {
-    /// Create a PromptEngine with overrides from this config
-    pub fn create_prompt_engine(&self) -> crate::prompt::PromptEngine {
-        crate::prompt::PromptEngine::from_config_overrides(
-            self.prompt_overrides.phase_overrides.clone(),
-        )
-    }
-}
+impl LlmPhasesConfig {}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct LlmPhaseConfig {

@@ -1,4 +1,4 @@
-//! Unit tests for confidence normalization (X.4).
+//! Unit tests for confidence normalization.
 //!
 //! Tests per-project confidence calibration based on:
 //! Paper: Closing the Gap — arxiv:2412.14306

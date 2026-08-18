@@ -48,7 +48,7 @@ pub async fn run_cwe_routing(
     Ok((findings, analyzed_files.to_vec()))
 }
 
-/// Run CPG slice phase (Phase 3/23)
+/// Run CPG slice phase (Phase 3/24)
 ///
 /// Uses Joern to build a Code Property Graph and extract code slices around
 /// suspected vulnerabilities, reducing LLM context size (LLMxCPG, Usenix 2025).
@@ -89,7 +89,7 @@ pub async fn run_cpg_slice(
         findings.len(),
         config.cpg.slice_budget_lines
     );
-    pb.set_message("Phase 3/23: CPG slice (building graph and slicing)");
+    pb.set_message("Phase 3/24: CPG slice (building graph and slicing)");
 
     let cpg = match engine.build(target_path) {
         Ok(cpg) => cpg,

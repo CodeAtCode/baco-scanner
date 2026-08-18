@@ -35,6 +35,36 @@ pub fn load_phase_prompts(base_path: Option<&str>) -> HashMap<String, String> {
     prompts
 }
 
+/// Load hunt domain prompts from prompts/hunt/*.md files
+pub fn load_hunt_prompts(base_path: Option<&str>) -> HashMap<String, String> {
+    let mut prompts = HashMap::new();
+    let base = base_path.unwrap_or("prompts");
+    let hunt_dir = Path::new(base).join("hunt");
+
+    let hunt_domains = [
+        ("injection", "injection.md"),
+        ("auth", "auth.md"),
+        ("xss", "xss.md"),
+        ("path_traversal", "path_traversal.md"),
+        ("crypto", "crypto.md"),
+        ("resource", "resource.md"),
+        ("deserialization", "deserialization.md"),
+    ];
+
+    for (domain_name, filename) in hunt_domains {
+        let filepath = hunt_dir.join(filename);
+        let clean_content = fs::read_to_string(&filepath)
+            .map(|content| content.trim().to_string())
+            .unwrap_or_else(|_| {
+                tracing::warn!("Warning: Could not load hunt prompt file: {:?}", filepath);
+                String::new()
+            });
+        prompts.insert(domain_name.to_string(), clean_content);
+    }
+
+    prompts
+}
+
 pub fn get_prompt(
     phase_name: &str,
     loaded_prompts: &HashMap<String, String>,

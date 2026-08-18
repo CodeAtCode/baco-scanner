@@ -1,4 +1,4 @@
-//! Primitive API catalogue for PacVD context abstraction (P4).
+//! Primitive API catalogue for PacVD context abstraction.
 //!
 //! Maps primitive C/system APIs (malloc, free, open, close, ...) to the
 //! vulnerability types they are associated with. Used by the four-dimension
