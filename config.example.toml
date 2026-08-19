@@ -196,3 +196,73 @@ project = "libxml2"
 # trusted_paths = ["."] # Filesystem paths the agent is allowed to access
 # keep_artifacts = false  # Keep agent work artifacts (logs, temp files)
 
+
+# CPG-guided slicing (P3.1)
+[cpg]
+# Whether CPG slicing is enabled
+# enabled = false
+# Path to Joern binary (None = search PATH)
+# joern_path = ""
+# Maximum lines to include in a slice
+# slice_budget_lines = 200
+
+# Exploit synthesis (T3.2)
+[exploit]
+# Whether exploit synthesis is enabled
+# enabled = false
+# Docker image for sandboxed exploit execution
+# sandbox_image = "python:3.11-slim"
+# Timeout for exploit execution in seconds
+# timeout_secs = 30
+# Maximum number of exploit attempts per finding
+# max_exploits_per_finding = 1
+
+# Soundness validation (CORRECT paper)
+[validate]
+# Whether the Validate phase is enabled
+# enabled = false
+
+# Triple-path context augmentation (P1: VulTriage)
+[vultriage]
+# Whether triple-path context augmentation is enabled
+# enabled = false
+# Whether to include the control path (AST/CFG/DFG verbalisation)
+# control_path = true
+# Whether to include the knowledge path (CWE pattern RAG)
+# knowledge_path = true
+# Whether to include the semantic path (function summary)
+# semantic_path = true
+
+# Policy-based generation (P2.2: VulnLLM-R)
+[policy_sampling]
+# Whether policy-based generation is enabled
+# enabled = false
+# Number of sampling rounds to build the policy
+# samples = 4
+
+# Agent scaffold (P2.5: VulnLLM-R)
+[agent_scaffold]
+# Whether the agent scaffold is enabled
+# enabled = false
+# Maximum interaction rounds per target function
+# max_rounds = 5
+# Number of call-graph paths to sample per target function
+# paths_per_target = 3
+
+# Primitive-API abstraction (P4: PacVD)
+[pacvd]
+# Whether PacVD abstraction is enabled
+# enabled = false
+# Abstraction level 1-4 (1=fuzzy, 4=concrete)
+# level = 2
+# Whether to auto-select the level based on the configured LLM model
+# auto_level = false
+
+# Multi-agent harness synthesis (P5: AgentFlow)
+[agent_flow]
+# Whether AgentFlow is enabled
+# enabled = false
+# Maximum search-loop iterations
+# max_iterations = 10
+# Whether the target must be built with coverage/sanitizer instrumentation
+# requires_instrumented_target = false

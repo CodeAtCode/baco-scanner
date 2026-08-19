@@ -6,7 +6,7 @@ use crate::llm;
 use crate::scanner::phases::PhaseConfig;
 use std::sync::Arc;
 
-/// Run LLM discovery phase (Phase 4/20)
+/// Run LLM discovery phase (Phase 7/24)
 pub async fn run_llm_discovery(
     scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,
@@ -25,11 +25,11 @@ pub async fn run_llm_discovery(
     tracing::info!("Running LLM discovery phase...");
     let base = pb.position();
     pb.set_message(
-        "Phase 4/20: LLM discovery (enriching vulnerability descriptions with AI context)...",
+        "Phase 7/24: LLM discovery (enriching vulnerability descriptions with AI context)...",
     );
 
     // Step 1: Detect project stack and fetch CVEs for threat intelligence
-    pb.set_message("Phase 4/20: Detecting project stack and fetching CVE data...");
+    pb.set_message("Phase 7/24: Detecting project stack and fetching CVE data...");
     let target_path_str = target_path.to_string_lossy().to_string();
     let bootstrapper = CveBootstrapper::new(target_path_str.clone());
 
@@ -133,7 +133,7 @@ pub async fn run_llm_discovery(
             };
             pb.set_position(base + progress_pct);
             pb.set_message(format!(
-                "Phase 4/20: Enriching findings [{}/{}] - {}",
+                "Phase 7/24: Enriching findings [{}/{}] - {}",
                 i + 1,
                 total_findings,
                 finding.title
@@ -213,12 +213,12 @@ Respond with ONLY JSON:
         }
         pb.set_position(base + 100);
         pb.set_message(format!(
-            "Phase 4/20: Discovery complete - enriched {} findings",
+            "Phase 7/24: Discovery complete - enriched {} findings",
             total_findings
         ));
     } else {
         tracing::debug!("No API key for discovery, skipping LLM enrichment");
-        pb.set_message("Phase 4/20: No API key configured - skipping discovery");
+        pb.set_message("Phase 7/24: No API key configured - skipping discovery");
         pb.set_position(base + 100);
     }
     Ok((findings, analyzed_files.to_vec()))

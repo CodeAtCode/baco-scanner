@@ -90,6 +90,7 @@ impl FileIndex {
         languages: &[String],
         max_size: u64,
         excludes: &[String],
+        pb: Option<&indicatif::ProgressBar>,
     ) -> Result<(Self, FileHashStore), std::io::Error> {
         if !std::path::Path::new(project_path).exists() {
             tracing::error!("\u{1B}[31m[INDEXING]\u{1B}[0m ERROR: Path does not exist!");
@@ -143,13 +144,22 @@ impl FileIndex {
             total_size / (1024 * 1024)
         );
 
+        if let Some(pb) = pb {
+            pb.set_length(all_files.len() as u64);
+            pb.set_position(0);
+            pb.set_message("Indexing files...");
+        }
+
         let mut hasher = crate::file_hash::FileHasher::new();
         let mut hash_store = FileHashStore::new();
 
-        for file_info in &mut all_files {
+        for (i, file_info) in all_files.iter_mut().enumerate() {
             if let Ok(hash) = hasher.hash_file(&file_info.path) {
                 file_info.hash = Some(hash.clone());
                 hash_store.insert_hash(&file_info.path, hash);
+            }
+            if let Some(pb) = pb {
+                pb.set_position((i + 1) as u64);
             }
         }
 

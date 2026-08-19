@@ -6,7 +6,7 @@ use crate::findings::VulnerabilityFinding;
 use crate::scanner::phases::PhaseConfig;
 use std::sync::Arc;
 
-/// Run Security Agent verification phase (Phase 6/20)
+/// Run Security Agent verification phase (Phase 10/24)
 pub async fn run_security_agent_verification(
     scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,
@@ -28,19 +28,19 @@ pub async fn run_security_agent_verification(
 
     if !config.agent.enabled {
         tracing::debug!("Agent mode disabled, skipping Security Agent verification");
-        pb.set_message("Phase 6/20: Agent mode disabled - skipping");
+        pb.set_message("Phase 10/24: Agent mode disabled - skipping");
         pb.set_position(base + 100);
         return Ok((findings, analyzed_files.to_vec()));
     }
 
     let Some(_api_key) = &config.llm.phases.discovery.api_key else {
         tracing::debug!("No API key for agent, skipping Security Agent verification");
-        pb.set_message("Phase 6/20: No API key - skipping");
+        pb.set_message("Phase 10/24: No API key - skipping");
         pb.set_position(base + 100);
         return Ok((findings, analyzed_files.to_vec()));
     };
 
-    pb.set_message("Phase 6/20: Security Agent verification (tool-based analysis)...");
+    pb.set_message("Phase 10/24: Security Agent verification (tool-based analysis)...");
 
     let total_findings = findings.len();
 
@@ -134,7 +134,7 @@ pub async fn run_security_agent_verification(
         };
         pb.set_position(base + progress_pct);
         pb.set_message(format!(
-            "Phase 6/20: Security Agent verifying [{}/{}] - {}",
+            "Phase 10/24: Security Agent verifying [{}/{}] - {}",
             i + 1,
             total_findings,
             finding.title
@@ -276,7 +276,7 @@ pub async fn run_security_agent_verification(
         };
 
         if enter_agent_flow {
-            pb.set_message("Phase 6/20: AgentFlow harness synthesis...");
+            pb.set_message("Phase 10/24: AgentFlow harness synthesis...");
 
             for finding in findings.iter_mut() {
                 // Build a minimal harness from the finding

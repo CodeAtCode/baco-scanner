@@ -3,7 +3,7 @@ use crate::findings::VulnerabilityFinding;
 use crate::git_analysis::GitAnalyzer;
 use crate::scanner::phases::PhaseConfig;
 
-/// Run ticket cross-reference phase (Phase 7/20)
+/// Run ticket cross-reference phase (Phase 11/24)
 pub async fn run_ticket_cross_ref(
     _scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,
@@ -52,7 +52,7 @@ pub async fn run_ticket_cross_ref(
     Ok((findings, analyzed_files.to_vec()))
 }
 
-/// Run Git analysis phase (Phase 8/20)
+/// Run Git analysis phase (Phase 12/24)
 pub async fn run_git_analysis(
     _scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,

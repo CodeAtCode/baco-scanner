@@ -3,7 +3,7 @@ use crate::error::ScanResult;
 use crate::findings::VulnerabilityFinding;
 use crate::scanner::phases::PhaseConfig;
 
-/// Run CWE routing phase (Phase 20/20)
+/// Run CWE routing phase (Phase 5/24)
 pub async fn run_cwe_routing(
     _scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,

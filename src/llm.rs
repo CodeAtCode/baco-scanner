@@ -770,7 +770,6 @@ fn get_error_details(e: &reqwest::Error) -> (String, String, &'static str) {
     (status, url_e, kind)
 }
 
-/// Helper to create LLM client with metrics from phase config
 pub fn create_llm_client_with_metrics(
     scanner: &crate::scanner::Scanner,
     phase_name: &str,
@@ -781,7 +780,15 @@ pub fn create_llm_client_with_metrics(
         _ => return None,
     };
 
-    let api_key = phase_config.api_key.as_ref()?;
+    let api_key = phase_config.api_key.as_ref();
+    if api_key.is_none() {
+        eprintln!(
+                "\u{1B}[33m[SCANNER] {} skipped: LLM not configured (set LLM_API_KEY or llm.api_key)\u{1B}[0m",
+                phase_name
+            );
+    }
+
+    let api_key = api_key?;
 
     let llm_config = LlmConfig {
         base_url: phase_config.base_url.clone(),

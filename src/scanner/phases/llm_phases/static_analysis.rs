@@ -1,4 +1,4 @@
-use super::helpers::detect_language;
+/// Run LLM static analysis phase (Phase 4/24)
 use crate::context::callee_walker::extract_call_sites;
 use crate::context::pacvd_extractor::{self, AbstractionLevel};
 use crate::context::semantic_path;
@@ -97,7 +97,7 @@ pub async fn run_llm_static_analysis(
 
     // Capture base position for intra-phase progress
     let base = pb.position();
-    pb.set_message("Phase 3/20: LLM static analysis (analyzing files for vulnerabilities)...");
+    pb.set_message("Phase 4/24: LLM static analysis (analyzing files for vulnerabilities)...");
 
     let index = crate::indexer::FileIndex::index_project(
         target_path.to_str().unwrap_or("."),
@@ -165,7 +165,7 @@ pub async fn run_llm_static_analysis(
                 let progress_pct = ((i as f64 / file_count as f64) * 100.0) as u64;
                 pb.set_position(base + progress_pct);
                 pb.set_message(format!(
-                    "Phase 3/20: Skipping already analyzed [{}]: {}",
+                    "Phase 4/24: Skipping already analyzed [{}]: {}",
                     i + 1,
                     file_info.path.display()
                 ));
@@ -173,7 +173,7 @@ pub async fn run_llm_static_analysis(
             }
             let progress_pct = ((i as f64 / file_count as f64) * 100.0) as u64;
             let msg = format!(
-                "Phase 3/20: LLM analyzing [{}/{}] ({:.0}%): {}",
+                "Phase 4/24: LLM analyzing [{}/{}] ({:.0}%): {}",
                 i + 1,
                 file_count,
                 progress_pct,
@@ -300,7 +300,7 @@ pub async fn run_llm_static_analysis(
                     llm_findings.extend(file_findings);
                     new_analyzed_files.push(file_path_str);
                     let msg = format!(
-                        "Phase 3/20: LLM analyzing [{}/{}] ({:.0}%): {} - {} findings total",
+                        "Phase 4/24: LLM analyzing [{}/{}] ({:.0}%): {} - {} findings total",
                         i + 1,
                         file_count,
                         progress_pct,
@@ -318,7 +318,7 @@ pub async fn run_llm_static_analysis(
                     let error_lines: Vec<&str> = e.lines().take(3).collect();
                     let error_summary = error_lines.join(" | ");
                     let msg = format!(
-                        "Phase 3/20: {} - {} - FAILED: {}",
+                        "Phase 4/24: {} - {} - FAILED: {}",
                         file_info.path.display(),
                         error_summary,
                         if i + 1 < file_count {
@@ -340,7 +340,7 @@ pub async fn run_llm_static_analysis(
 
         findings.extend(llm_findings.clone());
         pb.set_message(format!(
-            "Phase 3/20: LLM static analysis complete - {} findings discovered",
+            "Phase 4/24: LLM static analysis complete - {} findings discovered",
             llm_findings.len()
         ));
     } else {

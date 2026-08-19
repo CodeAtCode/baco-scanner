@@ -9,7 +9,7 @@ use crate::prompt::templates::cwe_to_hunt_domain;
 use crate::scanner::phases::PhaseConfig;
 use std::sync::Arc;
 
-/// Run LLM verification phase (Phase 5/20)
+/// Run LLM verification phase (Phase 8/24)
 pub async fn run_llm_verification(
     scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,
@@ -27,7 +27,7 @@ pub async fn run_llm_verification(
 
     tracing::info!("Running LLM verification phase...");
     let base = pb.position();
-    pb.set_message("Phase 5/20: LLM verification (validating findings with AI analysis)...");
+    pb.set_message("Phase 8/24: LLM verification (validating findings with AI analysis)...");
 
     let total_findings = findings.len();
     let use_agent_mode = config.agent.enabled;
@@ -53,7 +53,7 @@ pub async fn run_llm_verification(
                 };
                 pb.set_position(base + progress_pct);
                 pb.set_message(format!(
-                    "Phase 5/20: Agent verifying [{}/{}] - {}",
+                    "Phase 8/24: Agent verifying [{}/{}] - {}",
                     i + 1,
                     total_findings,
                     finding.title
@@ -97,7 +97,7 @@ pub async fn run_llm_verification(
                 };
                 pb.set_position(base + progress_pct);
                 pb.set_message(format!(
-                    "Phase 5/20: Verifying findings [{}/{}] - {}",
+                    "Phase 8/24: Verifying findings [{}/{}] - {}",
                     i + 1,
                     total_findings,
                     finding.title
@@ -152,16 +152,16 @@ pub async fn run_llm_verification(
         }
         pb.set_position(base + 100);
         pb.set_message(format!(
-            "Phase 5/20: Verification complete - verified {} findings",
+            "Phase 8/24: Verification complete - verified {} findings",
             total_findings
         ));
     } else {
         tracing::debug!("No API key for verification, skipping LLM verification");
-        pb.set_message("Phase 5/20: No API key configured - skipping verification");
+        pb.set_message("Phase 8/24: No API key configured - skipping verification");
     }
 
     // Step 2: Generate PoCs for high-severity confirmed findings
-    pb.set_message("Phase 5/20: Generating PoCs for high-severity findings...");
+    pb.set_message("Phase 8/24: Generating PoCs for high-severity findings...");
 
     let context = crate::analysis_context::AnalysisContext::default();
     let poc_engine = PoCGenerationEngine::new();

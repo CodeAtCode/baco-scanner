@@ -2,7 +2,7 @@ use crate::error::ScanResult;
 use crate::findings::VulnerabilityFinding;
 use crate::scanner::phases::PhaseConfig;
 
-/// Run auto patching phase (Phase 16/20)
+/// Run auto patching phase (Phase 19/24)
 pub async fn run_auto_patching(
     _scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,
@@ -44,7 +44,7 @@ pub async fn run_auto_patching(
     }
 }
 
-/// Run CVE bootstrap phase (Phase 17/20)
+/// Run CVE bootstrap phase (Phase 20/24)
 pub async fn run_cve_bootstrap(
     _scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,
@@ -86,7 +86,7 @@ pub async fn run_cve_bootstrap(
     }
 }
 
-/// Run PoC compiler phase (Phase 18/20)
+/// Run PoC compiler phase (Phase 21/24)
 pub async fn run_poc_compiler(
     _scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,
@@ -134,7 +134,7 @@ pub async fn run_poc_compiler(
     Ok((verified_findings, analyzed_files.to_vec()))
 }
 
-/// Run variant search phase (Phase 19/20)
+/// Run variant search phase (Phase 23/24)
 pub async fn run_variant_search(
     _scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,
