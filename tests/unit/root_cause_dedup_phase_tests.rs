@@ -3,51 +3,10 @@
 //! These tests verify that the root cause deduplication phase correctly
 //! collapses duplicate findings when enabled.
 
-use baco::findings::{Severity, VulnerabilityFinding};
+use crate::fixtures::make_finding_phase as make_finding;
+use baco::findings::VulnerabilityFinding;
 use baco::root_cause_dedup::RootCauseDeduplicator;
 use baco::scanner_types::severity::V3Severity;
-
-/// Helper to create a VulnerabilityFinding for tests
-fn make_finding(
-    id: &str,
-    title: &str,
-    file_path: &str,
-    line_number: Option<u32>,
-    code_snippet: Option<&str>,
-) -> VulnerabilityFinding {
-    VulnerabilityFinding {
-        id: id.to_string(),
-        title: title.to_string(),
-        description: "Test description".to_string(),
-        severity: Severity::High,
-        confidence_score: 0.8,
-        cwe_id: Some("CWE-79".to_string()),
-        file_path: file_path.to_string(),
-        line_number,
-        code_snippet: code_snippet.map(String::from),
-        diff_hunk: None,
-        recommendation: None,
-        code_location: None,
-        already_reported: false,
-        sources: vec!["test".to_string()],
-        commit_reference: None,
-        ticket_reference: None,
-        priority_score: Some(0.9),
-        cross_file_references: None,
-        verification_status: None,
-        verification_notes: None,
-        verification_error: None,
-        agent_evidence_path: None,
-        security_issue: None,
-        poc_code: None,
-        mitigation_code: None,
-        poc_format: None,
-        llm_model: None,
-        agent_mode: false,
-        statement_range: None,
-        triage_verdict: None,
-    }
-}
 
 #[test]
 fn test_root_cause_dedup_collapses_identical_findings() {

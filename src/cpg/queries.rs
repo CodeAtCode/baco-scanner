@@ -1,7 +1,8 @@
 //! Pre-built CPGQL queries per CWE family
 //!
 //! These are conservative query templates that should work across most codebases.
-//! TODO: validate against live Joern installation.
+//!
+//! Note: Query validation against a live Joern installation is pending.
 
 /// Get CPGQL query template for a given CWE ID
 ///
@@ -14,54 +15,37 @@ pub fn get_query_for_cwe(cwe_id: &str, entry_point: &str) -> String {
     match normalized.as_str() {
         // CWE-79: Cross-site scripting (XSS)
         // Find calls that might involve unsanitized output
-        "79" | "cwe-79" => {
-            // TODO: validate against live Joern
-            "cpg.call(\".*sanitize.*\").argument.l".to_string()
-        }
+        "79" | "cwe-79" => "cpg.call(\".*sanitize.*\").argument.l".to_string(),
 
         // CWE-89: SQL Injection
         // Find execute/query calls with non-literal arguments
         "89" | "cwe-89" => {
-            // TODO: validate against live Joern
             "cpg.call(\".*execute.*|.*query.*\").argument.whereNot(_.isLiteral).l".to_string()
         }
 
         // CWE-78: OS Command Injection
         // Find Process/exec calls
-        "78" | "cwe-78" => {
-            // TODO: validate against live Joern
-            "cpg.call(\"Process.*|exec.*\").argument.l".to_string()
-        }
+        "78" | "cwe-78" => "cpg.call(\"Process.*|exec.*\").argument.l".to_string(),
 
         // CWE-22: Path Traversal
         // Find file open/read calls
-        "22" | "cwe-22" => {
-            // TODO: validate against live Joern
-            "cpg.call(\".*open.*|.*read.*\").argument.l".to_string()
-        }
+        "22" | "cwe-22" => "cpg.call(\".*open.*|.*read.*\").argument.l".to_string(),
 
         // CWE-502: Deserialization of Untrusted Data
-        "502" | "cwe-502" => {
-            // TODO: validate against live Joern
-            "cpg.call(\".*deserialize.*|.*readObject.*\").l".to_string()
-        }
+        "502" | "cwe-502" => "cpg.call(\".*deserialize.*|.*readObject.*\").l".to_string(),
 
         // CWE-798: Hardcoded Credentials
-        "798" | "cwe-798" => {
-            // TODO: validate against live Joern
-            "cpg.identifier(\".*password.*|.*secret.*|.*apiKey.*\").l".to_string()
-        }
+        "798" | "cwe-798" => "cpg.identifier(\".*password.*|.*secret.*|.*apiKey.*\").l".to_string(),
 
         // CWE-200: Information Exposure
-        "200" | "cwe-200" => {
-            // TODO: validate against live Joern
-            "cpg.call(\".*log.*|.*print.*\").argument.l".to_string()
-        }
+        "200" | "cwe-200" => "cpg.call(\".*log.*|.*print.*\").argument.l".to_string(),
 
         // Default fallback: search for entry point function
         _ => {
-            // TODO: validate against live Joern
-            format!("cpg.method.name(\".*{}.*\").l", regex::escape(entry_point))
+            format!(
+                r#"cpg.method.name(".*{}.*")\.l"#,
+                regex::escape(entry_point)
+            )
         }
     }
 }

@@ -1,6 +1,6 @@
 # Contributing to BACO
 
-Welcome! BACO (Bug Analysis & Cross-reference Orchestrator) is a research-backed SAST scanner that augments static analysis with LLM-powered discovery across a 24-phase pipeline. Sponsored by [Regolo.AI](https://regolo.ai), this project integrates techniques from 18 academic papers to detect vulnerabilities with higher accuracy than traditional tools.
+Welcome! BACO (Bug Analysis & Cross-reference Orchestrator) is a research-backed SAST scanner that augments static analysis with LLM-powered discovery across a 24-phase pipeline. Sponsored by [Regolo.AI](https://regolo.ai), this project integrates techniques from 20 academic papers to detect vulnerabilities with higher accuracy than traditional tools.
 
 ## Getting Started
 
@@ -61,6 +61,21 @@ Adding a phase requires updates in multiple locations:
 2. **Checkpoint transitions**: Add checkpoint handling for the new phase.
 3. **Tests**: Update all phase-count references in test files.
 4. **Documentation**: Update `docs/architecture.md` and `README.md` phase counts.
+
+## Where Phases Live
+
+**Phase order** is defined ONCE in `PhaseGraph::new()` (`src/scanner/pipeline/orchestrator.rs`). The parallel/sequential split lives in `src/scanner/orchestrator.rs` (`scheduled_parallel_phases` / `scheduled_sequential_phases`); `docs/architecture.md` mirrors this structure.
+
+**Prompt templates** live in:
+- `prompts/phases/*.md` — phase-specific prompts (loaded at runtime)
+- `prompts/hunt/*.md` — domain hunt prompts (loaded at runtime)
+- Embedded prompts exist in `src/llm_analysis.rs` via `include_str!` — both mechanisms are valid.
+
+**New phases require**:
+- A `ScanPhase` variant + config flag (`src/config/phases.rs`)
+- Dispatch arm (`src/scanner/phases.rs` `run_phase`)
+- `PhaseGraph::new()` entry
+- Checkpoint `resume_from` entry (`src/scanner/checkpoint.rs`)
 
 ## Adding Tests
 

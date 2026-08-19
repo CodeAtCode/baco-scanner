@@ -47,14 +47,14 @@ open baco-output/report.html
 
 ### What happens next
 
-- **24 phases run**: 3 parallel (Indexing, Semgrep, LLM Static), 21 sequential — see [Architecture](docs/architecture.md)
+- **24 phases run**: 4 parallel (Indexing, Semgrep, CpgSlice, LlmStaticAnalysis) + 20 sequential — see [Architecture](docs/architecture.md)
 - **Output in `baco-output/`**: `findings.json`, `report.html`, `report.sarif`
 - **Resume interrupted scans**: `./target/release/baco resume --checkpoint baco-output/checkpoint.json`
 
 ## Features
 
-- **24-phase pipeline**: Indexing → Semgrep → CWE Routing → LLM Static Analysis → LLM Discovery → LLM Verification → Validate → SecurityAgent Verification → Ticket Cross-Ref → Git Analysis → Cross-File Analysis → Confidence Scoring → AI Aggregation → Threat Modeling → Root Cause Dedup → Multi-Verifier → Auto-Patching → CVE Bootstrap → PoC Compiler → Variant Search → Reporting
-- **Parallel execution**: Indexing, Semgrep, and LLM Static Analysis run concurrently; 21 sequential phases follow
+- **24-phase pipeline**: Indexing → Semgrep → CpgSlice → LlmStaticAnalysis → LlmCweRouting → LlmDiscovery → LlmVerification → Validate → SecurityAgentVerification → TicketCrossRef → GitAnalysis → CrossFileAnalysis → ConfidenceScoring → AIAggregation → ThreatModeling → RootCauseDedup → MultiVerifier → AutoPatching → CveBootstrap → PocCompiler → VariantSearch → Reporting → (see [Architecture](docs/architecture.md) for full phase names)
+- **Parallel execution**: Indexing, Semgrep, CpgSlice, and LlmStaticAnalysis run concurrently; 20 sequential phases follow
 - **CWE-aware MoE**: BM25 RAG retrieval from CWE knowledge base, routes to specialized analysis paths
 - **Research-backed**: 16 academic papers integrated (VulTriage, VulIn, MoCQ, MoEVD, AgentFlow) — see [Research Integration](docs/research-integration.md)
 - **Checkpoint/resume**: Crash recovery after each phase
@@ -79,71 +79,31 @@ open baco-output/report.html
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    subgraph Parallel["Parallel Detection"]
-        direction TB
-        A1[Indexing] --> A2[Semgrep] --> A3[LLM Static]
-    end
-
-    subgraph Discovery["Sequential Discovery"]
-        direction TB
-        B1[CWE Routing] --> B2[LLM Discovery] --> B3[LLM Verification]
-    end
-
-    subgraph Triage["Triage"]
-        direction TB
-        C1[SecurityAgent Verify] --> C2[Ticket Cross-Ref] --> C3[Git Analysis] --> C4[Cross-File] --> C5[Confidence]
-    end
-
-    subgraph Aggregation["Aggregation"]
-        direction TB
-        D1[AI Aggregation] --> D2[Threat Modeling]
-    end
-
-    subgraph PostProcessing["Post-Processing"]
-        direction TB
-        E1[Root Cause Dedup] --> E2[Multi-Verifier] --> E3[Auto-Patch] --> E4[CVE Bootstrap] --> E5[PoC Compiler] --> E6[Variant Search]
-    end
-
-    subgraph Output["Output"]
-        direction TB
-        F1[Reporting]
-    end
-
-    A3 --> B1
-    B3 --> C1
-    C5 --> D1
-    D2 --> E1
-    E6 --> F1
-```
-
-See [Architecture](docs/architecture.md) for the full PhaseGraph pipeline and data flow.
+See [Architecture](docs/architecture.md) for the PhaseGraph pipeline diagram, full phase list, and data flow.
 
 ## Research Foundation
 
-BACO integrates 16 papers from the [Awesome-LLMs-for-Vulnerability-Detection](https://github.com/huhusmang/Awesome-LLMs-for-Vulnerability-Detection) survey. Each integration is behind a config flag (default disabled) so users can opt in.
+BACO integrates 16 academic papers from the [Awesome-LLMs-for-Vulnerability-Detection](https://github.com/huhusmang/Awesome-LLMs-for-Vulnerability-Detection) survey. Integrations span agentic workflows, context enhancement, rule synthesis, MoE routing, and confidence calibration.
 
-| Category | Papers | Integration |
-|----------|--------|-------------|
-| Agentic & Multi-Agent | Sifting the Noise, AutoCVE, Cloudflare Security-Audit-Skill | Triage filter, multi-agent deduplication, parallel verification |
-| Context & Program Analysis | Context-Enhanced VD, VulIn (BM25 RAG), VulTriage, LLMxCPG | Triple-path context, BM25 retrieval, CPG-guided slicing |
-| Rule Synthesis & Exploit Gen | MoCQ, QRS | LLM-driven semgrep rule synthesis, adversarial validation |
-| Model Specialization & Routing | MoEVD, R2Vul + VULPO | Per-CWE MoE routing, specialized reasoning models |
-| Quality & Evaluation | SV-TrustEval-C, CORRECT, SecVulEval, PrimeVul | Regression suite, rationale validation, statement-level scoring, dataset hygiene |
-| Confidence & Calibration | Closing the Gap | Post-hoc normalization, confidence calibration |
-
-See [Research Integration](docs/research-integration.md) for detailed integration notes and [Paper Survey](docs/llm-vuln-detection-papers-survey.md) for the full 36-paper survey.
+See [Research Integration](docs/research-integration.md) for per-paper details (techniques, results, config flags) and [Paper Survey](docs/llm-vuln-detection-papers-survey.md) for the full 36-paper survey.
 
 ## Documentation
 
-| Document | What it covers |
-| --- | --- |
-| [Architecture](docs/architecture.md) | The 20-phase pipeline, PhaseGraph, data flow |
-| [Configuration](docs/configuration.md) | All config options, LLM setup, phase flags, prompt overrides |
-| [Research Integration](docs/research-integration.md) | The 16 papers integrated into baco, each with technique and result |
-| [Paper Survey](docs/llm-vuln-detection-papers-survey.md) | Full survey of 36 papers; the 5 selected for P1–P5 integration |
-| [Roadmap](todo.md) | Completed P1–P5 paper-integration tracks and pending work |
+- [Architecture](docs/architecture.md) — PhaseGraph pipeline, all 24 phases, data flow
+- [Configuration](docs/configuration.md) — Config options, LLM setup, phase flags, prompt overrides
+- [Research Integration](docs/research-integration.md) — 16 integrated papers with techniques and results
+- [Paper Survey](docs/llm-vuln-detection-papers-survey.md) — Full 36-paper survey
+- [Roadmap](todo.md) — Completed and pending work
+
+### Reading Order
+
+Recommended for new users:
+1. **README.md** (this page) — overview, quick start
+2. **docs/architecture.md** — pipeline architecture
+3. **docs/configuration.md** — configuration reference
+4. **docs/research-integration.md** — research integrations
+5. **docs/llm-vuln-detection-papers-survey.md** — paper survey
+6. **todo.md** — roadmap
 
 ## Acknowledgements
 

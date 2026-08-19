@@ -180,6 +180,9 @@ mod pipeline_test_helpers;
 // Prompt test fixtures (shared between prompt_tests and prompt_templates_tests)
 mod prompt_test_fixtures;
 
+// Prompt templates tests - covers BacoPhase/ProjectType enums, default prompts, template rendering
+mod prompt_templates_tests;
+
 // Findings module tests
 mod findings_tests;
 

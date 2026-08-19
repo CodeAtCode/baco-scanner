@@ -65,7 +65,7 @@ pub enum VulnerabilityPatternType {
     SecurityVulnerability,
     /// Security fix (patch applied)
     SecurityFix,
-    /// TODO/FIXME related to security
+    /// Pending security item (TODO/FIXME marker detected)
     SecurityTodo,
     /// Deprecated security-related code
     SecurityDeprecation,

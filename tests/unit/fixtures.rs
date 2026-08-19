@@ -31,6 +31,14 @@
 // Finding Fixtures
 // ============================================================================
 
+// Re-export helpers from centralized tests/fixtures/mod.rs for backward compatibility
+#[path = "../fixtures/mod.rs"]
+mod centralized_fixtures;
+
+pub use centralized_fixtures::create_test_finding as create_test_finding_central;
+pub use centralized_fixtures::make_finding_phase;
+pub use centralized_fixtures::make_finding_report;
+
 use baco::analysis_context::AnalysisContext;
 use baco::config::{
     AgentConfig, LlmConfig, LlmPhaseConfig, OutputConfig, PerformanceSettings, ProjectConfig,

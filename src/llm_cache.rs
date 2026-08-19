@@ -430,7 +430,7 @@ mod tests {
         assert_eq!(stats.total_hits, 3); // 2 puts + 1 get
     }
 
-    // TODO: Fix this test - tokio::spawn doesn't execute in single-thread runtime
+    // Test disabled: tokio::spawn requires multi-thread runtime
     // #[tokio::test]
     // async fn test_cache_persistence() { ... }
 

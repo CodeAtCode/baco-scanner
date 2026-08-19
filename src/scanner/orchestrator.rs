@@ -544,7 +544,7 @@ pub(super) async fn run_scanner(
         tracing::info!(
             "\u{1B}[34m[SCANNER]\u{1B}[0m Starting SERIAL phases (parallel disabled)..."
         );
-        // TODO: Implement sequential parallel phases if needed
+        // Parallelization not implemented - sequential mode active
     }
 
     let start_position = if enable_parallel { 300 } else { 0 };

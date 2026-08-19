@@ -66,7 +66,7 @@ pub fn compile_vulnerability_patterns() -> Vec<(Regex, VulnerabilityPatternType,
             VulnerabilityPatternType::SecurityDeprecation,
             "Security deprecation",
         ),
-        // TODO/FIXME security
+        // Pattern for security-related TODO/FIXME markers
         (
             Regex::new(r"(?i)(?:TODO|FIXME|HACK|XXX).*(?:security|vulnerability|injection|XSS|SQL|CWE)").unwrap(),
             VulnerabilityPatternType::SecurityTodo,
