@@ -1,9 +1,10 @@
+use crate::checkpoint::ScanPhase;
 use crate::cpg::CpgEngine as _;
 use crate::error::ScanResult;
 use crate::findings::VulnerabilityFinding;
 use crate::scanner::phases::PhaseConfig;
 
-/// Run CWE routing phase (Phase 5/24)
+/// Run CWE routing phase (phase 5 of 24).
 pub async fn run_cwe_routing(
     _scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,
@@ -48,7 +49,7 @@ pub async fn run_cwe_routing(
     Ok((findings, analyzed_files.to_vec()))
 }
 
-/// Run CPG slice phase (Phase 3/24)
+/// Run CPG slice phase (phase 3 of 24).
 ///
 /// Uses Joern to build a Code Property Graph and extract code slices around
 /// suspected vulnerabilities, reducing LLM context size (LLMxCPG, Usenix 2025).
@@ -89,7 +90,12 @@ pub async fn run_cpg_slice(
         findings.len(),
         config.cpg.slice_budget_lines
     );
-    pb.set_message("Phase 3/24: CPG slice (building graph and slicing)");
+    let phase_num = crate::scanner::pipeline::orchestrator::phase_index(&ScanPhase::CpgSlice);
+    let total = crate::scanner::pipeline::orchestrator::total_phases();
+    pb.set_message(format!(
+        "Phase {}/{}: CPG slice (building graph and slicing)...",
+        phase_num, total
+    ));
 
     let cpg = match engine.build(target_path) {
         Ok(cpg) => cpg,

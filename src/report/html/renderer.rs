@@ -405,10 +405,43 @@ pub fn generate_html_report(
         .collapsible {{ cursor: pointer; user-select: none; }}
         .collapsible::before {{ content: "▼"; margin-right: 8px; font-size: 0.8rem; }}
         .collapsible.collapsed::before {{ content: "▶"; }}
-        
-        .finding-meta-row {{ display: flex; gap: 20px; flex-wrap: wrap; margin-top: 10px; }}
-        .finding-meta-row .meta {{ flex: 1; min-width: 200px; margin: 0; }}
-    </style>
+
+        @media print {{
+            body {{ background: white; padding: 0; color: black; }}
+            .container {{ box-shadow: none; border: none; padding: 0; width: 100%; max-width: none; }}
+            .filters, .search-box, .toggle-btns, .toggle-btn {{ display: none !important; }}
+            .severity, .confidence-badge, .agent-badge, .triage-badge, .cwe-badge {{ 
+                border: 1px solid #000; 
+                color: black !important; 
+                background: transparent !important; 
+            }}
+            .finding {{ 
+                page-break-inside: avoid; 
+                border: 1px solid #ccc; 
+                background: white !important; 
+                margin-bottom: 20px; 
+                box-shadow: none; 
+            }}
+            .stat-card, .card {{ 
+                page-break-inside: avoid; 
+                border: 1px solid #ccc; 
+                background: white !important; 
+                color: black !important; 
+            }}
+            .card h3, .card p {{ color: black !important; }}
+            .code-panel, .code-snippet, .diff-hunk {{ 
+                background: #f9f9f9 !important; 
+                color: black !important; 
+                border: 1px solid #ccc; 
+            }}
+            .code-panel-header, .diff-header {{ 
+                background: #eee !important; 
+                color: #333 !important; 
+            }}
+            a {{ color: black; text-decoration: underline; }}
+            h1, h2, h3 {{ color: black !important; border-color: #333; }}
+        }}
+    
 </head>
 <body>
     <div class="container">

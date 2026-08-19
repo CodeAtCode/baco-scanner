@@ -53,8 +53,8 @@ enable_file_filtering = true
 # Phases marked "enabled" run by default; set to false to skip them.
 
 # Threat modeling using STRIDE analysis (adds LLM-based threat identification)
-# Default: true
-enable_threat_modeling = true
+# Default: false
+enable_threat_modeling = false
 # Root-cause deduplication (collapses findings that share the same root cause)
 # Default: true
 enable_root_cause_dedup = true
@@ -91,7 +91,7 @@ retry_backoff_ms = 2000
 # Maximum concurrent LLM requests (default: 4)
 max_concurrent = 4
 # LLM temperature for response randomness (0.0 = deterministic, 1.0 = creative)
-# Default: 0.0 for security scanner determinism
+# Default: 0.5 for security scanner determinism
 temperature = 0.5
 # P2.1: Truncated generation — caps reasoning tokens before forcing final answer
 # max_reasoning_tokens = 2048

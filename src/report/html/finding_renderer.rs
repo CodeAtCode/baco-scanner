@@ -3,7 +3,6 @@ use html_escape::encode_text;
 
 use super::utilities::{detect_language, markdown_to_html};
 
-/// Render a single finding card as HTML
 pub fn render_finding(finding: &VulnerabilityFinding, finding_id: usize) -> String {
     let severity_class = match finding.severity {
         crate::findings::Severity::Critical => "critical",
@@ -35,8 +34,7 @@ pub fn render_finding(finding: &VulnerabilityFinding, finding_id: usize) -> Stri
         String::new()
     };
 
-    // Build triage verdict badge (most important visual signal)
-    // Using findings::TriageVerdict variants: Kill = false positive, Pass = true positive
+    // Build triage verdict badge
     let triage_badge = match finding.triage_verdict {
         Some(crate::findings::TriageVerdict::Kill) => {
             r#"<span class="triage-badge false-positive">FALSE POSITIVE</span>"#.to_string()
@@ -76,19 +74,18 @@ pub fn render_finding(finding: &VulnerabilityFinding, finding_id: usize) -> Stri
     <div class="finding-header">
         <h3 class="collapsible" style="cursor: pointer;" onclick="document.getElementById('{0}-details').style.display = document.getElementById('{0}-details').style.display === 'none' ? 'block' : 'none'">{1} {2} {3} {4} {5}</h3>
         <span class="severity {6}">{7}</span>
-        {8}</div>
+        </div>
     <div class="finding-details" id="{0}-details">
         <div class="finding-meta-row">
             <div class="meta">
-                <strong>File:</strong> {9} {10}<br>
-                <strong>Source:</strong> {11}<br>
-                <strong>Confidence:</strong> {12}<br>
-                {13}</div>
+                <strong>File:</strong> {8} {9}<br>
+                <strong>Source:</strong> {10}<br>
+                <strong>Confidence:</strong> {11}<br>
+                {12}</div>
         </div>
-        <p>{14}</p>
+        <p>{13}</p>
 "#,
-        finding_div_id.clone(), // For id attribute (also used in onclick)
-        // H3 header: title + triage badge + location + confidence + CWE
+        finding_div_id.clone(), // For id attribute
         encode_text(&finding.title),
         triage_badge,
         location_span,
@@ -96,17 +93,11 @@ pub fn render_finding(finding: &VulnerabilityFinding, finding_id: usize) -> Stri
         cwe_badge,
         severity_class,
         encode_text(&finding.severity.to_string()),
-        // Second CWE badge in header (kept for consistency)
-        if let Some(cwe) = &finding.cwe_id {
-            format!(r#"<span class="cwe-badge">{}</span>"#, encode_text(cwe))
-        } else {
-            String::new()
-        },
+        // Removed the second cwe_badge instance here to fix duplication bug
         encode_text(&finding.file_path),
         line_info,
         encode_text(&finding.sources.join(", ")),
         confidence_badge,
-        // Source and agent mode info (treat empty strings as missing)
         if finding.agent_mode {
             let source = finding
                 .llm_model
@@ -119,18 +110,17 @@ pub fn render_finding(finding: &VulnerabilityFinding, finding_id: usize) -> Stri
             )
         } else if let Some(model) = &finding.llm_model {
             if model.is_empty() {
-                String::new() // Don't show source if empty
+                String::new()
             } else {
                 format!(r#"<br><strong>Source:</strong> {}"#, encode_text(model))
             }
         } else {
             String::new()
         },
-        // Convert markdown description to HTML
         markdown_to_html(&finding.description)
     );
 
-    // Show diff hunk if available (unified diff format)
+    // Show diff hunk if available
     if let Some(diff) = &finding.diff_hunk {
         let diff_trimmed = diff.trim();
         if !diff_trimmed.is_empty() {
@@ -161,7 +151,6 @@ pub fn render_finding(finding: &VulnerabilityFinding, finding_id: usize) -> Stri
         ));
     }
 
-    // PoC code snippets and mitigation examples
     let has_poc = finding.poc_code.is_some();
     let has_mitigation = finding.mitigation_code.is_some();
 
@@ -202,7 +191,6 @@ pub fn render_finding(finding: &VulnerabilityFinding, finding_id: usize) -> Stri
         html.push_str("</div>");
     }
 
-    // Additional metadata
     let mut meta_items = Vec::new();
     if let Some(cwe) = &finding.cwe_id {
         meta_items.push(format!(r#"<strong>CWE:</strong> <a href="https://cwe.mitre.org/data/definitions/{}.html" target="_blank">{}</a>"#, encode_text(cwe), encode_text(cwe)));
@@ -230,9 +218,7 @@ pub fn render_finding(finding: &VulnerabilityFinding, finding_id: usize) -> Stri
             encode_text(ticket)
         ));
     }
-    // Render the 5 missing fields
     if let Some((start, end)) = finding.statement_range {
-        // Only show if different from line_number
         if finding.line_number.map(|l| l != start).unwrap_or(true) {
             meta_items.push(format!(
                 r#"<strong>Statement range:</strong> lines {}-{}"#,

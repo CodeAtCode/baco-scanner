@@ -61,7 +61,7 @@ impl ScanPhase for IndexingPhase {
             &ctx.scanner.config.project.languages,
             ctx.scanner.config.scanner.max_file_size_kb * 1024,
             &ctx.scanner.config.scanner.exclude_paths,
-            Some(ctx.pb),
+            None,
         ) {
             Ok(result) => result,
             Err(e) => {

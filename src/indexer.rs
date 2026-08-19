@@ -152,6 +152,7 @@ impl FileIndex {
 
         let mut hasher = crate::file_hash::FileHasher::new();
         let mut hash_store = FileHashStore::new();
+        let file_count = all_files.len();
 
         for (i, file_info) in all_files.iter_mut().enumerate() {
             if let Ok(hash) = hasher.hash_file(&file_info.path) {
@@ -160,6 +161,12 @@ impl FileIndex {
             }
             if let Some(pb) = pb {
                 pb.set_position((i + 1) as u64);
+                pb.set_message(format!(
+                    "Indexing [{}/{}]: {}",
+                    i + 1,
+                    file_count,
+                    file_info.path.display()
+                ));
             }
         }
 

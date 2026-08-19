@@ -480,7 +480,9 @@ async fn run_sequential_phases(
 pub(super) async fn run_scanner(
     scanner: &super::Scanner,
 ) -> Result<Vec<VulnerabilityFinding>, String> {
-    let (mut findings, completed_phases, mut analyzed_files) = if !scanner.force && scanner.checkpoint_path.exists() {
+    let (mut findings, completed_phases, mut analyzed_files) = if !scanner.force
+        && scanner.checkpoint_path.exists()
+    {
         use crate::checkpoint::Checkpoint;
         match Checkpoint::load(&scanner.checkpoint_path.to_string_lossy()) {
             Ok(cp) => {
@@ -496,8 +498,8 @@ pub(super) async fn run_scanner(
                 let resume_phase =
                     Checkpoint::resume_from(&scanner.checkpoint_path.to_string_lossy())
                         .unwrap_or(ScanPhase::Indexing);
-                let phase_idx = scanner.phase_graph.phase_index(&resume_phase);
-                let total = scanner.phase_graph.total_phases();
+                let phase_idx = crate::scanner::pipeline::orchestrator::phase_index(&resume_phase);
+                let total = crate::scanner::pipeline::orchestrator::total_phases();
 
                 eprintln!(
                     "\u{1B}[33m[SCANNER] Resuming scan from phase {:?} ({}/{}) - {} phases already completed, {} findings loaded.\n         Use --force to start a fresh scan.\u{1B}[0m",

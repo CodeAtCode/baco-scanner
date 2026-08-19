@@ -4,7 +4,7 @@ use crate::error::ScanResult;
 use crate::findings::VulnerabilityFinding;
 use crate::scanner::phases::PhaseConfig;
 
-/// Run confidence scoring phase (Phase 14/24)
+/// Run confidence scoring phase (phase 14 of 24).
 pub async fn run_confidence_scoring(
     _scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,
@@ -63,7 +63,7 @@ pub async fn run_confidence_scoring(
     Ok((updated_findings, analyzed_files.to_vec()))
 }
 
-/// Run AI aggregation phase (Phase 15/24)
+/// Run AI aggregation phase (phase 15 of 24).
 pub async fn run_ai_aggregation(
     _scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,
@@ -108,7 +108,7 @@ pub async fn run_ai_aggregation(
     Ok((enriched_findings, analyzed_files.to_vec()))
 }
 
-/// Run reporting phase (Phase 24/24)
+/// Run reporting phase (phase 24 of 24).
 pub async fn run_reporting(
     _scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,

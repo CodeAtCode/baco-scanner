@@ -37,7 +37,6 @@ pip install semgrep
 export MISTRAL_API_KEY="your-key-here"
 
 # 4. Configure and scan
-# 4. Configure and scan
 cp config.example.toml my-config.toml
 # Edit my-config.toml: set [project] path to your target code
 ./target/release/baco scan --config my-config.toml
@@ -45,9 +44,10 @@ cp config.example.toml my-config.toml
 # First scan sequence:
 # 1. Set your LLM API key (via env or config file)
 # 2. Run the scan: ./target/release/baco scan --config my-config.toml
+# 3. Open the report: baco-output/report.html
 - **24 phases run**: 4 parallel (Indexing, Semgrep, CpgSlice, LlmStaticAnalysis) + 20 sequential — see [Architecture](docs/architecture.md)
-- **Output in `baco-output/`**: `findings.json`, `report.html`, `report.sarif`
-- **Resume interrupted scans**: the scanner writes a `checkpoint.json` to the output directory after each phase. Use `./target/release/baco resume --checkpoint baco-output/checkpoint.json` to restart from the last successful phase.
+- **Output in `baco-output/`**: `findings.json`, `report.html`, `report.sarif`, `checkpoint.json`
+- **Checkpoint file**: The scanner writes `checkpoint.json` after each phase. Re-running the scan auto-resumes from the checkpoint; use `./target/release/baco resume --checkpoint baco-output/checkpoint.json` for manual control.
 
 ### What happens next
 

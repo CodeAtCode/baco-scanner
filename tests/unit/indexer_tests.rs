@@ -223,6 +223,7 @@ fn test_index_project_incremental_basic() {
         &["c".to_string(), "rust".to_string()],
         1024 * 1024,
         &[],
+        None,
     )
     .unwrap();
 
@@ -238,6 +239,7 @@ fn test_index_project_incremental_invalid_path() {
         &["c".to_string()],
         1024 * 1024,
         &[],
+        None,
     );
 
     assert!(result.is_err());

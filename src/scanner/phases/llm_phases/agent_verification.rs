@@ -1,5 +1,6 @@
 use super::helpers::extract_function_name_from_finding;
 use crate::agent;
+use crate::checkpoint::ScanPhase;
 use crate::error::ScanResult;
 use crate::findings::VerificationStatus;
 use crate::findings::VulnerabilityFinding;
@@ -24,23 +25,36 @@ pub async fn run_security_agent_verification(
 
     tracing::info!("Running Security Agent verification phase...");
 
+    let phase_num =
+        crate::scanner::pipeline::orchestrator::phase_index(&ScanPhase::SecurityAgentVerification);
+    let total = crate::scanner::pipeline::orchestrator::total_phases();
+
     let base = pb.position();
 
     if !config.agent.enabled {
         tracing::debug!("Agent mode disabled, skipping Security Agent verification");
-        pb.set_message("Phase 10/24: Agent mode disabled - skipping");
+        pb.set_message(format!(
+            "Phase {}/{}: Agent mode disabled - skipping",
+            phase_num, total
+        ));
         pb.set_position(base + 100);
         return Ok((findings, analyzed_files.to_vec()));
     }
 
     let Some(_api_key) = &config.llm.phases.discovery.api_key else {
         tracing::debug!("No API key for agent, skipping Security Agent verification");
-        pb.set_message("Phase 10/24: No API key - skipping");
+        pb.set_message(format!(
+            "Phase {}/{}: No API key - skipping",
+            phase_num, total
+        ));
         pb.set_position(base + 100);
         return Ok((findings, analyzed_files.to_vec()));
     };
 
-    pb.set_message("Phase 10/24: Security Agent verification (tool-based analysis)...");
+    pb.set_message(format!(
+        "Phase {}/{}: Security Agent verification (tool-based analysis)...",
+        phase_num, total
+    ));
 
     let total_findings = findings.len();
 
@@ -134,7 +148,9 @@ pub async fn run_security_agent_verification(
         };
         pb.set_position(base + progress_pct);
         pb.set_message(format!(
-            "Phase 10/24: Security Agent verifying [{}/{}] - {}",
+            "Phase {}/{}: Security Agent verifying [{}/{}] - {}",
+            phase_num,
+            total,
             i + 1,
             total_findings,
             finding.title

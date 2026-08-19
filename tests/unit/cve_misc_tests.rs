@@ -839,6 +839,7 @@ fn test_index_project_incremental_basic() {
         &["rust".to_string()],
         1024 * 1024,
         &[],
+        None,
     )
     .unwrap();
 
@@ -855,6 +856,7 @@ fn test_index_project_incremental_nonexistent_path() {
         &["rust".to_string()],
         1024 * 1024,
         &[],
+        None,
     );
 
     assert!(result.is_err());

@@ -1,8 +1,9 @@
+use crate::checkpoint::ScanPhase;
 use crate::error::ScanResult;
 use crate::findings::VulnerabilityFinding;
 use crate::scanner::phases::PhaseConfig;
 
-/// Run rule synthesis phase (Phase 6/24)
+/// Run rule synthesis phase (phase 6 of 24).
 ///
 /// Generates semgrep rules from CWE identifiers using LLM synthesis (MoCQ paper).
 /// No-op when `config.rulesynth.enabled` is false or no API key is configured.
@@ -39,7 +40,12 @@ pub async fn run_rule_synthesis(
         config.rulesynth.max_rules_per_cwe,
         config.rulesynth.output_dir
     );
-    pb.set_message("Phase 6/24: Rule synthesis (LLM→semgrep rules)");
+    let phase_num = crate::scanner::pipeline::orchestrator::phase_index(&ScanPhase::RuleSynthesis);
+    let total = crate::scanner::pipeline::orchestrator::total_phases();
+    pb.set_message(format!(
+        "Phase {}/{}: Rule synthesis (LLM→semgrep rules)...",
+        phase_num, total
+    ));
 
     let timeout = phase_config.timeout_secs.unwrap_or(config.llm.timeout_secs);
     let llm_config = crate::llm::LlmConfig {
@@ -139,7 +145,7 @@ pub async fn run_rule_synthesis(
     Ok((findings, analyzed_files.to_vec()))
 }
 
-/// Run exploit synthesis phase (Phase 22/24)
+/// Run exploit synthesis phase (phase 22 of 24).
 ///
 /// Generates sandbox-verified exploits for confirmed findings (QRS paper).
 /// No-op when `config.exploit.enabled` is false or Docker sandbox unavailable.
@@ -200,7 +206,12 @@ pub async fn run_exploit_synth(
         config.exploit.max_exploits_per_finding,
         config.exploit.sandbox_image
     );
-    pb.set_message("Phase 22/24: Exploit synthesis (sandbox-verified PoCs)");
+    let phase_num = crate::scanner::pipeline::orchestrator::phase_index(&ScanPhase::ExploitSynth);
+    let total = crate::scanner::pipeline::orchestrator::total_phases();
+    pb.set_message(format!(
+        "Phase {}/{}: Exploit synthesis (sandbox-verified PoCs)...",
+        phase_num, total
+    ));
 
     let total = findings.len();
     for (i, finding) in findings.iter_mut().enumerate() {
@@ -273,7 +284,12 @@ pub async fn run_validate(
         "Running Validate phase (rationale check on {} findings)",
         findings.len()
     );
-    pb.set_message("Phase 9/24: Validate (rationale check)");
+    let phase_num = crate::scanner::pipeline::orchestrator::phase_index(&ScanPhase::Validate);
+    let total = crate::scanner::pipeline::orchestrator::total_phases();
+    pb.set_message(format!(
+        "Phase {}/{}: Validate (rationale check)...",
+        phase_num, total
+    ));
 
     let timeout = phase_config.timeout_secs.unwrap_or(config.llm.timeout_secs);
     let llm_config = crate::llm::LlmConfig {

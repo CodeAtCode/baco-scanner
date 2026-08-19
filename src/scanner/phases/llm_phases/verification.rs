@@ -1,4 +1,5 @@
 use crate::agent;
+use crate::checkpoint::ScanPhase;
 use crate::error::ScanResult;
 use crate::findings::VerificationStatus;
 use crate::findings::VulnerabilityFinding;
@@ -9,7 +10,7 @@ use crate::prompt::templates::cwe_to_hunt_domain;
 use crate::scanner::phases::PhaseConfig;
 use std::sync::Arc;
 
-/// Run LLM verification phase (Phase 8/24)
+/// Run LLM verification phase (phase 8 of 24).
 pub async fn run_llm_verification(
     scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,
@@ -27,7 +28,13 @@ pub async fn run_llm_verification(
 
     tracing::info!("Running LLM verification phase...");
     let base = pb.position();
-    pb.set_message("Phase 8/24: LLM verification (validating findings with AI analysis)...");
+    let phase_num =
+        crate::scanner::pipeline::orchestrator::phase_index(&ScanPhase::LlmVerification);
+    let total = crate::scanner::pipeline::orchestrator::total_phases();
+    pb.set_message(format!(
+        "Phase {}/{}: LLM verification (validating findings with AI analysis)...",
+        phase_num, total
+    ));
 
     let total_findings = findings.len();
     let use_agent_mode = config.agent.enabled;
@@ -53,7 +60,9 @@ pub async fn run_llm_verification(
                 };
                 pb.set_position(base + progress_pct);
                 pb.set_message(format!(
-                    "Phase 8/24: Agent verifying [{}/{}] - {}",
+                    "Phase {}/{}: Agent verifying [{}/{}] - {}",
+                    phase_num,
+                    total,
                     i + 1,
                     total_findings,
                     finding.title
@@ -97,7 +106,9 @@ pub async fn run_llm_verification(
                 };
                 pb.set_position(base + progress_pct);
                 pb.set_message(format!(
-                    "Phase 8/24: Verifying findings [{}/{}] - {}",
+                    "Phase {}/{}: Verifying findings [{}/{}] - {}",
+                    phase_num,
+                    total,
                     i + 1,
                     total_findings,
                     finding.title
@@ -152,16 +163,22 @@ pub async fn run_llm_verification(
         }
         pb.set_position(base + 100);
         pb.set_message(format!(
-            "Phase 8/24: Verification complete - verified {} findings",
-            total_findings
+            "Phase {}/{}: Verification complete - verified {} findings",
+            phase_num, total, total_findings
         ));
     } else {
         tracing::debug!("No API key for verification, skipping LLM verification");
-        pb.set_message("Phase 8/24: No API key configured - skipping verification");
+        pb.set_message(format!(
+            "Phase {}/{}: No API key configured - skipping verification",
+            phase_num, total
+        ));
     }
 
     // Step 2: Generate PoCs for high-severity confirmed findings
-    pb.set_message("Phase 8/24: Generating PoCs for high-severity findings...");
+    pb.set_message(format!(
+        "Phase {}/{}: Generating PoCs for high-severity findings...",
+        phase_num, total
+    ));
 
     let context = crate::analysis_context::AnalysisContext::default();
     let poc_engine = PoCGenerationEngine::new();
