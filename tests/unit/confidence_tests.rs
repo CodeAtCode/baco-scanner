@@ -6,44 +6,14 @@
 use baco::confidence::ConfidenceCalculator;
 use baco::findings::{Severity, VerificationStatus, VulnerabilityFinding};
 
-/// Helper to create a minimal VulnerabilityFinding for testing
+use crate::fixtures::make_finding_confidence;
+
 fn create_finding(
     severity: Severity,
     sources: Vec<&str>,
     verification_status: Option<VerificationStatus>,
 ) -> VulnerabilityFinding {
-    VulnerabilityFinding {
-        id: "test-finding".to_string(),
-        title: "Test Finding".to_string(),
-        description: "Test description".to_string(),
-        severity,
-        confidence_score: 0.0,
-        cwe_id: None,
-        file_path: "src/test.rs".to_string(),
-        line_number: Some(42),
-        code_snippet: None,
-        diff_hunk: None,
-        recommendation: None,
-        code_location: None,
-        already_reported: false,
-        sources: sources.into_iter().map(String::from).collect(),
-        commit_reference: None,
-        ticket_reference: None,
-        priority_score: None,
-        cross_file_references: None,
-        verification_status,
-        verification_notes: None,
-        verification_error: None,
-        agent_evidence_path: None,
-        security_issue: None,
-        poc_code: None,
-        mitigation_code: None,
-        poc_format: None,
-        llm_model: None,
-        agent_mode: false,
-        statement_range: None,
-        triage_verdict: None,
-    }
+    make_finding_confidence(severity, sources, verification_status)
 }
 
 // ============================================================================

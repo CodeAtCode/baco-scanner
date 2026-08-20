@@ -14,6 +14,8 @@ use baco::report::aggregation::{
     ReportAggregationPhase,
 };
 
+use crate::fixtures::make_finding_report_agg;
+
 /// Helper to create a test finding with custom parameters.
 fn create_finding(
     id: &str,
@@ -23,36 +25,7 @@ fn create_finding(
     cwe_id: Option<&str>,
     severity: Severity,
 ) -> VulnerabilityFinding {
-    VulnerabilityFinding {
-        id: id.to_string(),
-        title: title.to_string(),
-        description: "Test finding description".to_string(),
-        severity,
-        confidence_score: 0.8,
-        cwe_id: cwe_id.map(|s| s.to_string()),
-        file_path: file_path.to_string(),
-        line_number,
-        code_snippet: Some("test_code".to_string()),
-        diff_hunk: None,
-        recommendation: Some("Fix this issue".to_string()),
-        code_location: None,
-        already_reported: false,
-        sources: Vec::new(),
-        commit_reference: None,
-        ticket_reference: None,
-        priority_score: None,
-        cross_file_references: None,
-        verification_status: Some(VerificationStatus::NeedsReview),
-        verification_notes: None,
-        verification_error: None,
-        agent_evidence_path: None,
-        agent_mode: false,
-        llm_model: None,
-        security_issue: None,
-        poc_code: None,
-        mitigation_code: None,
-        poc_format: None,
-    }
+    make_finding_report_agg(id, title, file_path, line_number, cwe_id, severity)
 }
 
 /// Helper to create a finding with a security issue category.

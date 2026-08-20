@@ -12,48 +12,17 @@ use baco::report::aggregation::{
 use baco::root_cause_dedup::GlobalFpStore;
 use tempfile::TempDir;
 
-/// Helper to create a test VulnerabilityFinding with minimal fields
+use crate::fixtures::make_finding_report_agg;
+
 fn create_finding(
     id: &str,
     title: &str,
     severity: Severity,
     file_path: &str,
 ) -> VulnerabilityFinding {
-    VulnerabilityFinding {
-        id: id.to_string(),
-        title: title.to_string(),
-        description: "Test finding description".to_string(),
-        severity,
-        confidence_score: 0.8,
-        cwe_id: Some("CWE-79".to_string()),
-        file_path: file_path.to_string(),
-        line_number: Some(10),
-        code_snippet: Some("test code".to_string()),
-        diff_hunk: None,
-        recommendation: Some("Fix this".to_string()),
-        code_location: None,
-        already_reported: false,
-        sources: Vec::new(),
-        commit_reference: None,
-        ticket_reference: None,
-        priority_score: None,
-        cross_file_references: None,
-        verification_status: Some(VerificationStatus::NeedsReview),
-        verification_notes: None,
-        verification_error: None,
-        agent_evidence_path: None,
-        security_issue: None,
-        poc_code: None,
-        mitigation_code: None,
-        poc_format: None,
-        llm_model: None,
-        agent_mode: false,
-        statement_range: None,
-        triage_verdict: None,
-    }
+    make_finding_report_agg(id, title, file_path, Some(10), Some("CWE-79"), severity)
 }
 
-/// Helper to create a finding with custom confidence score
 fn create_finding_with_confidence(
     id: &str,
     title: &str,

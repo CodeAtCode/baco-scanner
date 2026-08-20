@@ -13,6 +13,8 @@ use baco::llm::ChatResponse;
 use serde_json::json;
 use std::sync::Arc;
 
+use crate::fixtures::make_finding_report_agg;
+
 /// Helper to create AgentSession with mock client
 fn create_session(
     mock_client: MockLlmClient,
@@ -34,38 +36,19 @@ fn create_session(
 
 /// Helper to create a test finding
 fn create_test_finding() -> VulnerabilityFinding {
-    VulnerabilityFinding {
-        id: "error-test-1".to_string(),
-        title: "Test Buffer Overflow".to_string(),
-        description: "A buffer overflow vulnerability in string handling".to_string(),
-        severity: Severity::High,
-        confidence_score: 0.9,
-        cwe_id: Some("CWE-120".to_string()),
-        file_path: "test.rs".to_string(),
-        line_number: Some(42),
-        code_snippet: Some("unsafe { strcpy(...) }".to_string()),
-        diff_hunk: None,
-        recommendation: None,
-        code_location: None,
-        already_reported: false,
-        sources: vec![],
-        commit_reference: None,
-        ticket_reference: None,
-        priority_score: None,
-        cross_file_references: None,
-        verification_status: None,
-        verification_notes: None,
-        verification_error: None,
-        agent_evidence_path: None,
-        security_issue: None,
-        poc_code: None,
-        mitigation_code: None,
-        poc_format: None,
-        llm_model: None,
-        agent_mode: true,
-        statement_range: None,
-        triage_verdict: None,
-    }
+    let mut finding = make_finding_report_agg(
+        "error-test-1",
+        "Test Buffer Overflow",
+        "test.rs",
+        Some(42),
+        Some("CWE-120"),
+        Severity::High,
+    );
+    finding.description = "A buffer overflow vulnerability in string handling".to_string();
+    finding.code_snippet = Some("unsafe { strcpy(...) }".to_string());
+    finding.sources = vec![];
+    finding.agent_mode = true;
+    finding
 }
 
 // ============================================================================

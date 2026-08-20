@@ -187,17 +187,6 @@ fn test_markdown_to_html_xss_protection() {
 // ============================================================================
 
 #[test]
-fn test_render_finding_critical_severity() {
-    let finding = make_finding("f1", Severity::Critical, "src/main.rs", Some(42));
-    let html = render_finding(&finding, 0);
-
-    assert!(html.contains("finding critical"));
-    assert!(html.contains("Critical")); // Severity is rendered as title case
-    assert!(html.contains("Finding f1"));
-    assert!(html.contains("src/main.rs"));
-}
-
-#[test]
 fn test_render_finding_with_cwe() {
     let finding = VulnerabilityFinding {
         cwe_id: Some("CWE-79".to_string()),
@@ -206,27 +195,6 @@ fn test_render_finding_with_cwe() {
     let html = render_finding(&finding, 0);
 
     assert!(html.contains("CWE-79"));
-}
-
-#[test]
-fn test_render_finding_without_line_number() {
-    let finding = make_finding("f1", Severity::Low, "src/unknown.rs", None);
-    let html = render_finding(&finding, 0);
-
-    assert!(html.contains("src/unknown.rs"));
-    assert!(!html.contains(":None"));
-}
-
-#[test]
-fn test_render_finding_with_recommendation() {
-    let finding = VulnerabilityFinding {
-        recommendation: Some("Fix this issue".to_string()),
-        ..make_finding("f1", Severity::Medium, "src/app.rs", Some(25))
-    };
-    let html = render_finding(&finding, 0);
-
-    assert!(html.contains("Recommendation"));
-    assert!(html.contains("Fix this"));
 }
 
 // ============================================================================

@@ -11,6 +11,8 @@ use baco::config::{NormalizationConfig, NormalizationTier};
 use baco::findings::{Severity, TriageVerdict, VerificationStatus, VulnerabilityFinding};
 use tempfile::TempDir;
 
+use crate::fixtures::make_aggregation_finding;
+
 // ============================================================================
 // Helper Functions
 // ============================================================================
@@ -23,38 +25,19 @@ fn create_test_finding(
     severity: Severity,
     confidence: f32,
 ) -> VulnerabilityFinding {
-    VulnerabilityFinding {
-        id: id.to_string(),
-        title: title.to_string(),
-        description: format!("Test finding: {}", title),
+    let mut finding = make_aggregation_finding(
+        id,
         severity,
-        confidence_score: confidence,
-        cwe_id: Some("CWE-79".to_string()),
-        file_path: file_path.to_string(),
-        line_number: Some(line),
-        code_snippet: None,
-        diff_hunk: None,
-        recommendation: None,
-        code_location: None,
-        already_reported: false,
-        sources: vec!["test".to_string()],
-        commit_reference: None,
-        ticket_reference: None,
-        priority_score: None,
-        cross_file_references: None,
-        verification_status: None,
-        verification_notes: None,
-        verification_error: None,
-        agent_evidence_path: None,
-        security_issue: None,
-        poc_code: None,
-        mitigation_code: None,
-        poc_format: None,
-        llm_model: None,
-        agent_mode: false,
-        statement_range: None,
-        triage_verdict: None,
-    }
+        confidence,
+        file_path,
+        Some(line),
+        Some("CWE-79"),
+        None,
+    );
+    finding.description = format!("Test finding: {}", title);
+    finding.title = title.to_string();
+    finding.sources = vec!["test".to_string()];
+    finding
 }
 
 // ============================================================================

@@ -14,6 +14,8 @@ use baco::scanner::Scanner;
 use std::fs;
 use std::path::PathBuf;
 
+use crate::fixtures::make_finding_report_agg;
+
 // ============================================================================
 // Test Fixtures
 // ============================================================================
@@ -61,38 +63,21 @@ fn create_test_scanner_config() -> ScannerConfig {
 }
 
 fn create_test_finding(title: &str, severity: Severity) -> VulnerabilityFinding {
-    VulnerabilityFinding {
-        id: format!("test-finding-{}", title.replace(" ", "-").to_lowercase()),
-        title: title.to_string(),
-        description: format!("Test finding: {}", title),
+    let mut finding = make_finding_report_agg(
+        &format!("test-finding-{}", title.replace(" ", "-").to_lowercase()),
+        title,
+        "src/test.rs",
+        Some(42),
+        Some("CWE-79"),
         severity,
-        confidence_score: 0.85,
-        cwe_id: Some("CWE-79".to_string()),
-        file_path: "src/test.rs".to_string(),
-        line_number: Some(42),
-        code_snippet: Some("test code".to_string()),
-        diff_hunk: None,
-        recommendation: Some("Fix this".to_string()),
-        code_location: Some("src/test.rs:42".to_string()),
-        already_reported: false,
-        sources: vec!["test".to_string()],
-        commit_reference: None,
-        ticket_reference: None,
-        priority_score: Some(0.9),
-        cross_file_references: None,
-        verification_status: None,
-        verification_notes: None,
-        verification_error: None,
-        agent_evidence_path: None,
-        security_issue: None,
-        poc_code: None,
-        mitigation_code: None,
-        poc_format: None,
-        llm_model: None,
-        agent_mode: false,
-        statement_range: None,
-        triage_verdict: None,
-    }
+    );
+    finding.description = format!("Test finding: {}", title);
+    finding.code_snippet = Some("test code".to_string());
+    finding.recommendation = Some("Fix this".to_string());
+    finding.code_location = Some("src/test.rs:42".to_string());
+    finding.sources = vec!["test".to_string()];
+    finding.priority_score = Some(0.9);
+    finding
 }
 
 fn get_temp_checkpoint_path(test_name: &str) -> PathBuf {

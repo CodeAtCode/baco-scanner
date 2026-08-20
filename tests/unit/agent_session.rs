@@ -14,6 +14,7 @@ use baco::agent::session::{AgentSession, ProgressCallback};
 use baco::config::AgentConfig;
 use baco::findings::{Severity, VerificationStatus, VulnerabilityFinding};
 use baco::llm::ChatResponse;
+use serde_json::json;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -1136,4 +1137,171 @@ async fn test_analyze_file_single_turn_limit() {
     let finding = result.unwrap();
     // Should stop at or near 1 turn
     assert!(finding.agent_turns >= 1 && finding.agent_turns <= 2);
+}
+
+// Tests merged from agent_session_inline_tests.rs
+
+#[tokio::test]
+async fn test_analyze_file_with_mock_llm_tool_call() {
+    let responses = vec![
+        // First turn: tool call
+        MockLlmClient::mock_tool_call("file_read", json!({ "path": "test.rs" })),
+        // Second turn: final response with vulnerability
+        MockLlmClient::mock_final_response(
+            r#"{"title": "Buffer Overflow", "description": "Found buffer overflow", "severity": "High", "cwe_id": "CWE-120"}"#,
+        ),
+    ];
+
+    let mock_client = MockLlmClient::new(responses);
+    let config = AgentConfig {
+        enabled: false,
+        max_turns: 10,
+        tool_timeout_secs: 30,
+        trusted_paths: vec![],
+        keep_artifacts: false,
+    };
+    let tmpdir = tempfile::tempdir().unwrap();
+    let progress_cb = Arc::new(|_| {});
+
+    // Create a test file
+    let test_file = tmpdir.path().join("test.rs");
+    std::fs::write(&test_file, "fn main() {}").unwrap();
+
+    let session = AgentSession::new(mock_client, &config, tmpdir.path(), progress_cb);
+
+    let result = session
+        .analyze_file(test_file.to_string_lossy().as_ref())
+        .await;
+    assert!(result.is_ok());
+    let finding = result.unwrap();
+
+    // Should have parsed the JSON finding
+    assert!(!finding.finding.title.is_empty());
+    assert_eq!(finding.agent_turns, 2);
+    assert!(!finding.tools_used.is_empty());
+}
+
+#[tokio::test]
+async fn test_analyze_file_with_mock_llm_no_vulnerability() {
+    let responses = vec![
+        // Single response indicating no vulnerability
+        ChatResponse {
+            content: "After reviewing the code, no security vulnerabilities were found. All inputs are properly validated.".to_string(),
+            tool_calls: vec![],
+            raw: json!({}),
+            model_used: "mock".to_string(),
+        },
+    ];
+
+    let mock_client = MockLlmClient::new(responses);
+    let config = AgentConfig {
+        enabled: false,
+        max_turns: 10,
+        tool_timeout_secs: 30,
+        trusted_paths: vec![],
+        keep_artifacts: false,
+    };
+    let tmpdir = tempfile::tempdir().unwrap();
+    let progress_cb = Arc::new(|_| {});
+
+    // Create a test file
+    let test_file = tmpdir.path().join("test.rs");
+    std::fs::write(&test_file, "fn main() {}").unwrap();
+
+    let session = AgentSession::new(mock_client, &config, tmpdir.path(), progress_cb);
+
+    let result = session
+        .analyze_file(test_file.to_string_lossy().as_ref())
+        .await;
+    assert!(result.is_ok());
+    let finding = result.unwrap();
+
+    // Should have an audit finding
+    assert!(finding.finding.title.contains("Security Audit") || finding.finding.title.is_empty());
+}
+
+#[tokio::test]
+async fn test_verify_finding_with_mock_llm() {
+    let responses = vec![
+        // First turn: tool call to write test
+        MockLlmClient::mock_tool_call(
+            "file_write",
+            json!({ "path": "poc.py", "content": "print('exploit')" }),
+        ),
+        // Second turn: verification result
+        ChatResponse {
+            content:
+                "compiled=true\ntest_passed=true\nTest successfully demonstrated the vulnerability"
+                    .to_string(),
+            tool_calls: vec![],
+            raw: json!({}),
+            model_used: "mock".to_string(),
+        },
+    ];
+
+    let mock_client = MockLlmClient::new(responses);
+    let config = AgentConfig {
+        enabled: false,
+        max_turns: 10,
+        tool_timeout_secs: 30,
+        trusted_paths: vec![],
+        keep_artifacts: false,
+    };
+    let tmpdir = tempfile::tempdir().unwrap();
+    let progress_cb = Arc::new(|_| {});
+
+    let session = AgentSession::new(mock_client, &config, tmpdir.path(), progress_cb);
+
+    let finding = VulnerabilityFinding {
+        id: "test-1".to_string(),
+        title: "Test Vulnerability".to_string(),
+        description: "A test vulnerability".to_string(),
+        severity: Severity::High,
+        confidence_score: 0.9,
+        cwe_id: None,
+        file_path: "test.rs".to_string(),
+        line_number: Some(42),
+        code_snippet: None,
+        diff_hunk: None,
+        recommendation: None,
+        code_location: None,
+        already_reported: false,
+        sources: vec![],
+        commit_reference: None,
+        ticket_reference: None,
+        priority_score: None,
+        cross_file_references: None,
+        verification_status: None,
+        verification_notes: None,
+        verification_error: None,
+        agent_evidence_path: None,
+        security_issue: None,
+        poc_code: None,
+        mitigation_code: None,
+        poc_format: None,
+        llm_model: None,
+        agent_mode: true,
+        statement_range: None,
+        triage_verdict: None,
+    };
+
+    let result = session.verify_finding("test.rs", &finding).await;
+    assert!(result.is_ok());
+    let verified = result.unwrap();
+
+    assert_eq!(verified.agent_turns, 2);
+    assert!(!verified.tools_used.is_empty());
+    assert!(verified.test_log.is_some());
+}
+
+#[test]
+fn test_progress_callback_type() {
+    // Verify that ProgressCallback can be created and called
+    let cb: ProgressCallback = Arc::new(|_msg| {
+        // Note: This test demonstrates the limitation - the closure cannot modify outer vars
+        // In real usage, ProgressCallback would use channels or other mechanisms
+    });
+
+    cb("test message".to_string());
+    // Just verify the callback can be created and invoked without panicking
 }

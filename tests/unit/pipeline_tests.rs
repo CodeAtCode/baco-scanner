@@ -5,7 +5,7 @@
 
 use baco::checkpoint::ScanPhase;
 use baco::config::ScannerConfig;
-use baco::findings::{Severity, VulnerabilityFinding};
+use baco::findings::VulnerabilityFinding;
 use baco::llm_metrics::LlmMetricsTracker;
 use baco::scanner::{CheckpointManager, Orchestrator, PhaseGraph, ScanCheckpoint};
 use std::path::PathBuf;
@@ -13,7 +13,7 @@ use tempfile::TempDir;
 
 // Wrapper for fixtures::create_test_finding with simpler signature
 fn create_test_finding(title: &str) -> VulnerabilityFinding {
-    crate::fixtures::create_test_finding(title, "src/test.rs", 42, Severity::Medium)
+    crate::fixtures::create_test_finding(&format!("{}-wrapper", title), title, "src/test.rs", 42)
 }
 
 fn get_temp_checkpoint_path(suffix: &str) -> PathBuf {

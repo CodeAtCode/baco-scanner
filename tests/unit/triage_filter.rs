@@ -1,8 +1,10 @@
 //! Unit tests for TriageFilter
 
-use baco::findings::{IssueCategory, SecurityIssue, Severity, VulnerabilityFinding};
+use baco::findings::{IssueCategory, SecurityIssue, VulnerabilityFinding};
 use baco::llm::{ChatMessage, ChatResponseWithModel};
 use baco::llm_verification::{AsyncLlmClient, TriageFilter, TriageVerdict};
+
+use crate::fixtures::make_finding_snippet;
 
 /// Simple mock client for testing
 struct SimpleMockClient {
@@ -26,44 +28,18 @@ impl AsyncLlmClient for SimpleMockClient {
 }
 
 fn create_test_finding(title: &str, code: Option<&str>) -> VulnerabilityFinding {
-    VulnerabilityFinding {
-        id: format!("test-{}", title.to_lowercase().replace(' ', "-")),
-        title: title.to_string(),
-        description: format!("Test finding: {}", title),
-        severity: Severity::Medium,
-        confidence_score: 0.7,
+    let mut finding = make_finding_snippet("test-1", "src/vuln.rs", title, code);
+    finding.id = format!("test-{}", title.to_lowercase().replace(' ', "-"));
+    finding.description = format!("Test finding: {}", title);
+    finding.code_location = Some("src/vuln.rs:42".to_string());
+    finding.security_issue = Some(SecurityIssue {
+        category: IssueCategory::Injection,
         cwe_id: Some("CWE-79".to_string()),
-        file_path: "src/vuln.rs".to_string(),
-        line_number: Some(42),
-        code_snippet: code.map(|s| s.to_string()),
-        diff_hunk: None,
-        recommendation: None,
-        code_location: Some("src/vuln.rs:42".to_string()),
-        already_reported: false,
-        sources: vec!["semgrep".to_string()],
-        commit_reference: None,
-        ticket_reference: None,
-        priority_score: None,
-        cross_file_references: None,
-        verification_status: None,
-        verification_notes: None,
-        verification_error: None,
-        agent_evidence_path: None,
-        security_issue: Some(SecurityIssue {
-            category: IssueCategory::Injection,
-            cwe_id: Some("CWE-79".to_string()),
-            owasp_category: None,
-            mitre_attack: None,
-            custom_tags: vec![],
-        }),
-        poc_code: None,
-        mitigation_code: None,
-        poc_format: None,
-        llm_model: None,
-        agent_mode: false,
-        statement_range: None,
-        triage_verdict: None,
-    }
+        owasp_category: None,
+        mitre_attack: None,
+        custom_tags: vec![],
+    });
+    finding
 }
 
 #[tokio::test]

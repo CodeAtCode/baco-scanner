@@ -16,86 +16,24 @@ use baco::variant_search::{SearchPattern, VariantHit, VariantSearcher};
 use std::fs;
 use tempfile::TempDir;
 
-/// Helper to create a test VulnerabilityFinding with minimal fields
+use crate::fixtures::{make_finding_report_agg, make_finding_snippet};
+
 fn create_finding(
     id: &str,
     file_path: &str,
     cwe_id: Option<&str>,
     title: &str,
 ) -> VulnerabilityFinding {
-    VulnerabilityFinding {
-        id: id.to_string(),
-        title: title.to_string(),
-        description: "Test finding description".to_string(),
-        severity: Severity::High,
-        confidence_score: 0.8,
-        cwe_id: cwe_id.map(String::from),
-        file_path: file_path.to_string(),
-        line_number: Some(42),
-        code_snippet: None,
-        diff_hunk: None,
-        recommendation: None,
-        code_location: None,
-        already_reported: false,
-        sources: vec!["test".to_string()],
-        commit_reference: None,
-        ticket_reference: None,
-        priority_score: None,
-        cross_file_references: None,
-        verification_status: None,
-        verification_notes: None,
-        verification_error: None,
-        agent_evidence_path: None,
-        security_issue: None,
-        poc_code: None,
-        mitigation_code: None,
-        poc_format: None,
-        llm_model: None,
-        agent_mode: false,
-        statement_range: None,
-        triage_verdict: None,
-    }
+    make_finding_report_agg(id, title, file_path, Some(42), cwe_id, Severity::High)
 }
 
-/// Helper to create a VulnerabilityFinding with code snippet
 fn create_finding_with_snippet(
     id: &str,
     file_path: &str,
     title: &str,
     code_snippet: Option<&str>,
 ) -> VulnerabilityFinding {
-    VulnerabilityFinding {
-        id: id.to_string(),
-        title: title.to_string(),
-        description: "Test finding".to_string(),
-        severity: Severity::Medium,
-        confidence_score: 0.7,
-        cwe_id: None,
-        file_path: file_path.to_string(),
-        line_number: Some(10),
-        code_snippet: code_snippet.map(String::from),
-        diff_hunk: None,
-        recommendation: None,
-        code_location: None,
-        already_reported: false,
-        sources: vec!["semgrep".to_string()],
-        commit_reference: None,
-        ticket_reference: None,
-        priority_score: Some(0.5),
-        cross_file_references: None,
-        verification_status: None,
-        verification_notes: None,
-        verification_error: None,
-        agent_evidence_path: None,
-        security_issue: None,
-        poc_code: None,
-        mitigation_code: None,
-        poc_format: None,
-        llm_model: None,
-        agent_mode: false,
-        statement_range: None,
-        triage_verdict: None,
-    }
+    make_finding_snippet(id, file_path, title, code_snippet)
 }
 
 // ============================================================================

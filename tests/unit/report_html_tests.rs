@@ -69,15 +69,6 @@ fn test_render_finding_info_severity() {
 }
 
 #[test]
-fn test_render_finding_without_line_number() {
-    let finding = make_finding("f6", Severity::High, "src/unknown.rs", None);
-    let html = render_finding(&finding, 5);
-
-    assert!(html.contains("src/unknown.rs"));
-    assert!(!html.contains(":None"));
-}
-
-#[test]
 fn test_render_finding_with_cwe_id() {
     let mut finding = make_finding("f7", Severity::High, "src/test.rs", Some(10));
     finding.cwe_id = Some("CWE-79".to_string());

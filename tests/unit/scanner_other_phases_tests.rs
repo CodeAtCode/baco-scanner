@@ -11,39 +11,24 @@ use baco::scanner::Scanner;
 use indicatif::ProgressBar;
 use std::path::PathBuf;
 
+use crate::fixtures::make_aggregation_finding;
+
 fn create_test_finding(id: &str, severity: Severity) -> VulnerabilityFinding {
-    VulnerabilityFinding {
-        id: id.to_string(),
-        title: "Test Vulnerability".to_string(),
-        description: "A test vulnerability".to_string(),
+    let mut finding = make_aggregation_finding(
+        id,
         severity,
-        confidence_score: 0.9,
-        cwe_id: Some("CWE-89".to_string()),
-        file_path: "test.py".to_string(),
-        line_number: Some(42),
-        code_snippet: Some("execute(user_input)".to_string()),
-        diff_hunk: None,
-        recommendation: None,
-        code_location: None,
-        already_reported: false,
-        sources: vec!["test".to_string()],
-        commit_reference: None,
-        ticket_reference: None,
-        priority_score: Some(0.8),
-        cross_file_references: None,
-        verification_status: Some(VerificationStatus::Confirmed),
-        verification_notes: None,
-        verification_error: None,
-        agent_evidence_path: None,
-        security_issue: None,
-        poc_code: None,
-        mitigation_code: None,
-        poc_format: None,
-        llm_model: None,
-        agent_mode: false,
-        statement_range: None,
-        triage_verdict: None,
-    }
+        0.9,
+        "test.py",
+        Some(42),
+        Some("CWE-89"),
+        Some(VerificationStatus::Confirmed),
+    );
+    finding.title = "Test Vulnerability".to_string();
+    finding.description = "A test vulnerability".to_string();
+    finding.code_snippet = Some("execute(user_input)".to_string());
+    finding.sources = vec!["test".to_string()];
+    finding.priority_score = Some(0.8);
+    finding
 }
 
 fn create_test_config() -> config::ScannerConfig {

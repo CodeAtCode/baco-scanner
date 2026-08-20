@@ -1,41 +1,12 @@
 use baco::config::{PromptSpec, RouterConfig};
-use baco::findings::{Severity, VulnerabilityFinding};
+use baco::findings::VulnerabilityFinding;
 use baco::router::CweRouter;
 use std::collections::HashMap;
 
+use crate::fixtures::make_finding_cwe;
+
 fn make_finding(id: &str, cwe_id: Option<&str>, file_path: &str) -> VulnerabilityFinding {
-    VulnerabilityFinding {
-        id: id.to_string(),
-        title: "test finding".to_string(),
-        description: "test".to_string(),
-        severity: Severity::Medium,
-        confidence_score: 0.5,
-        cwe_id: cwe_id.map(|s| s.to_string()),
-        file_path: file_path.to_string(),
-        line_number: Some(1),
-        code_snippet: None,
-        diff_hunk: None,
-        recommendation: None,
-        code_location: None,
-        already_reported: false,
-        sources: vec![],
-        commit_reference: None,
-        ticket_reference: None,
-        priority_score: None,
-        cross_file_references: None,
-        verification_status: None,
-        verification_notes: None,
-        verification_error: None,
-        agent_evidence_path: None,
-        security_issue: None,
-        poc_code: None,
-        mitigation_code: None,
-        poc_format: None,
-        llm_model: None,
-        agent_mode: false,
-        statement_range: None,
-        triage_verdict: None,
-    }
+    make_finding_cwe(id, cwe_id, file_path)
 }
 
 fn enabled_config_with_cwe_override(cwe_id: &str, model: &str) -> RouterConfig {

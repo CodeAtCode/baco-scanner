@@ -13,6 +13,8 @@ use std::fs;
 use std::path::PathBuf;
 use tempfile::TempDir;
 
+use crate::fixtures::make_finding_report_agg;
+
 // ============================================================================
 // Test Fixtures
 // ============================================================================
@@ -35,38 +37,21 @@ fn create_test_config() -> baco::config::ScannerConfig {
 }
 
 fn create_test_finding() -> VulnerabilityFinding {
-    VulnerabilityFinding {
-        id: "test-finding-001".to_string(),
-        title: "Test Vulnerability".to_string(),
-        description: "A test vulnerability for unit testing".to_string(),
-        severity: Severity::High,
-        confidence_score: 0.85,
-        cwe_id: Some("CWE-79".to_string()),
-        file_path: "src/test.c".to_string(),
-        line_number: Some(42),
-        code_snippet: Some("printf(user_input)".to_string()),
-        diff_hunk: None,
-        recommendation: Some("Use sanitized input".to_string()),
-        code_location: Some("src/test.c:42".to_string()),
-        already_reported: false,
-        sources: vec!["test".to_string()],
-        commit_reference: None,
-        ticket_reference: None,
-        priority_score: Some(0.9),
-        cross_file_references: None,
-        verification_status: None,
-        verification_notes: None,
-        verification_error: None,
-        agent_evidence_path: None,
-        security_issue: None,
-        poc_code: None,
-        mitigation_code: None,
-        poc_format: None,
-        llm_model: None,
-        agent_mode: false,
-        statement_range: None,
-        triage_verdict: None,
-    }
+    let mut finding = make_finding_report_agg(
+        "test-finding-001",
+        "Test Vulnerability",
+        "src/test.c",
+        Some(42),
+        Some("CWE-79"),
+        Severity::High,
+    );
+    finding.description = "A test vulnerability for unit testing".to_string();
+    finding.code_snippet = Some("printf(user_input)".to_string());
+    finding.recommendation = Some("Use sanitized input".to_string());
+    finding.code_location = Some("src/test.c:42".to_string());
+    finding.sources = vec!["test".to_string()];
+    finding.priority_score = Some(0.9);
+    finding
 }
 
 // ============================================================================

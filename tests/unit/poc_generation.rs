@@ -17,40 +17,19 @@ use baco::findings::{
 };
 use baco::poc_generation::{PoCFormat, PoCGenerationEngine, PoCGenerationResult, ProofOfConcept};
 
+use crate::fixtures::make_aggregation_finding;
+
 /// Helper to create a test finding with specific CWE
 fn create_test_finding(cwe_id: &str, severity: Severity) -> VulnerabilityFinding {
-    VulnerabilityFinding {
-        id: "test-finding-1".to_string(),
-        title: "Test Vulnerability".to_string(),
-        description: "A test vulnerability".to_string(),
+    make_aggregation_finding(
+        "test-finding-1",
         severity,
-        confidence_score: 0.9,
-        cwe_id: Some(cwe_id.to_string()),
-        file_path: "test.py".to_string(),
-        line_number: Some(42),
-        code_snippet: Some("execute(user_input)".to_string()),
-        diff_hunk: None,
-        recommendation: None,
-        code_location: None,
-        already_reported: false,
-        sources: vec!["test".to_string()],
-        commit_reference: None,
-        ticket_reference: None,
-        priority_score: Some(0.8),
-        cross_file_references: None,
-        verification_status: Some(VerificationStatus::Confirmed),
-        verification_notes: None,
-        verification_error: None,
-        agent_evidence_path: None,
-        security_issue: None,
-        poc_code: None,
-        mitigation_code: None,
-        poc_format: None,
-        llm_model: None,
-        agent_mode: false,
-        statement_range: None,
-        triage_verdict: None,
-    }
+        0.9,
+        "test.py",
+        Some(42),
+        Some(cwe_id),
+        Some(VerificationStatus::Confirmed),
+    )
 }
 
 /// Helper to create a finding with security issue (no CWE)

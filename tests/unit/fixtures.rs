@@ -35,9 +35,15 @@
 #[path = "../fixtures/mod.rs"]
 mod centralized_fixtures;
 
+pub use centralized_fixtures::create_test_finding;
 pub use centralized_fixtures::create_test_finding as create_test_finding_central;
+pub use centralized_fixtures::make_finding_cwe;
+pub use centralized_fixtures::make_finding_confidence;
+pub use centralized_fixtures::make_finding_html;
 pub use centralized_fixtures::make_finding_phase;
 pub use centralized_fixtures::make_finding_report;
+pub use centralized_fixtures::make_finding_report_agg;
+pub use centralized_fixtures::make_finding_snippet;
 
 use baco::analysis_context::AnalysisContext;
 use baco::config::{
@@ -46,7 +52,7 @@ use baco::config::{
 };
 use baco::findings::{Severity, VerificationStatus, VulnerabilityFinding};
 pub use baco::phase::helpers::{
-    create_finding_with_params, create_test_finding, create_test_finding_simple,
+    create_finding_with_params, create_test_finding_simple,
 };
 use baco::scanner::Scanner;
 use baco::scanner_types::cve::{CveEntry, CveSource};
@@ -725,7 +731,7 @@ mod tests {
 
     #[test]
     fn test_create_test_finding() {
-        let finding = create_test_finding("SQL Injection", "src/auth.rs", 42, Severity::High);
+        let finding = create_test_finding("test-sql-injection", "SQL Injection", "src/auth.rs", 42);
 
         assert_eq!(finding.id, "test-sql-injection");
         assert_eq!(finding.title, "SQL Injection");

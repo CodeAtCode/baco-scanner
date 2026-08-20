@@ -23,6 +23,8 @@ use baco::worktree_staging::WorktreeManager;
 use std::path::PathBuf;
 use std::time::Duration;
 
+use crate::fixtures::make_finding_report_agg;
+
 // ============================================================================
 // RateLimiter Tests
 // ============================================================================
@@ -90,38 +92,14 @@ async fn test_rate_limiter_blocks_when_exhausted() {
 // ============================================================================
 
 fn create_test_finding() -> VulnerabilityFinding {
-    VulnerabilityFinding {
-        id: "test-id".to_string(),
-        title: "Test Finding".to_string(),
-        description: "Test description".to_string(),
-        severity: Severity::Medium,
-        confidence_score: 0.5,
-        cwe_id: None,
-        file_path: "test.c".to_string(),
-        line_number: Some(42),
-        code_snippet: None,
-        diff_hunk: None,
-        recommendation: None,
-        code_location: None,
-        already_reported: false,
-        sources: Vec::new(),
-        commit_reference: None,
-        ticket_reference: None,
-        priority_score: None,
-        cross_file_references: None,
-        verification_status: None,
-        verification_notes: None,
-        verification_error: None,
-        agent_evidence_path: None,
-        security_issue: None,
-        poc_code: None,
-        mitigation_code: None,
-        poc_format: None,
-        llm_model: None,
-        agent_mode: false,
-        statement_range: None,
-        triage_verdict: None,
-    }
+    make_finding_report_agg(
+        "test-id",
+        "Test Finding",
+        "test.c",
+        Some(42),
+        None,
+        Severity::Medium,
+    )
 }
 
 #[test]

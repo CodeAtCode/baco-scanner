@@ -11,45 +11,19 @@ use baco::findings::{Severity, VulnerabilityFinding};
 use std::fs;
 use tempfile::TempDir;
 
-/// Helper to create a minimal test finding with all required fields
+use crate::fixtures::make_finding_html;
+
 fn make_finding(
     id: &str,
     severity: Severity,
     file: &str,
     line: Option<u32>,
 ) -> VulnerabilityFinding {
-    VulnerabilityFinding {
-        id: id.to_string(),
-        title: format!("Finding {}", id),
-        description: "Test description for directory creation verification".to_string(),
-        severity,
-        confidence_score: 0.8,
-        cwe_id: Some("CWE-79".to_string()),
-        file_path: file.to_string(),
-        line_number: line,
-        code_snippet: Some("unsafe code detected".to_string()),
-        diff_hunk: None,
-        recommendation: Some("Use safe alternatives".to_string()),
-        code_location: None,
-        already_reported: false,
-        sources: vec!["test".to_string()],
-        commit_reference: None,
-        ticket_reference: None,
-        priority_score: None,
-        cross_file_references: None,
-        verification_status: None,
-        verification_notes: None,
-        verification_error: None,
-        agent_evidence_path: None,
-        security_issue: None,
-        poc_code: None,
-        mitigation_code: None,
-        poc_format: None,
-        llm_model: None,
-        agent_mode: false,
-        statement_range: None,
-        triage_verdict: None,
-    }
+    let mut finding = make_finding_html(id, severity, file, line);
+    finding.cwe_id = Some("CWE-79".to_string());
+    finding.code_snippet = Some("unsafe code detected".to_string());
+    finding.recommendation = Some("Use safe alternatives".to_string());
+    finding
 }
 
 // ============================================================================

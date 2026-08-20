@@ -1140,3 +1140,648 @@ async fn test_search_with_cve_id() {
     // Should include CVE in query but still return empty (no real API call)
     assert_eq!(results.len(), 0);
 }
+
+// Tests merged from tickets_inline_tests.rs
+
+#[tokio::test]
+async fn test_search_returns_empty() {
+    let systems = vec![TicketSystem {
+        name: "GitHub".to_string(),
+        system_type: "github".to_string(),
+        url: "https://github.com".to_string(),
+        credentials: None,
+    }];
+
+    let searcher = TicketSearcher::new(systems);
+    let results = searcher.search_for_finding("test query").await.unwrap();
+    assert_eq!(results.len(), 0);
+}
+
+macro_rules! test_ticket_system {
+    ($name:ident, $systems:expr, $query:expr, $expected_len:expr) => {
+        #[tokio::test]
+        async fn $name() {
+            let searcher = TicketSearcher::new($systems);
+            let results = searcher.search_for_finding($query).await.unwrap();
+            assert_eq!(results.len(), $expected_len);
+        }
+    };
+}
+
+test_ticket_system!(
+    test_search_single_github,
+    vec![TicketSystem {
+        name: "GitHub".to_string(),
+        system_type: "github".to_string(),
+        url: "https://github.com".to_string(),
+        credentials: None,
+    }],
+    "test query",
+    0
+);
+
+test_ticket_system!(
+    test_search_single_gitlab,
+    vec![TicketSystem {
+        name: "GitLab".to_string(),
+        system_type: "gitlab".to_string(),
+        url: "https://gitlab.com".to_string(),
+        credentials: None,
+    }],
+    "test query",
+    0
+);
+
+fn create_github_gitlab_systems() -> Vec<TicketSystem> {
+    vec![
+        TicketSystem {
+            name: "GitHub".to_string(),
+            system_type: "github".to_string(),
+            url: "https://github.com".to_string(),
+            credentials: None,
+        },
+        TicketSystem {
+            name: "GitLab".to_string(),
+            system_type: "gitlab".to_string(),
+            url: "https://gitlab.com".to_string(),
+            credentials: None,
+        },
+    ]
+}
+
+test_ticket_system!(
+    test_search_with_multiple_systems_inline,
+    create_github_gitlab_systems(),
+    "test query",
+    0
+);
+
+test_ticket_system!(
+    test_search_combined_results,
+    create_github_gitlab_systems(),
+    "test query",
+    0
+);
+
+fn create_github_system_inline() -> TicketSystem {
+    TicketSystem {
+        name: "GitHub".to_string(),
+        system_type: "github".to_string(),
+        url: "https://github.com".to_string(),
+        credentials: None,
+    }
+}
+
+#[tokio::test]
+async fn test_search_github_stubbed() {
+    let systems = vec![create_github_system_inline()];
+
+    let searcher = TicketSearcher::new(systems);
+    let results = searcher.search_for_finding("CVE-2024-1234").await.unwrap();
+    assert_eq!(results.len(), 0);
+}
+
+#[tokio::test]
+async fn test_search_gitlab_stubbed() {
+    let systems = vec![TicketSystem {
+        name: "GitLab".to_string(),
+        system_type: "gitlab".to_string(),
+        url: "https://gitlab.com".to_string(),
+        credentials: None,
+    }];
+
+    let searcher = TicketSearcher::new(systems);
+    let results = searcher.search_for_finding("CVE-2024-5678").await.unwrap();
+    assert_eq!(results.len(), 0);
+}
+
+#[tokio::test]
+async fn test_search_with_error_handling() {
+    let systems = vec![TicketSystem {
+        name: "GitHub".to_string(),
+        system_type: "github".to_string(),
+        url: "https://github.com".to_string(),
+        credentials: None,
+    }];
+
+    let searcher = TicketSearcher::new(systems);
+    let result = searcher.search_for_finding("test query").await;
+    assert!(result.is_ok());
+}
+
+#[tokio::test]
+async fn test_search_no_matching_systems() {
+    let systems: Vec<TicketSystem> = vec![];
+
+    let searcher = TicketSearcher::new(systems);
+    let results = searcher.search_for_finding("test query").await.unwrap();
+    assert_eq!(results.len(), 0);
+}
+
+#[tokio::test]
+async fn test_search_with_mixed_system_types() {
+    let systems = vec![
+        TicketSystem {
+            name: "GitHub".to_string(),
+            system_type: "github".to_string(),
+            url: "https://github.com".to_string(),
+            credentials: None,
+        },
+        TicketSystem {
+            name: "GitLab".to_string(),
+            system_type: "gitlab".to_string(),
+            url: "https://gitlab.com".to_string(),
+            credentials: None,
+        },
+        TicketSystem {
+            name: "Unknown".to_string(),
+            system_type: "jira".to_string(),
+            url: "https://jira.example.com".to_string(),
+            credentials: None,
+        },
+    ];
+
+    let searcher = TicketSearcher::new(systems);
+    let results = searcher.search_for_finding("test query").await.unwrap();
+    assert_eq!(results.len(), 0);
+}
+
+#[tokio::test]
+async fn test_search_empty_string() {
+    let systems = vec![TicketSystem {
+        name: "GitHub".to_string(),
+        system_type: "github".to_string(),
+        url: "https://github.com".to_string(),
+        credentials: None,
+    }];
+
+    let searcher = TicketSearcher::new(systems);
+    let results = searcher.search_for_finding("").await.unwrap();
+    assert_eq!(results.len(), 0);
+}
+
+#[tokio::test]
+async fn test_search_long_string() {
+    let systems = vec![TicketSystem {
+        name: "GitHub".to_string(),
+        system_type: "github".to_string(),
+        url: "https://github.com".to_string(),
+        credentials: None,
+    }];
+
+    let searcher = TicketSearcher::new(systems);
+    let query = "CVE-2024-1234-5678-9012-3456-7890-ABCD-EFGH-IJKL-MNOP-QRST-UVWX-YZ12";
+    let results = searcher.search_for_finding(query).await.unwrap();
+    assert_eq!(results.len(), 0);
+}
+
+#[tokio::test]
+async fn test_search_reference_struct() {
+    let reference = TicketReference {
+        ticket_id: "TEST-123".to_string(),
+        ticket_url: "https://example.com/test/123".to_string(),
+        system: "github".to_string(),
+        status: "open".to_string(),
+        title: "Test vulnerability".to_string(),
+    };
+
+    assert_eq!(reference.ticket_id, "TEST-123");
+    assert_eq!(reference.system, "github");
+    assert!(!reference.title.is_empty());
+}
+
+#[test]
+fn test_ticket_system_creation() {
+    let system = TicketSystem {
+        name: "Test".to_string(),
+        system_type: "github".to_string(),
+        url: "https://test.com".to_string(),
+        credentials: Some("token".to_string()),
+    };
+
+    assert_eq!(system.name, "Test");
+    assert_eq!(system.system_type, "github");
+    assert!(system.credentials.is_some());
+}
+
+#[test]
+fn test_ticket_system_without_credentials() {
+    let system = TicketSystem {
+        name: "Test".to_string(),
+        system_type: "gitlab".to_string(),
+        url: "https://test.com".to_string(),
+        credentials: None,
+    };
+
+    assert!(system.credentials.is_none());
+}
+
+#[tokio::test]
+async fn test_search_with_whitespace_only() {
+    let systems = vec![TicketSystem {
+        name: "GitHub".to_string(),
+        system_type: "github".to_string(),
+        url: "https://github.com".to_string(),
+        credentials: None,
+    }];
+
+    let searcher = TicketSearcher::new(systems);
+    let results = searcher.search_for_finding("   ").await.unwrap();
+    assert_eq!(results.len(), 0);
+}
+
+#[tokio::test]
+async fn test_search_with_only_cve() {
+    let systems = vec![create_github_system_inline()];
+
+    let searcher = TicketSearcher::new(systems);
+    let results = searcher.search_for_finding("CVE-2024-1234").await.unwrap();
+    assert_eq!(results.len(), 0);
+}
+
+#[tokio::test]
+async fn test_search_with_cve_colon_format() {
+    let systems = vec![TicketSystem {
+        name: "GitHub".to_string(),
+        system_type: "github".to_string(),
+        url: "https://github.com".to_string(),
+        credentials: None,
+    }];
+
+    let searcher = TicketSearcher::new(systems);
+    let results = searcher.search_for_finding("CVE:2024-5678").await.unwrap();
+    assert_eq!(results.len(), 0);
+}
+
+#[tokio::test]
+async fn test_search_with_sql_injection() {
+    let systems = vec![TicketSystem {
+        name: "GitHub".to_string(),
+        system_type: "github".to_string(),
+        url: "https://github.com".to_string(),
+        credentials: None,
+    }];
+
+    let searcher = TicketSearcher::new(systems);
+    let results = searcher
+        .search_for_finding("SQL injection vulnerability in login form")
+        .await
+        .unwrap();
+    assert_eq!(results.len(), 0);
+}
+
+#[tokio::test]
+async fn test_search_with_python_language() {
+    let systems = vec![TicketSystem {
+        name: "GitHub".to_string(),
+        system_type: "github".to_string(),
+        url: "https://github.com".to_string(),
+        credentials: None,
+    }];
+
+    let searcher = TicketSearcher::new(systems);
+    let results = searcher
+        .search_for_finding("Python buffer overflow in memory handling")
+        .await
+        .unwrap();
+    assert_eq!(results.len(), 0);
+}
+
+#[test]
+fn test_ticket_reference_clone() {
+    let reference = TicketReference {
+        ticket_id: "123".to_string(),
+        ticket_url: "https://github.com/owner/repo/issues/123".to_string(),
+        system: "github".to_string(),
+        status: "open".to_string(),
+        title: "Test issue".to_string(),
+    };
+
+    let cloned = reference.clone();
+    assert_eq!(reference.ticket_id, cloned.ticket_id);
+    assert_eq!(reference.ticket_url, cloned.ticket_url);
+    assert_eq!(reference.system, cloned.system);
+    assert_eq!(reference.status, cloned.status);
+    assert_eq!(reference.title, cloned.title);
+}
+
+#[test]
+fn test_ticket_reference_debug_format() {
+    let reference = TicketReference {
+        ticket_id: "456".to_string(),
+        ticket_url: "https://gitlab.com/group/project/issues/456".to_string(),
+        system: "gitlab".to_string(),
+        status: "closed".to_string(),
+        title: "Another issue".to_string(),
+    };
+
+    let debug_output = format!("{:?}", reference);
+    assert!(debug_output.contains("456"));
+    assert!(debug_output.contains("gitlab"));
+}
+
+#[test]
+fn test_ticket_system_debug_format() {
+    let system = TicketSystem {
+        name: "My GitHub".to_string(),
+        system_type: "github".to_string(),
+        url: "https://github.com".to_string(),
+        credentials: None,
+    };
+
+    let debug_output = format!("{:?}", system);
+    assert!(debug_output.contains("My GitHub"));
+    assert!(debug_output.contains("github"));
+}
+
+#[tokio::test]
+async fn test_search_with_multiple_cves_inline() {
+    let systems = vec![TicketSystem {
+        name: "GitHub".to_string(),
+        system_type: "github".to_string(),
+        url: "https://github.com".to_string(),
+        credentials: None,
+    }];
+
+    let searcher = TicketSearcher::new(systems);
+    let results = searcher
+        .search_for_finding("CVE-2024-1234 and CVE-2024-5678 vulnerabilities")
+        .await
+        .unwrap();
+    assert_eq!(results.len(), 0);
+}
+
+#[tokio::test]
+async fn test_search_gitlab_state_format() {
+    let systems = vec![TicketSystem {
+        name: "GitLab".to_string(),
+        system_type: "gitlab".to_string(),
+        url: "https://gitlab.com".to_string(),
+        credentials: None,
+    }];
+
+    let searcher = TicketSearcher::new(systems);
+    let results = searcher.search_for_finding("test").await.unwrap();
+    assert_eq!(results.len(), 0);
+}
+
+#[test]
+fn test_ticket_reference_all_fields() {
+    let reference = TicketReference {
+        ticket_id: "12345".to_string(),
+        ticket_url: "https://github.com/test/repo/issues/12345".to_string(),
+        system: "github".to_string(),
+        status: "open".to_string(),
+        title: "Security vulnerability in auth module".to_string(),
+    };
+
+    assert_eq!(reference.ticket_id, "12345");
+    assert_eq!(
+        reference.ticket_url,
+        "https://github.com/test/repo/issues/12345"
+    );
+    assert_eq!(reference.system, "github");
+    assert_eq!(reference.status, "open");
+    assert_eq!(reference.title, "Security vulnerability in auth module");
+}
+
+#[test]
+fn test_ticket_reference_gitlab_format() {
+    let reference = TicketReference {
+        ticket_id: "999".to_string(),
+        ticket_url: "https://gitlab.com/group/subgroup/project/issues/999".to_string(),
+        system: "gitlab".to_string(),
+        status: "closed".to_string(),
+        title: "XXE vulnerability in XML parser".to_string(),
+    };
+
+    assert_eq!(reference.ticket_id, "999");
+    assert_eq!(reference.system, "gitlab");
+    assert_eq!(reference.status, "closed");
+}
+
+#[tokio::test]
+async fn test_search_unsupported_system_variants() {
+    let systems = vec![
+        TicketSystem {
+            name: "Jira".to_string(),
+            system_type: "jira".to_string(),
+            url: "https://jira.example.com".to_string(),
+            credentials: None,
+        },
+        TicketSystem {
+            name: "Redmine".to_string(),
+            system_type: "redmine".to_string(),
+            url: "https://redmine.example.com".to_string(),
+            credentials: None,
+        },
+        TicketSystem {
+            name: "Phabricator".to_string(),
+            system_type: "phabricator".to_string(),
+            url: "https://phabricator.example.com".to_string(),
+            credentials: None,
+        },
+    ];
+
+    let searcher = TicketSearcher::new(systems);
+    let results = searcher
+        .search_for_finding("test vulnerability")
+        .await
+        .unwrap();
+    assert_eq!(results.len(), 0);
+}
+
+#[tokio::test]
+async fn test_search_with_special_characters() {
+    let systems = vec![TicketSystem {
+        name: "GitHub".to_string(),
+        system_type: "github".to_string(),
+        url: "https://github.com".to_string(),
+        credentials: None,
+    }];
+
+    let searcher = TicketSearcher::new(systems);
+    let results = searcher
+        .search_for_finding("<script>alert('xss')</script> vulnerability")
+        .await
+        .unwrap();
+    assert_eq!(results.len(), 0);
+}
+
+#[tokio::test]
+async fn test_search_with_unicode() {
+    let systems = vec![TicketSystem {
+        name: "GitHub".to_string(),
+        system_type: "github".to_string(),
+        url: "https://github.com".to_string(),
+        credentials: None,
+    }];
+
+    let searcher = TicketSearcher::new(systems);
+    let results = searcher
+        .search_for_finding("vulnerability with cafe and naive characters")
+        .await
+        .unwrap();
+    assert_eq!(results.len(), 0);
+}
+
+#[test]
+fn test_ticket_system_all_combinations() {
+    let system1 = TicketSystem {
+        name: "Private GitLab".to_string(),
+        system_type: "gitlab".to_string(),
+        url: "https://gitlab.company.com".to_string(),
+        credentials: Some("token-abc-123".to_string()),
+    };
+    assert!(system1.credentials.is_some());
+
+    let system2 = TicketSystem {
+        name: "Public GitHub".to_string(),
+        system_type: "github".to_string(),
+        url: "https://github.com".to_string(),
+        credentials: None,
+    };
+    assert!(system2.credentials.is_none());
+
+    let system3 = TicketSystem {
+        name: String::new(),
+        system_type: String::new(),
+        url: String::new(),
+        credentials: None,
+    };
+    assert!(system3.name.is_empty());
+}
+
+#[tokio::test]
+async fn test_searcher_with_no_systems() {
+    let systems: Vec<TicketSystem> = vec![];
+    let searcher = TicketSearcher::new(systems);
+    let results = searcher.search_for_finding("anything").await.unwrap();
+    assert_eq!(results.len(), 0);
+}
+
+#[tokio::test]
+async fn test_search_with_all_vuln_types() {
+    let systems = vec![TicketSystem {
+        name: "GitHub".to_string(),
+        system_type: "github".to_string(),
+        url: "https://github.com".to_string(),
+        credentials: None,
+    }];
+
+    let searcher = TicketSearcher::new(systems);
+
+    let vuln_types = [
+        "injection",
+        "xss",
+        "xxe",
+        "sql",
+        "path traversal",
+        "overflow",
+        "deserialization",
+        "buffer",
+        "race condition",
+        "privilege",
+        "authentication",
+        "authorization",
+        "csrf",
+        "ssrf",
+        "xml",
+        "yaml",
+    ];
+
+    for vuln_type in vuln_types.iter() {
+        let results = searcher.search_for_finding(vuln_type).await.unwrap();
+        assert_eq!(results.len(), 0, "Failed for vuln type: {}", vuln_type);
+    }
+}
+
+#[tokio::test]
+async fn test_search_with_all_languages() {
+    let systems = vec![TicketSystem {
+        name: "GitHub".to_string(),
+        system_type: "github".to_string(),
+        url: "https://github.com".to_string(),
+        credentials: None,
+    }];
+
+    let searcher = TicketSearcher::new(systems);
+
+    let languages = [
+        "python",
+        "javascript",
+        "rust",
+        "c++",
+        "java",
+        "go",
+        "ruby",
+        "php",
+    ];
+
+    for lang in languages.iter() {
+        let query = format!("{} vulnerability", lang);
+        let results = searcher.search_for_finding(&query).await.unwrap();
+        assert_eq!(results.len(), 0, "Failed for language: {}", lang);
+    }
+}
+
+#[tokio::test]
+async fn test_search_github_with_successful_response_inline() {
+    let mut server = Server::new_async().await;
+
+    let mock = server
+        .mock("GET", "/search/issues")
+        .match_query(mockito::Matcher::Any)
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(r#"{"total_count": 1, "items": [{"number": 123, "html_url": "https://github.com/owner/repo/issues/123", "state": "open", "title": "Test issue"}]}"#)
+        .create_async()
+        .await;
+
+    let systems = vec![TicketSystem {
+        name: "GitHub".to_string(),
+        system_type: "github".to_string(),
+        url: server.url(),
+        credentials: None,
+    }];
+
+    let searcher = TicketSearcher::new(systems);
+    let results = searcher
+        .search_for_finding("test vulnerability")
+        .await
+        .unwrap();
+
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].ticket_id, "123");
+    assert_eq!(results[0].system, "github");
+
+    mock.assert_async().await;
+}
+
+#[tokio::test]
+async fn test_search_github_with_empty_response_inline() {
+    let mut server = Server::new_async().await;
+
+    let mock = server
+        .mock("GET", "/search/issues")
+        .match_query(mockito::Matcher::Any)
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(r#"{"total_count": 0, "items": []}"#)
+        .create_async()
+        .await;
+
+    let systems = vec![TicketSystem {
+        name: "GitHub".to_string(),
+        system_type: "github".to_string(),
+        url: server.url(),
+        credentials: None,
+    }];
+
+    let searcher = TicketSearcher::new(systems);
+    let results = searcher.search_for_finding("test").await.unwrap();
+
+    assert_eq!(results.len(), 0);
+
+    mock.assert_async().await;
+}
