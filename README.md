@@ -87,7 +87,7 @@ See [Architecture](docs/architecture.md) for the PhaseGraph pipeline diagram, fu
 
 ## Research Foundation
 
-BACO integrates 16 academic papers from the [Awesome-LLMs-for-Vulnerability-Detection](https://github.com/huhusmang/Awesome-LLMs-for-Vulnerability-Detection) survey. Integrations span agentic workflows, context enhancement, rule synthesis, MoE routing, and confidence calibration.
+BACO integrates 20 academic papers from the [Awesome-LLMs-for-Vulnerability-Detection](https://github.com/huhusmang/Awesome-LLMs-for-Vulnerability-Detection) survey. Integrations span agentic workflows, context enhancement, rule synthesis, MoE routing, and confidence calibration.
 
 See [Research Integration](docs/research-integration.md) for per-paper details (techniques, results, config flags) and [Paper Survey](docs/llm-vuln-detection-papers-survey.md) for the full 36-paper survey.
 
@@ -95,8 +95,11 @@ See [Research Integration](docs/research-integration.md) for per-paper details (
 
 - [Architecture](docs/architecture.md) — PhaseGraph pipeline, all 24 phases, data flow
 - [Configuration](docs/configuration.md) — Config options, LLM setup, phase flags, prompt overrides
-- [Research Integration](docs/research-integration.md) — 16 integrated papers with techniques and results
+- [Research Integration](docs/research-integration.md) — 20 integrated papers with techniques and results
 - [Paper Survey](docs/llm-vuln-detection-papers-survey.md) — Full 36-paper survey
+- [Operator Tuning](docs/operator-tuning.md) — Performance flags and scenario-based tuning
+- [Output Interpretation](docs/output-interpretation.md) — Reading findings, confidence, triage verdicts
+- [Troubleshooting](docs/troubleshooting.md) — Common errors and fixes
 - [Roadmap](todo.md) — Completed and pending work
 
 ### Reading Order
@@ -107,7 +110,10 @@ Recommended for new users:
 3. **docs/configuration.md** — configuration reference
 4. **docs/research-integration.md** — research integrations
 5. **docs/llm-vuln-detection-papers-survey.md** — paper survey
-6. **todo.md** — roadmap
+6. **docs/operator-tuning.md** — performance tuning
+7. **docs/output-interpretation.md** — reading results
+8. **docs/troubleshooting.md** — error fixes
+9. **todo.md** — roadmap
 
 ## Acknowledgements
 

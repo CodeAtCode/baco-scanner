@@ -12,7 +12,7 @@ This document covers the **20 papers already integrated** into baco's architectu
 |-------|--------------|--------|
 | Sifting the Noise (ISSTA 2026) | Triage filter to reduce false positives | Integrated |
 | AutoCVE | Multi-agent deduplication pipeline | Integrated |
-| Cloudflare Security-Audit-Skill | Six-phase parallel orchestration | Pending |
+| Cloudflare Security-Audit-Skill | Six-phase parallel orchestration | Integrated |
 | Context-Enhanced Vulnerability Detection | Multi-level context injection | Integrated |
 | VulIn (BM25 RAG) | Specification RAG with BM25 retrieval | Integrated |
 | VulnTriage | Triple-path context augmentation | Integrated |
@@ -63,7 +63,7 @@ For the broader survey of 36 surveyed papers and the selection criteria for the 
 
 **Key Result:** The parallel orchestration pattern doubled discovery rates compared to sequential approaches while maintaining accuracy through independent verification.
 
-**Baco Integration:** Planned; hunt prompt templates are being wired back into the pipeline to implement the six-phase parallel orchestration pattern.
+**Baco Integration:** Hunt prompt templates are wired into the pipeline (`prompts/hunt/*.md` loaded at runtime, CWE→domain mapping in `cwe_to_hunt_domain`, used by the verification phase) to implement the parallel orchestration pattern.
 
 ## Context & Program Analysis
 

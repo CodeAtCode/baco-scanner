@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Threat-modeling phase disabled by default (`enable_threat_modeling = false`) — it generated a static STRIDE template rather than code-derived analysis
 
+---
+
 ## [1.1.0] - 2026-08-12
 
 ### Added

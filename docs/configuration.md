@@ -90,7 +90,7 @@ enable_variant_search = true
 | `enable_cve_bootstrap` | `true` | External network requests to NVD/CISA |
 | `enable_variant_search` | `true` | Additional LLM API calls |
 
-See [`docs/architecture.md`](architecture.md) for the full 20-phase pipeline description.
+See [`docs/architecture.md`](architecture.md) for the full 24-phase pipeline description.
 
 ## LLM Configuration
 
@@ -98,7 +98,7 @@ BACO supports single or multiple models per phase. When multiple models are conf
 
 **Default temperature:** `0.5` (controlled randomness for better security analysis)
 
-**Default max_reasoning_tokens:** `2048` (caps reasoning phase before forcing final answer)
+**Default max_reasoning_tokens:** unset (`None` — no cap unless configured)
 
 **Single model:**
 ```toml
@@ -326,7 +326,7 @@ Caps reasoning tokens before forcing the final answer. Configured in the `[llm]`
 
 | Field                | Type | Default | Description                    |
 |----------------------|------|---------|--------------------------------|
-| `max_reasoning_tokens`| int | 2048   | Max tokens for reasoning phase |
+| `max_reasoning_tokens`| int | None   | Max tokens for reasoning phase |
 
 ```toml
 [llm]
