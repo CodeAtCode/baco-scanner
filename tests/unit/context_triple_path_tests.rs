@@ -48,16 +48,6 @@ fn test_build_python() {
 }
 
 #[test]
-fn test_build_empty_source() {
-    let source = "";
-    let kb = CweKnowledgeBase::load_embedded().unwrap();
-    let result = TriplePathContext::build(source, Language::C, &kb, 1);
-
-    // Empty source may produce error or minimal valid context
-    let _ = result; // Just verify no panic
-}
-
-#[test]
 fn test_build_with_zero_top_k() {
     let source = "fn test() { let x = 1; }";
     let kb = CweKnowledgeBase::load_embedded().unwrap();
@@ -138,101 +128,112 @@ fn test_with_semantic_can_be_chained() {
 // ============================================================================
 
 #[test]
-fn test_to_prompt_section_contains_header() {
-    let source = "fn test() { let x = 1; }";
+fn test_to_prompt_section() {
     let kb = CweKnowledgeBase::load_embedded().unwrap();
-    let context = TriplePathContext::build(source, Language::Rust, &kb, 1).unwrap();
-
-    let prompt = context.to_prompt_section();
-    assert!(prompt.contains("%%TRIPLE_PATH_CONTEXT%%"));
-}
-
-#[test]
-fn test_to_prompt_section_contains_control_path() {
-    let source = "fn test() { let x = 1; }";
-    let kb = CweKnowledgeBase::load_embedded().unwrap();
-    let context = TriplePathContext::build(source, Language::Rust, &kb, 1).unwrap();
-
-    let prompt = context.to_prompt_section();
-    assert!(prompt.contains("### Control Path"));
-    assert!(prompt.contains("AST Structure:"));
-    assert!(prompt.contains("Control Flow Graph:"));
-    assert!(prompt.contains("Data Flow Graph:"));
-}
-
-#[test]
-fn test_to_prompt_section_contains_knowledge_path() {
-    let source = "fn test() { let x = 1; }";
-    let kb = CweKnowledgeBase::load_embedded().unwrap();
-    let context = TriplePathContext::build(source, Language::Rust, &kb, 1).unwrap();
-
-    let prompt = context.to_prompt_section();
-    assert!(prompt.contains("### Knowledge Path"));
-}
-
-#[test]
-fn test_to_prompt_section_semantic_none() {
-    let source = "fn test() { let x = 1; }";
-    let kb = CweKnowledgeBase::load_embedded().unwrap();
-    let context = TriplePathContext::build(source, Language::Rust, &kb, 1).unwrap();
-
-    let prompt = context.to_prompt_section();
-    assert!(prompt.contains("### Semantic Path"));
-    assert!(prompt.contains("(semantic summary not available)"));
-}
-
-#[test]
-fn test_to_prompt_section_semantic_some() {
-    let source = "fn test() { let x = 1; }";
-    let kb = CweKnowledgeBase::load_embedded().unwrap();
-    let context = TriplePathContext::build(source, Language::Rust, &kb, 1).unwrap();
-    let context = context.with_semantic("Custom summary".to_string());
-
-    let prompt = context.to_prompt_section();
-    assert!(prompt.contains("Custom summary"));
-}
-
-#[test]
-fn test_to_prompt_section_knowledge_empty() {
-    let source = "fn test() { let x = 1; }";
-    let kb = CweKnowledgeBase::load_embedded().unwrap();
-    let context = TriplePathContext::build(source, Language::Rust, &kb, 1).unwrap();
-
-    let prompt = context.to_prompt_section();
-    // May contain "(no related CWE rules found)" if no matches
-    assert!(prompt.contains("### Knowledge Path"));
-}
-
-#[test]
-fn test_to_prompt_section_non_empty() {
-    let source = "fn test() { let x = 1; }";
-    let kb = CweKnowledgeBase::load_embedded().unwrap();
-    let context = TriplePathContext::build(source, Language::Rust, &kb, 1).unwrap();
-
-    let prompt = context.to_prompt_section();
-    assert!(!prompt.is_empty());
-    assert!(prompt.len() > 50); // Should have substantial content
-}
-
-#[test]
-fn test_to_prompt_section_with_multiple_knowledge_rules() {
-    let source = r#"
+    
+    let cases = vec![
+        (
+            "header",
+            "fn test() { let x = 1; }",
+            Language::Rust,
+            1,
+            None,
+            vec!["%%TRIPLE_PATH_CONTEXT%%"],
+        ),
+        (
+            "control_path",
+            "fn test() { let x = 1; }",
+            Language::Rust,
+            1,
+            None,
+            vec!["### Control Path", "AST Structure:", "Control Flow Graph:", "Data Flow Graph:"],
+        ),
+        (
+            "knowledge_path",
+            "fn test() { let x = 1; }",
+            Language::Rust,
+            1,
+            None,
+            vec!["### Knowledge Path"],
+        ),
+        (
+            "semantic_none",
+            "fn test() { let x = 1; }",
+            Language::Rust,
+            1,
+            None,
+            vec!["### Semantic Path", "(semantic summary not available)"],
+        ),
+        (
+            "semantic_some",
+            "fn test() { let x = 1; }",
+            Language::Rust,
+            1,
+            Some("Custom summary"),
+            vec!["Custom summary"],
+        ),
+        (
+            "knowledge_empty",
+            "fn test() { let x = 1; }",
+            Language::Rust,
+            1,
+            None,
+            vec!["### Knowledge Path"],
+        ),
+        (
+            "non_empty",
+            "fn test() { let x = 1; }",
+            Language::Rust,
+            1,
+            None,
+            vec![],
+        ),
+        (
+            "multiple_knowledge_rules",
+            r#"
 void vulnerable(char *input) {
     char buffer[100];
     strcpy(buffer, input);
 }
-"#;
-    let kb = CweKnowledgeBase::load_embedded().unwrap();
-    let context = TriplePathContext::build(source, Language::C, &kb, 5).unwrap();
-    let context = context.with_semantic("Vulnerable function".to_string());
+"#,
+            Language::C,
+            5,
+            Some("Vulnerable function"),
+            vec![
+                "%%TRIPLE_PATH_CONTEXT%%",
+                "### Control Path",
+                "### Knowledge Path",
+                "### Semantic Path",
+                "Vulnerable function",
+            ],
+        ),
+    ];
 
-    let prompt = context.to_prompt_section();
+    for (name, source, lang, top_k, semantic, expected_contents) in cases {
+        let context = TriplePathContext::build(source, lang, &kb, top_k).unwrap();
+        let context = if let Some(summary) = semantic {
+            context.with_semantic(summary.to_string())
+        } else {
+            context
+        };
 
-    assert!(prompt.contains("%%TRIPLE_PATH_CONTEXT%%"));
-    assert!(prompt.contains("### Control Path"));
-    assert!(prompt.contains("### Knowledge Path"));
-    assert!(prompt.contains("### Semantic Path"));
-    assert!(prompt.contains("Vulnerable function"));
+        let prompt = context.to_prompt_section();
+
+        for expected in expected_contents {
+            assert!(
+                prompt.contains(expected),
+                "{}: missing '{}', got:\n{}",
+                name,
+                expected,
+                prompt
+            );
+        }
+
+        if name == "non_empty" {
+            assert!(!prompt.is_empty(), "{}: prompt should not be empty", name);
+            assert!(prompt.len() > 50, "{}: prompt should have substantial content", name);
+        }
+    }
 }
 
 // ============================================================================

@@ -341,9 +341,13 @@ pub struct IndexStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+
+    static INDEX_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn test_build_embedding_index() {
+        let _guard = INDEX_LOCK.lock().unwrap();
         let specs = vec![
             SecuritySpecification {
                 id: "spec-1".to_string(),
@@ -428,6 +432,7 @@ mod tests {
 
     #[test]
     fn test_hybrid_search() {
+        let _guard = INDEX_LOCK.lock().unwrap();
         // Clear index first
         clear_index();
 
@@ -449,6 +454,7 @@ mod tests {
 
     #[test]
     fn test_clear_index() {
+        let _guard = INDEX_LOCK.lock().unwrap();
         let specs = vec![SecuritySpecification {
             id: "spec-1".to_string(),
             vuln_type: "CWE-79".to_string(),

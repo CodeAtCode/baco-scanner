@@ -290,121 +290,108 @@ fn test_parse_empty_models() {
 
 #[test]
 #[serial]
-fn test_env_override_discovery_only() {
-    let mut guard = EnvVarGuard::new();
-    guard.set("LLM_DISCOVERY_KEY", "env-discovery-key");
+fn test_env_overrides() {
+    let cases = vec![
+        (
+            "discovery_only",
+            vec![("LLM_DISCOVERY_KEY", "env-discovery-key")],
+            Some("env-discovery-key"),
+            None,
+            None,
+        ),
+        (
+            "all_phases",
+            vec![
+                ("LLM_DISCOVERY_KEY", "env-discovery"),
+                ("LLM_VERIFICATION_KEY", "env-verification"),
+                ("LLM_AGGREGATION_KEY", "env-aggregation"),
+            ],
+            Some("env-discovery"),
+            Some("env-verification"),
+            Some("env-aggregation"),
+        ),
+        (
+            "toml_takes_precedence",
+            vec![
+                ("LLM_DISCOVERY_KEY", "env-key"),
+                ("LLM_VERIFICATION_KEY", "env-key"),
+                ("LLM_AGGREGATION_KEY", "env-key"),
+            ],
+            Some("toml-discovery"),
+            Some("toml-verification"),
+            Some("env-key"),
+        ),
+        (
+            "unknown_phase",
+            vec![("LLM_UNKNOWN_PHASE_KEY", "unknown-key")],
+            None,
+            None,
+            None,
+        ),
+    ];
 
-    let toml_str = base_config_toml();
-    let mut config: ScannerConfig = toml::from_str(&toml_str).unwrap();
+    for (name, env_vars, expected_discovery, expected_verification, expected_aggregation) in cases {
+        let mut guard = EnvVarGuard::new();
+        for (key, value) in env_vars {
+            guard.set(key, value);
+        }
 
-    apply_env_overrides(&mut config);
+        let toml_str = if name == "toml_takes_precedence" {
+            r#"
+                [project]
+                name = "test"
+                path = "/tmp/test"
 
-    assert_eq!(
-        config.llm.phases.discovery.api_key,
-        Some("env-discovery-key".to_string())
-    );
-    assert!(config.llm.phases.verification.api_key.is_none());
-    assert!(config.llm.phases.aggregation.api_key.is_none());
-}
+                [output]
+                dir = "./out"
 
-#[test]
-#[serial]
-fn test_env_override_all_phases() {
-    let mut guard = EnvVarGuard::new();
-    guard.set("LLM_DISCOVERY_KEY", "env-discovery");
-    guard.set("LLM_VERIFICATION_KEY", "env-verification");
-    guard.set("LLM_AGGREGATION_KEY", "env-aggregation");
+                [scanner]
+                commit_lookback_days = 30
+                max_file_size_kb = 100
 
-    let toml_str = base_config_toml();
-    let mut config: ScannerConfig = toml::from_str(&toml_str).unwrap();
+                [llm]
+                timeout_secs = 30
+                max_retries = 2
+                retry_backoff_ms = 1000
 
-    apply_env_overrides(&mut config);
+                [llm.phases.discovery]
+                base_url = "http://test"
+                api_key = "toml-discovery"
 
-    assert_eq!(
-        config.llm.phases.discovery.api_key,
-        Some("env-discovery".to_string())
-    );
-    assert_eq!(
-        config.llm.phases.verification.api_key,
-        Some("env-verification".to_string())
-    );
-    assert_eq!(
-        config.llm.phases.aggregation.api_key,
-        Some("env-aggregation".to_string())
-    );
-}
+                [llm.phases.verification]
+                base_url = "http://test"
+                api_key = "toml-verification"
 
-#[test]
-#[serial]
-fn test_env_override_toml_takes_precedence() {
-    let mut guard = EnvVarGuard::new();
-    guard.set("LLM_DISCOVERY_KEY", "env-key");
-    guard.set("LLM_VERIFICATION_KEY", "env-key");
-    guard.set("LLM_AGGREGATION_KEY", "env-key");
+                [llm.phases.aggregation]
+                base_url = "http://test"
+            "#
+            .to_string()
+        } else {
+            base_config_toml()
+        };
 
-    let toml_str = r#"
-        [project]
-        name = "test"
-        path = "/tmp/test"
+        let mut config: ScannerConfig = toml::from_str(&toml_str).unwrap();
+        apply_env_overrides(&mut config);
 
-        [output]
-        dir = "./out"
-
-        [scanner]
-        commit_lookback_days = 30
-        max_file_size_kb = 100
-
-        [llm]
-        timeout_secs = 30
-        max_retries = 2
-        retry_backoff_ms = 1000
-
-        [llm.phases.discovery]
-        base_url = "http://test"
-        api_key = "toml-discovery"
-
-        [llm.phases.verification]
-        base_url = "http://test"
-        api_key = "toml-verification"
-
-        [llm.phases.aggregation]
-        base_url = "http://test"
-    "#;
-
-    let mut config: ScannerConfig = toml::from_str(toml_str).unwrap();
-    apply_env_overrides(&mut config);
-
-    // TOML keys should be preserved
-    assert_eq!(
-        config.llm.phases.discovery.api_key,
-        Some("toml-discovery".to_string())
-    );
-    assert_eq!(
-        config.llm.phases.verification.api_key,
-        Some("toml-verification".to_string())
-    );
-    // Aggregation has no TOML key, so env should apply
-    assert_eq!(
-        config.llm.phases.aggregation.api_key,
-        Some("env-key".to_string())
-    );
-}
-
-#[test]
-#[serial]
-fn test_env_override_unknown_phase() {
-    let mut guard = EnvVarGuard::new();
-    // This env var doesn't correspond to any known phase
-    guard.set("LLM_UNKNOWN_PHASE_KEY", "unknown-key");
-
-    let toml_str = base_config_toml();
-    let mut config: ScannerConfig = toml::from_str(&toml_str).unwrap();
-
-    // Should not panic, just log warning
-    apply_env_overrides(&mut config);
-
-    // No changes expected
-    assert!(config.llm.phases.discovery.api_key.is_none());
+        assert_eq!(
+            config.llm.phases.discovery.api_key.as_deref(),
+            expected_discovery,
+            "{}: discovery key",
+            name
+        );
+        assert_eq!(
+            config.llm.phases.verification.api_key.as_deref(),
+            expected_verification,
+            "{}: verification key",
+            name
+        );
+        assert_eq!(
+            config.llm.phases.aggregation.api_key.as_deref(),
+            expected_aggregation,
+            "{}: aggregation key",
+            name
+        );
+    }
 }
 
 fn base_config_toml() -> String {
@@ -442,224 +429,236 @@ fn base_config_toml() -> String {
 // ============================================================================
 
 #[test]
-fn test_validate_missing_base_url() {
-    let toml_str = r#"
-        [project]
-        name = "test"
-        path = "/tmp/test"
+fn test_validate_errors() {
+    let cases = vec![
+        (
+            "missing_base_url",
+            r#"
+                [project]
+                name = "test"
+                path = "/tmp/test"
 
-        [output]
-        dir = "./out"
+                [output]
+                dir = "./out"
 
-        [scanner]
-        commit_lookback_days = 30
-        max_file_size_kb = 100
+                [scanner]
+                commit_lookback_days = 30
+                max_file_size_kb = 100
 
-        [llm]
-        timeout_secs = 30
-        max_retries = 2
-        retry_backoff_ms = 1000
+                [llm]
+                timeout_secs = 30
+                max_retries = 2
+                retry_backoff_ms = 1000
 
-        [llm.phases.discovery]
-        base_url = ""
-        api_key = "test-key"
-        model = "test"
+                [llm.phases.discovery]
+                base_url = ""
+                api_key = "test-key"
+                model = "test"
 
-        [llm.phases.verification]
-        base_url = "http://test"
-        model = "test"
+                [llm.phases.verification]
+                base_url = "http://test"
+                model = "test"
 
-        [llm.phases.aggregation]
-        base_url = "http://test"
-        model = "test"
-    "#;
+                [llm.phases.aggregation]
+                base_url = "http://test"
+                model = "test"
+            "#,
+            true,
+            Some("discovery"),
+            Some("base_url"),
+            None,
+        ),
+        (
+            "missing_model",
+            r#"
+                [project]
+                name = "test"
+                path = "/tmp/test"
 
-    let config: ScannerConfig = toml::from_str(toml_str).unwrap();
-    let result = config.validate();
+                [output]
+                dir = "./out"
 
-    assert!(result.is_err());
-    let err_msg = result.unwrap_err();
-    assert!(err_msg.to_string().contains("discovery"));
-    assert!(err_msg.to_string().contains("base_url"));
-}
+                [scanner]
+                commit_lookback_days = 30
+                max_file_size_kb = 100
 
-#[test]
-fn test_validate_missing_model() {
-    let toml_str = r#"
-        [project]
-        name = "test"
-        path = "/tmp/test"
+                [llm]
+                timeout_secs = 30
+                max_retries = 2
+                retry_backoff_ms = 1000
 
-        [output]
-        dir = "./out"
+                [llm.phases.discovery]
+                base_url = "http://test"
+                api_key = "test-key"
 
-        [scanner]
-        commit_lookback_days = 30
-        max_file_size_kb = 100
+                [llm.phases.verification]
+                base_url = "http://test"
+                model = "test"
 
-        [llm]
-        timeout_secs = 30
-        max_retries = 2
-        retry_backoff_ms = 1000
+                [llm.phases.aggregation]
+                base_url = "http://test"
+                model = "test"
+            "#,
+            true,
+            Some("discovery"),
+            Some("model"),
+            None,
+        ),
+        (
+            "empty_api_key_skips_validation",
+            r#"
+                [project]
+                name = "test"
+                path = "/tmp/test"
 
-        [llm.phases.discovery]
-        base_url = "http://test"
-        api_key = "test-key"
+                [output]
+                dir = "./out"
 
-        [llm.phases.verification]
-        base_url = "http://test"
-        model = "test"
+                [scanner]
+                commit_lookback_days = 30
+                max_file_size_kb = 100
 
-        [llm.phases.aggregation]
-        base_url = "http://test"
-        model = "test"
-    "#;
+                [llm]
+                timeout_secs = 30
+                max_retries = 2
+                retry_backoff_ms = 1000
 
-    let config: ScannerConfig = toml::from_str(toml_str).unwrap();
-    let result = config.validate();
+                [llm.phases.discovery]
+                base_url = "http://test"
+                model = "test"
 
-    assert!(result.is_err());
-    let err_msg = result.unwrap_err();
-    assert!(err_msg.to_string().contains("discovery"));
-    assert!(err_msg.to_string().contains("model"));
-}
+                [llm.phases.verification]
+                base_url = "http://test"
+                model = "test"
 
-#[test]
-fn test_validate_empty_api_key_skips_validation() {
-    // Empty api_key should skip validation for that phase
-    let toml_str = r#"
-        [project]
-        name = "test"
-        path = "/tmp/test"
+                [llm.phases.aggregation]
+                base_url = "http://test"
+                model = "test"
+            "#,
+            false,
+            None,
+            None,
+            Some("base_url"),
+        ),
+        (
+            "none_api_key_skips_validation",
+            r#"
+                [project]
+                name = "test"
+                path = "/tmp/test"
 
-        [output]
-        dir = "./out"
+                [output]
+                dir = "./out"
 
-        [scanner]
-        commit_lookback_days = 30
-        max_file_size_kb = 100
+                [scanner]
+                commit_lookback_days = 30
+                max_file_size_kb = 100
 
-        [llm]
-        timeout_secs = 30
-        max_retries = 2
-        retry_backoff_ms = 1000
+                [llm]
+                timeout_secs = 30
+                max_retries = 2
+                retry_backoff_ms = 1000
 
-        [llm.phases.discovery]
-        base_url = "http://test"
-        model = "test"
+                [llm.phases.discovery]
+                base_url = "http://test"
+                model = "test"
 
-        [llm.phases.verification]
-        base_url = "http://test"
-        model = "test"
+                [llm.phases.verification]
+                base_url = "http://test"
+                model = "test"
 
-        [llm.phases.aggregation]
-        base_url = "http://test"
-        model = "test"
-    "#;
+                [llm.phases.aggregation]
+                base_url = "http://test"
+                model = "test"
+            "#,
+            false,
+            None,
+            None,
+            Some("base_url"),
+        ),
+        (
+            "nonexistent_project_path",
+            r#"
+                [project]
+                name = "test"
+                path = "/nonexistent/path/that/does/not/exist"
 
-    let config: ScannerConfig = toml::from_str(toml_str).unwrap();
-    // This will fail on semgrep check, but not on LLM validation
-    let result = config.validate();
+                [output]
+                dir = "./out"
 
-    // May fail due to semgrep not being installed, but not due to LLM config
-    if let Err(err_msg) = result {
-        assert!(!err_msg.to_string().contains("base_url"));
-        assert!(!err_msg.to_string().contains("model"));
+                [scanner]
+                commit_lookback_days = 30
+                max_file_size_kb = 100
+
+                [llm]
+                timeout_secs = 30
+                max_retries = 2
+                retry_backoff_ms = 1000
+
+                [llm.phases.discovery]
+                base_url = "http://test"
+                model = "test"
+
+                [llm.phases.verification]
+                base_url = "http://test"
+                model = "test"
+
+                [llm.phases.aggregation]
+                base_url = "http://test"
+                model = "test"
+            "#,
+            true,
+            None,
+            None,
+            Some("does not exist"),
+        ),
+    ];
+
+    for (
+        name,
+        toml_str,
+        expect_llm_error,
+        expected_field1,
+        expected_field2,
+        skip_llm_check_field,
+    ) in cases {
+        let config: ScannerConfig = toml::from_str(toml_str).unwrap();
+        
+        if name == "none_api_key_skips_validation" {
+            assert!(config.llm.phases.discovery.api_key.is_none(), "{}: api_key is None", name);
+        }
+        
+        let result = config.validate();
+
+        if expect_llm_error {
+            assert!(result.is_err(), "{}: expected error", name);
+            let err_msg = result.unwrap_err().to_string();
+            if let Some(field1) = expected_field1 {
+                assert!(err_msg.contains(field1), "{}: error should contain '{}'", name, field1);
+            }
+            if let Some(field2) = expected_field2 {
+                assert!(err_msg.contains(field2), "{}: error should contain '{}'", name, field2);
+            }
+        } else {
+            if let Err(err_msg) = result {
+                let err_str = err_msg.to_string();
+                if let Some(skip_field) = skip_llm_check_field {
+                    assert!(!err_str.contains(skip_field), "{}: should not contain '{}' (LLM validation skipped)", name, skip_field);
+                    if let Some(field2) = expected_field2 {
+                        assert!(!err_str.contains(field2), "{}: should not contain '{}' (LLM validation skipped)", name, field2);
+                    }
+                }
+            }
+        }
     }
 }
 
 #[test]
-fn test_validate_none_api_key_skips_validation() {
-    // None api_key should skip validation for that phase
-    let toml_str = r#"
-        [project]
-        name = "test"
-        path = "/tmp/test"
-
-        [output]
-        dir = "./out"
-
-        [scanner]
-        commit_lookback_days = 30
-        max_file_size_kb = 100
-
-        [llm]
-        timeout_secs = 30
-        max_retries = 2
-        retry_backoff_ms = 1000
-
-        [llm.phases.discovery]
-        base_url = "http://test"
-        model = "test"
-
-        [llm.phases.verification]
-        base_url = "http://test"
-        model = "test"
-
-        [llm.phases.aggregation]
-        base_url = "http://test"
-        model = "test"
-    "#;
-
-    let config: ScannerConfig = toml::from_str(toml_str).unwrap();
-    // Verify api_key is None
-    assert!(config.llm.phases.discovery.api_key.is_none());
-
-    // Validation should skip LLM checks for phases without api_key
-    let result = config.validate();
-
-    if let Err(err_msg) = result {
-        assert!(!err_msg.to_string().contains("base_url"));
-        assert!(!err_msg.to_string().contains("model"));
-    }
-}
-
-#[test]
-fn test_validate_nonexistent_project_path() {
-    let toml_str = r#"
-        [project]
-        name = "test"
-        path = "/nonexistent/path/that/does/not/exist"
-
-        [output]
-        dir = "./out"
-
-        [scanner]
-        commit_lookback_days = 30
-        max_file_size_kb = 100
-
-        [llm]
-        timeout_secs = 30
-        max_retries = 2
-        retry_backoff_ms = 1000
-
-        [llm.phases.discovery]
-        base_url = "http://test"
-        model = "test"
-
-        [llm.phases.verification]
-        base_url = "http://test"
-        model = "test"
-
-        [llm.phases.aggregation]
-        base_url = "http://test"
-        model = "test"
-    "#;
-
-    let config: ScannerConfig = toml::from_str(toml_str).unwrap();
-    let result = config.validate();
-
-    assert!(result.is_err());
-    let err_msg = result.unwrap_err();
-    assert!(err_msg.to_string().contains("does not exist"));
-}
-
-#[test]
-fn test_from_file_success() {
+fn test_from_file_errors() {
     let temp_dir = std::env::temp_dir().join("baco_config_test_from_file");
     let _ = std::fs::create_dir_all(&temp_dir);
+    
     let config_file = temp_dir.join("test.toml");
-
     let toml_str = r#"
         [project]
         name = "test"
@@ -849,50 +848,55 @@ fn test_agent_config_custom() {
 // ============================================================================
 
 #[test]
-fn test_llm_phase_config_get_models_priority() {
-    // Test that models list takes precedence over single model string
-    let phase = LlmPhaseConfig {
-        base_url: "http://test".to_string(),
-        api_key: Some("key".to_string()),
-        model: "single-model".to_string(),
-        models: vec!["multi-1".to_string(), "multi-2".to_string()],
-        timeout_secs: None,
-    };
+fn test_llm_phase_config_get_models() {
+    let cases = vec![
+        (
+            "priority_models_list",
+            LlmPhaseConfig {
+                base_url: "http://test".to_string(),
+                api_key: Some("key".to_string()),
+                model: "single-model".to_string(),
+                models: vec!["multi-1".to_string(), "multi-2".to_string()],
+                timeout_secs: None,
+            },
+            vec!["multi-1", "multi-2"],
+        ),
+        (
+            "fallback_single_model",
+            LlmPhaseConfig {
+                base_url: "http://test".to_string(),
+                api_key: Some("key".to_string()),
+                model: "single-model".to_string(),
+                models: vec![],
+                timeout_secs: None,
+            },
+            vec!["single-model"],
+        ),
+        (
+            "empty_when_both_missing",
+            LlmPhaseConfig {
+                base_url: "http://test".to_string(),
+                api_key: Some("key".to_string()),
+                model: "".to_string(),
+                models: vec![],
+                timeout_secs: None,
+            },
+            vec![],
+        ),
+    ];
 
-    let models = phase.get_models();
-    assert_eq!(models.len(), 2);
-    assert_eq!(models[0], "multi-1");
-}
-
-#[test]
-fn test_llm_phase_config_fallback_to_single_model() {
-    // Test fallback to single model when models list is empty
-    let phase = LlmPhaseConfig {
-        base_url: "http://test".to_string(),
-        api_key: Some("key".to_string()),
-        model: "single-model".to_string(),
-        models: vec![],
-        timeout_secs: None,
-    };
-
-    let models = phase.get_models();
-    assert_eq!(models.len(), 1);
-    assert_eq!(models[0], "single-model");
-}
-
-#[test]
-fn test_llm_phase_config_empty_when_both_missing() {
-    // Test empty result when both model and models are empty
-    let phase = LlmPhaseConfig {
-        base_url: "http://test".to_string(),
-        api_key: Some("key".to_string()),
-        model: "".to_string(),
-        models: vec![],
-        timeout_secs: None,
-    };
-
-    let models = phase.get_models();
-    assert!(models.is_empty());
+    for (name, phase, expected_models) in cases {
+        let models = phase.get_models();
+        assert_eq!(
+            models.len(),
+            expected_models.len(),
+            "{}: model count",
+            name
+        );
+        for (i, expected) in expected_models.iter().enumerate() {
+            assert_eq!(models[i], *expected, "{}: model {}", name, i);
+        }
+    }
 }
 
 // ============================================================================
