@@ -194,20 +194,204 @@ async fn test_semgrep_phase_error_handling() {
 // ============================================================================
 
 #[tokio::test]
-async fn test_validate_phase_skips_when_disabled() {
-    run_phase_skip_test(ScanPhase::Validate, |c| {
-        c.validate.enabled = false;
-    })
-    .await;
-}
+async fn test_phases_skip_when_disabled() {
+    /// Config modification strategy
+    enum ConfigModifier {
+        ValidateDisabled,
+        ValidateNoApiKey,
+        ConfidenceScoringDisabled,
+        ThreatModelingDisabled,
+        RootCauseDedupDisabled,
+        MultiVerifierDisabled,
+        AutoPatchingDisabled,
+        CveBootstrapDisabled,
+        PocCompilerDisabled,
+        VariantSearchDisabled,
+        CweRoutingDisabled,
+        RuleSynthesisDisabled,
+        RuleSynthesisNoApiKey,
+        ExploitSynthDisabled,
+        ExploitSynthNoApiKey,
+        CpgSliceDisabled,
+    }
 
-#[tokio::test]
-async fn test_validate_phase_skips_without_api_key() {
-    run_phase_skip_test(ScanPhase::Validate, |c| {
-        c.validate.enabled = true;
-        c.llm.phases.verification.api_key = None;
-    })
-    .await;
+    fn apply_modifier(config: &mut config::ScannerConfig, modifier: ConfigModifier) {
+        match modifier {
+            ConfigModifier::ValidateDisabled => {
+                config.validate.enabled = false;
+            }
+            ConfigModifier::ValidateNoApiKey => {
+                config.validate.enabled = true;
+                config.llm.phases.verification.api_key = None;
+            }
+            ConfigModifier::ConfidenceScoringDisabled => {
+                config.scanner.performance.enable_confidence_refinement = false;
+            }
+            ConfigModifier::ThreatModelingDisabled => {
+                config.scanner.performance.enable_threat_modeling = false;
+            }
+            ConfigModifier::RootCauseDedupDisabled => {
+                config.scanner.performance.enable_root_cause_dedup = false;
+            }
+            ConfigModifier::MultiVerifierDisabled => {
+                config.scanner.performance.enable_multi_verifier = false;
+            }
+            ConfigModifier::AutoPatchingDisabled => {
+                config.scanner.performance.enable_auto_patching = false;
+            }
+            ConfigModifier::CveBootstrapDisabled => {
+                config.scanner.performance.enable_cve_bootstrap = false;
+            }
+            ConfigModifier::PocCompilerDisabled => {
+                config.scanner.performance.enable_poc_compilation = false;
+            }
+            ConfigModifier::VariantSearchDisabled => {
+                config.scanner.performance.enable_variant_search = false;
+            }
+            ConfigModifier::CweRoutingDisabled => {
+                config.router.enabled = false;
+            }
+            ConfigModifier::RuleSynthesisDisabled => {
+                config.rulesynth.enabled = false;
+            }
+            ConfigModifier::RuleSynthesisNoApiKey => {
+                config.rulesynth.enabled = true;
+                config.llm.phases.discovery.api_key = None;
+            }
+            ConfigModifier::ExploitSynthDisabled => {
+                config.exploit.enabled = false;
+            }
+            ConfigModifier::ExploitSynthNoApiKey => {
+                config.exploit.enabled = true;
+                config.llm.phases.discovery.api_key = None;
+            }
+            ConfigModifier::CpgSliceDisabled => {
+                config.cpg.enabled = false;
+            }
+        }
+    }
+
+    // Test case: (phase, config_modifier, description)
+    let test_cases = vec![
+        (
+            ScanPhase::Validate,
+            ConfigModifier::ValidateDisabled,
+            "validate_disabled",
+        ),
+        (
+            ScanPhase::Validate,
+            ConfigModifier::ValidateNoApiKey,
+            "validate_no_api_key",
+        ),
+        (
+            ScanPhase::ConfidenceScoring,
+            ConfigModifier::ConfidenceScoringDisabled,
+            "confidence_scoring_disabled",
+        ),
+        (
+            ScanPhase::ThreatModeling,
+            ConfigModifier::ThreatModelingDisabled,
+            "threat_modeling_disabled",
+        ),
+        (
+            ScanPhase::RootCauseDedup,
+            ConfigModifier::RootCauseDedupDisabled,
+            "root_cause_dedup_disabled",
+        ),
+        (
+            ScanPhase::MultiVerifier,
+            ConfigModifier::MultiVerifierDisabled,
+            "multi_verifier_disabled",
+        ),
+        (
+            ScanPhase::AutoPatching,
+            ConfigModifier::AutoPatchingDisabled,
+            "auto_patching_disabled",
+        ),
+        (
+            ScanPhase::CveBootstrap,
+            ConfigModifier::CveBootstrapDisabled,
+            "cve_bootstrap_disabled",
+        ),
+        (
+            ScanPhase::PocCompiler,
+            ConfigModifier::PocCompilerDisabled,
+            "poc_compiler_disabled",
+        ),
+        (
+            ScanPhase::VariantSearch,
+            ConfigModifier::VariantSearchDisabled,
+            "variant_search_disabled",
+        ),
+        (
+            ScanPhase::CweRouting,
+            ConfigModifier::CweRoutingDisabled,
+            "cwe_routing_disabled",
+        ),
+        (
+            ScanPhase::RuleSynthesis,
+            ConfigModifier::RuleSynthesisDisabled,
+            "rule_synthesis_disabled",
+        ),
+        (
+            ScanPhase::RuleSynthesis,
+            ConfigModifier::RuleSynthesisNoApiKey,
+            "rule_synthesis_no_api_key",
+        ),
+        (
+            ScanPhase::ExploitSynth,
+            ConfigModifier::ExploitSynthDisabled,
+            "exploit_synth_disabled",
+        ),
+        (
+            ScanPhase::ExploitSynth,
+            ConfigModifier::ExploitSynthNoApiKey,
+            "exploit_synth_no_api_key",
+        ),
+        (
+            ScanPhase::CpgSlice,
+            ConfigModifier::CpgSliceDisabled,
+            "cpg_slice_disabled",
+        ),
+    ];
+
+    for (phase, modifier, description) in test_cases {
+        let scanner = create_test_scanner();
+        let mut config = create_test_config();
+        apply_modifier(&mut config, modifier);
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("test-1", Severity::High)];
+        let phase_config = PhaseConfig {
+            phase: &phase,
+            findings: findings.clone(),
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
+        };
+
+        let result = run_phase(&scanner, phase_config).await;
+        assert!(
+            result.is_ok(),
+            "Phase {:?} ({}) should complete without error",
+            phase,
+            description
+        );
+        let (updated, _) = result.unwrap();
+        assert_eq!(
+            updated.len(),
+            findings.len(),
+            "Phase {:?} ({}) should preserve finding count when skipped",
+            phase,
+            description
+        );
+    }
 }
 
 // ============================================================================
@@ -307,18 +491,6 @@ async fn test_cross_file_analysis_basic() {
 }
 
 // ============================================================================
-// Confidence Scoring Phase Tests
-// ============================================================================
-
-#[tokio::test]
-async fn test_confidence_scoring_skips_when_disabled() {
-    run_phase_skip_test(ScanPhase::ConfidenceScoring, |c| {
-        c.scanner.performance.enable_confidence_refinement = false;
-    })
-    .await;
-}
-
-// ============================================================================
 // AI Aggregation Phase Tests
 // ============================================================================
 
@@ -410,192 +582,8 @@ async fn test_reporting_phase_empty_findings() {
 }
 
 // ============================================================================
-// Threat Modeling Phase Tests
+// Reporting Phase Tests
 // ============================================================================
-
-#[tokio::test]
-async fn test_threat_modeling_skips_when_disabled() {
-    run_phase_skip_test(ScanPhase::ThreatModeling, |c| {
-        c.scanner.performance.enable_threat_modeling = false;
-    })
-    .await;
-}
-
-// ============================================================================
-// Root Cause Deduplication Phase Tests
-// ============================================================================
-
-#[tokio::test]
-async fn test_root_cause_dedup_skips_when_disabled() {
-    run_phase_skip_test(ScanPhase::RootCauseDedup, |c| {
-        c.scanner.performance.enable_root_cause_dedup = false;
-    })
-    .await;
-}
-
-// ============================================================================
-// Multi Verifier Phase Tests
-// ============================================================================
-
-#[tokio::test]
-async fn test_multi_verifier_skips_when_disabled() {
-    run_phase_skip_test(ScanPhase::MultiVerifier, |c| {
-        c.scanner.performance.enable_multi_verifier = false;
-    })
-    .await;
-}
-
-// ============================================================================
-// Auto Patching Phase Tests
-// ============================================================================
-
-#[tokio::test]
-async fn test_auto_patching_skips_when_disabled() {
-    run_phase_skip_test(ScanPhase::AutoPatching, |c| {
-        c.scanner.performance.enable_auto_patching = false;
-    })
-    .await;
-}
-
-// ============================================================================
-// CVE Bootstrap Phase Tests
-// ============================================================================
-
-#[tokio::test]
-async fn test_cve_bootstrap_skips_when_disabled() {
-    run_phase_skip_test(ScanPhase::CveBootstrap, |c| {
-        c.scanner.performance.enable_cve_bootstrap = false;
-    })
-    .await;
-}
-
-// ============================================================================
-// PoC Compiler Phase Tests
-// ============================================================================
-
-#[tokio::test]
-async fn test_poc_compiler_skips_when_disabled() {
-    run_phase_skip_test(ScanPhase::PocCompiler, |c| {
-        c.scanner.performance.enable_poc_compilation = false;
-    })
-    .await;
-}
-
-// ============================================================================
-// Variant Search Phase Tests
-// ============================================================================
-
-#[tokio::test]
-async fn test_variant_search_skips_when_disabled() {
-    let scanner = create_test_scanner();
-    let mut config = create_test_config();
-    config.scanner.performance.enable_variant_search = false;
-    let pb = ProgressBar::hidden();
-    let metrics_tracker = LlmMetricsTracker::new();
-    let analyzed_files: Vec<String> = vec![];
-    let target_path = PathBuf::from(".");
-    let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
-    let findings = vec![create_test_finding("test-1", Severity::High)];
-    let phase_config = PhaseConfig {
-        phase: &ScanPhase::VariantSearch,
-        findings: findings.clone(),
-        pb: &pb,
-        analyzed_files: &analyzed_files,
-        metrics_tracker: &metrics_tracker,
-        target_path: &target_path,
-        config: &config,
-        project_stack: &project_stack,
-    };
-    let result = run_phase(&scanner, phase_config).await;
-    assert!(result.is_ok());
-    let (updated, _) = result.unwrap();
-    assert_eq!(updated.len(), findings.len());
-}
-
-// ============================================================================
-// CWE Routing Phase Tests
-// ============================================================================
-
-#[tokio::test]
-async fn test_cwe_routing_skips_when_router_disabled() {
-    let scanner = create_test_scanner();
-    let mut config = create_test_config();
-    config.router.enabled = false;
-    let pb = ProgressBar::hidden();
-    let metrics_tracker = LlmMetricsTracker::new();
-    let analyzed_files: Vec<String> = vec![];
-    let target_path = PathBuf::from(".");
-    let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
-    let findings = vec![create_test_finding("cwe-1", Severity::High)];
-    let phase_config = PhaseConfig {
-        phase: &ScanPhase::CweRouting,
-        findings: findings.clone(),
-        pb: &pb,
-        analyzed_files: &analyzed_files,
-        metrics_tracker: &metrics_tracker,
-        target_path: &target_path,
-        config: &config,
-        project_stack: &project_stack,
-    };
-    let result = run_phase(&scanner, phase_config).await;
-    assert!(result.is_ok());
-    let (updated, _) = result.unwrap();
-    assert_eq!(updated.len(), findings.len());
-}
-
-// ============================================================================
-// Rule Synthesis Phase Tests
-// ============================================================================
-
-#[tokio::test]
-async fn test_rule_synthesis_skips_when_disabled() {
-    run_phase_skip_test(ScanPhase::RuleSynthesis, |c| {
-        c.rulesynth.enabled = false;
-    })
-    .await;
-}
-
-#[tokio::test]
-async fn test_rule_synthesis_skips_without_api_key() {
-    run_phase_skip_test(ScanPhase::RuleSynthesis, |c| {
-        c.rulesynth.enabled = true;
-        c.llm.phases.discovery.api_key = None;
-    })
-    .await;
-}
-
-// ============================================================================
-// Exploit Synthesis Phase Tests
-// ============================================================================
-
-#[tokio::test]
-async fn test_exploit_synth_skips_when_disabled() {
-    run_phase_skip_test(ScanPhase::ExploitSynth, |c| {
-        c.exploit.enabled = false;
-    })
-    .await;
-}
-
-#[tokio::test]
-async fn test_exploit_synth_skips_without_api_key() {
-    run_phase_skip_test(ScanPhase::ExploitSynth, |c| {
-        c.exploit.enabled = true;
-        c.llm.phases.discovery.api_key = None;
-    })
-    .await;
-}
-
-// ============================================================================
-// CPG Slice Phase Tests
-// ============================================================================
-
-#[tokio::test]
-async fn test_cpg_slice_skips_when_disabled() {
-    run_phase_skip_test(ScanPhase::CpgSlice, |c| {
-        c.cpg.enabled = false;
-    })
-    .await;
-}
 
 // ============================================================================
 // Edge Case Tests

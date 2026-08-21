@@ -621,31 +621,56 @@ fn test_validate_errors() {
         expected_field1,
         expected_field2,
         skip_llm_check_field,
-    ) in cases {
+    ) in cases
+    {
         let config: ScannerConfig = toml::from_str(toml_str).unwrap();
-        
+
         if name == "none_api_key_skips_validation" {
-            assert!(config.llm.phases.discovery.api_key.is_none(), "{}: api_key is None", name);
+            assert!(
+                config.llm.phases.discovery.api_key.is_none(),
+                "{}: api_key is None",
+                name
+            );
         }
-        
+
         let result = config.validate();
 
         if expect_llm_error {
             assert!(result.is_err(), "{}: expected error", name);
             let err_msg = result.unwrap_err().to_string();
             if let Some(field1) = expected_field1 {
-                assert!(err_msg.contains(field1), "{}: error should contain '{}'", name, field1);
+                assert!(
+                    err_msg.contains(field1),
+                    "{}: error should contain '{}'",
+                    name,
+                    field1
+                );
             }
             if let Some(field2) = expected_field2 {
-                assert!(err_msg.contains(field2), "{}: error should contain '{}'", name, field2);
+                assert!(
+                    err_msg.contains(field2),
+                    "{}: error should contain '{}'",
+                    name,
+                    field2
+                );
             }
         } else {
             if let Err(err_msg) = result {
                 let err_str = err_msg.to_string();
                 if let Some(skip_field) = skip_llm_check_field {
-                    assert!(!err_str.contains(skip_field), "{}: should not contain '{}' (LLM validation skipped)", name, skip_field);
+                    assert!(
+                        !err_str.contains(skip_field),
+                        "{}: should not contain '{}' (LLM validation skipped)",
+                        name,
+                        skip_field
+                    );
                     if let Some(field2) = expected_field2 {
-                        assert!(!err_str.contains(field2), "{}: should not contain '{}' (LLM validation skipped)", name, field2);
+                        assert!(
+                            !err_str.contains(field2),
+                            "{}: should not contain '{}' (LLM validation skipped)",
+                            name,
+                            field2
+                        );
                     }
                 }
             }
@@ -657,7 +682,7 @@ fn test_validate_errors() {
 fn test_from_file_errors() {
     let temp_dir = std::env::temp_dir().join("baco_config_test_from_file");
     let _ = std::fs::create_dir_all(&temp_dir);
-    
+
     let config_file = temp_dir.join("test.toml");
     let toml_str = r#"
         [project]
@@ -887,12 +912,7 @@ fn test_llm_phase_config_get_models() {
 
     for (name, phase, expected_models) in cases {
         let models = phase.get_models();
-        assert_eq!(
-            models.len(),
-            expected_models.len(),
-            "{}: model count",
-            name
-        );
+        assert_eq!(models.len(), expected_models.len(), "{}: model count", name);
         for (i, expected) in expected_models.iter().enumerate() {
             assert_eq!(models[i], *expected, "{}: model {}", name, i);
         }

@@ -121,13 +121,7 @@ fn test_scan_error_unknown() {
     assert!(display.contains("something went wrong"));
 }
 
-// Note: reqwest::Error is difficult to construct in unit tests.
-// The Http variant conversion is tested through integration tests.
-#[test]
-fn test_scan_error_http_variant_placeholder() {
-    // Placeholder test - real HTTP error testing happens in integration tests
-    // This just verifies the test suite structure is complete
-}
+// reqwest::Error construction is non-trivial; the Http variant is covered by integration tests.
 
 // ============================================================================
 // PhaseError Tests

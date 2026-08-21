@@ -519,8 +519,7 @@ fn assert_severity_handling(severity: Severity, note: &str) {
     let context = AnalysisContext::default();
 
     let result = engine.generate(&[finding], &context, &[PoCFormat::Python]);
-
-    let _ = (result, note);
+    assert!(result.errors.is_empty(), "{note}: generation produced errors");
 }
 
 #[test]
@@ -670,8 +669,7 @@ fn assert_category_generation(category: IssueCategory, format: PoCFormat, note: 
     let context = AnalysisContext::default();
 
     let result = engine.generate(&[finding], &context, &[format]);
-
-    let _ = (result, note);
+    assert!(result.errors.is_empty(), "{note}: generation produced errors");
 }
 
 #[test]

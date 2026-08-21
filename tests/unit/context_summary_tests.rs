@@ -121,7 +121,12 @@ fn test_format_for_prompt_sections() {
     for (name, summary, expected_contents) in cases {
         let formatted = summary.format_for_prompt();
         for expected in expected_contents {
-            assert!(formatted.contains(expected), "{}: missing '{}'", name, expected);
+            assert!(
+                formatted.contains(expected),
+                "{}: missing '{}'",
+                name,
+                expected
+            );
         }
     }
 }
@@ -189,7 +194,10 @@ int main() {
         assert!(!summary.functions.is_empty(), "{}: functions", name);
         if !expected_func_name.is_empty() {
             assert!(
-                summary.functions.iter().any(|f| f.name == expected_func_name),
+                summary
+                    .functions
+                    .iter()
+                    .any(|f| f.name == expected_func_name),
                 "{}: expected function {} not found",
                 name,
                 expected_func_name
@@ -504,7 +512,7 @@ const fs = require('fs');
 fn test_extract_js_exports() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let tmp_path = tmp_dir.path().join("test.js");
-    
+
     // ES6 exports
     let content_es6 = r#"
 export const myConst = 42;
@@ -513,8 +521,11 @@ export default MyClass;
 "#;
     fs::write(&tmp_path, content_es6).unwrap();
     let summary = ContextExtractor::extract(&tmp_path);
-    assert!(!summary.exports.is_empty(), "es6: exports should not be empty");
-    
+    assert!(
+        !summary.exports.is_empty(),
+        "es6: exports should not be empty"
+    );
+
     // CommonJS exports (may or may not be detected)
     let tmp_path2 = tmp_dir.path().join("test2.js");
     let content_commonjs = r#"
@@ -537,7 +548,12 @@ fn test_detect_language() {
         ("cpp", "test.cpp", "int main() { return 0; }", "cpp"),
         ("python", "test.py", "def main(): pass", "python"),
         ("javascript", "test.js", "function main() {}", "javascript"),
-        ("typescript", "test.ts", "function main(): void {}", "typescript"),
+        (
+            "typescript",
+            "test.ts",
+            "function main(): void {}",
+            "typescript",
+        ),
         ("unknown", "test.xyz", "", "unknown"),
     ];
 

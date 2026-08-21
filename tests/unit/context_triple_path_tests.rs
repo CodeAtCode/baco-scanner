@@ -130,7 +130,7 @@ fn test_with_semantic_can_be_chained() {
 #[test]
 fn test_to_prompt_section() {
     let kb = CweKnowledgeBase::load_embedded().unwrap();
-    
+
     let cases = vec![
         (
             "header",
@@ -146,7 +146,12 @@ fn test_to_prompt_section() {
             Language::Rust,
             1,
             None,
-            vec!["### Control Path", "AST Structure:", "Control Flow Graph:", "Data Flow Graph:"],
+            vec![
+                "### Control Path",
+                "AST Structure:",
+                "Control Flow Graph:",
+                "Data Flow Graph:",
+            ],
         ),
         (
             "knowledge_path",
@@ -231,7 +236,11 @@ void vulnerable(char *input) {
 
         if name == "non_empty" {
             assert!(!prompt.is_empty(), "{}: prompt should not be empty", name);
-            assert!(prompt.len() > 50, "{}: prompt should have substantial content", name);
+            assert!(
+                prompt.len() > 50,
+                "{}: prompt should have substantial content",
+                name
+            );
         }
     }
 }
