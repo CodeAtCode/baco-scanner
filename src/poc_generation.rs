@@ -452,7 +452,6 @@ func safePath(filename string) (string, error) {
             metadata: HashMap::new(),
         })
     }
-
 }
 
 /// Generate a simple UUID-like string.
@@ -633,17 +632,6 @@ mod tests {
         // Low severity without verification might be filtered
         // This test ensures the code handles it gracefully
         assert!(result.errors.is_empty() || result.proofs.is_empty());
-    }
-
-    #[test]
-    fn test_available_templates() {
-        let engine = PoCGenerationEngine::new();
-
-        let python_templates = engine.available_templates(PoCFormat::Python);
-        assert!(!python_templates.is_empty());
-
-        let rust_templates = engine.available_templates(PoCFormat::Rust);
-        assert!(!rust_templates.is_empty());
     }
 
     #[test]

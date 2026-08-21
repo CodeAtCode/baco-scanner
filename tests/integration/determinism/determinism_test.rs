@@ -3,7 +3,6 @@ use std::collections::HashSet;
 
 use baco::indexer::FileIndex;
 
-
 use std::fs;
 use tempfile::TempDir;
 
@@ -23,8 +22,6 @@ fn index_project(path: &std::path::Path) -> Result<FileIndex, std::io::Error> {
         &[],
     )
 }
-
-
 
 /// Indexing is purely filesystem-based and must be 100% deterministic.
 #[tokio::test]
@@ -67,10 +64,6 @@ async fn test_indexing_determinism_many_files() {
     assert!(paths1.len() >= 20, "All 20 files should be indexed");
 }
 
-
-
-
-
 /// Two different projects should each produce deterministic file sets.
 #[tokio::test]
 async fn test_multi_project_indexing_determinism() {
@@ -102,7 +95,3 @@ async fn test_multi_project_indexing_determinism() {
         "Different projects yield different file sets"
     );
 }
-
-
-
-

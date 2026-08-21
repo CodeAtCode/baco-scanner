@@ -36,7 +36,6 @@ pub struct VerificationReport {
     pub high_confidence_findings: Vec<String>,
 }
 
-
 /// Render template with variable substitution
 pub fn render_template(template: &str, variables: &HashMap<String, String>) -> String {
     let mut result = template.to_string();
@@ -194,8 +193,6 @@ where
         }
     }
 }
-
-
 
 /// Trait for LLM clients used in triage
 #[async_trait::async_trait]

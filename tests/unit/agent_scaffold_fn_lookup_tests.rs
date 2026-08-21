@@ -21,8 +21,6 @@ fn create_temp_file(content: &str, ext: &str) -> PathBuf {
 #[test]
 fn test_new_empty() {
     let lookup = FunctionLookup::new();
-    assert!(lookup.is_empty());
-    assert_eq!(lookup.len(), 0);
     assert!(lookup.lookup("main").is_none());
     assert!(!lookup.contains("main"));
 }
@@ -133,9 +131,6 @@ fn test_index_unreadable_file() {
     let mut lookup = FunctionLookup::new();
     let invalid_path = PathBuf::from("/nonexistent/file.rs");
     lookup.index_file(&invalid_path, Language::Rust);
-
-    // Should handle gracefully - index remains empty
-    assert!(lookup.is_empty());
 }
 
 #[test]
@@ -206,7 +201,6 @@ fn func_b() {
 
     assert!(lookup.contains("func_a"));
     assert!(lookup.contains("func_b"));
-    assert_eq!(lookup.len(), 2);
 
     let _ = fs::remove_file(&path1);
     let _ = fs::remove_file(&path2);

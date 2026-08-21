@@ -588,11 +588,23 @@ impl ChatMessage {
     }
 }
 
+pub trait LlmProvider {
+    fn chat(&self, messages: &[ChatMessage]) -> Result<String, String>;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use mockall::mock;
 
+    mock! {
+        #[derive(Debug)]
+        pub LlmProvider {}
+
+        impl LlmProvider for LlmProvider {
+            fn chat(&self, messages: &[ChatMessage]) -> Result<String, String>;
+        }
+    }
 
     #[test]
     fn test_chat_message_assistant() {

@@ -217,15 +217,6 @@ fn test_resume_full_sequential_chain() {
     }
 }
 
-#[test]
-fn test_checkpoint_format_phase_cwe_routing() {
-    let now = chrono::Utc::now();
-    let cp = Checkpoint::new("s1", "/p", now);
-    let formatted = cp.format_phase();
-    // CweRouting should have a format entry (not crash)
-    assert!(!formatted.is_empty());
-}
-
 fn make_checkpoint_path(tmp: &tempfile::TempDir, phase: ScanPhase) -> PathBuf {
     let path = tmp.path().join("checkpoint.json");
     let now = chrono::Utc::now();

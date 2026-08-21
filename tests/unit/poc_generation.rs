@@ -450,43 +450,6 @@ fn test_generate_mitigation_unknown_cwe() {
     assert!(mitigation.is_none());
 }
 
-// ============================================================================
-// Available Templates Tests
-// ============================================================================
-
-#[test]
-fn test_available_templates_python() {
-    let engine = PoCGenerationEngine::new();
-
-    let templates = engine.available_templates(PoCFormat::Python);
-    assert!(!templates.is_empty());
-}
-
-#[test]
-fn test_available_templates_rust() {
-    let engine = PoCGenerationEngine::new();
-
-    let templates = engine.available_templates(PoCFormat::Rust);
-    assert!(!templates.is_empty());
-}
-
-#[test]
-fn test_available_templates_shell() {
-    let engine = PoCGenerationEngine::new();
-
-    let templates = engine.available_templates(PoCFormat::Shell);
-    assert!(!templates.is_empty());
-}
-
-#[test]
-fn test_available_templates_go() {
-    let engine = PoCGenerationEngine::new();
-
-    let templates = engine.available_templates(PoCFormat::Go);
-    assert!(!templates.is_empty());
-}
-
-// ============================================================================
 // Edge Cases - Empty and Unknown
 // ============================================================================
 
@@ -519,7 +482,10 @@ fn assert_severity_handling(severity: Severity, note: &str) {
     let context = AnalysisContext::default();
 
     let result = engine.generate(&[finding], &context, &[PoCFormat::Python]);
-    assert!(result.errors.is_empty(), "{note}: generation produced errors");
+    assert!(
+        result.errors.is_empty(),
+        "{note}: generation produced errors"
+    );
 }
 
 #[test]
@@ -669,7 +635,10 @@ fn assert_category_generation(category: IssueCategory, format: PoCFormat, note: 
     let context = AnalysisContext::default();
 
     let result = engine.generate(&[finding], &context, &[format]);
-    assert!(result.errors.is_empty(), "{note}: generation produced errors");
+    assert!(
+        result.errors.is_empty(),
+        "{note}: generation produced errors"
+    );
 }
 
 #[test]

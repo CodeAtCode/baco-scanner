@@ -3,7 +3,6 @@ use crate::llm_metrics::LlmMetrics;
 use serde::Serialize;
 use std::fs;
 
-
 #[derive(Serialize)]
 pub struct ReportSummary {
     pub total_findings: usize,

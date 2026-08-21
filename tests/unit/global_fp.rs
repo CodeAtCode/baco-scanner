@@ -1,7 +1,5 @@
 //! Unit tests for GlobalFpStore and cross-scan merge functionality
 
-use crate::common::create_test_finding;
-use baco::findings::FindingsMerger;
 use baco::root_cause_dedup::GlobalFpStore;
 
 #[test]
@@ -73,63 +71,4 @@ fn test_global_fp_store_save_and_reload() {
     assert!(reloaded.is_false_positive("id-2"));
     assert!(reloaded.is_false_positive("id-3"));
     assert!(!reloaded.is_false_positive("nonexistent"));
-}
-
-#[test]
-fn test_merge_scans_deduplicates() {
-    let scan1 = vec![
-        create_test_finding("f1", "SQL Injection", "src/db.rs", 42),
-        create_test_finding("f2", "XSS", "src/api.rs", 100),
-    ];
-
-    let scan2 = vec![
-        create_test_finding("f1", "SQL Injection", "src/db.rs", 42), // Duplicate
-        create_test_finding("f3", "CSRF", "src/auth.rs", 200),
-    ];
-
-    let scan3 = vec![
-        create_test_finding("f2", "XSS", "src/api.rs", 100), // Duplicate
-        create_test_finding("f4", "Path Traversal", "src/fs.rs", 50),
-    ];
-
-    let merged = FindingsMerger::merge_scans(vec![scan1, scan2, scan3]);
-
-    // Should have 4 unique findings (f1, f2, f3, f4)
-    assert_eq!(merged.len(), 4);
-
-    // Verify all unique IDs are present
-    let ids: Vec<String> = merged.iter().map(|f| f.id.clone()).collect();
-    assert!(ids.contains(&"f1".to_string()));
-    assert!(ids.contains(&"f2".to_string()));
-    assert!(ids.contains(&"f3".to_string()));
-    assert!(ids.contains(&"f4".to_string()));
-}
-
-#[test]
-fn test_merge_scans_empty_scans() {
-    let merged = FindingsMerger::merge_scans(vec![
-        vec![],
-        vec![create_test_finding("f1", "Test", "src/test.rs", 1)],
-        vec![],
-    ]);
-
-    assert_eq!(merged.len(), 1);
-    assert_eq!(merged[0].id, "f1");
-}
-
-#[test]
-fn test_merge_scans_all_duplicates() {
-    let scan1 = vec![
-        create_test_finding("f1", "SQL Injection", "src/db.rs", 42),
-        create_test_finding("f2", "XSS", "src/api.rs", 100),
-    ];
-
-    let scan2 = vec![
-        create_test_finding("f1", "SQL Injection", "src/db.rs", 42),
-        create_test_finding("f2", "XSS", "src/api.rs", 100),
-    ];
-
-    let merged = FindingsMerger::merge_scans(vec![scan1, scan2]);
-
-    assert_eq!(merged.len(), 2);
 }

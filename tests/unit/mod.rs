@@ -38,7 +38,6 @@ mod staging;
 // Tickets tests - covers extract_meaningful_words and TicketSearcher
 mod tickets;
 
-
 // Checkpoint save/load tests
 mod scanner_checkpoint_tests;
 

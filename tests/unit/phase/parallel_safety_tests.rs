@@ -334,7 +334,6 @@ dir = "/tmp/output"
 format = ["json"]
 
 [scanner]
-commit_lookback_days = 30
 max_file_size_kb = 1024
 
 [llm]

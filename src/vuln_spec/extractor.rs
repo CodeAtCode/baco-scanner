@@ -5,7 +5,6 @@
 
 use crate::vuln_spec::schema::{DomainCategory, SecuritySpecification};
 use regex::Regex;
-use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
 
 /// Extract specifications from a git patch
@@ -79,7 +78,7 @@ struct PatchHunk {
 }
 
 /// Extract a single specification from a patch hunk
-fn extract_single_spec(hunk: &PatchHunk, _full_patch: &str) -> Option<SecuritySpecification> {
+fn extract_single_spec(hunk: &PatchHunk, full_patch: &str) -> Option<SecuritySpecification> {
     // Extract added and removed lines
     let added_lines: Vec<&str> = hunk
         .content
@@ -112,12 +111,12 @@ fn extract_single_spec(hunk: &PatchHunk, _full_patch: &str) -> Option<SecuritySp
     }
 
     // Generate specification ID from patch hash (simple hash for now)
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    let hasher = std::collections::hash_map::DefaultHasher::new();
     let patch_hash = format!("{:x}", hasher.finish());
     let spec_id = format!("spec-{}", &patch_hash[..8]);
 
-    // Determine domain from file paths in patch (simplified - always "general")
-    let domain = "general".to_string();
+    // Determine domain from file paths in patch
+    let domain = extract_domain_from_patch(full_patch);
 
     // Categorize as general or domain-specific
     let category = categorize_spec_internal(&vuln_type, &domain, &safe_pattern);
@@ -264,6 +263,33 @@ fn generate_safe_pattern(added: &str, removed: &str) -> String {
     }
 }
 
+/// Extract domain from patch file paths
+pub fn extract_domain_from_patch(patch: &str) -> String {
+    // Look for file paths in the patch (format: --- a/path/to/file)
+    let re = Regex::new(r"--- a/([^\s]+)").unwrap();
+
+    if let Some(mat) = re.find(patch) {
+        let path = mat.as_str().to_lowercase();
+        if path.contains("crypto") || path.contains("cipher") {
+            return "crypto".to_string();
+        }
+        if path.contains("db.rs") || path.contains("database") || path.contains("sql") {
+            return "database".to_string();
+        }
+        if path.contains("http") || path.contains("web") || path.contains("api") {
+            return "web-server".to_string();
+        }
+        if path.contains("network") || path.contains("socket") {
+            return "network".to_string();
+        }
+        if path.contains("auth") || path.contains("login") {
+            return "authentication".to_string();
+        }
+    }
+
+    "general".to_string()
+}
+
 /// Generate human-readable description
 fn generate_description(vuln_type: &str, vulnerable_code: &str) -> String {
     let vuln_desc = match vuln_type {
@@ -292,7 +318,6 @@ fn truncate_text(text: &str, max_len: usize) -> String {
         format!("{}...", text.chars().take(trunc_len).collect::<String>())
     }
 }
-
 
 #[cfg(test)]
 mod tests {

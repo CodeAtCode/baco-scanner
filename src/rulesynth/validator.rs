@@ -74,7 +74,6 @@ pub fn validate_rule(rule_yaml: &str) -> Result<(), RuleError> {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -129,7 +128,6 @@ severity: WARNING
         assert_eq!(format!("{}", err), "I/O error: io error");
     }
 
-
     #[test]
     fn test_validate_rule_empty_string() {
         let result = validate_rule("");
@@ -178,7 +176,6 @@ severity: WARNING
             _ => {}
         }
     }
-
 
     #[test]
     fn test_rule_error_source_returns_none() {

@@ -172,5 +172,3 @@ fn test_mock_llm_response_parsing() {
         "element.textContent = escapeHtml(userInput);"
     );
 }
-
-

@@ -128,7 +128,6 @@ impl FunctionLookup {
     pub fn contains(&self, name: &str) -> bool {
         self.functions.contains_key(name)
     }
-
 }
 
 /// Get file extensions for the specified languages.

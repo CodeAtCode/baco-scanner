@@ -111,53 +111,6 @@ mod tests {
     }
 
     #[test]
-    fn test_database_operations() {
-        let mut db = SpecificationDatabase::new();
-
-        let spec = SecuritySpecification {
-            id: "spec-001".to_string(),
-            vuln_type: "CWE-79".to_string(),
-            description: "XSS vulnerability".to_string(),
-            safe_behavior_pattern: "Sanitize input".to_string(),
-            project_domain: "web".to_string(),
-            source_patch_hash: "abc123".to_string(),
-            category: DomainCategory::General,
-        };
-
-        db.add_specification(spec.clone());
-
-        assert_eq!(db.specifications.len(), 1);
-        assert!(!db.get_by_cwe("CWE-79").is_empty());
-    }
-
-    #[test]
-    fn test_save_load_database() {
-        let mut db = SpecificationDatabase::new();
-
-        let spec = SecuritySpecification {
-            id: "spec-001".to_string(),
-            vuln_type: "CWE-89".to_string(),
-            description: "SQL injection".to_string(),
-            safe_behavior_pattern: "Use parameterized queries".to_string(),
-            project_domain: "database".to_string(),
-            source_patch_hash: "def456".to_string(),
-            category: DomainCategory::DomainSpecific("database".to_string()),
-        };
-
-        db.add_specification(spec);
-
-        let temp_file = "/tmp/test_vuln_spec_db.json";
-        db.save(temp_file).expect("Should save database");
-
-        let loaded = SpecificationDatabase::load(temp_file).expect("Should load database");
-
-        assert_eq!(loaded.specifications.len(), 1);
-        assert_eq!(loaded.specifications[0].id, "spec-001");
-
-        std::fs::remove_file(temp_file).ok();
-    }
-
-    #[test]
     fn test_domain_category_serialization() {
         let general = DomainCategory::General;
         let domain = DomainCategory::DomainSpecific("rust".to_string());

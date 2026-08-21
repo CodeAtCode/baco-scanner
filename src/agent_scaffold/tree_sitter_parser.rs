@@ -3,7 +3,6 @@
 //! Provides common utilities for parsing source files with tree-sitter across
 //! call graph construction and function lookup modules.
 
-use std::path::Path;
 use tree_sitter::Parser;
 
 use crate::context::control_path::Language;

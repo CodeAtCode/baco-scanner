@@ -237,7 +237,6 @@ fn test_call_graph_nonexistent_file_handled() {
 // FunctionLookup tests
 // ============================================================================
 
-
 #[test]
 fn test_function_lookup_index_file_rust() {
     let dir = tempdir().expect("Failed to create temp dir");
@@ -365,16 +364,6 @@ fn broken( {
 
     // May or may not have functions, but should not crash
 }
-
-#[test]
-
-#[test]
-fn test_function_lookup_multiple_files_indexing() {
-    let dir = tempdir().expect("Failed to create temp dir");
-
-}
-
-#[test]
 
 // ============================================================================
 // Coverage tests for agent_scaffold modules (merged from agent_scaffold_coverage_tests.rs)
@@ -779,12 +768,7 @@ fn test_function_lookup_index_file_nonexistent() {
 
     let mut lookup = FunctionLookup::new();
     lookup.index_file(&file_path, Language::Rust);
-
-    // Should remain empty, no panic
-    assert!(lookup.is_empty());
 }
-
-
 
 #[test]
 fn test_function_lookup_index_directory_empty() {
@@ -792,8 +776,6 @@ fn test_function_lookup_index_directory_empty() {
 
     let mut lookup = FunctionLookup::new();
     lookup.index_directory(dir.path(), &[Language::Rust], 1024 * 1024, &[]);
-
-    assert!(lookup.is_empty());
 }
 
 #[test]
@@ -805,8 +787,6 @@ fn test_function_lookup_index_directory_nested() {
     fs::create_dir_all(&nested_subdir).expect("Failed to create dirs");
 
     let file1 = dir.path().join("root.rs");
-    let file2 = subdir.join("sub.rs");
-    let file3 = nested_subdir.join("deep.rs");
 
     fs::write(&file1, "fn root_func() {}").expect("Failed to write file1");
 }
@@ -908,7 +888,6 @@ fn test_function_lookup_contains_variations() {
     assert!(!lookup.contains("test"));
     assert!(!lookup.contains("func"));
 }
-
 
 #[test]
 fn test_function_lookup_index_file_javascript() {

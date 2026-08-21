@@ -62,8 +62,7 @@ fn test_default_config() {
     assert_eq!(config.project.path, "");
     assert!(config.project.languages.is_empty());
     assert_eq!(config.output.dir, "");
-    assert!(config.output.format.is_empty());
-    assert_eq!(config.scanner.commit_lookback_days, 0);
+
     assert_eq!(config.scanner.max_file_size_kb, 0);
     assert!(config.scanner.exclude_paths.is_empty());
 }
@@ -74,12 +73,10 @@ fn test_parse_minimal_config() {
         [project]
         name = "minimal"
         path = "/tmp/minimal"
-
         [output]
         dir = "./output"
 
         [scanner]
-        commit_lookback_days = 30
         max_file_size_kb = 100
 
         [llm]
@@ -93,7 +90,6 @@ fn test_parse_minimal_config() {
     assert_eq!(config.project.name, "minimal");
     assert_eq!(config.project.path, "/tmp/minimal");
     assert_eq!(config.output.dir, "./output");
-    assert_eq!(config.scanner.commit_lookback_days, 30);
     assert_eq!(config.llm.max_retries, 2);
 }
 
@@ -107,10 +103,8 @@ fn test_parse_full_config() {
 
         [output]
         dir = "./baco-output"
-        format = ["json", "html", "markdown"]
 
         [scanner]
-        commit_lookback_days = 180
         max_file_size_kb = 1024
         exclude_paths = ["tests/", "vendor/", "node_modules/"]
 
@@ -168,15 +162,13 @@ fn test_parse_full_config() {
         max_turns = 20
         tool_timeout_secs = 60
         trusted_paths = ["/safe/path", "./trusted"]
-        keep_artifacts = true
     "#;
 
     let config: ScannerConfig = toml::from_str(toml_str).unwrap();
 
     assert_eq!(config.project.name, "full-test");
     assert_eq!(config.project.languages.len(), 3);
-    assert_eq!(config.output.format.len(), 3);
-    assert_eq!(config.scanner.exclude_paths.len(), 3);
+
     assert_eq!(config.scanner.semgrep.exclude_rules.len(), 1);
     assert!(config.scanner.performance.enable_threat_modeling);
     assert_eq!(config.llm.max_concurrent, 8);
@@ -199,7 +191,6 @@ fn test_parse_models_field_precedence() {
         dir = "./out"
 
         [scanner]
-        commit_lookback_days = 30
         max_file_size_kb = 100
 
         [llm]
@@ -234,7 +225,6 @@ fn test_parse_legacy_model_field() {
         dir = "./out"
 
         [scanner]
-        commit_lookback_days = 30
         max_file_size_kb = 100
 
         [llm]
@@ -266,7 +256,6 @@ fn test_parse_empty_models() {
         dir = "./out"
 
         [scanner]
-        commit_lookback_days = 30
         max_file_size_kb = 100
 
         [llm]
@@ -342,12 +331,11 @@ fn test_env_overrides() {
                 name = "test"
                 path = "/tmp/test"
 
-                [output]
-                dir = "./out"
+        [output]
+        dir = "./out"
 
-                [scanner]
-                commit_lookback_days = 30
-                max_file_size_kb = 100
+        [scanner]
+        max_file_size_kb = 100
 
                 [llm]
                 timeout_secs = 30
@@ -404,7 +392,6 @@ fn base_config_toml() -> String {
         dir = "./out"
 
         [scanner]
-        commit_lookback_days = 30
         max_file_size_kb = 100
 
         [llm]
@@ -438,12 +425,11 @@ fn test_validate_errors() {
                 name = "test"
                 path = "/tmp/test"
 
-                [output]
-                dir = "./out"
+        [output]
+        dir = "./out"
 
-                [scanner]
-                commit_lookback_days = 30
-                max_file_size_kb = 100
+        [scanner]
+        max_file_size_kb = 100
 
                 [llm]
                 timeout_secs = 30
@@ -475,12 +461,11 @@ fn test_validate_errors() {
                 name = "test"
                 path = "/tmp/test"
 
-                [output]
-                dir = "./out"
+        [output]
+        dir = "./out"
 
-                [scanner]
-                commit_lookback_days = 30
-                max_file_size_kb = 100
+        [scanner]
+        max_file_size_kb = 100
 
                 [llm]
                 timeout_secs = 30
@@ -511,12 +496,11 @@ fn test_validate_errors() {
                 name = "test"
                 path = "/tmp/test"
 
-                [output]
-                dir = "./out"
+        [output]
+        dir = "./out"
 
-                [scanner]
-                commit_lookback_days = 30
-                max_file_size_kb = 100
+        [scanner]
+        max_file_size_kb = 100
 
                 [llm]
                 timeout_secs = 30
@@ -547,12 +531,11 @@ fn test_validate_errors() {
                 name = "test"
                 path = "/tmp/test"
 
-                [output]
-                dir = "./out"
+        [output]
+        dir = "./out"
 
-                [scanner]
-                commit_lookback_days = 30
-                max_file_size_kb = 100
+        [scanner]
+        max_file_size_kb = 100
 
                 [llm]
                 timeout_secs = 30
@@ -583,12 +566,11 @@ fn test_validate_errors() {
                 name = "test"
                 path = "/nonexistent/path/that/does/not/exist"
 
-                [output]
-                dir = "./out"
+        [output]
+        dir = "./out"
 
-                [scanner]
-                commit_lookback_days = 30
-                max_file_size_kb = 100
+        [scanner]
+        max_file_size_kb = 100
 
                 [llm]
                 timeout_secs = 30
@@ -693,7 +675,6 @@ fn test_from_file_errors() {
         dir = "./out"
 
         [scanner]
-        commit_lookback_days = 30
         max_file_size_kb = 100
 
         [llm]
@@ -774,7 +755,6 @@ fn test_performance_settings_custom() {
         dir = "./out"
 
         [scanner]
-        commit_lookback_days = 30
         max_file_size_kb = 100
 
         [scanner.performance]
@@ -815,8 +795,6 @@ fn test_agent_config_defaults() {
     assert!(!config.enabled);
     assert_eq!(config.max_turns, 10);
     assert_eq!(config.tool_timeout_secs, 30);
-    assert_eq!(config.trusted_paths, vec![".".to_string()]);
-    assert!(!config.keep_artifacts);
 }
 
 #[test]
@@ -830,7 +808,6 @@ fn test_agent_config_custom() {
         dir = "./out"
 
         [scanner]
-        commit_lookback_days = 30
         max_file_size_kb = 100
 
         [llm]
@@ -855,7 +832,6 @@ fn test_agent_config_custom() {
         max_turns = 50
         tool_timeout_secs = 120
         trusted_paths = ["/safe", "./trusted"]
-        keep_artifacts = true
     "#;
 
     let config: ScannerConfig = toml::from_str(toml_str).unwrap();
@@ -865,7 +841,6 @@ fn test_agent_config_custom() {
     assert_eq!(agent.max_turns, 50);
     assert_eq!(agent.tool_timeout_secs, 120);
     assert_eq!(agent.trusted_paths.len(), 2);
-    assert!(agent.keep_artifacts);
 }
 
 // ============================================================================
@@ -934,7 +909,6 @@ fn test_ticket_system_config_parsing() {
         dir = "./out"
 
         [scanner]
-        commit_lookback_days = 30
         max_file_size_kb = 100
 
         [llm]

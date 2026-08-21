@@ -1,7 +1,5 @@
 //! Environment and utility functions for scanner
 
-use std::path::Path;
-
 /// Extract owner and repository name from a Git URL
 ///
 /// Supports both HTTPS and SSH URL formats:
@@ -141,5 +139,4 @@ mod tests {
             Some(("vercel".to_string(), "next.js".to_string()))
         );
     }
-
 }

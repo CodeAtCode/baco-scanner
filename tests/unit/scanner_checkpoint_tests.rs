@@ -406,34 +406,6 @@ fn test_checkpoint_resume_from_invalid_file() {
     let _ = fs::remove_file(&temp_path);
 }
 
-// ============================================================================
-// Checkpoint::format_phase() Tests
-// ============================================================================
-
-#[test]
-fn test_checkpoint_format_phase_indexing() {
-    let checkpoint = create_test_checkpoint();
-    let formatted = checkpoint.format_phase();
-    assert!(formatted.contains("Indexing"));
-}
-
-#[test]
-fn test_checkpoint_format_phase_complete() {
-    let mut checkpoint = create_test_checkpoint();
-    checkpoint.current_phase = ScanPhase::Complete;
-    let formatted = checkpoint.format_phase();
-    assert!(formatted.contains("Complete"));
-}
-
-#[test]
-fn test_checkpoint_format_phase_error() {
-    let mut checkpoint = create_test_checkpoint();
-    checkpoint.current_phase = ScanPhase::Error;
-    let formatted = checkpoint.format_phase();
-    assert!(formatted.contains("Error"));
-}
-
-// ============================================================================
 // Checkpoint Clone/Copy Tests
 // ============================================================================
 

@@ -125,7 +125,6 @@ mod tests {
                 exclude_paths: vec![],
                 semgrep: crate::config::SemgrepSettings::default(),
                 performance: PerformanceSettings::default(),
-                ..Default::default()
             },
             llm: crate::config::LlmConfig {
                 phases: LlmPhasesConfig::default(),
@@ -136,7 +135,6 @@ mod tests {
             },
             output: crate::config::OutputConfig {
                 dir: "/tmp/test_output".to_string(),
-                ..Default::default()
             },
             agent: AgentConfig::default(),
             tickets: crate::config::TicketConfig { systems: vec![] },

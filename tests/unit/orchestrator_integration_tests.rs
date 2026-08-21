@@ -32,7 +32,6 @@ fn create_test_scanner_config() -> ScannerConfig {
             exclude_paths: vec![],
             semgrep: Default::default(),
             performance: PerformanceSettings::default(),
-            ..Default::default()
         },
         llm: LlmConfig {
             phases: LlmPhasesConfig::default(),
@@ -43,7 +42,6 @@ fn create_test_scanner_config() -> ScannerConfig {
         },
         output: OutputConfig {
             dir: "/tmp/test_output".to_string(),
-            ..Default::default()
         },
         agent: AgentConfig::default(),
         tickets: Default::default(),

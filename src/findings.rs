@@ -201,7 +201,6 @@ impl VulnerabilityFinding {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -263,7 +262,6 @@ mod tests {
         assert_eq!(finding.poc_code, deserialized.poc_code);
         assert_eq!(finding.mitigation_code, deserialized.mitigation_code);
     }
-
 
     #[test]
     fn test_severity_display() {

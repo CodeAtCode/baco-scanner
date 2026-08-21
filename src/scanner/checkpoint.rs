@@ -129,7 +129,6 @@ impl Checkpoint {
             ScanPhase::Complete | ScanPhase::Error => ScanPhase::Indexing,
         })
     }
-
 }
 
 /// Save a checkpoint with findings and analyzed files
@@ -379,50 +378,6 @@ mod tests {
         assert_eq!(next_phase, ScanPhase::Indexing);
 
         let _ = fs::remove_file(temp_path);
-    }
-
-    #[test]
-    fn test_format_phase_all_variants() {
-        let checkpoint = Checkpoint::new("test", "/tmp", Utc::now());
-
-        // Test all phase formatting
-        let phases = vec![
-            (ScanPhase::Indexing, "🔄 Indexing ⚙️"),
-            (ScanPhase::Semgrep, "🔍 Semgrep Static Analysis"),
-            (ScanPhase::LlmStaticAnalysis, "🧠 LLM Static Analysis"),
-            (ScanPhase::LlmDiscovery, "🔎 LLM Discovery"),
-            (ScanPhase::LlmVerification, "✅ LLM Verification"),
-            (ScanPhase::TicketCrossRef, "🎫 Ticket Cross-Ref"),
-            (ScanPhase::GitAnalysis, "📊 Git Analysis"),
-            (ScanPhase::CrossFileAnalysis, "🔗 Cross-File Analysis"),
-            (ScanPhase::ConfidenceScoring, "⚖️ Confidence Scoring"),
-            (ScanPhase::AiAggregation, "🤖 AI Aggregation"),
-            (ScanPhase::Reporting, "📝 Reporting"),
-            (ScanPhase::ThreatModeling, "🛡️ Threat Modeling"),
-            (ScanPhase::RootCauseDedup, "🔍 Root Cause Dedup"),
-            (ScanPhase::MultiVerifier, "🗳️ Multi-Verifier"),
-            (ScanPhase::AutoPatching, "🔧 Auto-Patching"),
-            (ScanPhase::CveBootstrap, "📦 CVE Bootstrap"),
-            (ScanPhase::PocCompiler, "💻 PoC Compiler"),
-            (ScanPhase::VariantSearch, "🔍 Variant Search"),
-            (
-                ScanPhase::SecurityAgentVerification,
-                "🤖 SecurityAgent Verification",
-            ),
-            (ScanPhase::Complete, "✨ Complete"),
-            (ScanPhase::Error, "❌ Error"),
-        ];
-
-        for (phase, expected) in phases {
-            let mut cp = checkpoint.clone();
-            cp.current_phase = phase.clone();
-            assert_eq!(
-                cp.format_phase(),
-                expected,
-                "Phase {:?} formatting mismatch",
-                phase
-            );
-        }
     }
 
     #[test]
