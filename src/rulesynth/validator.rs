@@ -74,21 +74,6 @@ pub fn validate_rule(rule_yaml: &str) -> Result<(), RuleError> {
     }
 }
 
-/// Validate multiple rules and return indices of valid ones
-#[allow(dead_code)]
-pub fn validate_rules(rules: &[String]) -> Vec<usize> {
-    rules
-        .iter()
-        .enumerate()
-        .filter_map(|(i, rule)| {
-            if validate_rule(rule).is_ok() {
-                Some(i)
-            } else {
-                None
-            }
-        })
-        .collect()
-}
 
 #[cfg(test)]
 mod tests {
@@ -144,18 +129,6 @@ severity: WARNING
         assert_eq!(format!("{}", err), "I/O error: io error");
     }
 
-    #[test]
-    fn test_validate_rules_batch() {
-        let rules = vec![
-            "valid yaml content".to_string(),
-            "another valid".to_string(),
-        ];
-
-        let valid_indices = validate_rules(&rules);
-        // Result depends on whether semgrep is available and if the YAML is valid
-        // Just check it returns a Vec without panicking
-        assert!(valid_indices.len() <= rules.len());
-    }
 
     #[test]
     fn test_validate_rule_empty_string() {
@@ -206,33 +179,6 @@ severity: WARNING
         }
     }
 
-    #[test]
-    fn test_validate_rules_empty_slice() {
-        let rules: Vec<String> = vec![];
-        let valid_indices = validate_rules(&rules);
-        assert!(valid_indices.is_empty());
-    }
-
-    #[test]
-    fn test_validate_rules_single_element() {
-        let rules = vec!["single rule".to_string()];
-        let valid_indices = validate_rules(&rules);
-        // Should return either empty vec or vec with [0]
-        assert!(valid_indices.len() <= 1);
-    }
-
-    #[test]
-    fn test_validate_rules_all_invalid() {
-        let rules = vec![
-            "invalid yaml {{{".to_string(),
-            "also invalid".to_string(),
-            "no semgrep here".to_string(),
-        ];
-        let valid_indices = validate_rules(&rules);
-        // If semgrep is not installed, all will fail with SemgrepNotFound
-        // If installed, invalid YAML should fail validation
-        assert!(valid_indices.is_empty() || valid_indices.len() < rules.len());
-    }
 
     #[test]
     fn test_rule_error_source_returns_none() {

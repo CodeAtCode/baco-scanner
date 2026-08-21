@@ -201,54 +201,6 @@ impl VulnerabilityFinding {
     }
 }
 
-pub struct FindingsMerger {
-    findings: Vec<VulnerabilityFinding>,
-}
-
-impl FindingsMerger {
-    pub fn new() -> Self {
-        Self {
-            findings: Vec::new(),
-        }
-    }
-
-    pub fn merge(&mut self, new_findings: Vec<VulnerabilityFinding>) {
-        for finding in new_findings {
-            if !self.findings.iter().any(|f| f.id == finding.id) {
-                self.findings.push(finding);
-            }
-        }
-    }
-
-    /// Merge findings from multiple scans, deduplicating by RootCauseId
-    ///
-    /// This method takes multiple scans (each scan is a Vec of findings) and merges them
-    /// into a single deduplicated list. Findings with the same id are considered duplicates.
-    pub fn merge_scans(scans: Vec<Vec<VulnerabilityFinding>>) -> Vec<VulnerabilityFinding> {
-        let mut seen_ids = std::collections::HashSet::new();
-        let mut merged = Vec::new();
-
-        for scan in scans {
-            for finding in scan {
-                if seen_ids.insert(finding.id.clone()) {
-                    merged.push(finding);
-                }
-            }
-        }
-
-        merged
-    }
-
-    pub fn into_findings(self) -> Vec<VulnerabilityFinding> {
-        self.findings
-    }
-}
-
-impl Default for FindingsMerger {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 #[cfg(test)]
 mod tests {
@@ -312,82 +264,6 @@ mod tests {
         assert_eq!(finding.mitigation_code, deserialized.mitigation_code);
     }
 
-    #[test]
-    fn test_findings_merger_deduplicates() {
-        let mut merger = FindingsMerger::new();
-
-        let finding1 = VulnerabilityFinding {
-            id: "same-id".to_string(),
-            title: "Title 1".to_string(),
-            description: "Desc".to_string(),
-            severity: Severity::High,
-            confidence_score: 0.8,
-            cwe_id: None,
-            file_path: "test.c".to_string(),
-            line_number: Some(42),
-            code_snippet: None,
-            diff_hunk: None,
-            recommendation: None,
-            code_location: None,
-            already_reported: false,
-            sources: vec![],
-            commit_reference: None,
-            ticket_reference: None,
-            priority_score: None,
-            cross_file_references: None,
-            verification_status: None,
-            verification_notes: None,
-            verification_error: None,
-            agent_evidence_path: None,
-            security_issue: None,
-            poc_code: None,
-            mitigation_code: None,
-            poc_format: None,
-            llm_model: None,
-            agent_mode: false,
-            statement_range: None,
-            triage_verdict: None,
-        };
-
-        let finding2 = VulnerabilityFinding {
-            id: "same-id".to_string(),
-            title: "Title 2".to_string(),
-            description: "Desc".to_string(),
-            severity: Severity::High,
-            confidence_score: 0.9,
-            cwe_id: None,
-            file_path: "test.c".to_string(),
-            line_number: Some(42),
-            code_snippet: None,
-            diff_hunk: None,
-            recommendation: None,
-            code_location: None,
-            already_reported: false,
-            sources: vec![],
-            commit_reference: None,
-            ticket_reference: None,
-            priority_score: None,
-            cross_file_references: None,
-            verification_status: None,
-            verification_notes: None,
-            verification_error: None,
-            agent_evidence_path: None,
-            security_issue: None,
-            poc_code: None,
-            mitigation_code: None,
-            poc_format: None,
-            llm_model: None,
-            agent_mode: false,
-            statement_range: None,
-            triage_verdict: None,
-        };
-
-        merger.merge(vec![finding1]);
-        merger.merge(vec![finding2]);
-
-        let findings = merger.into_findings();
-        assert_eq!(findings.len(), 1);
-    }
 
     #[test]
     fn test_severity_display() {

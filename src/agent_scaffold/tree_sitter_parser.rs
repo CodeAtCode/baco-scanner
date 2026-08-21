@@ -33,16 +33,6 @@ impl ParsedFile {
         self.tree.root_node()
     }
 }
-
-/// Parse a source file with the specified language.
-///
-/// Returns None if the file cannot be read, the language cannot be set,
-/// or if parsing fails with errors.
-pub fn parse_file(path: &Path, language: Language) -> Option<ParsedFile> {
-    let content = std::fs::read_to_string(path).ok()?;
-    parse_source(&content, language)
-}
-
 /// Parse source code string with the specified language.
 ///
 /// Returns None if parsing fails with errors.

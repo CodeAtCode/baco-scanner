@@ -45,15 +45,6 @@ pub fn get_git_remote_url(repo_path: &str) -> Option<String> {
 }
 
 /// Compute checkpoint path from output directory
-pub fn compute_checkpoint_path(output_dir: &Path) -> std::path::PathBuf {
-    output_dir.join("checkpoint.json")
-}
-
-/// Compute findings JSON path from output directory
-pub fn compute_findings_json_path(output_dir: &Path) -> std::path::PathBuf {
-    output_dir.join("findings.json")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -151,20 +142,4 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_compute_checkpoint_path() {
-        let output_dir = std::path::Path::new("/tmp/output");
-        let checkpoint_path = compute_checkpoint_path(output_dir);
-        assert_eq!(
-            checkpoint_path,
-            std::path::Path::new("/tmp/output/checkpoint.json")
-        );
-    }
-
-    #[test]
-    fn test_compute_findings_json_path() {
-        let output_dir = std::path::Path::new("/tmp/output");
-        let json_path = compute_findings_json_path(output_dir);
-        assert_eq!(json_path, std::path::Path::new("/tmp/output/findings.json"));
-    }
 }

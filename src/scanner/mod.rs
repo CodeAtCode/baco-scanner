@@ -22,11 +22,7 @@ pub use pipeline::resumption::{CheckpointManager, ScanCheckpoint};
 pub use phases::{run_phase, PhaseConfig};
 
 // Re-export utility functions from env
-pub use env::{
-    compute_checkpoint_path, compute_findings_json_path, extract_owner_repo_from_url,
-    get_git_remote_url,
-};
-
+pub use env::{extract_owner_repo_from_url, get_git_remote_url};
 // Re-export parallel module types for testing
 pub use parallel::{
     combine_parallel_results, has_valid_checkpoint_findings, run_indexing_phase,

@@ -3,11 +3,6 @@ use crate::llm_metrics::LlmMetrics;
 use serde::Serialize;
 use std::fs;
 
-#[derive(Serialize)]
-pub struct FindingsOutput {
-    pub findings: Vec<VulnerabilityFinding>,
-    pub summary: ReportSummary,
-}
 
 #[derive(Serialize)]
 pub struct ReportSummary {

@@ -208,8 +208,6 @@ pub struct ProjectConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct OutputConfig {
     pub dir: String,
-    #[serde(default)]
-    pub format: Vec<String>,
 }
 
 // Default value functions - these need to be in mod.rs so they can be referenced

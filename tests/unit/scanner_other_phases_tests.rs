@@ -40,10 +40,8 @@ fn create_test_config() -> config::ScannerConfig {
         },
         output: baco::config::OutputConfig {
             dir: "/tmp/test_output".to_string(),
-            format: vec![],
         },
         scanner: ScannerSettings {
-            commit_lookback_days: 7,
             max_file_size_kb: 1024,
             exclude_paths: vec![],
             semgrep: baco::config::SemgrepSettings::default(),

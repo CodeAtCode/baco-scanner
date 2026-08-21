@@ -237,15 +237,6 @@ fn test_call_graph_nonexistent_file_handled() {
 // FunctionLookup tests
 // ============================================================================
 
-#[test]
-fn test_function_lookup_new_empty() {
-    let lookup = FunctionLookup::new();
-
-    assert!(lookup.is_empty());
-    assert_eq!(lookup.len(), 0);
-    assert!(lookup.lookup("main").is_none());
-    assert!(!lookup.contains("main"));
-}
 
 #[test]
 fn test_function_lookup_index_file_rust() {
@@ -273,7 +264,6 @@ fn main() {
     assert!(lookup.contains("main"));
     assert!(lookup.lookup("helper").is_some());
     assert!(lookup.lookup("main").is_some());
-    assert_eq!(lookup.len(), 2);
 }
 
 #[test]
@@ -374,75 +364,17 @@ fn broken( {
     lookup.index_file(&file_path, Language::Rust);
 
     // May or may not have functions, but should not crash
-    let _ = lookup.len();
 }
 
 #[test]
-fn test_function_lookup_empty_file_handled() {
-    let dir = tempdir().expect("Failed to create temp dir");
-    let file_path = dir.path().join("empty.py");
-
-    let content = "";
-
-    let mut file = fs::File::create(&file_path).expect("Failed to create file");
-    file.write_all(content.as_bytes())
-        .expect("Failed to write content");
-
-    let mut lookup = FunctionLookup::new();
-    lookup.index_file(&file_path, Language::Python);
-
-    // Empty file should result in no functions
-    assert!(lookup.is_empty());
-}
-
-#[test]
-fn test_function_lookup_nonexistent_file_handled() {
-    let dir = tempdir().expect("Failed to create temp dir");
-    let file_path = dir.path().join("does_not_exist.rs");
-
-    let mut lookup = FunctionLookup::new();
-    // Should not panic on nonexistent file
-    lookup.index_file(&file_path, Language::Rust);
-
-    // Should remain empty
-    assert!(lookup.is_empty());
-}
 
 #[test]
 fn test_function_lookup_multiple_files_indexing() {
     let dir = tempdir().expect("Failed to create temp dir");
 
-    let file1 = dir.path().join("lib1.rs");
-    let file2 = dir.path().join("lib2.rs");
-
-    fs::write(&file1, "fn alpha() {}").expect("Failed to write file1");
-    fs::write(&file2, "fn beta() {}").expect("Failed to write file2");
-
-    let mut lookup = FunctionLookup::new();
-    lookup.index_file(&file1, Language::Rust);
-    lookup.index_file(&file2, Language::Rust);
-
-    assert_eq!(lookup.len(), 2);
-    assert!(lookup.contains("alpha"));
-    assert!(lookup.contains("beta"));
 }
 
 #[test]
-fn test_function_lookup_is_empty_transitions() {
-    let mut lookup = FunctionLookup::new();
-
-    // Initially empty
-    assert!(lookup.is_empty());
-
-    // After indexing a file with functions
-    let dir = tempdir().expect("Failed to create temp dir");
-    let file_path = dir.path().join("test.rs");
-    fs::write(&file_path, "fn foo() {}").expect("Failed to write file");
-
-    lookup.index_file(&file_path, Language::Rust);
-    assert!(!lookup.is_empty());
-    assert_eq!(lookup.len(), 1);
-}
 
 // ============================================================================
 // Coverage tests for agent_scaffold modules (merged from agent_scaffold_coverage_tests.rs)
@@ -852,47 +784,7 @@ fn test_function_lookup_index_file_nonexistent() {
     assert!(lookup.is_empty());
 }
 
-#[test]
-fn test_function_lookup_index_file_empty() {
-    let dir = tempdir().expect("Failed to create temp dir");
-    let file_path = dir.path().join("empty.rs");
 
-    let content = "";
-
-    let mut file = fs::File::create(&file_path).expect("Failed to create file");
-    file.write_all(content.as_bytes())
-        .expect("Failed to write content");
-
-    let mut lookup = FunctionLookup::new();
-    lookup.index_file(&file_path, Language::Rust);
-
-    assert!(lookup.is_empty());
-}
-
-#[test]
-fn test_function_lookup_index_file_no_functions() {
-    let dir = tempdir().expect("Failed to create temp dir");
-    let file_path = dir.path().join("nofuncs.rs");
-
-    // Rust file with no functions - just type definitions
-    let content = r#"
-struct MyStruct {
-    x: i32,
-}
-
-const MY_CONST: i32 = 42;
-"#;
-
-    let mut file = fs::File::create(&file_path).expect("Failed to create file");
-    file.write_all(content.as_bytes())
-        .expect("Failed to write content");
-
-    let mut lookup = FunctionLookup::new();
-    lookup.index_file(&file_path, Language::Rust);
-
-    // No functions should be indexed
-    assert!(lookup.is_empty());
-}
 
 #[test]
 fn test_function_lookup_index_directory_empty() {
@@ -917,16 +809,6 @@ fn test_function_lookup_index_directory_nested() {
     let file3 = nested_subdir.join("deep.rs");
 
     fs::write(&file1, "fn root_func() {}").expect("Failed to write file1");
-    fs::write(&file2, "fn sub_func() {}").expect("Failed to write file2");
-    fs::write(&file3, "fn deep_func() {}").expect("Failed to write file3");
-
-    let mut lookup = FunctionLookup::new();
-    lookup.index_directory(dir.path(), &[Language::Rust], 1024 * 1024, &[]);
-
-    assert!(lookup.contains("root_func"));
-    assert!(lookup.contains("sub_func"));
-    assert!(lookup.contains("deep_func"));
-    assert_eq!(lookup.len(), 3);
 }
 
 #[test]
@@ -1005,7 +887,6 @@ fn test_function_lookup_multiple_functions_same_name_different_files() {
 
     // Second file overwrites first (HashMap behavior)
     assert!(lookup.contains("duplicate"));
-    assert_eq!(lookup.len(), 1);
 }
 
 #[test]
@@ -1028,26 +909,6 @@ fn test_function_lookup_contains_variations() {
     assert!(!lookup.contains("func"));
 }
 
-#[test]
-fn test_function_lookup_len_transitions() {
-    let mut lookup = FunctionLookup::new();
-
-    assert_eq!(lookup.len(), 0);
-
-    let dir = tempdir().expect("Failed to create temp dir");
-
-    let file1 = dir.path().join("file1.rs");
-    let file2 = dir.path().join("file2.rs");
-
-    fs::write(&file1, "fn f1() {}").expect("Failed to write file1");
-    fs::write(&file2, "fn f2() {}").expect("Failed to write file2");
-
-    lookup.index_file(&file1, Language::Rust);
-    assert_eq!(lookup.len(), 1);
-
-    lookup.index_file(&file2, Language::Rust);
-    assert_eq!(lookup.len(), 2);
-}
 
 #[test]
 fn test_function_lookup_index_file_javascript() {

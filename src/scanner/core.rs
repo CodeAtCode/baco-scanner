@@ -171,10 +171,8 @@ mod tests {
             },
             output: OutputConfig {
                 dir: "/tmp/test-output".to_string(),
-                format: vec![],
             },
             scanner: crate::config::ScannerSettings {
-                commit_lookback_days: 30,
                 max_file_size_kb: 1024,
                 exclude_paths: vec![],
                 semgrep: crate::config::SemgrepSettings::default(),

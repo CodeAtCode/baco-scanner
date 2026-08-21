@@ -4,7 +4,6 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ScannerSettings {
-    pub commit_lookback_days: u32,
     pub max_file_size_kb: u64,
     #[serde(default)]
     pub exclude_paths: Vec<String>,

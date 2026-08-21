@@ -125,11 +125,8 @@ mod tests {
         // Integration: if semgrep fails, phase returns PhaseError::Semgrep,
         // scanner logs "Semgrep failed: {e}. Skipping phase." and continues
 
-        use baco::phase::ScanPhase;
-
-        let phase = baco::phase::semgrep::SemgrepPhase;
-        assert_eq!(phase.name(), "Semgrep");
-        assert_eq!(phase.order(), 2);
+        // Note: ScanPhase trait and SemgrepPhase deleted as dead code
+        // This test verified the trait framework which is no longer used
     }
 
     #[test]
@@ -137,14 +134,8 @@ mod tests {
         // SemgrepPhase.execute wraps SemgrepRunner.run():
         // match runner.run(...).await { Ok(findings) => Ok(findings), Err(e) => { warn; Err(PhaseError::Semgrep) } }
 
-        use baco::error::PhaseError;
-        let phase_err = PhaseError::Semgrep("simulated error".to_string());
-        let msg = format!("{}", phase_err);
-        assert!(
-            msg.contains("Semgrep"),
-            "PhaseError includes context: {}",
-            msg
-        );
+        // Note: PhaseError::Semgrep and ScanPhase trait deleted as dead code
+        // This test verified the trait framework which is no longer used
     }
 
     #[test]

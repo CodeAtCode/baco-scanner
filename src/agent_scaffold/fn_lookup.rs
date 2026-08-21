@@ -129,15 +129,6 @@ impl FunctionLookup {
         self.functions.contains_key(name)
     }
 
-    /// Get the number of indexed functions.
-    pub fn len(&self) -> usize {
-        self.functions.len()
-    }
-
-    /// Check if the index is empty.
-    pub fn is_empty(&self) -> bool {
-        self.functions.is_empty()
-    }
 }
 
 /// Get file extensions for the specified languages.

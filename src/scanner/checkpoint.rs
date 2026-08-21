@@ -130,36 +130,6 @@ impl Checkpoint {
         })
     }
 
-    pub fn format_phase(&self) -> String {
-        match self.current_phase {
-            ScanPhase::Indexing => "🔄 Indexing ⚙️".to_string(),
-            ScanPhase::Semgrep => "🔍 Semgrep Static Analysis".to_string(),
-            ScanPhase::CweRouting => "🎯 MoE CWE Routing".to_string(),
-            ScanPhase::CpgSlice => "✂️ CPG-guided Slicing".to_string(),
-            ScanPhase::LlmStaticAnalysis => "🧠 LLM Static Analysis".to_string(),
-            ScanPhase::LlmDiscovery => "🔎 LLM Discovery".to_string(),
-            ScanPhase::LlmVerification => "✅ LLM Verification".to_string(),
-            ScanPhase::TicketCrossRef => "🎫 Ticket Cross-Ref".to_string(),
-            ScanPhase::GitAnalysis => "📊 Git Analysis".to_string(),
-            ScanPhase::CrossFileAnalysis => "🔗 Cross-File Analysis".to_string(),
-            ScanPhase::ConfidenceScoring => "⚖️ Confidence Scoring".to_string(),
-            ScanPhase::AiAggregation => "🤖 AI Aggregation".to_string(),
-            ScanPhase::Reporting => "📝 Reporting".to_string(),
-            ScanPhase::ThreatModeling => "🛡️ Threat Modeling".to_string(),
-            ScanPhase::RootCauseDedup => "🔍 Root Cause Dedup".to_string(),
-            ScanPhase::MultiVerifier => "🗳️ Multi-Verifier".to_string(),
-            ScanPhase::AutoPatching => "🔧 Auto-Patching".to_string(),
-            ScanPhase::CveBootstrap => "📦 CVE Bootstrap".to_string(),
-            ScanPhase::PocCompiler => "💻 PoC Compiler".to_string(),
-            ScanPhase::VariantSearch => "🔍 Variant Search".to_string(),
-            ScanPhase::SecurityAgentVerification => "🤖 SecurityAgent Verification".to_string(),
-            ScanPhase::RuleSynthesis => "⚗️ Rule Synthesis".to_string(),
-            ScanPhase::Validate => "🛡️ Validate (Rationale Check)".to_string(),
-            ScanPhase::ExploitSynth => "💉 Exploit Synthesis".to_string(),
-            ScanPhase::Complete => "✨ Complete".to_string(),
-            ScanPhase::Error => "❌ Error".to_string(),
-        }
-    }
 }
 
 /// Save a checkpoint with findings and analyzed files

@@ -4,9 +4,7 @@
 //! (arXiv:2511.04014), which extracts security specifications from historical
 //! vulnerabilities and patches to enhance vulnerability detection.
 
-use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 /// Unique identifier for a security specification
 pub type SpecId = String;
@@ -89,101 +87,6 @@ fn default_false() -> bool {
 
 fn default_db_path() -> String {
     "baco-output/vuln_spec_db.json".to_string()
-}
-
-/// Specification database storing all extracted security specifications
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct SpecificationDatabase {
-    /// All stored specifications
-    #[serde(default)]
-    pub specifications: Vec<SecuritySpecification>,
-
-    /// Source metadata for specifications
-    #[serde(default)]
-    pub sources: Vec<SpecificationSource>,
-
-    /// Last updated timestamp
-    #[serde(default = "default_now")]
-    pub last_updated: String,
-}
-
-fn default_now() -> String {
-    Utc::now().to_rfc3339()
-}
-
-impl SpecificationDatabase {
-    /// Create a new empty specification database
-    pub fn new() -> Self {
-        Self {
-            specifications: Vec::new(),
-            sources: Vec::new(),
-            last_updated: Utc::now().to_rfc3339(),
-        }
-    }
-
-    /// Load database from JSON file
-    pub fn load(path: &str) -> Result<Self, std::io::Error> {
-        let content = std::fs::read_to_string(path)?;
-        let db: SpecificationDatabase = serde_json::from_str(&content)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-        Ok(db)
-    }
-
-    /// Save database to JSON file
-    pub fn save(&self, path: &str) -> Result<(), std::io::Error> {
-        // Ensure parent directory exists
-        if let Some(parent) = PathBuf::from(path).parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-
-        let content = serde_json::to_string_pretty(self)?;
-        std::fs::write(path, content)?;
-        Ok(())
-    }
-
-    /// Add a new specification to the database
-    pub fn add_specification(&mut self, spec: SecuritySpecification) {
-        self.specifications.push(spec);
-        self.last_updated = Utc::now().to_rfc3339();
-    }
-
-    /// Add a new source to the database
-    pub fn add_source(&mut self, source: SpecificationSource) {
-        self.sources.push(source);
-        self.last_updated = Utc::now().to_rfc3339();
-    }
-
-    /// Get specifications by CWE type
-    pub fn get_by_cwe(&self, cwe_id: &str) -> Vec<&SecuritySpecification> {
-        self.specifications
-            .iter()
-            .filter(|spec| spec.vuln_type == cwe_id)
-            .collect()
-    }
-
-    /// Get specifications by domain
-    pub fn get_by_domain(&self, domain: &str) -> Vec<&SecuritySpecification> {
-        self.specifications
-            .iter()
-            .filter(|spec| spec.project_domain == domain)
-            .collect()
-    }
-
-    /// Get general specifications (non-domain-specific)
-    pub fn get_general_specs(&self) -> Vec<&SecuritySpecification> {
-        self.specifications
-            .iter()
-            .filter(|spec| matches!(spec.category, DomainCategory::General))
-            .collect()
-    }
-
-    /// Get domain-specific specifications
-    pub fn get_domain_specs(&self) -> Vec<&SecuritySpecification> {
-        self.specifications
-            .iter()
-            .filter(|spec| matches!(spec.category, DomainCategory::DomainSpecific(_)))
-            .collect()
-    }
 }
 
 #[cfg(test)]

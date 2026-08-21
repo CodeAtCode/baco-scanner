@@ -417,11 +417,6 @@ impl LlmAnalyzer {
     }
 
     /// Retrieve relevant CWE specifications based on file path and code content (public)
-    pub fn retrieve_cwe_specs_public(&self, file_path: &str, code_content: &str) -> String {
-        self.retrieve_cwe_specs_inner(file_path, code_content)
-    }
-
-    /// Truncate code to fit in context window
     pub fn truncate_code(&self, code: &str) -> String {
         let max_chars = 8000; // Keep under context limits
         if code.len() <= max_chars {

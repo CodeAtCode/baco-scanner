@@ -90,14 +90,7 @@ impl AiAggregationPhase {
         self.enrichment.enrich_findings(findings).await
     }
 
-    /// Extract a field value from JSON response (deprecated, kept for compatibility)
-    #[allow(dead_code)]
-    fn extract_json_field(_json: &str, _field: &str) -> Option<String> {
-        None
-    }
-
     /// Semantic deduplication: uses LLM to identify and merge duplicate findings
-    #[allow(dead_code)]
     async fn semantic_deduplication(
         &self,
         findings: &[VulnerabilityFinding],

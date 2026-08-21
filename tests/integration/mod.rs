@@ -14,7 +14,6 @@ mod determinism;
 mod moe_pipeline;
 mod semgrep;
 mod sv_trusteval;
-mod triage_pipeline;
 
 // Triple path context integration tests (T2.2)
 mod triple_path;

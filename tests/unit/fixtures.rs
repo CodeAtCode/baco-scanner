@@ -199,10 +199,8 @@ pub fn create_test_config() -> ScannerConfig {
         },
         output: OutputConfig {
             dir: "/tmp/baco-test-output".to_string(),
-            format: vec!["json".to_string()],
         },
         scanner: ScannerSettings {
-            commit_lookback_days: 30,
             max_file_size_kb: 1024,
             exclude_paths: vec![],
             semgrep: SemgrepSettings {
@@ -286,10 +284,8 @@ pub fn create_minimal_config() -> ScannerConfig {
         },
         output: OutputConfig {
             dir: "/tmp/baco_test_output".to_string(),
-            format: vec!["html".to_string()],
         },
         scanner: ScannerSettings {
-            commit_lookback_days: 30,
             max_file_size_kb: 1024,
             exclude_paths: vec![],
             semgrep: SemgrepSettings::default(),
@@ -307,7 +303,6 @@ pub fn create_minimal_config() -> ScannerConfig {
             max_turns: 10,
             tool_timeout_secs: 30,
             trusted_paths: vec![],
-            keep_artifacts: false,
         },
         tickets: TicketConfig::default(),
         router: Default::default(),

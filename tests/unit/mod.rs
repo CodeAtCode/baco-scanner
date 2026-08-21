@@ -38,8 +38,6 @@ mod staging;
 // Tickets tests - covers extract_meaningful_words and TicketSearcher
 mod tickets;
 
-// Error handling tests
-mod error_tests;
 
 // Checkpoint save/load tests
 mod scanner_checkpoint_tests;
@@ -68,7 +66,6 @@ mod llm_analysis_test;
 
 // BM25 retrieval tests
 mod bm25_search;
-mod triage_filter;
 
 // Context extraction tests
 mod context_extractor;
@@ -97,9 +94,6 @@ mod phase_graph;
 // Triple path context tests (T2.2)
 mod control_path;
 mod semantic_path;
-
-// Rationale check tests
-mod rationale_check;
 
 // Statement-level localization tests
 mod statement_range;
@@ -147,11 +141,10 @@ mod cve_client_tests;
 mod scanner_sequential_tests;
 mod worktree_staging_tests;
 
-// Additional coverage: enrichment, exploit harness, parallel
+// Additional coverage: enrichment, exploit harness
 mod ai_aggregation_enrichment_tests;
 mod exploit_harness_tests;
 mod html_report_dir_creation_tests;
-mod scanner_parallel_tests;
 
 // CVE client network tests using mockito
 mod cve_client_network_tests;
@@ -183,9 +176,6 @@ mod prompt_templates_tests;
 
 // Findings module tests
 mod findings_tests;
-
-// LLM verification phase tests
-mod llm_verification_phase_tests;
 
 // MultiVerifier phase tests
 mod multi_verifier_phase_tests;

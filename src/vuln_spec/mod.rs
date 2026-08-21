@@ -13,7 +13,4 @@ pub mod retriever;
 pub mod schema;
 
 // Re-export main types for convenience
-pub use schema::{
-    DomainCategory, SecuritySpecification, SpecificationDatabase, SpecificationSource,
-    VulnSpecConfig,
-};
+pub use schema::{DomainCategory, SecuritySpecification, SpecificationSource, VulnSpecConfig};

@@ -23,7 +23,6 @@ fn create_test_config() -> baco::config::ScannerConfig {
     baco::config::ScannerConfig {
         output: OutputConfig {
             dir: "/tmp/baco_test_output".to_string(),
-            format: vec!["json".to_string()],
         },
         scanner: ScannerSettings {
             performance: PerformanceSettings {
@@ -688,7 +687,6 @@ fn create_config_without_llm_keys() -> baco::config::ScannerConfig {
     baco::config::ScannerConfig {
         output: OutputConfig {
             dir: "/tmp/baco_run_test_output".to_string(),
-            format: vec!["json".to_string()],
         },
         scanner: ScannerSettings {
             performance: PerformanceSettings {

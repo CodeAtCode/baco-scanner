@@ -588,36 +588,11 @@ impl ChatMessage {
     }
 }
 
-pub trait LlmProvider {
-    fn chat(&self, messages: &[ChatMessage]) -> Result<String, String>;
-}
-
-// Note: LlmProvider trait is kept for backwards compatibility
-// LlmClient::chat is now async and should be used directly
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use mockall::mock;
 
-    mock! {
-        #[derive(Debug)]
-        pub LlmProvider {}
-
-        impl LlmProvider for LlmProvider {
-            fn chat(&self, messages: &[ChatMessage]) -> Result<String, String>;
-        }
-    }
-
-    #[test]
-    fn test_chat_message_creation() {
-        let sys = ChatMessage::system("You are a security expert");
-        assert_eq!(sys.role, "system");
-        assert_eq!(sys.content, "You are a security expert");
-
-        let user = ChatMessage::user("Analyze this code");
-        assert_eq!(user.role, "user");
-    }
 
     #[test]
     fn test_chat_message_assistant() {

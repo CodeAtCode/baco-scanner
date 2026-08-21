@@ -25,7 +25,6 @@ fn create_test_config(max_turns: u32) -> AgentConfig {
         max_turns,
         tool_timeout_secs: 30,
         trusted_paths: vec![],
-        keep_artifacts: false,
     }
 }
 
@@ -131,7 +130,6 @@ fn test_session_creation_with_custom_timeout() {
         max_turns: 10,
         tool_timeout_secs: 60,
         trusted_paths: vec![],
-        keep_artifacts: false,
     };
     let temp_dir = create_temp_dir();
     let progress_cb: ProgressCallback = Arc::new(|_| {});
@@ -1158,7 +1156,6 @@ async fn test_analyze_file_with_mock_llm_tool_call() {
         max_turns: 10,
         tool_timeout_secs: 30,
         trusted_paths: vec![],
-        keep_artifacts: false,
     };
     let tmpdir = tempfile::tempdir().unwrap();
     let progress_cb = Arc::new(|_| {});
@@ -1199,7 +1196,6 @@ async fn test_analyze_file_with_mock_llm_no_vulnerability() {
         max_turns: 10,
         tool_timeout_secs: 30,
         trusted_paths: vec![],
-        keep_artifacts: false,
     };
     let tmpdir = tempfile::tempdir().unwrap();
     let progress_cb = Arc::new(|_| {});
@@ -1245,7 +1241,6 @@ async fn test_verify_finding_with_mock_llm() {
         max_turns: 10,
         tool_timeout_secs: 30,
         trusted_paths: vec![],
-        keep_artifacts: false,
     };
     let tmpdir = tempfile::tempdir().unwrap();
     let progress_cb = Arc::new(|_| {});

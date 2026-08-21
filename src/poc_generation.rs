@@ -453,14 +453,6 @@ func safePath(filename string) (string, error) {
         })
     }
 
-    /// Get available templates for a format.
-    pub fn available_templates(&self, format: PoCFormat) -> Vec<String> {
-        self.templates
-            .values()
-            .filter(|t| t.format == format)
-            .map(|t| t.cwe_id.clone())
-            .collect()
-    }
 }
 
 /// Generate a simple UUID-like string.
