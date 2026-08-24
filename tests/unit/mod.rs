@@ -66,9 +66,6 @@ mod llm_analysis_test;
 // BM25 retrieval tests
 mod bm25_search;
 
-// Context extraction tests
-mod context_extractor;
-
 // Global false positive store tests
 mod global_fp;
 
@@ -210,9 +207,7 @@ mod context_callee_walker_tests;
 mod context_control_path_tests;
 mod context_knowledge_path_tests;
 mod context_pacvd_extractor_tests;
-mod context_primitive_api_tests;
 mod context_semantic_path_tests;
-mod context_summary_tests;
 mod context_triple_path_tests;
 
 // HTML renderer unit tests

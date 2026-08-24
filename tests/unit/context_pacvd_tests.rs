@@ -3,11 +3,9 @@
 //! Tests:
 //! - pacvd_extractor: AbstractionLevel, AbstractionVector, extract(), auto_level()
 //! - callee_walker: CallSite, extract_call_sites()
-//! - primitive_api: PRIMITIVE_API_TABLE, lookup(), PrimitiveApiVulnType
 
 use baco::context::callee_walker::{extract_call_sites, CallSite};
 use baco::context::pacvd_extractor::{auto_level, extract, AbstractionLevel};
-use baco::context::primitive_api::{lookup, PrimitiveApiVulnType, PRIMITIVE_API_TABLE};
 use std::collections::BTreeSet;
 
 // ============================================================================
@@ -473,92 +471,6 @@ fn test_extract_call_sites_with_brackets() {
         callee: "func".to_string(),
         arg_count: 2,
     }));
-}
-
-// ============================================================================
-// primitive_api tests
-// ============================================================================
-
-#[test]
-fn test_lookup_malloc() {
-    let vulns = lookup("malloc");
-    assert!(vulns.contains(&PrimitiveApiVulnType::NullPointerDeref));
-    assert!(vulns.contains(&PrimitiveApiVulnType::MemoryLeak));
-    assert!(vulns.contains(&PrimitiveApiVulnType::UseAfterFree));
-    assert!(vulns.contains(&PrimitiveApiVulnType::DoubleFree));
-}
-
-#[test]
-fn test_lookup_free() {
-    let vulns = lookup("free");
-    assert!(vulns.contains(&PrimitiveApiVulnType::MemoryLeak));
-    assert!(vulns.contains(&PrimitiveApiVulnType::UseAfterFree));
-    assert!(vulns.contains(&PrimitiveApiVulnType::DoubleFree));
-}
-
-#[test]
-fn test_lookup_open() {
-    let vulns = lookup("open");
-    assert_eq!(vulns, &[PrimitiveApiVulnType::ResourceLeak]);
-}
-
-#[test]
-fn test_lookup_fclose() {
-    let vulns = lookup("fclose");
-    assert_eq!(vulns, &[PrimitiveApiVulnType::ResourceLeak]);
-}
-
-#[test]
-fn test_lookup_realloc() {
-    let vulns = lookup("realloc");
-    assert!(vulns.contains(&PrimitiveApiVulnType::NullPointerDeref));
-}
-
-#[test]
-fn test_lookup_calloc() {
-    let vulns = lookup("calloc");
-    assert!(vulns.contains(&PrimitiveApiVulnType::NullPointerDeref));
-}
-
-#[test]
-fn test_lookup_unknown_api() {
-    let vulns = lookup("nonexistent_function_xyz");
-    assert!(vulns.is_empty());
-}
-
-#[test]
-fn test_lookup_case_sensitive() {
-    let vulns_lower = lookup("malloc");
-    let vulns_upper = lookup("MALLOC");
-    assert!(!vulns_lower.is_empty());
-    assert!(vulns_upper.is_empty());
-}
-
-#[test]
-fn test_primitive_api_table_not_empty() {
-    assert!(!PRIMITIVE_API_TABLE.is_empty());
-}
-
-#[test]
-fn test_primitive_api_table_has_expected_entries() {
-    let table_names: Vec<&str> = PRIMITIVE_API_TABLE.iter().map(|e| e.name).collect();
-    assert!(table_names.contains(&"malloc"));
-    assert!(table_names.contains(&"free"));
-    assert!(table_names.contains(&"open"));
-    assert!(table_names.contains(&"close"));
-    assert!(table_names.contains(&"fopen"));
-}
-
-#[test]
-fn test_vuln_type_as_str_all_variants() {
-    assert_eq!(PrimitiveApiVulnType::ResourceLeak.as_str(), "ResourceLeak");
-    assert_eq!(
-        PrimitiveApiVulnType::NullPointerDeref.as_str(),
-        "NullPointerDeref"
-    );
-    assert_eq!(PrimitiveApiVulnType::MemoryLeak.as_str(), "MemoryLeak");
-    assert_eq!(PrimitiveApiVulnType::UseAfterFree.as_str(), "UseAfterFree");
-    assert_eq!(PrimitiveApiVulnType::DoubleFree.as_str(), "DoubleFree");
 }
 
 // ============================================================================

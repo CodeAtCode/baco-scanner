@@ -29,76 +29,6 @@ pub struct ParallelPhaseResult {
     pub duration: std::time::Duration,
 }
 
-/// Execute indexing phase in parallel
-#[allow(dead_code)]
-pub async fn run_indexing_phase(
-    scanner: &super::Scanner,
-    pb: &ProgressBar,
-    initial_findings: Vec<VulnerabilityFinding>,
-) -> Result<(Vec<VulnerabilityFinding>, Vec<String>), String> {
-    tracing::info!("Running Indexing phase");
-
-    let result = scanner
-        .run_phase(&ScanPhase::Indexing, initial_findings, pb, &[])
-        .await;
-
-    result
-}
-
-/// Execute Semgrep phase in parallel
-#[allow(dead_code)]
-pub async fn run_semgrep_phase(
-    scanner: &super::Scanner,
-    pb: &ProgressBar,
-    initial_findings: Vec<VulnerabilityFinding>,
-) -> Result<(Vec<VulnerabilityFinding>, Vec<String>), String> {
-    tracing::info!("Running Semgrep phase");
-
-    let result = scanner
-        .run_phase(&ScanPhase::Semgrep, initial_findings, pb, &[])
-        .await;
-
-    result
-}
-
-/// Execute LLM static analysis phase in parallel
-#[allow(dead_code)]
-pub async fn run_llm_static_phase(
-    scanner: &super::Scanner,
-    pb: &ProgressBar,
-    initial_findings: Vec<VulnerabilityFinding>,
-    analyzed_files: &[String],
-) -> Result<(Vec<VulnerabilityFinding>, Vec<String>), String> {
-    tracing::info!("Running LLM Static Analysis phase");
-
-    let result = scanner
-        .run_phase(
-            &ScanPhase::LlmStaticAnalysis,
-            initial_findings,
-            pb,
-            analyzed_files,
-        )
-        .await;
-
-    result
-}
-
-/// Check if a phase has valid findings in checkpoint
-#[allow(dead_code)]
-pub async fn has_valid_checkpoint_findings(
-    checkpoint_path: &std::path::Path,
-    phase: &ScanPhase,
-) -> bool {
-    use crate::scanner::checkpoint::load_checkpoint_findings;
-
-    let checkpoint_findings = load_checkpoint_findings(checkpoint_path, phase).await;
-
-    !checkpoint_findings.is_empty()
-        && checkpoint_findings
-            .iter()
-            .any(|f| !f.description.is_empty())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -204,15 +134,6 @@ mod tests {
         // LLM provides analyzed files
         assert_eq!(analyzed_files.len(), 1);
         assert_eq!(analyzed_files[0], "file3.rs");
-    }
-
-    #[tokio::test]
-    async fn test_has_valid_checkpoint_findings_empty() {
-        // Test with a non-existent path - should return false
-        let temp_path = std::path::PathBuf::from("/tmp/nonexistent_checkpoint");
-
-        let result = has_valid_checkpoint_findings(&temp_path, &ScanPhase::Indexing).await;
-        assert!(!result);
     }
 
     #[tokio::test]

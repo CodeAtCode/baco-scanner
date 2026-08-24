@@ -14,8 +14,7 @@ mod sequential;
 pub use core::{Scanner, ScannerState};
 
 // Re-export pipeline orchestration
-pub use pipeline::orchestrator::{Orchestrator, PhaseGraph};
-pub use pipeline::resumption::{CheckpointManager, ScanCheckpoint};
+pub use pipeline::orchestrator::PhaseGraph;
 
 // Re-export phases for testing
 #[cfg(test)]
@@ -24,15 +23,12 @@ pub use phases::{run_phase, PhaseConfig};
 // Re-export utility functions from env
 pub use env::{extract_owner_repo_from_url, get_git_remote_url};
 // Re-export parallel module types for testing
-pub use parallel::{
-    combine_parallel_results, has_valid_checkpoint_findings, run_indexing_phase,
-    run_llm_static_phase, run_semgrep_phase, ParallelPhaseConfig, ParallelPhaseResult,
-};
+pub use parallel::{combine_parallel_results, ParallelPhaseConfig, ParallelPhaseResult};
 
 // Use the checkpoint module for save/load
 use crate::checkpoint::ScanPhase;
 use crate::findings::VulnerabilityFinding;
-use checkpoint::{load_checkpoint_findings, save_checkpoint};
+use checkpoint::save_checkpoint;
 
 // Re-export Scanner methods that need access to all modules
 impl Scanner {
@@ -62,7 +58,6 @@ impl Scanner {
     }
 
     /// Save checkpoint with current findings
-    #[allow(dead_code)]
     async fn save_checkpoint(
         &self,
         findings: &[VulnerabilityFinding],
@@ -78,12 +73,6 @@ impl Scanner {
             &self.metrics_tracker,
         )
         .await
-    }
-
-    /// Load findings from checkpoint for a specific phase
-    #[allow(dead_code)]
-    async fn load_checkpoint_findings(&self, phase: &ScanPhase) -> Vec<VulnerabilityFinding> {
-        load_checkpoint_findings(&self.checkpoint_path, phase).await
     }
 
     /// Return the number of parallel phases (for testing)

@@ -42,7 +42,7 @@ pub mod incremental_scan;
 pub mod indexer;
 pub mod llm;
 pub mod llm_analysis;
-pub mod llm_cache;
+
 pub mod llm_metrics;
 pub mod llm_verification;
 pub mod multi_verifier;

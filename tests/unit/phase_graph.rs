@@ -4,8 +4,7 @@
 //! Indexing → Semgrep → CpgSlice → LlmStaticAnalysis → CweRouting → RuleSynthesis → … → Reporting.
 
 use baco::checkpoint::ScanPhase;
-use baco::config::ScannerConfig;
-use baco::scanner::{Orchestrator, PhaseGraph};
+use baco::scanner::PhaseGraph;
 
 const EXPECTED_PHASES: [ScanPhase; 24] = [
     ScanPhase::Indexing,
@@ -273,26 +272,4 @@ fn test_default_equals_new() {
     for (default_phase, new_phase) in default_graph.phases().iter().zip(new_graph.phases().iter()) {
         assert_eq!(default_phase, new_phase);
     }
-}
-
-#[test]
-fn test_orchestrator_phase_graph_has_24_phases() {
-    let config = ScannerConfig::default();
-    let orchestrator = Orchestrator::new(&config);
-    let phase_graph = orchestrator.phase_graph();
-
-    assert_eq!(phase_graph.phases().len(), 24);
-    assert_eq!(phase_graph.phases()[0], ScanPhase::Indexing);
-    assert_eq!(phase_graph.phases()[23], ScanPhase::Reporting);
-}
-
-#[test]
-fn test_orchestrator_metadata_accessible() {
-    let config = ScannerConfig::default();
-    let orchestrator = Orchestrator::new(&config);
-    let phase_graph = orchestrator.phase_graph();
-
-    let indexing_meta = phase_graph.get_metadata(&ScanPhase::Indexing);
-    assert!(indexing_meta.is_some());
-    assert_eq!(indexing_meta.unwrap().display_name, "Indexing");
 }

@@ -4,7 +4,6 @@
 //! dependencies, and configuration without hard-coded match statements.
 
 use crate::checkpoint::ScanPhase;
-use crate::config;
 
 use std::collections::HashMap;
 
@@ -262,31 +261,5 @@ pub fn phase_index(phase: &ScanPhase) -> usize {
 impl Default for PhaseGraph {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-/// Orchestrates phase execution with checkpointing support.
-pub struct Orchestrator<'a> {
-    phase_graph: PhaseGraph,
-    config: &'a config::ScannerConfig,
-}
-
-impl<'a> Orchestrator<'a> {
-    /// Create a new orchestrator with the given config.
-    pub fn new(config: &'a config::ScannerConfig) -> Self {
-        Self {
-            phase_graph: PhaseGraph::new(),
-            config,
-        }
-    }
-
-    /// Get the phase graph.
-    pub fn phase_graph(&self) -> &PhaseGraph {
-        &self.phase_graph
-    }
-
-    /// Get the config reference.
-    pub fn config(&self) -> &'a config::ScannerConfig {
-        self.config
     }
 }

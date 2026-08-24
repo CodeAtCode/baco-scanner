@@ -29,10 +29,6 @@ mod tests {
             result.is_err(),
             "Should simulate semgrep not installed error"
         );
-
-        // In the actual SemgrepRunner::run(), Command::output would fail with Io error
-        // (which becomes SemgrepError::NotFound) and the phase returns PhaseError::Semgrep
-        // which the scanner handles gracefully with a warning and continues to other phases
     }
 
     #[test]
@@ -51,8 +47,6 @@ mod tests {
         //         if !output.status.success() {
         //             return Err(format!("Semgrep failed: {}", ...))
         //         }
-        // This Err is caught by SemgrepPhase.execute() which returns PhaseError::Semgrep
-        // Scanner logs warning and continues (other phases run in parallel)
     }
 
     #[test]
@@ -68,7 +62,6 @@ mod tests {
         // In SemgrepRunner::parse_json_output(), serde_json::from_slice error is caught:
         // let results: serde_json::Value = serde_json::from_slice(json)
         //     .map_err(|e| format!("Failed to parse semgrep JSON: {}", e))?;
-        // which returns Err(String) → phase returns PhaseError::Semgrep → scanner continues
     }
 
     #[test]
@@ -83,10 +76,6 @@ mod tests {
             !has_results,
             "Mock JSON doesn't have 'results' key as expected"
         );
-
-        // SemgrepPhase.execute handles errors gracefully
-        use baco::error::PhaseError;
-        let _phase_err: PhaseError = PhaseError::Semgrep("graceful".to_string());
     }
 
     #[test]
@@ -118,75 +107,5 @@ mod tests {
         // .and_then(|v| v.as_u64())  → Some if line present, else None → continue
         // .and_then(|v| v.as_str())  → Some if check_id present, else None → continue
         // parse_json_output contains continue paths for missing fields
-    }
-
-    #[test]
-    fn test_semgrep_graceful_degradation_integration() {
-        // Integration: if semgrep fails, phase returns PhaseError::Semgrep,
-        // scanner logs "Semgrep failed: {e}. Skipping phase." and continues
-
-        // Note: ScanPhase trait and SemgrepPhase deleted as dead code
-        // This test verified the trait framework which is no longer used
-    }
-
-    #[test]
-    fn test_semgrep_phase_handles_execution_error_gracefully() {
-        // SemgrepPhase.execute wraps SemgrepRunner.run():
-        // match runner.run(...).await { Ok(findings) => Ok(findings), Err(e) => { warn; Err(PhaseError::Semgrep) } }
-
-        // Note: PhaseError::Semgrep and ScanPhase trait deleted as dead code
-        // This test verified the trait framework which is no longer used
-    }
-
-    #[test]
-    fn test_semgrep_error_enums_cover_all_failures() {
-        // SemgrepError enum variants cover all failure modes without panics:
-        use baco::error::SemgrepError;
-
-        let not_found = SemgrepError::NotFound("semgrep not installed".into());
-        let execution = SemgrepError::Execution("semgrep crashed".into());
-        let json_parse = SemgrepError::JsonParse("invalid JSON".into());
-        let cache = SemgrepError::Cache("cache error".into());
-        let config = SemgrepError::Config("config invalid".into());
-
-        // All variants can be constructed and matched
-        match not_found {
-            SemgrepError::NotFound(_) => {}
-            _ => unreachable!(),
-        }
-        match execution {
-            SemgrepError::Execution(_) => {}
-            _ => unreachable!(),
-        }
-        match json_parse {
-            SemgrepError::JsonParse(_) => {}
-            _ => unreachable!(),
-        }
-        match cache {
-            SemgrepError::Cache(_) => {}
-            _ => unreachable!(),
-        }
-        match config {
-            SemgrepError::Config(_) => {}
-            _ => unreachable!(),
-        }
-    }
-
-    #[test]
-    fn test_scan_error_propagates_semgrep_failures() {
-        // ScanError::Semgrep variant propagates all semgrep failures to top level
-        use baco::error::{ScanError, SemgrepError};
-
-        let err1 = ScanError::Semgrep(SemgrepError::NotFound("test".into()));
-        let err2 = ScanError::Semgrep(SemgrepError::Execution("test".into()));
-        let err3 = ScanError::Semgrep(SemgrepError::JsonParse("test".into()));
-        let err4 = ScanError::Semgrep(SemgrepError::Cache("test".into()));
-        let err5 = ScanError::Semgrep(SemgrepError::Config("test".into()));
-
-        assert!(matches!(err1, ScanError::Semgrep(_)));
-        assert!(matches!(err2, ScanError::Semgrep(_)));
-        assert!(matches!(err3, ScanError::Semgrep(_)));
-        assert!(matches!(err4, ScanError::Semgrep(_)));
-        assert!(matches!(err5, ScanError::Semgrep(_)));
     }
 }

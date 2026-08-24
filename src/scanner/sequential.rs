@@ -1,11 +1,6 @@
 //! Sequential phase execution utilities
 
 use crate::checkpoint::ScanPhase;
-use crate::findings::VulnerabilityFinding;
-
-use indicatif::ProgressBar;
-
-use std::time::Instant;
 
 /// List of all sequential phases in execution order
 #[allow(dead_code)]
@@ -99,38 +94,6 @@ pub fn get_phase_message(phase: &ScanPhase, phase_num: usize, total_phases: usiz
     }
 }
 
-/// Execute a single sequential phase with timing and progress reporting
-#[allow(dead_code)]
-pub async fn execute_sequential_phase(
-    scanner: &super::Scanner,
-    phase: &ScanPhase,
-    findings: Vec<VulnerabilityFinding>,
-    pb: &ProgressBar,
-    analyzed_files: &[String],
-    phase_num: usize,
-    total_phases: usize,
-) -> Result<(Vec<VulnerabilityFinding>, Vec<String>), String> {
-    let phase_msg = get_phase_message(phase, phase_num, total_phases);
-    pb.set_message(phase_msg);
-
-    let phase_start = Instant::now();
-
-    let (findings, analyzed_files) = scanner
-        .run_phase(phase, findings, pb, analyzed_files)
-        .await?;
-
-    let phase_duration = phase_start.elapsed();
-    tracing::info!("Phase {:?} completed in {:?}", phase, phase_duration);
-
-    Ok((findings, analyzed_files))
-}
-
-/// Check if early termination should be triggered
-#[allow(dead_code)]
-pub fn check_early_termination(findings: &[VulnerabilityFinding], threshold: f32) -> bool {
-    threshold > 0.0 && findings.len() as f32 > threshold
-}
-
 // ============================================================================
 // Tests
 // ============================================================================
@@ -138,42 +101,6 @@ pub fn check_early_termination(findings: &[VulnerabilityFinding], threshold: f32
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::findings::Severity;
-
-    fn create_test_finding(severity: Severity) -> VulnerabilityFinding {
-        VulnerabilityFinding {
-            id: "test-id".to_string(),
-            title: "Test Finding".to_string(),
-            description: "Test description".to_string(),
-            severity,
-            confidence_score: 0.8,
-            cwe_id: Some("CWE-79".to_string()),
-            file_path: "src/test.rs".to_string(),
-            line_number: Some(42),
-            code_snippet: Some("unsafe_code()".to_string()),
-            diff_hunk: None,
-            recommendation: Some("Fix this".to_string()),
-            code_location: Some("src/test.rs:42".to_string()),
-            already_reported: false,
-            sources: vec!["test".to_string()],
-            commit_reference: None,
-            ticket_reference: None,
-            priority_score: None,
-            cross_file_references: None,
-            verification_status: None,
-            verification_notes: None,
-            verification_error: None,
-            agent_evidence_path: None,
-            security_issue: None,
-            poc_code: None,
-            mitigation_code: None,
-            poc_format: None,
-            llm_model: None,
-            agent_mode: false,
-            statement_range: None,
-            triage_verdict: None,
-        }
-    }
 
     // --- get_phase_message tests ---
 
@@ -231,62 +158,6 @@ mod tests {
         let msg = get_phase_message(&ScanPhase::Indexing, 0, 16);
         assert!(msg.contains("Phase 0/16"));
         assert!(msg.contains("Indexing"));
-    }
-
-    // --- check_early_termination tests ---
-
-    #[test]
-    fn test_check_early_termination_below_threshold() {
-        let findings = vec![
-            create_test_finding(Severity::High),
-            create_test_finding(Severity::Medium),
-        ];
-        // threshold=5, findings=2 -> should not terminate
-        assert!(!check_early_termination(&findings, 5.0));
-    }
-
-    #[test]
-    fn test_check_early_termination_at_threshold() {
-        let findings = vec![
-            create_test_finding(Severity::High),
-            create_test_finding(Severity::Medium),
-            create_test_finding(Severity::Low),
-        ];
-        // threshold=3, findings=3 -> 3.0 > 3.0 is false
-        assert!(!check_early_termination(&findings, 3.0));
-    }
-
-    #[test]
-    fn test_check_early_termination_above_threshold() {
-        let findings = vec![
-            create_test_finding(Severity::High),
-            create_test_finding(Severity::Medium),
-            create_test_finding(Severity::Low),
-            create_test_finding(Severity::Critical),
-        ];
-        // threshold=3, findings=4 -> 4.0 > 3.0 is true
-        assert!(check_early_termination(&findings, 3.0));
-    }
-
-    #[test]
-    fn test_check_early_termination_zero_threshold() {
-        let findings = vec![create_test_finding(Severity::High)];
-        // threshold=0.0 -> should never terminate (disabled)
-        assert!(!check_early_termination(&findings, 0.0));
-    }
-
-    #[test]
-    fn test_check_early_termination_empty_findings() {
-        let findings: Vec<VulnerabilityFinding> = vec![];
-        // No findings, any positive threshold -> should not terminate
-        assert!(!check_early_termination(&findings, 1.0));
-    }
-
-    #[test]
-    fn test_check_early_termination_negative_threshold() {
-        let findings = vec![create_test_finding(Severity::High)];
-        // Negative threshold -> should never terminate
-        assert!(!check_early_termination(&findings, -1.0));
     }
 
     // --- SEQUENTIAL_PHASES constant tests ---

@@ -3,12 +3,10 @@
 //! Extracts function/module/project-level summaries to provide
 //! structured context to LLM prompts.
 
-pub mod summary;
-
 // Triple path context modules (T2.2 - VulTriage)
 pub mod control_path;
 pub mod knowledge_path;
-pub mod primitive_api;
+
 pub mod semantic_path;
 pub mod triple_path;
 
@@ -26,7 +24,5 @@ pub use knowledge_path::{
 pub use pacvd_extractor::{
     auto_level, categorize, extract as extract_pacvd, tag_cwe, AbstractionLevel, AbstractionVector,
 };
-pub use primitive_api::{lookup as lookup_primitive_api, PrimitiveApiEntry, PrimitiveApiVulnType};
 pub use semantic_path::{summarize as summarize_semantic, SemanticPath};
-pub use summary::{ContextExtractor, ContextSummary, FunctionSummary};
 pub use triple_path::TriplePathContext;

@@ -6,7 +6,6 @@ pub mod common;
 
 mod agent;
 mod cli;
-mod context_in_prompt;
 mod cross_scan_merge;
 mod cwe_rag_in_prompt;
 mod cwe_rag_pipeline;

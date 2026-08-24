@@ -10,10 +10,7 @@ use crate::fixtures::{
 use baco::checkpoint::ScanPhase;
 use baco::findings::{Severity, VulnerabilityFinding};
 use baco::phase::helpers::create_test_finding_simple;
-use baco::scanner::{
-    combine_parallel_results, has_valid_checkpoint_findings, run_indexing_phase,
-    run_llm_static_phase, run_semgrep_phase, ParallelPhaseConfig, ParallelPhaseResult, Scanner,
-};
+use baco::scanner::{combine_parallel_results, ParallelPhaseConfig, ParallelPhaseResult, Scanner};
 use indicatif::ProgressBar;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -438,112 +435,8 @@ fn test_combine_parallel_results_only_initial_and_llm() {
 }
 
 // ============================================================================
-// Phase Execution Function Tests (Mock/Integration)
+// Phase Execution Function Tests — removed (functions deleted as dead code)
 // ============================================================================
-
-#[tokio::test]
-async fn test_run_indexing_phase_with_empty_findings() {
-    let config = create_test_config();
-    let target_path = PathBuf::from("/tmp/test-project");
-    let scanner = Scanner::new(config, target_path, false);
-    let pb = ProgressBar::hidden();
-
-    let result = run_indexing_phase(&scanner, &pb, vec![]).await;
-
-    assert!(result.is_ok());
-    let (findings, analyzed_files) = result.unwrap();
-    assert!(findings.is_empty());
-    assert!(analyzed_files.is_empty());
-}
-
-#[tokio::test]
-async fn test_run_semgrep_phase_with_empty_findings() {
-    let config = create_test_config();
-    let target_path = PathBuf::from("/tmp/test-project");
-    let scanner = Scanner::new(config, target_path, false);
-    let pb = ProgressBar::hidden();
-
-    let result = run_semgrep_phase(&scanner, &pb, vec![]).await;
-
-    assert!(result.is_ok());
-    let (findings, analyzed_files) = result.unwrap();
-    assert!(findings.is_empty());
-    assert!(analyzed_files.is_empty());
-}
-
-#[tokio::test]
-async fn test_run_llm_static_phase_with_empty_findings() {
-    let config = create_test_config();
-    let target_path = PathBuf::from("/tmp/test-project");
-    let scanner = Scanner::new(config, target_path, false);
-    let pb = ProgressBar::hidden();
-
-    let result = run_llm_static_phase(&scanner, &pb, vec![], &[]).await;
-
-    assert!(result.is_ok());
-    let (findings, analyzed_files) = result.unwrap();
-    assert!(findings.is_empty());
-    assert!(analyzed_files.is_empty());
-}
-
-#[tokio::test]
-async fn test_run_indexing_phase_with_initial_findings() {
-    let config = create_test_config();
-    let target_path = PathBuf::from("/tmp/test-project");
-    let scanner = Scanner::new(config, target_path, false);
-    let pb = ProgressBar::hidden();
-
-    let initial_findings = vec![create_test_finding_simple("Initial", Severity::High)];
-
-    let result = run_indexing_phase(&scanner, &pb, initial_findings).await;
-
-    assert!(result.is_ok());
-    let (findings, _) = result.unwrap();
-    assert!(!findings.is_empty());
-}
-
-#[tokio::test]
-async fn test_run_semgrep_phase_with_initial_findings() {
-    let config = create_test_config();
-    let target_path = PathBuf::from("/tmp/test-project");
-    let scanner = Scanner::new(config, target_path, false);
-    let pb = ProgressBar::hidden();
-
-    let initial_findings = vec![create_test_finding_simple("Initial", Severity::Medium)];
-
-    let result = run_semgrep_phase(&scanner, &pb, initial_findings).await;
-
-    assert!(result.is_ok());
-    let (findings, _) = result.unwrap();
-    assert!(!findings.is_empty());
-}
-
-// ============================================================================
-// has_valid_checkpoint_findings Tests
-// ============================================================================
-
-#[tokio::test]
-async fn test_has_valid_checkpoint_findings_nonexistent_path() {
-    let temp_path = PathBuf::from("/tmp/nonexistent_checkpoint_12345");
-    let phase = ScanPhase::Indexing;
-
-    let result = has_valid_checkpoint_findings(&temp_path, &phase).await;
-
-    assert!(!result);
-}
-
-#[tokio::test]
-async fn test_has_valid_checkpoint_findings_different_phases() {
-    let temp_path = PathBuf::from("/tmp/nonexistent_checkpoint_12345");
-
-    let indexing_result = has_valid_checkpoint_findings(&temp_path, &ScanPhase::Indexing).await;
-    let semgrep_result = has_valid_checkpoint_findings(&temp_path, &ScanPhase::Semgrep).await;
-    let llm_result = has_valid_checkpoint_findings(&temp_path, &ScanPhase::LlmStaticAnalysis).await;
-
-    assert!(!indexing_result);
-    assert!(!semgrep_result);
-    assert!(!llm_result);
-}
 
 // ============================================================================
 // Edge Cases and Integration Tests
