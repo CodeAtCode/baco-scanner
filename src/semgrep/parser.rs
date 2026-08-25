@@ -196,7 +196,12 @@ pub fn parse_json_output(
                 agent_mode: false,
                 statement_range: Some((rf.line, rf.end_line)),
                 triage_verdict: None,
-                evidence: vec![],
+                evidence: vec![crate::evidence::Evidence {
+                    source: crate::evidence::EvidenceSource::Semgrep(check_id.clone()),
+                    weight: 0.7,
+                    detail: format!("Detected by Semgrep rule {}", check_id),
+                    timestamp: chrono::Utc::now(),
+                }],
                 verification_tier: None,
             });
         } else {
@@ -271,7 +276,12 @@ pub fn parse_json_output(
                 agent_mode: false,
                 statement_range: None,
                 triage_verdict: None,
-                evidence: vec![],
+                evidence: vec![crate::evidence::Evidence {
+                    source: crate::evidence::EvidenceSource::Semgrep(check_id.clone()),
+                    weight: 0.7,
+                    detail: format!("Detected by Semgrep rule {}", check_id),
+                    timestamp: chrono::Utc::now(),
+                }],
                 verification_tier: None,
             });
         }
