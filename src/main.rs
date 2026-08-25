@@ -27,6 +27,8 @@ enum Commands {
         target: Option<PathBuf>,
         #[arg(long, short)]
         force: bool,
+        #[arg(long, help = "Only independently reproduced findings reach reports")]
+        evidence_gate: bool,
     },
     Resume {
         #[arg(short, long)]
@@ -82,9 +84,10 @@ async fn main() {
             config,
             target,
             force,
+            evidence_gate,
         } => {
             info!("Starting scan with config: {:?}", config);
-            run_scan(&config, target, force, cli.quiet)
+            run_scan(&config, target, force, evidence_gate, cli.quiet)
                 .await
                 .unwrap_or_else(|e| {
                     tracing::error!("Scan failed: {}", e);
@@ -121,6 +124,7 @@ async fn run_scan(
     config_path: &Path,
     target: Option<PathBuf>,
     force: bool,
+    evidence_gate: bool,
     quiet: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     match validation::validate_config(config_path) {
@@ -130,8 +134,17 @@ async fn run_scan(
             std::process::exit(2);
         }
     }
-    let config =
+    let mut config =
         config::ScannerConfig::from_file(config_path.to_str().ok_or("Invalid config path")?)?;
+
+    // Apply CLI flag override
+    if evidence_gate {
+        config.output.evidence_gate = true;
+    }
+
+    // Save evidence_gate flag before config is moved into scanner
+    let evidence_gate_enabled = config.output.evidence_gate;
+
     let output_dir = PathBuf::from(&config.output.dir);
     std::fs::create_dir_all(&output_dir)?;
 
@@ -201,6 +214,24 @@ async fn run_scan(
             tracing::info!("Severity breakdown: {}", parts.join(", "));
         }
 
+        // Evidence tier summary when gating is active
+        if evidence_gate_enabled {
+            let mut tier_counts = (0, 0, 0); // (verified, supported, unverified)
+            for finding in &findings {
+                let tier =
+                    baco::evidence::classify_finding(&finding.evidence, finding.confidence_score);
+                match tier {
+                    baco::evidence::VerificationTier::Verified => tier_counts.0 += 1,
+                    baco::evidence::VerificationTier::Supported => tier_counts.1 += 1,
+                    baco::evidence::VerificationTier::Unverified => tier_counts.2 += 1,
+                }
+            }
+            println!(
+                "Evidence gate: {} verified, {} supported, {} unverified (excluded from reports)",
+                tier_counts.0, tier_counts.1, tier_counts.2
+            );
+        }
+
         // Save findings to output directory
         let findings_path = output_dir.join("findings.json");
         let json = serde_json::to_string_pretty(&findings)?;
@@ -213,6 +244,24 @@ async fn run_scan(
     } else {
         // Quiet mode: only show summary line when complete
         tracing::info!("Scan complete: {} findings", findings.len());
+
+        // Evidence tier summary when gating is active
+        if evidence_gate_enabled {
+            let mut tier_counts = (0, 0, 0); // (verified, supported, unverified)
+            for finding in &findings {
+                let tier =
+                    baco::evidence::classify_finding(&finding.evidence, finding.confidence_score);
+                match tier {
+                    baco::evidence::VerificationTier::Verified => tier_counts.0 += 1,
+                    baco::evidence::VerificationTier::Supported => tier_counts.1 += 1,
+                    baco::evidence::VerificationTier::Unverified => tier_counts.2 += 1,
+                }
+            }
+            println!(
+                "Evidence gate: {} verified, {} supported, {} unverified (excluded from reports)",
+                tier_counts.0, tier_counts.1, tier_counts.2
+            );
+        }
 
         // Save findings to output directory
         let findings_path = output_dir.join("findings.json");

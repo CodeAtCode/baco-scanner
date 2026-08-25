@@ -9,6 +9,7 @@
 use baco::config::ScannerConfig;
 use baco::evidence::{Evidence, EvidenceSource};
 use baco::findings::{Severity, VulnerabilityFinding};
+use baco::report::html::generate_html_report;
 use baco::report::json::write_findings_json;
 use baco::report::sarif::generate_sarif_report;
 use chrono::Utc;
@@ -138,9 +139,9 @@ fn gate_on_keeps_high_confidence_supported() {
 }
 
 #[test]
-fn json_gate_on_drops_unverified() {
+fn json_gate_on_includes_all_findings_with_tiers() {
     let findings = vec![
-        make_finding("empty", vec![]),
+        make_finding("unverified", vec![]),
         make_finding(
             "verified",
             vec![
@@ -156,6 +157,55 @@ fn json_gate_on_drops_unverified() {
     let _ = std::fs::remove_file(path);
     let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
     let findings = parsed.as_array().unwrap();
-    assert_eq!(findings.len(), 1);
-    assert_eq!(findings[0]["id"], "verified");
+    // JSON keeps ALL findings for transparency
+    assert_eq!(findings.len(), 2);
+    // Each finding has verification_tier set
+    assert_eq!(findings[0]["verification_tier"], "unverified");
+    assert_eq!(findings[1]["verification_tier"], "verified");
+}
+
+#[test]
+fn html_gate_on_includes_appendix_for_unverified() {
+    let findings = vec![
+        make_finding("unverified", vec![]),
+        make_finding(
+            "verified",
+            vec![
+                make_evidence(EvidenceSource::Semgrep("s".into())),
+                make_evidence(EvidenceSource::IndependentVerifier("v".into())),
+            ],
+        ),
+    ];
+    let path = "/tmp/baco_e2e_gate.html";
+    let cfg = gate_config();
+    generate_html_report(&findings, path, Some(&cfg), None).unwrap();
+    let content = std::fs::read_to_string(path).unwrap();
+    let _ = std::fs::remove_file(path);
+
+    // Appendix section exists
+    assert!(content.contains("Appendix: Unverified Findings"));
+    // Unverified finding title is mentioned
+    assert!(content.contains("Finding unverified"));
+}
+
+#[test]
+fn html_gate_off_no_appendix() {
+    let findings = vec![
+        make_finding("unverified", vec![]),
+        make_finding(
+            "verified",
+            vec![
+                make_evidence(EvidenceSource::Semgrep("s".into())),
+                make_evidence(EvidenceSource::IndependentVerifier("v".into())),
+            ],
+        ),
+    ];
+    let path = "/tmp/baco_e2e_no_gate.html";
+    let cfg = ScannerConfig::default();
+    generate_html_report(&findings, path, Some(&cfg), None).unwrap();
+    let content = std::fs::read_to_string(path).unwrap();
+    let _ = std::fs::remove_file(path);
+
+    // No appendix when gate is off
+    assert!(!content.contains("Appendix: Unverified Findings"));
 }

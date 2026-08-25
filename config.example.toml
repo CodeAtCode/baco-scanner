@@ -23,6 +23,10 @@ languages = ["c", "python"]
 dir = "./baco-output"
 # Report formats to generate: ["json", "html", "both"]
 format = ["json", "html"]
+# Evidence gate (default: false). When true, only findings classified as
+# verified or supported reach report.html and report.sarif; findings.json
+# always contains every finding with its verification_tier attached.
+# evidence_gate = false
 
 # Scanner settings
 [scanner]

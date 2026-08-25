@@ -97,6 +97,31 @@ When `triage_verdict` is `downgrade`, the finding includes `adjusted_severity` s
 
 When `triage_verdict` is `chain_required`, the finding includes `chain_partner_ids` listing related finding IDs that must be present for exploitation.
 
+## Verification Tiers
+
+The `verification_tier` field classifies how strongly a finding is supported by independent evidence:
+
+| Tier | Rule | Meaning |
+|------|------|---------|
+| `verified` | Evidence from ≥2 different source kinds, including at least one verifier | Independently reproduced — highest trust |
+| `supported` | ≥2 evidence items of any kind, or a single source with confidence > 0.8 | Plausible but not independently reproduced |
+| `unverified` | Everything else | Single-source or no evidence |
+
+Evidence sources are grouped into kinds: static analysis (`semgrep`, `cpg_slice`), LLM analysis (`llm_analysis`, `rule_synthesis`), verifiers (`independent_verifier`, `security_agent_verification`), and specifications (`cwe_spec`). Two entries from the same kind do not count as independent reproduction.
+
+### Evidence Gating
+
+Enable with `[output] evidence_gate = true` in your config or `--evidence-gate` on the scan command:
+
+| Output | Behavior when gate is on |
+|--------|--------------------------|
+| `findings.json` | All findings kept; each gets `verification_tier` attached |
+| `report.html` | Main body shows verified + supported only; unverified findings listed in an appendix section |
+| `report.sarif` | Only verified + supported findings emitted |
+| CLI | Summary line: `Evidence gate: N verified, M supported, K unverified (excluded from reports)` |
+
+With the gate off (default), all outputs contain all findings unchanged.
+
 ## Severity vs. Confidence: Prioritization Matrix
 
 Combine severity and confidence to decide what to fix first:
@@ -120,8 +145,9 @@ baco generates three output files:
 
 | File | Purpose |
 |------|---------|
-| `findings.json` | Full JSON array of all `VulnerabilityFinding` objects. Use for programmatic processing or custom reports. |
-| `report.html` | Human-readable HTML report with severity breakdown, charts, and clickable finding details. |
+| `findings.json` | Full JSON array of all `VulnerabilityFinding` objects. Use for programmatic processing or custom reports. With evidence gating on, each entry includes its `verification_tier`. |
+| `report.html` | Human-readable HTML report with severity breakdown, charts, and clickable finding details. With evidence gating on, shows verified + supported findings and an appendix of unverified ones. |
+| `report.sarif` | SARIF output for CI/CD integration. With evidence gating on, contains only verified + supported findings. |
 | `checkpoint.json` | Internal state for resuming interrupted scans. Do not edit manually. |
 
 All files are written to the output directory specified in your config or CLI flags.

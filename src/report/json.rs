@@ -1,5 +1,5 @@
 use crate::config::ScannerConfig;
-use crate::evidence::{classify_finding, VerificationTier};
+use crate::evidence::classify_finding;
 use crate::findings::{Severity, VulnerabilityFinding};
 use crate::llm_metrics::LlmMetrics;
 use serde::Serialize;
@@ -60,35 +60,19 @@ pub fn write_findings_json(
     llm_metrics: Option<LlmMetrics>,
     config: Option<&ScannerConfig>,
 ) -> Result<(), String> {
-    // Filter findings if evidence gate is enabled
-    let filtered_findings = if let Some(cfg) = config {
+    // JSON output contains ALL findings for transparency (no filtering)
+    // but ensures every finding has verification_tier set when gate is enabled
+    let mut findings_with_tier = findings.to_vec();
+    if let Some(cfg) = config {
         if cfg.output.evidence_gate {
-            findings
-                .iter()
-                .filter(|f| {
-                    let tier = classify_finding(&f.evidence, f.confidence_score);
-                    matches!(
-                        tier,
-                        VerificationTier::Verified | VerificationTier::Supported
-                    )
-                })
-                .cloned()
-                .collect::<Vec<_>>()
-        } else {
-            findings.to_vec()
-        }
-    } else {
-        findings.to_vec()
-    };
-
-    // Compute verification_tier for each finding
-    let mut findings_with_tier = filtered_findings;
-    for finding in &mut findings_with_tier {
-        if finding.verification_tier.is_none() {
-            finding.verification_tier = Some(classify_finding(
-                &finding.evidence,
-                finding.confidence_score,
-            ));
+            for finding in &mut findings_with_tier {
+                if finding.verification_tier.is_none() {
+                    finding.verification_tier = Some(classify_finding(
+                        &finding.evidence,
+                        finding.confidence_score,
+                    ));
+                }
+            }
         }
     }
 
