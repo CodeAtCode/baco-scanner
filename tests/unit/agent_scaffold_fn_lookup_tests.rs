@@ -1,18 +1,22 @@
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use baco::agent_scaffold::fn_lookup::{get_extensions_for_languages, FunctionLookup};
 use baco::context::control_path::Language;
+
+static FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 fn create_temp_file(content: &str, ext: &str) -> PathBuf {
     let mut temp_dir = std::env::temp_dir();
     temp_dir.push("baco_fn_lookup_test");
     let _ = fs::create_dir_all(&temp_dir);
 
-    // Use a unique filename based on timestamp and process ID to avoid collisions
-    let unique_id = std::time::Instant::now().elapsed().as_nanos();
-    let file_path = temp_dir.join(format!("test_{}_{}.{}", std::process::id(), unique_id, ext));
+    // Clock-based ids can collide for tests running in the same process
+    // within the same nanosecond; the counter cannot.
+    let id = FILE_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let file_path = temp_dir.join(format!("test_{}_{}.{}", std::process::id(), id, ext));
     let mut file = fs::File::create(&file_path).unwrap();
     file.write_all(content.as_bytes()).unwrap();
     file_path
