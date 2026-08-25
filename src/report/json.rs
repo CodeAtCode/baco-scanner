@@ -1,3 +1,5 @@
+use crate::config::ScannerConfig;
+use crate::evidence::{classify_finding, VerificationTier};
 use crate::findings::{Severity, VulnerabilityFinding};
 use crate::llm_metrics::LlmMetrics;
 use serde::Serialize;
@@ -56,7 +58,40 @@ pub fn write_findings_json(
     findings: &[VulnerabilityFinding],
     output_path: &str,
     llm_metrics: Option<LlmMetrics>,
+    config: Option<&ScannerConfig>,
 ) -> Result<(), String> {
+    // Filter findings if evidence gate is enabled
+    let filtered_findings = if let Some(cfg) = config {
+        if cfg.output.evidence_gate {
+            findings
+                .iter()
+                .filter(|f| {
+                    let tier = classify_finding(&f.evidence, f.confidence_score);
+                    matches!(
+                        tier,
+                        VerificationTier::Verified | VerificationTier::Supported
+                    )
+                })
+                .cloned()
+                .collect::<Vec<_>>()
+        } else {
+            findings.to_vec()
+        }
+    } else {
+        findings.to_vec()
+    };
+
+    // Compute verification_tier for each finding
+    let mut findings_with_tier = filtered_findings;
+    for finding in &mut findings_with_tier {
+        if finding.verification_tier.is_none() {
+            finding.verification_tier = Some(classify_finding(
+                &finding.evidence,
+                finding.confidence_score,
+            ));
+        }
+    }
+
     let _summary = ReportSummary {
         total_findings: findings.len(),
         critical: findings
@@ -118,7 +153,7 @@ pub fn write_findings_json(
         }),
     };
 
-    let json = serde_json::to_string_pretty(&findings)
+    let json = serde_json::to_string_pretty(&findings_with_tier)
         .map_err(|e| format!("Failed to serialize findings: {}", e))?;
 
     // Create parent directory if it doesn't exist
@@ -172,6 +207,8 @@ mod tests {
             agent_mode: false,
             statement_range: None,
             triage_verdict: None,
+            evidence: vec![],
+            verification_tier: None,
         }
     }
 
@@ -182,7 +219,7 @@ mod tests {
 
         let _ = fs::remove_file(output_path);
 
-        let result = write_findings_json(&findings, output_path, None);
+        let result = write_findings_json(&findings, output_path, None, None);
 
         assert!(result.is_ok());
         assert!(Path::new(output_path).exists());
@@ -200,7 +237,7 @@ mod tests {
 
         let _ = fs::remove_file(output_path);
 
-        let result = write_findings_json(&findings, output_path, None);
+        let result = write_findings_json(&findings, output_path, None, None);
 
         assert!(result.is_ok());
 
@@ -224,7 +261,7 @@ mod tests {
 
         let _ = fs::remove_file(output_path);
 
-        let result = write_findings_json(&findings, output_path, None);
+        let result = write_findings_json(&findings, output_path, None, None);
 
         assert!(result.is_ok());
 
@@ -249,7 +286,7 @@ mod tests {
 
         let _ = fs::remove_file(output_path);
 
-        let result = write_findings_json(&findings, output_path, None);
+        let result = write_findings_json(&findings, output_path, None, None);
 
         assert!(result.is_ok());
 
@@ -268,7 +305,7 @@ mod tests {
 
         let _ = fs::remove_file(output_path);
 
-        let result = write_findings_json(&findings, output_path, None);
+        let result = write_findings_json(&findings, output_path, None, None);
 
         assert!(result.is_ok());
 
@@ -286,7 +323,7 @@ mod tests {
 
         let _ = fs::remove_dir_all(&temp_dir);
 
-        let result = write_findings_json(&findings, output_path.to_str().unwrap(), None);
+        let result = write_findings_json(&findings, output_path.to_str().unwrap(), None, None);
 
         assert!(result.is_ok());
         assert!(output_path.exists());
@@ -304,7 +341,7 @@ mod tests {
 
         let _ = fs::remove_file(output_path);
 
-        let result = write_findings_json(&findings, output_path, None);
+        let result = write_findings_json(&findings, output_path, None, None);
 
         assert!(result.is_ok());
 
@@ -354,7 +391,7 @@ mod tests {
 
         let _ = fs::remove_file(output_path);
 
-        let result = write_findings_json(&findings, output_path, Some(llm_metrics));
+        let result = write_findings_json(&findings, output_path, Some(llm_metrics), None);
 
         assert!(result.is_ok());
 
@@ -379,7 +416,7 @@ mod tests {
 
         let _ = fs::remove_file(output_path);
 
-        let result = write_findings_json(&findings, output_path, None);
+        let result = write_findings_json(&findings, output_path, None, None);
 
         assert!(result.is_ok());
 
@@ -405,7 +442,7 @@ mod tests {
 
         let _ = fs::remove_file(output_path);
 
-        let result = write_findings_json(&findings, output_path, None);
+        let result = write_findings_json(&findings, output_path, None, None);
 
         assert!(result.is_ok());
 
@@ -432,7 +469,7 @@ mod tests {
 
         let _ = fs::remove_file(output_path);
 
-        let result = write_findings_json(&findings, output_path, None);
+        let result = write_findings_json(&findings, output_path, None, None);
 
         assert!(result.is_ok());
 
@@ -452,7 +489,7 @@ mod tests {
 
         let _ = fs::remove_file(output_path);
 
-        let result = write_findings_json(&findings, output_path, None);
+        let result = write_findings_json(&findings, output_path, None, None);
 
         assert!(result.is_ok());
 
@@ -474,7 +511,7 @@ mod tests {
 
         let _ = fs::remove_file(output_path);
 
-        let result = write_findings_json(&findings, output_path, None);
+        let result = write_findings_json(&findings, output_path, None, None);
 
         assert!(result.is_ok());
 
@@ -493,7 +530,7 @@ mod tests {
 
         let _ = fs::remove_file(output_path);
 
-        let result = write_findings_json(&findings, output_path, None);
+        let result = write_findings_json(&findings, output_path, None, None);
 
         assert!(result.is_ok());
 
@@ -517,7 +554,7 @@ mod tests {
 
         let _ = fs::remove_file(output_path);
 
-        let result = write_findings_json(&findings, output_path, None);
+        let result = write_findings_json(&findings, output_path, None, None);
 
         assert!(result.is_ok());
 
@@ -539,7 +576,7 @@ mod tests {
 
         let _ = fs::remove_file(output_path);
 
-        let result = write_findings_json(&findings, output_path, None);
+        let result = write_findings_json(&findings, output_path, None, None);
 
         assert!(result.is_ok());
 

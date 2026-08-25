@@ -44,39 +44,47 @@ impl CveBootstrapper {
 
         let root = Path::new(&self.project_root);
 
-        if let Ok(cargo) = self.parse_cargo_toml(root) {
-            stack.languages.push("Rust".to_string());
-            stack.dependencies = cargo;
-        }
-
-        if let Ok(npm) = self.parse_package_json(root) {
-            if !stack.languages.contains(&"JavaScript".to_string()) {
-                stack.languages.push("JavaScript".to_string());
-            }
-            stack.frameworks.extend(npm.0);
-            for dep in npm.1 {
-                stack.dependencies.push(dep);
+        if root.join("Cargo.toml").exists() {
+            if let Ok(cargo) = self.parse_cargo_toml(root) {
+                stack.languages.push("Rust".to_string());
+                stack.dependencies = cargo;
             }
         }
 
-        if let Ok(python) = self.parse_requirements_txt(root) {
-            if !stack.languages.contains(&"Python".to_string()) {
-                stack.languages.push("Python".to_string());
+        if root.join("package.json").exists() {
+            if let Ok(npm) = self.parse_package_json(root) {
+                if !stack.languages.contains(&"JavaScript".to_string()) {
+                    stack.languages.push("JavaScript".to_string());
+                }
+                stack.frameworks.extend(npm.0);
+                for dep in npm.1 {
+                    stack.dependencies.push(dep);
+                }
             }
-            stack.dependencies.extend(python);
         }
 
-        if let Ok(go) = self.parse_go_mod(root) {
-            if !stack.languages.contains(&"Go".to_string()) {
-                stack.languages.push("Go".to_string());
+        if root.join("requirements.txt").exists() {
+            if let Ok(python) = self.parse_requirements_txt(root) {
+                if !stack.languages.contains(&"Python".to_string()) {
+                    stack.languages.push("Python".to_string());
+                }
+                stack.dependencies.extend(python);
             }
-            stack.dependencies = go;
+        }
+
+        if root.join("go.mod").exists() {
+            if let Ok(go) = self.parse_go_mod(root) {
+                if !stack.languages.contains(&"Go".to_string()) {
+                    stack.languages.push("Go".to_string());
+                }
+                stack.dependencies = go;
+            }
         }
 
         Ok(stack)
     }
 
-    fn parse_cargo_toml(&self, root: &Path) -> Result<Vec<Dependency>> {
+    pub fn parse_cargo_toml(&self, root: &Path) -> Result<Vec<Dependency>> {
         let cargo_path = root.join("Cargo.toml");
         if !cargo_path.exists() {
             return Ok(Vec::new());
@@ -122,7 +130,7 @@ impl CveBootstrapper {
         Ok(deps)
     }
 
-    fn parse_package_json(&self, root: &Path) -> Result<(Vec<String>, Vec<Dependency>)> {
+    pub fn parse_package_json(&self, root: &Path) -> Result<(Vec<String>, Vec<Dependency>)> {
         let pkg_path = root.join("package.json");
         if !pkg_path.exists() {
             return Ok((Vec::new(), Vec::new()));
@@ -163,7 +171,7 @@ impl CveBootstrapper {
         Ok((frameworks, deps))
     }
 
-    fn parse_requirements_txt(&self, root: &Path) -> Result<Vec<Dependency>> {
+    pub fn parse_requirements_txt(&self, root: &Path) -> Result<Vec<Dependency>> {
         let req_path = root.join("requirements.txt");
         if !req_path.exists() {
             return Ok(Vec::new());
@@ -217,7 +225,7 @@ impl CveBootstrapper {
         }
     }
 
-    fn parse_go_mod(&self, root: &Path) -> Result<Vec<Dependency>> {
+    pub fn parse_go_mod(&self, root: &Path) -> Result<Vec<Dependency>> {
         let go_path = root.join("go.mod");
         if !go_path.exists() {
             return Ok(Vec::new());
@@ -327,7 +335,11 @@ impl CveBootstrapper {
             });
         }
 
-        clusters.sort_by_key(|b| std::cmp::Reverse(b.cve_count));
+        clusters.sort_by(|a, b| {
+            b.cve_count
+                .cmp(&a.cve_count)
+                .then_with(|| a.pattern_name.cmp(&b.pattern_name))
+        });
 
         clusters
     }

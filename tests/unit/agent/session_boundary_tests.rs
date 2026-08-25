@@ -336,6 +336,8 @@ async fn test_verify_finding_max_turns_boundary() {
         agent_mode: true,
         statement_range: None,
         triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
     };
 
     let result = session.verify_finding("test.rs", &finding).await;

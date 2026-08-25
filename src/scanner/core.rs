@@ -171,6 +171,7 @@ mod tests {
             },
             output: OutputConfig {
                 dir: "/tmp/test-output".to_string(),
+                evidence_gate: false,
             },
             scanner: crate::config::ScannerSettings {
                 max_file_size_kb: 1024,
@@ -253,6 +254,8 @@ mod tests {
             agent_mode: false,
             statement_range: None,
             triage_verdict: None,
+            evidence: vec![],
+            verification_tier: None,
         }];
 
         let scanner =
@@ -312,6 +315,8 @@ mod tests {
             agent_mode: false,
             statement_range: None,
             triage_verdict: None,
+            evidence: vec![],
+            verification_tier: None,
         });
 
         assert_eq!(scanner.findings().len(), 1);
@@ -354,6 +359,8 @@ mod tests {
             agent_mode: false,
             statement_range: None,
             triage_verdict: None,
+            evidence: vec![],
+            verification_tier: None,
         });
 
         let findings = scanner.findings_mut();
@@ -398,6 +405,8 @@ mod tests {
             agent_mode: false,
             statement_range: None,
             triage_verdict: None,
+            evidence: vec![],
+            verification_tier: None,
         });
 
         assert_eq!(scanner.findings().len(), 1);
@@ -434,6 +443,8 @@ mod tests {
             agent_mode: false,
             statement_range: None,
             triage_verdict: None,
+            evidence: vec![],
+            verification_tier: None,
         }];
 
         scanner.update_findings(new_findings.clone());
@@ -551,6 +562,8 @@ mod tests {
             agent_mode: false,
             statement_range: None,
             triage_verdict: None,
+            evidence: vec![],
+            verification_tier: None,
         }];
 
         let multi_progress = MultiProgress::new();
@@ -597,6 +610,8 @@ mod tests {
             agent_mode: false,
             statement_range: None,
             triage_verdict: None,
+            evidence: vec![],
+            verification_tier: None,
         }
     }
 

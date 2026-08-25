@@ -775,6 +775,8 @@ fn test_render_finding_with_all_fields_populated() {
         agent_mode: true,
         statement_range: Some((40, 45)),
         triage_verdict: Some(TriageVerdict::Pass),
+        evidence: vec![],
+        verification_tier: None,
     };
 
     let html = baco::report::html::finding_renderer::render_finding(&finding, 58);

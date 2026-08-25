@@ -70,6 +70,8 @@ mod tests {
             agent_mode: false,
             statement_range: None,
             triage_verdict: None,
+            evidence: vec![],
+            verification_tier: None,
         }];
 
         let has_valid = findings.iter().all(|f| f.description.is_empty());
@@ -110,6 +112,8 @@ mod tests {
             agent_mode: false,
             statement_range: None,
             triage_verdict: None,
+            evidence: vec![],
+            verification_tier: None,
         };
 
         let checkpoint_findings = vec![valid_finding];
@@ -155,6 +159,8 @@ mod tests {
                 agent_mode: false,
                 statement_range: None,
                 triage_verdict: None,
+                evidence: vec![],
+                verification_tier: None,
             },
             VulnerabilityFinding {
                 id: "test-2".to_string(),
@@ -187,6 +193,8 @@ mod tests {
                 agent_mode: false,
                 statement_range: None,
                 triage_verdict: None,
+                evidence: vec![],
+                verification_tier: None,
             },
         ];
 
@@ -435,6 +443,8 @@ mod tests {
             agent_mode: false,
             statement_range: None,
             triage_verdict: None,
+            evidence: vec![],
+            verification_tier: None,
         }];
 
         findings.append(&mut indexing_findings.clone());
@@ -471,6 +481,8 @@ mod tests {
             agent_mode: false,
             statement_range: None,
             triage_verdict: None,
+            evidence: vec![],
+            verification_tier: None,
         }];
 
         findings.append(&mut semgrep_findings.clone());
@@ -621,6 +633,8 @@ mod tests {
                 agent_mode: false,
                 statement_range: None,
                 triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
             }],
             vec!["file.rs".to_string()],
         ));
@@ -675,6 +689,8 @@ mod tests {
             agent_mode: false,
             statement_range: None,
             triage_verdict: None,
+            evidence: vec![],
+            verification_tier: None,
         }];
         let has_valid_single = !single_empty_desc.is_empty()
             && single_empty_desc.iter().any(|f| !f.description.is_empty());

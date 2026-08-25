@@ -40,6 +40,7 @@ fn create_test_config() -> config::ScannerConfig {
         },
         output: baco::config::OutputConfig {
             dir: "/tmp/test_output".to_string(),
+            evidence_gate: false,
         },
         scanner: ScannerSettings {
             max_file_size_kb: 1024,

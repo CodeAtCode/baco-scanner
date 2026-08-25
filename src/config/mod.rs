@@ -208,6 +208,8 @@ pub struct ProjectConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct OutputConfig {
     pub dir: String,
+    #[serde(default)]
+    pub evidence_gate: bool,
 }
 
 // Default value functions - these need to be in mod.rs so they can be referenced

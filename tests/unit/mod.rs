@@ -230,3 +230,9 @@ mod inert_config_wiring_tests;
 
 // Phase scheduling tests
 mod phase_scheduling_tests;
+
+// Evidence-gating classification tests
+mod evidence_tests;
+
+// CVE bootstrap tests
+mod cve_bootstrap_tests;

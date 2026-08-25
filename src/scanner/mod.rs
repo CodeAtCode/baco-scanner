@@ -124,6 +124,7 @@ mod tests {
             },
             output: crate::config::OutputConfig {
                 dir: "/tmp/test_output".to_string(),
+                evidence_gate: false,
             },
             agent: AgentConfig::default(),
             tickets: crate::config::TicketConfig { systems: vec![] },

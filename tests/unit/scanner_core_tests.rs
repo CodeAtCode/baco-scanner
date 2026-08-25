@@ -23,6 +23,7 @@ fn create_test_config() -> baco::config::ScannerConfig {
     baco::config::ScannerConfig {
         output: OutputConfig {
             dir: "/tmp/baco_test_output".to_string(),
+            evidence_gate: false,
         },
         scanner: ScannerSettings {
             performance: PerformanceSettings {
@@ -687,6 +688,7 @@ fn create_config_without_llm_keys() -> baco::config::ScannerConfig {
     baco::config::ScannerConfig {
         output: OutputConfig {
             dir: "/tmp/baco_run_test_output".to_string(),
+            evidence_gate: false,
         },
         scanner: ScannerSettings {
             performance: PerformanceSettings {
@@ -840,6 +842,8 @@ async fn test_scanner_run_with_initial_findings_force() {
             agent_mode: false,
             statement_range: None,
             triage_verdict: None,
+            evidence: vec![],
+            verification_tier: None,
         })
         .collect();
 

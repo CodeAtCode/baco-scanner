@@ -227,40 +227,69 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     }
 }
 
-/// Hybrid search combining BM25 and vector similarity
+/// Reciprocal Rank Fusion (RRF) for merging ranked lists
+///
+/// Formula: RRF(d) = Σ 1/(k + rank_i(d))
+/// where k=60 (standard) and rank_i(d) is the rank of document d in result list i
+fn reciprocal_rank_fusion(
+    bm25_results: Vec<(usize, f32)>,
+    vector_results: Vec<(usize, f32)>,
+    k: usize,
+    top_k: usize,
+) -> Vec<(usize, f64)> {
+    use std::collections::HashMap;
+
+    // Compute RRF scores for each document
+    let mut rrf_scores: HashMap<usize, f64> = HashMap::new();
+
+    // Process BM25 results (rank starts at 1)
+    for (rank, (doc_idx, _)) in bm25_results.iter().enumerate() {
+        let rank = rank + 1; // 1-based rank
+        let score = 1.0 / (k as f64 + rank as f64);
+        *rrf_scores.entry(*doc_idx).or_insert(0.0) += score;
+    }
+
+    // Process vector results (rank starts at 1)
+    for (rank, (doc_idx, _)) in vector_results.iter().enumerate() {
+        let rank = rank + 1; // 1-based rank
+        let score = 1.0 / (k as f64 + rank as f64);
+        *rrf_scores.entry(*doc_idx).or_insert(0.0) += score;
+    }
+
+    // Convert to sorted vector
+    let mut results: Vec<(usize, f64)> = rrf_scores.into_iter().collect();
+
+    // Sort by score descending, tie-break by doc_idx ascending
+    results.sort_by(|a, b| {
+        b.1.partial_cmp(&a.1)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then(a.0.cmp(&b.0))
+    });
+
+    // Cap at top_k
+    results.truncate(top_k);
+    results
+}
+
+/// Hybrid search combining BM25 and vector similarity using Reciprocal Rank Fusion
 fn hybrid_search(query: &str, top_k: usize) -> Vec<(usize, f32)> {
     let index = EMBEDDING_INDEX.read().expect("Failed to acquire read lock");
 
     // BM25 search
     let bm25_results = index.search_bm25(query, top_k * 2);
-    let bm25_scores: HashMap<usize, f32> = bm25_results.into_iter().collect();
 
     // Vector search
     let query_embedding = generate_embedding(query);
     let vector_results = index.search_vector(&query_embedding, top_k * 2);
-    let vector_scores: HashMap<usize, f32> = vector_results.into_iter().collect();
 
-    // Combine scores (weighted average)
-    let mut combined_scores: HashMap<usize, f32> = HashMap::new();
-    let all_docs: Vec<usize> = bm25_scores
-        .keys()
-        .chain(vector_scores.keys())
-        .copied()
-        .collect();
+    // Apply RRF fusion
+    let rrf_results = reciprocal_rank_fusion(bm25_results, vector_results, 60, top_k);
 
-    for doc_id in all_docs {
-        let bm25_score = bm25_scores.get(&doc_id).copied().unwrap_or(0.0);
-        let vector_score = vector_scores.get(&doc_id).copied().unwrap_or(0.0);
-
-        // Weight: 40% BM25, 60% vector
-        let combined = 0.4 * bm25_score + 0.6 * vector_score;
-        combined_scores.insert(doc_id, combined);
-    }
-
-    let mut results: Vec<(usize, f32)> = combined_scores.into_iter().collect();
-    results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-    results.truncate(top_k);
-    results
+    // Convert f64 scores back to f32 for compatibility
+    rrf_results
+        .into_iter()
+        .map(|(doc_idx, score)| (doc_idx, score as f32))
+        .collect()
 }
 
 /// Retrieve relevant specifications for target code
@@ -483,5 +512,91 @@ mod tests {
         // Note: 'where' may or may not be filtered depending on implementation
         // Just verify we got some keywords
         assert!(!keywords.is_empty());
+    }
+
+    #[test]
+    fn test_reciprocal_rank_fusion_empty_inputs() {
+        // Both empty
+        let result = reciprocal_rank_fusion(vec![], vec![], 60, 10);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_reciprocal_rank_fusion_one_empty() {
+        // BM25 empty, vector non-empty
+        let vector_results = vec![(1, 0.9), (2, 0.8), (3, 0.7)];
+        let result = reciprocal_rank_fusion(vec![], vector_results.clone(), 60, 10);
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0].0, 1); // Highest ranked
+        assert_eq!(result[1].0, 2);
+        assert_eq!(result[2].0, 3);
+
+        // Vector empty, BM25 non-empty
+        let bm25_results = vec![(4, 0.9), (5, 0.8)];
+        let result = reciprocal_rank_fusion(bm25_results.clone(), vec![], 60, 10);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].0, 4);
+        assert_eq!(result[1].0, 5);
+    }
+
+    #[test]
+    fn test_reciprocal_rank_fusion_overlapping_results() {
+        // Same doc in both lists - should have higher RRF score
+        let bm25_results = vec![(1, 0.9), (2, 0.8), (3, 0.7)];
+        let vector_results = vec![(2, 0.85), (4, 0.75), (5, 0.65)];
+
+        let result = reciprocal_rank_fusion(bm25_results, vector_results, 60, 10);
+
+        // Doc 2 appears in both lists, should have highest RRF score
+        assert_eq!(result[0].0, 2);
+
+        // All unique docs should be present
+        let doc_ids: Vec<usize> = result.iter().map(|(id, _)| *id).collect();
+        assert!(doc_ids.contains(&1));
+        assert!(doc_ids.contains(&2));
+        assert!(doc_ids.contains(&3));
+        assert!(doc_ids.contains(&4));
+        assert!(doc_ids.contains(&5));
+    }
+
+    #[test]
+    fn test_reciprocal_rank_fusion_tie_breaking() {
+        // Create scenario where two docs have same RRF score (same rank in both lists)
+        let bm25_results = vec![(5, 0.9), (3, 0.8)];
+        let vector_results = vec![(3, 0.9), (5, 0.8)];
+
+        let result = reciprocal_rank_fusion(bm25_results, vector_results, 60, 10);
+
+        // Both docs have same RRF score (rank 1 in one list, rank 2 in other)
+        // Tie-break by doc_idx ascending, so doc 3 should come before doc 5
+        assert_eq!(result[0].0, 3);
+        assert_eq!(result[1].0, 5);
+    }
+
+    #[test]
+    fn test_reciprocal_rank_fusion_top_k_capping() {
+        let bm25_results = vec![(1, 0.9), (2, 0.8), (3, 0.7), (4, 0.6)];
+        let vector_results = vec![(5, 0.9), (6, 0.8), (7, 0.7), (8, 0.6)];
+
+        // Request only top 3
+        let result = reciprocal_rank_fusion(bm25_results, vector_results, 60, 3);
+
+        assert_eq!(result.len(), 3);
+        // All should be unique
+        let doc_ids: Vec<usize> = result.iter().map(|(id, _)| *id).collect();
+        assert_eq!(doc_ids.len(), 3);
+    }
+
+    #[test]
+    fn test_reciprocal_rank_fusion_rank_calculation() {
+        // Verify RRF formula: 1/(k + rank)
+        let bm25_results = vec![(1, 1.0)]; // rank 1
+        let vector_results = vec![];
+
+        let result = reciprocal_rank_fusion(bm25_results, vector_results, 60, 10);
+
+        // RRF score should be 1/(60 + 1) = 1/61
+        let expected_score = 1.0 / 61.0;
+        assert!((result[0].1 - expected_score).abs() < 1e-10);
     }
 }

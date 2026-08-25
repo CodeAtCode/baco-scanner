@@ -177,6 +177,8 @@ async fn test_phase_context_isolation() {
                     agent_mode: false,
                     statement_range: None,
                     triage_verdict: None,
+                    evidence: vec![],
+                    verification_tier: None,
                 };
 
                 scanner.add_finding(finding.clone());
@@ -287,6 +289,8 @@ async fn test_report_generation_isolation() {
                         agent_mode: false,
                         statement_range: None,
                         triage_verdict: None,
+                        evidence: vec![],
+                        verification_tier: None,
                     };
                     scanner.add_finding(finding);
                 }

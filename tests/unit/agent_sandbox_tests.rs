@@ -64,6 +64,8 @@ fn create_minimal_finding() -> VulnerabilityFinding {
         agent_mode: true,
         statement_range: None,
         triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
     }
 }
 

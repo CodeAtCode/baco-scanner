@@ -453,6 +453,8 @@ mod tests {
             poc_format: None,
             statement_range: None,
             triage_verdict: None,
+            evidence: vec![],
+            verification_tier: None,
         }
     }
 

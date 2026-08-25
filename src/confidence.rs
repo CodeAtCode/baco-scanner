@@ -97,6 +97,8 @@ mod tests {
             agent_mode: false,
             statement_range: None,
             triage_verdict: None,
+            evidence: vec![],
+            verification_tier: None,
         };
 
         let score = ConfidenceCalculator::calculate_composite(&mut finding);
@@ -137,6 +139,8 @@ mod tests {
             agent_mode: false,
             statement_range: None,
             triage_verdict: None,
+            evidence: vec![],
+            verification_tier: None,
         };
 
         let score = ConfidenceCalculator::calculate_composite(&mut finding);
@@ -176,6 +180,8 @@ mod tests {
             agent_mode: false,
             statement_range: None,
             triage_verdict: None,
+            evidence: vec![],
+            verification_tier: None,
         };
 
         ConfidenceCalculator::recalculate_priority(&mut finding);

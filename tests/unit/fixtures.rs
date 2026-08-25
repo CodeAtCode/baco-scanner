@@ -107,6 +107,8 @@ pub fn create_minimal_finding() -> VulnerabilityFinding {
         agent_mode: false,
         statement_range: None,
         triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
     }
 }
 
@@ -147,6 +149,8 @@ pub fn create_complete_finding() -> VulnerabilityFinding {
         agent_mode: false,
         statement_range: None,
         triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
     }
 }
 
@@ -199,6 +203,7 @@ pub fn create_test_config() -> ScannerConfig {
         },
         output: OutputConfig {
             dir: "/tmp/baco-test-output".to_string(),
+            evidence_gate: false,
         },
         scanner: ScannerSettings {
             max_file_size_kb: 1024,
@@ -284,6 +289,7 @@ pub fn create_minimal_config() -> ScannerConfig {
         },
         output: OutputConfig {
             dir: "/tmp/baco_test_output".to_string(),
+            evidence_gate: false,
         },
         scanner: ScannerSettings {
             max_file_size_kb: 1024,
@@ -711,6 +717,8 @@ pub fn make_aggregation_finding(
         agent_mode: false,
         statement_range: None,
         triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
     }
 }
 

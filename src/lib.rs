@@ -34,6 +34,7 @@ pub mod crossfile;
 pub mod cve_bootstrap;
 pub mod cve_client;
 pub mod error;
+pub mod evidence;
 pub mod exploit;
 pub mod file_hash;
 pub mod findings;

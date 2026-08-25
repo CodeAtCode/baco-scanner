@@ -130,9 +130,12 @@ pub async fn run_reporting(
     let llm_metrics = metrics_tracker.finalize().await;
 
     let json_path = format!("{}/findings.json", config.output.dir);
-    if let Err(e) =
-        crate::report::json::write_findings_json(&findings, json_path.as_str(), Some(llm_metrics))
-    {
+    if let Err(e) = crate::report::json::write_findings_json(
+        &findings,
+        json_path.as_str(),
+        Some(llm_metrics),
+        None,
+    ) {
         tracing::warn!("Failed to write JSON report: {}", e);
     }
 

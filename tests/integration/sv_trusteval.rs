@@ -446,6 +446,8 @@ fn test_finding_json_roundtrip_with_fixture_context() {
         agent_mode: false,
         statement_range: None,
         triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
     };
 
     let json = serde_json::to_string(&finding).unwrap();

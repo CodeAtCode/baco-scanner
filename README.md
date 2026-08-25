@@ -64,7 +64,7 @@ cp config.example.toml my-config.toml
 - **Checkpoint/resume**: Crash recovery after each phase
 - **Multiple outputs**: JSON, HTML, SARIF
 - **Config-driven**: TOML config with env var overrides
-- **Ticket integration**: GitHub, GitLab, Bugzilla, Jira
+- **Ticket systems**: Configurable via `[[tickets.systems]]` TOML blocks (supports any system type via `system_type` field) — see [Configuration](docs/configuration.md) for setup
 
 ## Supported Languages
 

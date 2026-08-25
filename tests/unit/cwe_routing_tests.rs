@@ -56,6 +56,8 @@ fn create_finding_with_cwe(
         agent_mode: false,
         statement_range: None,
         triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
     }
 }
 

@@ -196,6 +196,8 @@ pub fn parse_json_output(
                 agent_mode: false,
                 statement_range: Some((rf.line, rf.end_line)),
                 triage_verdict: None,
+                evidence: vec![],
+                verification_tier: None,
             });
         } else {
             let first = &raw_findings[0];
@@ -269,6 +271,8 @@ pub fn parse_json_output(
                 agent_mode: false,
                 statement_range: None,
                 triage_verdict: None,
+                evidence: vec![],
+                verification_tier: None,
             });
         }
     }

@@ -53,6 +53,8 @@ pub fn create_test_finding(
         agent_mode: false,
         statement_range: None,
         triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
     }
 }
 
@@ -102,6 +104,8 @@ pub fn create_finding_with_params(
         agent_mode: false,
         statement_range: None,
         triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
     }
 }
 

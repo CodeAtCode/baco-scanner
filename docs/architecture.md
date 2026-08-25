@@ -13,34 +13,34 @@ BACO uses a **data-driven PhaseGraph** (`src/scanner/pipeline/orchestrator.rs`) 
 
 **Core Pipeline (24 phases):**
 
-Phase order is defined once in `PhaseGraph::new()` (src/scanner/pipeline/orchestrator.rs); this table mirrors it and must be updated when that changes.
+> **Note:** Phase order is defined in `PhaseGraph::new()` (src/scanner/pipeline/orchestrator.rs:28-53). This table is manually maintained and should be updated when that code changes.
 
-| Phase # | Name | Parallel/Sequential | Config gate (default) |
-|---------|------|---------------------|----------------------|
-| 1 | Indexing | Parallel | Always-on |
-| 2 | Semgrep | Parallel | Always-on |
-| 3 | CPG Slice | Parallel | `cpg.enabled=false` |
-| 4 | LLM Static Analysis | Parallel | `llm.phases.indexing` (API key present) |
-| 5 | CWE Routing | Sequential | Always-on |
-| 6 | Rule Synthesis | Sequential | `rulesynth.enabled=false` |
-| 7 | LLM Discovery | Sequential | `llm.phases.discovery` (API key present) |
-| 8 | LLM Verification | Sequential | `llm.phases.verification` (API key present) |
-| 9 | Validate | Sequential | `validate.enabled=false` |
-| 10 | SecurityAgent Verification | Sequential | `agent.enabled=false` |
-| 11 | Ticket Cross-Reference | Sequential | `llm.phases.ticket_crossref` (API key present) |
-| 12 | Git Analysis | Sequential | `llm.phases.git_analysis` (API key present) |
-| 13 | Cross-File Analysis | Sequential | `llm.phases.cross_file_analysis` (API key present) |
-| 14 | Confidence Scoring | Sequential | `normalization.enabled=false` |
-| 15 | AI Aggregation | Sequential | `llm.phases.aggregation` (API key present) |
-| 16 | Threat Modeling | Sequential | `aggregation.tier_2_features.enabled=false` |
-| 17 | Root Cause Deduplication | Sequential | `aggregation.root_cause_dedup=true` |
-| 18 | Multi-Verifier | Sequential | `aggregation.multi_verifier=true` |
-| 19 | Auto-Patching | Sequential | `aggregation.auto_patching=false` |
-| 20 | CVE Bootstrap | Sequential | `aggregation.cve_bootstrap=true` |
-| 21 | PoC Compilation | Sequential | `aggregation.poc_compilation=false` |
-| 22 | Exploit Synthesis | Sequential | `exploit.enabled=false` |
-| 23 | Variant Search | Sequential | `aggregation.variant_search=true` |
-| 24 | Reporting | Sequential | Always-on |
+| Phase # | Name | Config gate (default) |
+|---------|------|----------------------|
+| 1 | Indexing | Always-on |
+| 2 | Semgrep | Always-on |
+| 3 | CPG Slice | `cpg.enabled=false` |
+| 4 | LLM Static Analysis | `llm.phases.indexing` (API key present) |
+| 5 | CWE Routing | Always-on |
+| 6 | Rule Synthesis | `rulesynth.enabled=false` |
+| 7 | LLM Discovery | `llm.phases.discovery` (API key present) |
+| 8 | LLM Verification | `llm.phases.verification` (API key present) |
+| 9 | Validate | `validate.enabled=false` |
+| 10 | SecurityAgent Verification | `agent.enabled=false` |
+| 11 | Ticket Cross-Reference | `llm.phases.ticket_crossref` (API key present) |
+| 12 | Git Analysis | `llm.phases.git_analysis` (API key present) |
+| 13 | Cross-File Analysis | `llm.phases.cross_file_analysis` (API key present) |
+| 14 | Confidence Scoring | `normalization.enabled=false` |
+| 15 | AI Aggregation | `llm.phases.aggregation` (API key present) |
+| 16 | Threat Modeling | `aggregation.tier_2_features.enabled=false` |
+| 17 | Root Cause Deduplication | `aggregation.root_cause_dedup=true` |
+| 18 | Multi-Verifier | `aggregation.multi_verifier=true` |
+| 19 | Auto-Patching | `aggregation.auto_patching=false` |
+| 20 | CVE Bootstrap | `aggregation.cve_bootstrap=true` |
+| 21 | PoC Compilation | `aggregation.poc_compilation=false` |
+| 22 | Exploit Synthesis | `exploit.enabled=false` |
+| 23 | Variant Search | `aggregation.variant_search=true` |
+| 24 | Reporting | Always-on |
 
 ## Data Flow
 

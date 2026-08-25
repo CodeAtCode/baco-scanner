@@ -691,6 +691,8 @@ fn test_vulnerability_finding_construction() {
         agent_mode: false,
         statement_range: None,
         triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
     };
 
     assert_eq!(finding.id, "test-id");
@@ -769,6 +771,8 @@ fn test_vulnerability_finding_serialize() {
         agent_mode: false,
         statement_range: None,
         triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
     };
 
     let json = serde_json::to_string(&finding).unwrap();
@@ -866,6 +870,8 @@ fn test_vulnerability_finding_roundtrip() {
         triage_verdict: Some(TriageVerdict::Downgrade {
             adjusted_severity: Severity::Low,
         }),
+        evidence: vec![],
+        verification_tier: None,
     };
 
     let json = serde_json::to_string(&finding).unwrap();
@@ -906,6 +912,8 @@ fn test_vulnerability_finding_field_access() {
         agent_mode: false,
         statement_range: None,
         triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
     };
 
     assert_eq!(finding.id, "access-test");

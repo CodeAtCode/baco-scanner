@@ -186,6 +186,10 @@ pub struct VulnerabilityFinding {
     pub statement_range: Option<(u32, u32)>,
     #[serde(default)]
     pub triage_verdict: Option<TriageVerdict>,
+    #[serde(default)]
+    pub evidence: Vec<crate::evidence::Evidence>,
+    #[serde(default)]
+    pub verification_tier: Option<crate::evidence::VerificationTier>,
 }
 
 impl VulnerabilityFinding {
@@ -252,6 +256,8 @@ mod tests {
             agent_mode: false,
             statement_range: None,
             triage_verdict: None,
+            evidence: vec![],
+            verification_tier: None,
         };
 
         let json = serde_json::to_string(&finding).unwrap();

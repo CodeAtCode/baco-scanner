@@ -77,6 +77,8 @@ fn create_test_finding(title: &str, severity: Severity) -> VulnerabilityFinding 
         agent_mode: true,
         statement_range: None,
         triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
     }
 }
 
@@ -1106,6 +1108,8 @@ async fn test_verify_finding_with_minimal_finding() {
         agent_mode: true,
         statement_range: None,
         triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
     };
 
     let result = session.verify_finding("test.rs", &finding).await;
@@ -1278,6 +1282,8 @@ async fn test_verify_finding_with_mock_llm() {
         agent_mode: true,
         statement_range: None,
         triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
     };
 
     let result = session.verify_finding("test.rs", &finding).await;

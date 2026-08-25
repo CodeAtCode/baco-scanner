@@ -199,6 +199,8 @@ fn test_finding_creation_with_critical_severity() {
         agent_mode: false,
         statement_range: None,
         triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
     };
 
     assert_eq!(finding.severity, Severity::Critical);
@@ -240,6 +242,8 @@ fn test_finding_optional_fields_none() {
         agent_mode: false,
         statement_range: None,
         triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
     };
 
     assert!(finding.cwe_id.is_none());
@@ -282,6 +286,8 @@ fn test_finding_sources_empty() {
         agent_mode: false,
         statement_range: None,
         triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
     };
 
     assert!(finding.sources.is_empty());
@@ -320,6 +326,8 @@ fn test_finding_already_reported_flag() {
         agent_mode: false,
         statement_range: None,
         triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
     };
 
     assert!(!finding.already_reported);
@@ -360,6 +368,8 @@ fn test_finding_agent_mode_flag() {
         agent_mode: true,
         statement_range: None,
         triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
     };
 
     assert!(finding.agent_mode);
@@ -411,6 +421,8 @@ fn test_finding_with_all_phases() {
             agent_mode: false,
             statement_range: None,
             triage_verdict: None,
+            evidence: vec![],
+            verification_tier: None,
         };
     }
 }

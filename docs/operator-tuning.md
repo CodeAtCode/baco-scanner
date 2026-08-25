@@ -77,7 +77,7 @@ max_concurrent = 2
 | `enable_confidence_refinement` | bool | true | Re-calibrates confidence scores |
 | `enable_cve_bootstrap` | bool | true | Enriches findings with CVE data |
 | `enable_variant_search` | bool | true | Searches for variant vulnerability instances |
-| `early_termination_threshold` | float | 1000.0 | Stops scan after N findings (not in config.example.toml) |
+| `early_termination_threshold` | float | 1000.0 | Stops scan after N findings (0.0 disables) |
 
 ## General Settings
 
@@ -109,7 +109,7 @@ Use to suppress known false positives. Document each exclusion.
 
 ### Early Termination Threshold
 
-Not exposed in `config.example.toml`. Add manually:
+Controls when the scan stops based on finding count. Set to `0.0` to disable.
 
 ```toml
 [scanner.performance]

@@ -62,6 +62,8 @@ fn create_mock_findings() -> Vec<VulnerabilityFinding> {
             agent_mode: false,
             statement_range: None,
             triage_verdict: None,
+            evidence: vec![],
+            verification_tier: None,
         },
         VulnerabilityFinding {
             id: "finding-2".to_string(),
@@ -94,6 +96,8 @@ fn create_mock_findings() -> Vec<VulnerabilityFinding> {
             agent_mode: false,
             statement_range: None,
             triage_verdict: None,
+            evidence: vec![],
+            verification_tier: None,
         },
         VulnerabilityFinding {
             id: "finding-3".to_string(),
@@ -126,6 +130,8 @@ fn create_mock_findings() -> Vec<VulnerabilityFinding> {
             agent_mode: false,
             statement_range: None,
             triage_verdict: None,
+            evidence: vec![],
+            verification_tier: None,
         },
         VulnerabilityFinding {
             id: "finding-4".to_string(),
@@ -158,6 +164,8 @@ fn create_mock_findings() -> Vec<VulnerabilityFinding> {
             agent_mode: false,
             statement_range: None,
             triage_verdict: None,
+            evidence: vec![],
+            verification_tier: None,
         },
     ]
 }
@@ -194,6 +202,8 @@ fn create_single_finding(severity: Severity, file_path: &str) -> Vec<Vulnerabili
         agent_mode: false,
         statement_range: None,
         triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
     }]
 }
 
@@ -874,6 +884,8 @@ fn test_generate_with_special_characters_in_file_paths() {
         agent_mode: false,
         statement_range: None,
         triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
     }];
 
     let tm = ThreatModelFile::generate(&ctx, &findings);
@@ -982,6 +994,8 @@ fn test_performance_generate_many_findings() {
             agent_mode: false,
             statement_range: None,
             triage_verdict: None,
+            evidence: vec![],
+            verification_tier: None,
         });
     }
 

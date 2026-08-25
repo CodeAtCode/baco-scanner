@@ -237,6 +237,8 @@ impl AgentSession {
                                 agent_mode: true,
                                 statement_range: None,
                                 triage_verdict: None,
+                                evidence: vec![],
+                                verification_tier: None,
                             },
                             compile_path,
                             test_source_path,

@@ -302,6 +302,8 @@ mod tests {
             agent_mode: false,
             statement_range: None,
             triage_verdict: None,
+            evidence: vec![],
+            verification_tier: None,
         }
     }
 
@@ -648,6 +650,8 @@ mod tests {
             agent_mode: true,
             statement_range: Some((40, 45)),
             triage_verdict: Some(TriageVerdict::Pass),
+            evidence: vec![],
+            verification_tier: None,
         };
 
         let html = render_finding(&finding, 28);

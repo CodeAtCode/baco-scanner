@@ -1,8 +1,34 @@
+use crate::config::ScannerConfig;
+use crate::evidence::{classify_finding, VerificationTier};
 use crate::findings::{Severity, VulnerabilityFinding};
 
-pub fn generate_sarif_report(findings: &[VulnerabilityFinding]) -> Result<String, String> {
+pub fn generate_sarif_report(
+    findings: &[VulnerabilityFinding],
+    config: Option<&ScannerConfig>,
+) -> Result<String, String> {
+    // Filter findings if evidence gate is enabled
+    let filtered_findings = if let Some(cfg) = config {
+        if cfg.output.evidence_gate {
+            findings
+                .iter()
+                .filter(|f| {
+                    let tier = classify_finding(&f.evidence, f.confidence_score);
+                    matches!(
+                        tier,
+                        VerificationTier::Verified | VerificationTier::Supported
+                    )
+                })
+                .cloned()
+                .collect::<Vec<_>>()
+        } else {
+            findings.to_vec()
+        }
+    } else {
+        findings.to_vec()
+    };
+
     let mut results = Vec::new();
-    for finding in findings {
+    for finding in &filtered_findings {
         let driver_location = if finding.file_path.is_empty() {
             serde_json::json!({})
         } else {
@@ -108,16 +134,16 @@ pub fn generate_sarif_report(findings: &[VulnerabilityFinding]) -> Result<String
     }
 
     let sarif = serde_json::json!({
-        "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
-        "version": "2.1.0",
-        "runs": [
-            serde_json::json!({
-                "tool": {
-                    "driver": {
-                        "name": "BACO Security Scanner",
-                        "informationUri": "https://github.com/mte90/baco",
-                        "version": env!("CARGO_PKG_VERSION"),
-                        "rules": findings.iter().map(|f| serde_json::json!({
+              "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+              "version": "2.1.0",
+              "runs": [
+                  serde_json::json!({
+                      "tool": {
+                          "driver": {
+                              "name": "BACO Security Scanner",
+                              "informationUri": "https://github.com/mte90/baco",
+                              "version": env!("CARGO_PKG_VERSION"),
+                              "rules": filtered_findings.iter().map(|f| serde_json::json!({
                             "id": f.id,
                             "name": f.title,
                             "shortDescription": {"text": f.description},
@@ -173,13 +199,15 @@ mod tests {
             agent_mode: false,
             statement_range: None,
             triage_verdict: None,
+            evidence: vec![],
+            verification_tier: None,
         }
     }
 
     #[test]
     fn test_sarif_schema_version() {
         let findings = vec![make_finding(Severity::High, "test-1")];
-        let result = generate_sarif_report(&findings).unwrap();
+        let result = generate_sarif_report(&findings, None).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
         assert_eq!(parsed["$schema"], "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json");
         assert_eq!(parsed["version"], "2.1.0");
@@ -188,7 +216,7 @@ mod tests {
     #[test]
     fn test_sarif_tool_driver() {
         let findings = vec![make_finding(Severity::Critical, "test-1")];
-        let result = generate_sarif_report(&findings).unwrap();
+        let result = generate_sarif_report(&findings, None).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
         let driver = &parsed["runs"][0]["tool"]["driver"];
         assert_eq!(driver["name"], "BACO Security Scanner");
@@ -204,7 +232,7 @@ mod tests {
             make_finding(Severity::Low, "low-1"),
             make_finding(Severity::Info, "info-1"),
         ];
-        let result = generate_sarif_report(&findings).unwrap();
+        let result = generate_sarif_report(&findings, None).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
         let results = parsed["runs"][0]["results"].as_array().unwrap();
 
@@ -218,7 +246,7 @@ mod tests {
     #[test]
     fn test_sarif_rule_definition() {
         let findings = vec![make_finding(Severity::High, "test-1")];
-        let result = generate_sarif_report(&findings).unwrap();
+        let result = generate_sarif_report(&findings, None).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
         let rules = parsed["runs"][0]["tool"]["driver"]["rules"]
             .as_array()
@@ -233,7 +261,7 @@ mod tests {
     #[test]
     fn test_sarif_physical_location() {
         let findings = vec![make_finding(Severity::High, "test-1")];
-        let result = generate_sarif_report(&findings).unwrap();
+        let result = generate_sarif_report(&findings, None).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
         let location = &parsed["runs"][0]["results"][0]["locations"][0]["physicalLocation"];
 
@@ -244,7 +272,7 @@ mod tests {
     #[test]
     fn test_sarif_empty_findings() {
         let findings: Vec<VulnerabilityFinding> = vec![];
-        let result = generate_sarif_report(&findings).unwrap();
+        let result = generate_sarif_report(&findings, None).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
         let results = parsed["runs"][0]["results"].as_array().unwrap();
         assert!(results.is_empty());
@@ -257,7 +285,7 @@ mod tests {
             make_finding(Severity::High, "test-2"),
             make_finding(Severity::Medium, "test-3"),
         ];
-        let result = generate_sarif_report(&findings).unwrap();
+        let result = generate_sarif_report(&findings, None).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
         let results = parsed["runs"][0]["results"].as_array().unwrap();
         assert_eq!(results.len(), 3);
@@ -269,7 +297,7 @@ mod tests {
         finding.cwe_id = Some("CWE-79".to_string());
         let findings = vec![finding];
 
-        let result = generate_sarif_report(&findings).unwrap();
+        let result = generate_sarif_report(&findings, None).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
         let rule = &parsed["runs"][0]["tool"]["driver"]["rules"][0];
 
@@ -282,7 +310,7 @@ mod tests {
         finding.line_number = None;
         let findings = vec![finding];
 
-        let result = generate_sarif_report(&findings).unwrap();
+        let result = generate_sarif_report(&findings, None).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
         let region = &parsed["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["region"];
 
@@ -299,7 +327,7 @@ mod tests {
         finding.poc_format = Some("python".to_string());
 
         let findings = vec![finding];
-        let result = generate_sarif_report(&findings).unwrap();
+        let result = generate_sarif_report(&findings, None).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
 
         let related = &parsed["runs"][0]["results"][0]["relatedLocations"];

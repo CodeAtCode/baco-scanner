@@ -47,6 +47,8 @@ pub fn make_finding_phase(
         agent_mode: false,
         statement_range: None,
         triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
     }
 }
 
@@ -90,6 +92,8 @@ pub fn make_finding_report(
         agent_mode: false,
         statement_range: None,
         triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
     }
 }
 
@@ -133,6 +137,8 @@ pub fn create_test_finding(
         agent_mode: false,
         statement_range: None,
         triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
     }
 }
 
@@ -179,6 +185,8 @@ pub fn make_aggregation_finding(
         agent_mode: false,
         statement_range: None,
         triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
     }
 }
 
@@ -222,6 +230,8 @@ pub fn make_finding_html(
         agent_mode: false,
         statement_range: None,
         triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
     }
 }
 
@@ -262,6 +272,8 @@ pub fn make_finding_cwe(
         agent_mode: false,
         statement_range: None,
         triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
     }
 }
 
@@ -303,6 +315,8 @@ pub fn make_finding_snippet(
         agent_mode: false,
         statement_range: None,
         triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
     }
 }
 
@@ -343,6 +357,8 @@ pub fn make_finding_confidence(
         agent_mode: false,
         statement_range: None,
         triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
     }
 }
 
@@ -386,5 +402,7 @@ pub fn make_finding_report_agg(
         poc_format: None,
         statement_range: None,
         triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
     }
 }

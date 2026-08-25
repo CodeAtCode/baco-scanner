@@ -1,4 +1,5 @@
 use crate::config::ScannerConfig;
+use crate::evidence::{classify_finding, VerificationTier};
 use crate::findings::VulnerabilityFinding;
 use chrono::Utc;
 use std::fs;
@@ -14,8 +15,29 @@ pub fn generate_html_report(
     config: Option<&ScannerConfig>,
     llm_metrics: Option<crate::report::json::LlmMetricsSummary>,
 ) -> Result<(), String> {
+    // Filter findings if evidence gate is enabled
+    let filtered_findings: Vec<VulnerabilityFinding> = if let Some(cfg) = config {
+        if cfg.output.evidence_gate {
+            findings
+                .iter()
+                .filter(|f| {
+                    let tier = classify_finding(&f.evidence, f.confidence_score);
+                    matches!(
+                        tier,
+                        VerificationTier::Verified | VerificationTier::Supported
+                    )
+                })
+                .cloned()
+                .collect()
+        } else {
+            findings.to_vec()
+        }
+    } else {
+        findings.to_vec()
+    };
+
     let scan_date = Utc::now().format("%Y-%m-%d %H:%M:%S UTC");
-    let total_findings = findings.len();
+    let total_findings = filtered_findings.len();
 
     // Collect unique languages from findings for conditional Prism.js loading
     let mut languages: std::collections::HashSet<String> = std::collections::HashSet::new();
@@ -512,7 +534,7 @@ pub fn generate_html_report(
         avg_confidence * 100.0,
         verified,
         already_reported,
-        findings
+        filtered_findings
             .iter()
             .map(|f| &f.file_path)
             .collect::<std::collections::HashSet<_>>()
@@ -524,7 +546,7 @@ pub fn generate_html_report(
     );
 
     // Generate finding cards
-    for (finding_id, finding) in findings.iter().enumerate() {
+    for (finding_id, finding) in filtered_findings.iter().enumerate() {
         html.push_str(&render_finding(finding, finding_id));
     }
 
@@ -535,7 +557,7 @@ pub fn generate_html_report(
 </body>
 </html>"#,
         env!("CARGO_PKG_VERSION"),
-        findings.len()
+        filtered_findings.len()
     ));
 
     // Create parent directory if it doesn't exist
@@ -585,6 +607,8 @@ mod tests {
             agent_mode: false,
             statement_range: None,
             triage_verdict: None,
+            evidence: vec![],
+            verification_tier: None,
         }
     }
 

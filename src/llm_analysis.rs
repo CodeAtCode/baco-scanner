@@ -629,6 +629,8 @@ impl LlmAnalyzer {
                         agent_mode: false,
                         statement_range,
                         triage_verdict: None,
+                        evidence: vec![],
+                        verification_tier: None,
                     });
                 }
             }

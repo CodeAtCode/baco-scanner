@@ -42,6 +42,7 @@ fn create_test_scanner_config() -> ScannerConfig {
         },
         output: OutputConfig {
             dir: "/tmp/test_output".to_string(),
+            evidence_gate: false,
         },
         agent: AgentConfig::default(),
         tickets: Default::default(),

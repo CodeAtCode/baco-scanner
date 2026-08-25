@@ -436,13 +436,13 @@ fn run_report(input: &Path, format: &str, quiet: bool) -> Result<(), Box<dyn std
         }
         "json" => {
             use baco::report::json::write_findings_json;
-            write_findings_json(&findings, &output_path.to_string_lossy(), None)
+            write_findings_json(&findings, &output_path.to_string_lossy(), None, None)
                 .map_err(|e| format!("Failed to generate JSON report: {}", e))?;
         }
         "sarif" => {
             use baco::report::sarif::generate_sarif_report;
             let sarif_path = output_path.clone();
-            let sarif_json = generate_sarif_report(&findings)?;
+            let sarif_json = generate_sarif_report(&findings, None)?;
             std::fs::write(&sarif_path, sarif_json)
                 .map_err(|e| format!("Failed to write SARIF report: {}", e))?;
             if !quiet {

@@ -5,3 +5,6 @@
 mod scanner_core_tests;
 mod scanner_init_tests;
 mod scanner_state_tests;
+
+// Scanner phase tests
+mod phases;

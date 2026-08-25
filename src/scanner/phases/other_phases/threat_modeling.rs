@@ -86,6 +86,8 @@ pub async fn run_threat_modeling(
                     agent_mode: false,
                     statement_range: None,
                     triage_verdict: None,
+                    evidence: vec![],
+                    verification_tier: None,
                 };
                 findings.push(finding);
             }

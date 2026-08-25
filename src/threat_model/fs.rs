@@ -329,6 +329,8 @@ mod tests {
                 agent_mode: false,
                 statement_range: None,
                 triage_verdict: None,
+                evidence: vec![],
+                verification_tier: None,
             },
             VulnerabilityFinding {
                 id: "test-2".to_string(),
@@ -361,6 +363,8 @@ mod tests {
                 agent_mode: false,
                 statement_range: None,
                 triage_verdict: None,
+                evidence: vec![],
+                verification_tier: None,
             },
         ]
     }
