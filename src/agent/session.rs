@@ -237,7 +237,14 @@ impl AgentSession {
                                 agent_mode: true,
                                 statement_range: None,
                                 triage_verdict: None,
-                                evidence: vec![],
+                                evidence: vec![crate::evidence::Evidence {
+                                    source: crate::evidence::EvidenceSource::LlmAnalysis(
+                                        self.client.model_name().to_string(),
+                                    ),
+                                    weight: 0.7,
+                                    detail: "BugHunter agent finding".to_string(),
+                                    timestamp: chrono::Utc::now(),
+                                }],
                                 verification_tier: None,
                             },
                             compile_path,

@@ -234,5 +234,8 @@ mod phase_scheduling_tests;
 // Evidence-gating classification tests
 mod evidence_tests;
 
+// End-to-end evidence-gating pipeline tests
+mod evidence_gate_e2e_tests;
+
 // CVE bootstrap tests
 mod cve_bootstrap_tests;
