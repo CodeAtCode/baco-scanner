@@ -655,3 +655,90 @@ fn test_generate_html_report_contains_collapsible_details() {
 
     let _ = fs::remove_file(output_path);
 }
+
+// ============================================================================
+// Structural Validation - Tag Balance
+// ============================================================================
+
+fn assert_tag_balance(html: &str) {
+    for tag in [
+        "div", "section", "body", "html", "head", "table", "tr", "td", "th", "h1", "h2", "h3", "p",
+        "span", "ul", "li", "a", "button", "script", "style", "title",
+    ] {
+        let open = html.matches(&format!("<{} ", tag)).count()
+            + html.matches(&format!("<{}>", tag)).count();
+        let close = html.matches(&format!("</{}>", tag)).count();
+        assert_eq!(
+            open, close,
+            "tag <{tag}> unbalanced: {open} open vs {close} close"
+        );
+    }
+}
+
+#[test]
+fn test_html_report_tags_balanced_with_findings() {
+    let findings = vec![
+        make_finding("f1", Severity::High, "src/a.rs", Some(10)),
+        make_finding("f2", Severity::Low, "src/b.rs", Some(20)),
+    ];
+    let output_path = "/tmp/test_html_tag_balance.html";
+    let _ = fs::remove_file(output_path);
+
+    let result = baco::report::html::generate_html_report(&findings, output_path, None, None);
+    assert!(result.is_ok());
+
+    let content = fs::read_to_string(output_path).unwrap();
+    assert_tag_balance(&content);
+
+    let _ = fs::remove_file(output_path);
+}
+
+#[test]
+fn test_html_report_tags_balanced_with_gate_and_appendix() {
+    use baco::config::ScannerConfig;
+    use baco::evidence::{Evidence, EvidenceSource};
+
+    let mut verified = make_finding("f1", Severity::High, "src/a.rs", Some(10));
+    verified.evidence = vec![
+        Evidence {
+            source: EvidenceSource::Semgrep("rule.x".to_string()),
+            weight: 0.9,
+            detail: "semgrep match".to_string(),
+            timestamp: chrono::Utc::now(),
+        },
+        Evidence {
+            source: EvidenceSource::IndependentVerifier("validate".to_string()),
+            weight: 0.95,
+            detail: "confirmed".to_string(),
+            timestamp: chrono::Utc::now(),
+        },
+    ];
+
+    let mut unverified = make_finding("f2", Severity::Medium, "src/b.rs", Some(20));
+    unverified.evidence = vec![Evidence {
+        source: EvidenceSource::LlmAnalysis("model".to_string()),
+        weight: 0.7,
+        detail: "llm only".to_string(),
+        timestamp: chrono::Utc::now(),
+    }];
+
+    let findings = vec![verified, unverified];
+    let mut cfg = ScannerConfig::default();
+    cfg.output.evidence_gate = true;
+
+    let output_path = "/tmp/test_html_tag_balance_gate.html";
+    let _ = fs::remove_file(output_path);
+
+    let result = baco::report::html::generate_html_report(&findings, output_path, Some(&cfg), None);
+    assert!(result.is_ok());
+
+    let content = fs::read_to_string(output_path).unwrap();
+    assert_tag_balance(&content);
+    assert!(content.contains("unverified-appendix"));
+    // Appendix must render before the footer
+    let appendix_pos = content.find("unverified-appendix").unwrap();
+    let footer_pos = content.find("class=\"footer\"").unwrap();
+    assert!(appendix_pos < footer_pos, "appendix must precede footer");
+
+    let _ = fs::remove_file(output_path);
+}

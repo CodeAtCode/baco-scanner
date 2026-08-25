@@ -301,3 +301,39 @@ fn test_chat_response_with_model_new() {
     assert_eq!(response.content, "Analysis complete");
     assert_eq!(response.model_used, "llama3.1");
 }
+
+// ============================================================================
+// chat_endpoint Tests - URL construction must not double the /v1 prefix
+// ============================================================================
+
+#[test]
+fn test_chat_endpoint_base_url_with_v1() {
+    assert_eq!(
+        baco::llm::chat_endpoint("https://api.mistral.ai/v1"),
+        "https://api.mistral.ai/v1/chat/completions"
+    );
+}
+
+#[test]
+fn test_chat_endpoint_base_url_without_v1() {
+    assert_eq!(
+        baco::llm::chat_endpoint("https://llm.example.com"),
+        "https://llm.example.com/v1/chat/completions"
+    );
+}
+
+#[test]
+fn test_chat_endpoint_base_url_with_trailing_slash() {
+    assert_eq!(
+        baco::llm::chat_endpoint("https://api.openai.com/v1/"),
+        "https://api.openai.com/v1/chat/completions"
+    );
+}
+
+#[test]
+fn test_chat_endpoint_localhost_no_v1() {
+    assert_eq!(
+        baco::llm::chat_endpoint("http://localhost:8080"),
+        "http://localhost:8080/v1/chat/completions"
+    );
+}

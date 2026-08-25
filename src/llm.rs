@@ -25,6 +25,14 @@ fn default_runtime_temperature() -> f32 {
     0.5
 }
 
+/// Build the chat-completions endpoint, tolerating base URLs that already
+/// include the `/v1` prefix (the documented convention for OpenAI/Mistral).
+pub fn chat_endpoint(base_url: &str) -> String {
+    let base = base_url.trim_end_matches('/');
+    let base = base.strip_suffix("/v1").unwrap_or(base);
+    format!("{}/v1/chat/completions", base)
+}
+
 impl LlmConfig {
     /// Get list of models (supports backward compatibility)
     pub fn get_models(&self) -> Vec<String> {
@@ -201,7 +209,7 @@ impl LlmClient {
         payload: serde_json::Value,
         messages_for_metrics: usize,
     ) -> Result<ChatResponseWithModel, String> {
-        let url = format!("{}/v1/chat/completions", base_url);
+        let url = chat_endpoint(base_url);
         let model = self.get_current_model();
         let start_time = std::time::Instant::now();
 
@@ -334,7 +342,7 @@ impl LlmClient {
         base_url: &str,
         payload: serde_json::Value,
     ) -> Result<ChatResponse, String> {
-        let url = format!("{}/v1/chat/completions", base_url);
+        let url = chat_endpoint(base_url);
         let model = self.get_current_model();
         let start_time = std::time::Instant::now();
 
@@ -501,7 +509,7 @@ impl LlmClient {
 
         let tokens_prompt: usize = messages.iter().map(|m| m.content.len() / 4).sum();
 
-        let chat_url = format!("{}/v1/chat/completions", self.config.base_url);
+        let chat_url = chat_endpoint(&self.config.base_url);
         tracing::info!("Trying LLM API at: {}", chat_url);
 
         match self
@@ -543,7 +551,7 @@ impl LlmClient {
             payload["max_tokens"] = serde_json::json!(max_tokens);
         }
 
-        let chat_url = format!("{}/v1/chat/completions", self.config.base_url);
+        let chat_url = chat_endpoint(&self.config.base_url);
         tracing::info!("Trying LLM API (with tools) at: {}", chat_url);
 
         match self
