@@ -5,6 +5,7 @@ mod scanner;
 mod specifications;
 mod tickets;
 
+use crate::vuln_spec::schema::VulnSpecConfig;
 pub use env::*;
 pub use llm::*;
 pub use phases::*;
@@ -55,6 +56,8 @@ pub struct ScannerConfig {
     pub pacvd: PacvdConfig,
     #[serde(default)]
     pub agent_flow: AgentFlowConfig,
+    #[serde(default)]
+    pub vuln_spec: VulnSpecConfig,
 }
 
 /// Config error with field path and TOML location information

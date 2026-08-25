@@ -252,6 +252,17 @@ pub async fn run_security_agent_verification(
                     finding.verification_notes = scaffold_context;
                 }
 
+                finding.add_evidence(
+                    crate::evidence::EvidenceSource::SecurityAgentVerification(
+                        "agent_verification".into(),
+                    ),
+                    1.0,
+                    format!(
+                        "Agent verification result: {:?}",
+                        finding.verification_status
+                    ),
+                );
+
                 tracing::debug!(
                     "Security Agent verified {}: {:?} - {} turns, {} tools",
                     finding.title,
@@ -273,6 +284,13 @@ pub async fn run_security_agent_verification(
                 } else {
                     finding.verification_notes = Some(format!("Agent verification failed: {}", e));
                 }
+                finding.add_evidence(
+                    crate::evidence::EvidenceSource::SecurityAgentVerification(
+                        "agent_verification".into(),
+                    ),
+                    1.0,
+                    format!("Agent verification result: Failed - {}", e),
+                );
             }
         }
     }

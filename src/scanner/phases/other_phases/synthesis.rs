@@ -223,6 +223,13 @@ pub async fn run_exploit_synth(
                         finding.id,
                         result.exit_code
                     );
+                    finding.add_evidence(
+                        crate::evidence::EvidenceSource::IndependentVerifier(
+                            "exploit_synth".into(),
+                        ),
+                        1.0,
+                        "Exploit synthesized and verified against target".into(),
+                    );
                     if let Some(verdict) = &mut finding.triage_verdict {
                         let _ = verdict;
                     }
@@ -314,6 +321,11 @@ pub async fn run_validate(
                 let mut f = finding;
                 f.confidence_score =
                     (f.confidence_score + verdict.confidence_adjustment).clamp(0.0, 1.0);
+                f.add_evidence(
+                    crate::evidence::EvidenceSource::LlmAnalysis("rationale_validation".into()),
+                    0.7,
+                    format!("Rationale validation verdict: {:?}", verdict),
+                );
                 if !verdict.issues.is_empty() {
                     let note = format!(
                         "Rationale check: {}\nIssues: {}",

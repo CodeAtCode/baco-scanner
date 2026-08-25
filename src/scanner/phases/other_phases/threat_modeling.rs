@@ -128,13 +128,20 @@ pub async fn run_root_cause_dedup(
     let mut dedup = crate::root_cause_dedup::RootCauseDeduplicator::new();
     let deduped_groups = dedup.deduplicate(findings.clone());
 
-    // Keep one finding per group (the first one encountered)
+    // Keep one finding per group (the first one encountered), merging evidence from dropped findings
     let mut kept_findings = Vec::new();
     for group in deduped_groups {
         if let Some(finding_id) = group.findings.first() {
             // Find the original finding by ID
-            if let Some(finding) = findings.iter().find(|f| f.id == *finding_id) {
-                kept_findings.push(finding.clone());
+            if let Some(kept_finding) = findings.iter().find(|f| f.id == *finding_id) {
+                let mut kept = kept_finding.clone();
+                // Merge evidence from all dropped findings in this group
+                for dropped_id in &group.findings[1..] {
+                    if let Some(dropped_finding) = findings.iter().find(|f| f.id == *dropped_id) {
+                        kept.evidence.extend(dropped_finding.evidence.clone());
+                    }
+                }
+                kept_findings.push(kept);
             }
         }
     }
@@ -176,7 +183,7 @@ pub async fn run_multi_verifier(
         circuit_breaker_threshold: 0.5,
     };
     let verifier = crate::multi_verifier::MultiVerifier::new(config_verifier);
-    let verified_findings = verifier.verify_batch(&findings);
+    let verified_findings = verifier.verify_batch_with_evidence(&findings);
 
     tracing::info!(
         "Multi verifier: {} findings → {} findings",

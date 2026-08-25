@@ -82,6 +82,14 @@ pub async fn run_llm_verification(
                         if finding.agent_evidence_path.is_none() {
                             finding.agent_evidence_path = converted.agent_evidence_path;
                         }
+                        finding.add_evidence(
+                            crate::evidence::EvidenceSource::LlmAnalysis("verification".into()),
+                            0.8,
+                            format!(
+                                "LLM verification verdict: {:?}",
+                                finding.verification_status
+                            ),
+                        );
                     }
                     Err(e) => {
                         tracing::warn!(
@@ -158,6 +166,14 @@ pub async fn run_llm_verification(
                         finding.verification_status = Some(VerificationStatus::NeedsReview);
                         finding.verification_notes = Some(response_with_model.content.clone());
                     }
+                    finding.add_evidence(
+                        crate::evidence::EvidenceSource::LlmAnalysis("verification".into()),
+                        0.8,
+                        format!(
+                            "LLM verification verdict: {:?}",
+                            finding.verification_status
+                        ),
+                    );
                 }
             }
         }

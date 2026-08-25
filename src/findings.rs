@@ -203,6 +203,20 @@ impl VulnerabilityFinding {
         let result = hasher.finalize();
         hex::encode(result)
     }
+
+    pub fn add_evidence(
+        &mut self,
+        source: crate::evidence::EvidenceSource,
+        weight: f64,
+        detail: String,
+    ) {
+        self.evidence.push(crate::evidence::Evidence {
+            source,
+            weight,
+            detail,
+            timestamp: chrono::Utc::now(),
+        });
+    }
 }
 
 #[cfg(test)]

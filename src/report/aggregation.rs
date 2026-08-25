@@ -134,10 +134,9 @@ impl ReportAggregationPhase {
         findings: Vec<VulnerabilityFinding>,
         fp_store: Option<&GlobalFpStore>,
     ) -> Vec<VulnerabilityFinding> {
-        use std::collections::HashSet;
+        use std::collections::HashMap;
 
-        let mut seen = HashSet::new();
-        let mut unique = Vec::new();
+        let mut seen: HashMap<String, VulnerabilityFinding> = HashMap::new();
 
         for finding in findings {
             // Filter out false positives if FP store is provided
@@ -160,13 +159,16 @@ impl ReportAggregationPhase {
                 finding.cwe_id.clone().unwrap_or_else(|| finding.id.clone())
             );
 
-            if !seen.contains(&key) {
-                seen.insert(key);
-                unique.push(finding);
+            if let Some(kept) = seen.get_mut(&key) {
+                // Collision: merge evidence into the kept finding
+                kept.evidence.extend(finding.evidence);
+            } else {
+                // First occurrence: store the finding
+                seen.insert(key, finding);
             }
         }
 
-        unique
+        seen.into_values().collect()
     }
 
     /// Calculate aggregate statistics from findings.

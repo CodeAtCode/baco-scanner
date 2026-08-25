@@ -171,6 +171,11 @@ pub async fn run_llm_discovery(
                         if finding.agent_evidence_path.is_none() {
                             finding.agent_evidence_path = converted.agent_evidence_path;
                         }
+                        finding.add_evidence(
+                            crate::evidence::EvidenceSource::LlmAnalysis("discovery".into()),
+                            0.6,
+                            "LLM discovery refined this finding".into(),
+                        );
                     }
                     Err(e) => {
                         // Silently skip expected errors (placeholder paths, missing files)
@@ -216,6 +221,11 @@ Respond with ONLY JSON:
                         if let Some(fix) = parsed.get("fix_code").and_then(|v| v.as_str()) {
                             finding.diff_hunk = Some(fix.to_string());
                         }
+                        finding.add_evidence(
+                            crate::evidence::EvidenceSource::LlmAnalysis("discovery".into()),
+                            0.6,
+                            "LLM discovery refined this finding".into(),
+                        );
                     }
                 }
             }

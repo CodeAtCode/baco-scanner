@@ -128,6 +128,15 @@ pub async fn run_cpg_slice(
                     slice.source.len(),
                     slice.related_functions.len()
                 );
+                let mut f = finding.clone();
+                f.add_evidence(
+                    crate::evidence::EvidenceSource::CpgSlice("cpg_slice".into()),
+                    0.6,
+                    format!(
+                        "CPG slice isolated {} relevant statements",
+                        slice.source.lines().count()
+                    ),
+                );
             }
         }
         pb.set_position(pb.position() + (i as u64 * 100 / total.max(1) as u64));

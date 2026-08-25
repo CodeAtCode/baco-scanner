@@ -309,6 +309,39 @@ pub async fn run_llm_static_analysis(
 
             match analyzer.analyze_file(&file_info.path).await {
                 Ok(file_findings) => {
+                    // Wire vuln_spec retriever if enabled
+                    let file_findings = if config.vuln_spec.enabled {
+                        let mut findings_with_specs = file_findings;
+                        for finding in &mut findings_with_specs {
+                            // Read relevant code snippet for retrieval
+                            if let Ok(code_snippet) = std::fs::read_to_string(&file_info.path) {
+                                // Only retrieve specs if CWE ID is present
+                                if let Some(cwe_id) = &finding.cwe_id {
+                                    let specs =
+                                        crate::vuln_spec::retriever::retrieve_relevant_specs(
+                                            &code_snippet,
+                                            cwe_id,
+                                            3,
+                                        );
+                                    for spec in specs {
+                                        finding.add_evidence(
+                                            crate::evidence::EvidenceSource::CweSpec(
+                                                spec.id.clone(),
+                                            ),
+                                            0.5,
+                                            format!(
+                                                "Matched known vulnerability specification: {}",
+                                                spec.description
+                                            ),
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                        findings_with_specs
+                    } else {
+                        file_findings
+                    };
                     llm_findings.extend(file_findings);
                     new_analyzed_files.push(file_path_str);
                     let msg = format!(

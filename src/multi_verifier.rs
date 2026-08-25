@@ -172,6 +172,14 @@ impl MultiVerifier {
         &self,
         findings: &[crate::findings::VulnerabilityFinding],
     ) -> Vec<crate::findings::VulnerabilityFinding> {
+        self.verify_batch_with_evidence(findings)
+    }
+
+    /// Verify multiple findings in batch with evidence collection
+    pub fn verify_batch_with_evidence(
+        &self,
+        findings: &[crate::findings::VulnerabilityFinding],
+    ) -> Vec<crate::findings::VulnerabilityFinding> {
         let mut verified_findings = Vec::new();
 
         for finding in findings {
@@ -185,10 +193,18 @@ impl MultiVerifier {
                 )
             });
 
+            // Add evidence for every verified finding (confirmed or inconclusive)
+            let mut finding_with_evidence = finding.clone();
+            finding_with_evidence.add_evidence(
+                crate::evidence::EvidenceSource::IndependentVerifier("multi_verifier".into()),
+                1.0,
+                format!("Multi-verifier verdict: {:?}", verdict.final_verdict),
+            );
+
             // Keep findings that are confirmed or inconclusive, reject confirmed false positives
             match verdict.final_verdict {
                 VerifierVerdict::Confirmed => {
-                    verified_findings.push(finding.clone());
+                    verified_findings.push(finding_with_evidence);
                 }
                 VerifierVerdict::Rejected => {
                     // This is a false positive - skip it
@@ -199,7 +215,7 @@ impl MultiVerifier {
                 }
                 VerifierVerdict::Inconclusive => {
                     // Keep inconclusive findings for manual review
-                    verified_findings.push(finding.clone());
+                    verified_findings.push(finding_with_evidence);
                 }
             }
         }

@@ -53,9 +53,18 @@ pub async fn run_confidence_scoring(
         if let Some(refined) = refined_scores.get(&finding.id) {
             let mut updated = finding.clone();
             updated.confidence_score = refined.refined_score;
+            updated.verification_tier = Some(crate::evidence::classify_finding(
+                &updated.evidence,
+                updated.confidence_score,
+            ));
             updated_findings.push(updated);
         } else {
-            updated_findings.push(finding);
+            let mut updated = finding.clone();
+            updated.verification_tier = Some(crate::evidence::classify_finding(
+                &updated.evidence,
+                updated.confidence_score,
+            ));
+            updated_findings.push(updated);
         }
     }
 

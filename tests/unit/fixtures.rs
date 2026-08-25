@@ -274,6 +274,7 @@ pub fn create_test_config() -> ScannerConfig {
         agent_scaffold: Default::default(),
         pacvd: Default::default(),
         agent_flow: Default::default(),
+        vuln_spec: Default::default(),
     }
 }
 
@@ -323,6 +324,7 @@ pub fn create_minimal_config() -> ScannerConfig {
         agent_scaffold: Default::default(),
         pacvd: Default::default(),
         agent_flow: Default::default(),
+        vuln_spec: Default::default(),
     }
 }
 
