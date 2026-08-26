@@ -742,3 +742,228 @@ fn test_html_report_tags_balanced_with_gate_and_appendix() {
 
     let _ = fs::remove_file(output_path);
 }
+
+// ============================================================================
+// Lane C Tests - Evidence Gate and HTML Rendering
+// ============================================================================
+
+/// Test 1: HTML with zero findings: page renders, tags balanced, no panic.
+#[test]
+fn test_html_zero_findings_renders_balanced() {
+    let findings: Vec<VulnerabilityFinding> = vec![];
+    let output_path = "/tmp/lane_c_test_zero_findings.html";
+    let _ = fs::remove_file(output_path);
+
+    let result = baco::report::html::generate_html_report(&findings, output_path, None, None);
+
+    assert!(result.is_ok());
+    assert!(Path::new(output_path).exists());
+
+    let content = fs::read_to_string(output_path).unwrap();
+    assert!(content.contains("<!DOCTYPE html>"));
+    assert!(content.contains("</html>"));
+    assert_tag_balance(&content);
+
+    let _ = fs::remove_file(output_path);
+}
+
+/// Test 2: HTML with zero unverified findings: pin the CURRENT behavior of the unverified
+/// appendix section (assert present-or-absent as the code actually does, with a short
+/// comment naming the pinned behavior).
+#[test]
+fn test_html_zero_unverified_appendix_pinned_behavior() {
+    // Pinned behavior: when gate is ON but there are NO unverified findings,
+    // the appendix section is NOT rendered (unverified_findings.is_empty() check).
+    use baco::config::ScannerConfig;
+    use baco::evidence::{Evidence, EvidenceSource};
+
+    let mut verified = make_finding("f1", Severity::High, "src/a.rs", Some(10));
+    verified.evidence = vec![
+        Evidence {
+            source: EvidenceSource::Semgrep("rule.x".to_string()),
+            weight: 0.9,
+            detail: "semgrep match".to_string(),
+            timestamp: chrono::Utc::now(),
+        },
+        Evidence {
+            source: EvidenceSource::IndependentVerifier("validate".to_string()),
+            weight: 0.95,
+            detail: "confirmed".to_string(),
+            timestamp: chrono::Utc::now(),
+        },
+    ];
+
+    let findings = vec![verified];
+    let mut cfg = ScannerConfig::default();
+    cfg.output.evidence_gate = true;
+
+    let output_path = "/tmp/lane_c_test_zero_unverified.html";
+    let _ = fs::remove_file(output_path);
+
+    let result = baco::report::html::generate_html_report(&findings, output_path, Some(&cfg), None);
+    assert!(result.is_ok());
+
+    let content = fs::read_to_string(output_path).unwrap();
+    assert_tag_balance(&content);
+    // Pinned: appendix section is absent when no unverified findings exist
+    assert!(!content.contains("Appendix: Unverified Findings"));
+
+    let _ = fs::remove_file(output_path);
+}
+
+/// Test 3: HTML, gate ON, all-verified findings: no unverified appendix content.
+#[test]
+fn test_html_gate_on_all_verified_no_appendix() {
+    use baco::config::ScannerConfig;
+    use baco::evidence::{Evidence, EvidenceSource};
+
+    let mut f1 = make_finding("v1", Severity::High, "src/a.rs", Some(10));
+    f1.evidence = vec![
+        Evidence {
+            source: EvidenceSource::Semgrep("r1".to_string()),
+            weight: 0.9,
+            detail: "semgrep".to_string(),
+            timestamp: chrono::Utc::now(),
+        },
+        Evidence {
+            source: EvidenceSource::IndependentVerifier("v".to_string()),
+            weight: 0.95,
+            detail: "verified".to_string(),
+            timestamp: chrono::Utc::now(),
+        },
+    ];
+
+    let mut f2 = make_finding("v2", Severity::Medium, "src/b.rs", Some(20));
+    f2.evidence = vec![
+        Evidence {
+            source: EvidenceSource::Semgrep("r2".to_string()),
+            weight: 0.85,
+            detail: "semgrep".to_string(),
+            timestamp: chrono::Utc::now(),
+        },
+        Evidence {
+            source: EvidenceSource::CpgSlice("slice".to_string()),
+            weight: 0.8,
+            detail: "cpg".to_string(),
+            timestamp: chrono::Utc::now(),
+        },
+    ];
+
+    let findings = vec![f1, f2];
+    let mut cfg = ScannerConfig::default();
+    cfg.output.evidence_gate = true;
+
+    let output_path = "/tmp/lane_c_test_all_verified.html";
+    let _ = fs::remove_file(output_path);
+
+    let result = baco::report::html::generate_html_report(&findings, output_path, Some(&cfg), None);
+    assert!(result.is_ok());
+
+    let content = fs::read_to_string(output_path).unwrap();
+    assert!(!content.contains("Appendix: Unverified Findings"));
+    assert!(content.contains("2 findings")); // Both verified findings in main body
+
+    let _ = fs::remove_file(output_path);
+}
+
+/// Test 4: HTML, gate ON, mixed tiers: appendix contains only unverified findings.
+#[test]
+fn test_html_gate_on_mixed_tiers_appendix_unverified_only() {
+    use baco::config::ScannerConfig;
+    use baco::evidence::{Evidence, EvidenceSource};
+
+    let mut verified = make_finding("verified", Severity::High, "src/a.rs", Some(10));
+    verified.evidence = vec![
+        Evidence {
+            source: EvidenceSource::Semgrep("r1".to_string()),
+            weight: 0.9,
+            detail: "semgrep".to_string(),
+            timestamp: chrono::Utc::now(),
+        },
+        Evidence {
+            source: EvidenceSource::IndependentVerifier("v".to_string()),
+            weight: 0.95,
+            detail: "verified".to_string(),
+            timestamp: chrono::Utc::now(),
+        },
+    ];
+
+    let mut unverified = make_finding("unverified", Severity::Medium, "src/b.rs", Some(20));
+    unverified.evidence = vec![Evidence {
+        source: EvidenceSource::LlmAnalysis("model".to_string()),
+        weight: 0.7,
+        detail: "llm only".to_string(),
+        timestamp: chrono::Utc::now(),
+    }];
+
+    let findings = vec![verified, unverified];
+    let mut cfg = ScannerConfig::default();
+    cfg.output.evidence_gate = true;
+
+    let output_path = "/tmp/lane_c_test_mixed_tiers.html";
+    let _ = fs::remove_file(output_path);
+
+    let result = baco::report::html::generate_html_report(&findings, output_path, Some(&cfg), None);
+    assert!(result.is_ok());
+
+    let content = fs::read_to_string(output_path).unwrap();
+    // Main body should have 1 verified finding
+    assert!(content.contains("1 findings"));
+    // Appendix should exist with unverified finding
+    assert!(content.contains("Appendix: Unverified Findings"));
+    assert!(content.contains("Finding unverified"));
+    // Appendix must precede footer
+    let appendix_pos = content.find("unverified-appendix").unwrap();
+    let footer_pos = content.find("class=\"footer\"").unwrap();
+    assert!(appendix_pos < footer_pos);
+
+    let _ = fs::remove_file(output_path);
+}
+
+/// Test 5: HTML, gate OFF: all findings rendered, no filtering.
+#[test]
+fn test_html_gate_off_all_findings_rendered() {
+    use baco::config::ScannerConfig;
+    use baco::evidence::{Evidence, EvidenceSource};
+
+    let mut verified = make_finding("verified", Severity::High, "src/a.rs", Some(10));
+    verified.evidence = vec![
+        Evidence {
+            source: EvidenceSource::Semgrep("r1".to_string()),
+            weight: 0.9,
+            detail: "semgrep".to_string(),
+            timestamp: chrono::Utc::now(),
+        },
+        Evidence {
+            source: EvidenceSource::IndependentVerifier("v".to_string()),
+            weight: 0.95,
+            detail: "verified".to_string(),
+            timestamp: chrono::Utc::now(),
+        },
+    ];
+
+    let mut unverified = make_finding("unverified", Severity::Medium, "src/b.rs", Some(20));
+    unverified.evidence = vec![Evidence {
+        source: EvidenceSource::LlmAnalysis("model".to_string()),
+        weight: 0.7,
+        detail: "llm only".to_string(),
+        timestamp: chrono::Utc::now(),
+    }];
+
+    let findings = vec![verified, unverified];
+    let cfg = ScannerConfig::default(); // evidence_gate = false by default
+
+    let output_path = "/tmp/lane_c_test_gate_off.html";
+    let _ = fs::remove_file(output_path);
+
+    let result = baco::report::html::generate_html_report(&findings, output_path, Some(&cfg), None);
+    assert!(result.is_ok());
+
+    let content = fs::read_to_string(output_path).unwrap();
+    // All 2 findings rendered in main body
+    assert!(content.contains("2 findings"));
+    // No appendix when gate is off
+    assert!(!content.contains("Appendix: Unverified Findings"));
+
+    let _ = fs::remove_file(output_path);
+}

@@ -44,6 +44,9 @@ mod scanner_checkpoint_tests;
 // Checkpoint resume functionality tests
 mod checkpoint_resume_tests;
 
+// Checkpoint save/load/resume round-trip tests
+mod checkpoint_tests;
+
 // Scanner orchestrator integration tests
 mod orchestrator_integration_tests;
 

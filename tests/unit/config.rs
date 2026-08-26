@@ -1210,3 +1210,115 @@ fn test_ticket_system_config_parsing() {
     assert!(jira.api_key.is_none());
     assert_eq!(jira.project, Some("SEC".to_string()));
 }
+
+#[test]
+fn test_example_toml_deserializes() {
+    let config = ScannerConfig::from_file("config.example.toml");
+    assert!(
+        config.is_ok(),
+        "config.example.toml should deserialize successfully"
+    );
+}
+
+#[test]
+fn test_example_toml_evidence_gate_false() {
+    let config = ScannerConfig::from_file("config.example.toml").unwrap();
+    assert!(
+        !config.output.evidence_gate,
+        "evidence_gate should be false in example config"
+    );
+}
+
+#[test]
+fn test_example_toml_tickets_section() {
+    let config = ScannerConfig::from_file("config.example.toml").unwrap();
+    assert_eq!(
+        config.tickets.systems.len(),
+        1,
+        "example config should have one ticket system"
+    );
+
+    let github_system = &config.tickets.systems[0];
+    assert_eq!(
+        github_system.system_type, "github",
+        "system_type should be github"
+    );
+    assert_eq!(
+        github_system.project,
+        Some("libxml2".to_string()),
+        "project should be libxml2"
+    );
+    assert!(
+        github_system.api_key.is_none(),
+        "api_key should be None in example config"
+    );
+}
+
+#[test]
+#[serial]
+fn test_apply_env_overrides_explicit_wins() {
+    let mut guard = EnvVarGuard::new();
+    guard.set("LLM_DISCOVERY_KEY", "env-discovery-key");
+    guard.set("LLM_VERIFICATION_KEY", "env-verification-key");
+    guard.set("LLM_AGGREGATION_KEY", "env-aggregation-key");
+
+    let toml_str = r#"
+        [project]
+        name = "test"
+        path = "/tmp/test"
+
+        [output]
+        dir = "./out"
+
+        [scanner]
+        max_file_size_kb = 100
+
+        [llm]
+        timeout_secs = 30
+        max_retries = 2
+        retry_backoff_ms = 1000
+
+        [llm.phases.discovery]
+        base_url = "http://test"
+        api_key = "explicit-discovery-key"
+
+        [llm.phases.verification]
+        base_url = "http://test"
+        api_key = "explicit-verification-key"
+
+        [llm.phases.aggregation]
+        base_url = "http://test"
+        api_key = "explicit-aggregation-key"
+    "#;
+
+    let mut config: ScannerConfig = toml::from_str(toml_str).unwrap();
+    apply_env_overrides(&mut config);
+
+    assert_eq!(
+        config.llm.phases.discovery.api_key,
+        Some("explicit-discovery-key".to_string())
+    );
+    assert_eq!(
+        config.llm.phases.verification.api_key,
+        Some("explicit-verification-key".to_string())
+    );
+    assert_eq!(
+        config.llm.phases.aggregation.api_key,
+        Some("explicit-aggregation-key".to_string())
+    );
+}
+
+#[test]
+fn test_invalid_toml_returns_err() {
+    let invalid_toml = r#"
+        [project
+        name = "test"
+        invalid toml {{{
+    "#;
+
+    let result: Result<ScannerConfig, _> = toml::from_str(invalid_toml);
+    assert!(
+        result.is_err(),
+        "Invalid TOML should return an error, not panic"
+    );
+}
