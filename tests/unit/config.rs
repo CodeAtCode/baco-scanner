@@ -382,6 +382,260 @@ fn test_env_overrides() {
     }
 }
 
+// ============================================================================
+// Ticket System Environment Override Tests
+// ============================================================================
+
+#[test]
+#[serial]
+fn test_ticket_env_overrides_github() {
+    let mut guard = EnvVarGuard::new();
+    guard.set("TICKET_GITHUB_KEY", "env-github-token");
+
+    let toml_str = r#"
+        [project]
+        name = "test"
+        path = "/tmp/test"
+
+        [output]
+        dir = "./out"
+
+        [scanner]
+        max_file_size_kb = 100
+
+        [llm]
+        timeout_secs = 30
+        max_retries = 2
+        retry_backoff_ms = 1000
+
+        [llm.phases.discovery]
+        base_url = "http://test"
+        model = "test"
+
+        [llm.phases.verification]
+        base_url = "http://test"
+        model = "test"
+
+        [llm.phases.aggregation]
+        base_url = "http://test"
+        model = "test"
+
+        [tickets]
+        [[tickets.systems]]
+        system_type = "github"
+        url = "https://github.com/org/repo"
+        project = "myproject"
+    "#;
+
+    let mut config: ScannerConfig = toml::from_str(toml_str).unwrap();
+    apply_env_overrides(&mut config);
+
+    assert_eq!(config.tickets.systems.len(), 1);
+    assert_eq!(
+        config.tickets.systems[0].api_key,
+        Some("env-github-token".to_string())
+    );
+}
+
+#[test]
+#[serial]
+fn test_ticket_env_overrides_gitlab() {
+    let mut guard = EnvVarGuard::new();
+    guard.set("TICKET_GITLAB_KEY", "env-gitlab-token");
+
+    let toml_str = r#"
+        [project]
+        name = "test"
+        path = "/tmp/test"
+
+        [output]
+        dir = "./out"
+
+        [scanner]
+        max_file_size_kb = 100
+
+        [llm]
+        timeout_secs = 30
+        max_retries = 2
+        retry_backoff_ms = 1000
+
+        [llm.phases.discovery]
+        base_url = "http://test"
+        model = "test"
+
+        [llm.phases.verification]
+        base_url = "http://test"
+        model = "test"
+
+        [llm.phases.aggregation]
+        base_url = "http://test"
+        model = "test"
+
+        [tickets]
+        [[tickets.systems]]
+        system_type = "gitlab"
+        url = "https://gitlab.com/group/project"
+        project = "myproject"
+    "#;
+
+    let mut config: ScannerConfig = toml::from_str(toml_str).unwrap();
+    apply_env_overrides(&mut config);
+
+    assert_eq!(config.tickets.systems.len(), 1);
+    assert_eq!(
+        config.tickets.systems[0].api_key,
+        Some("env-gitlab-token".to_string())
+    );
+}
+
+#[test]
+#[serial]
+fn test_ticket_env_overrides_explicit_takes_precedence() {
+    let mut guard = EnvVarGuard::new();
+    guard.set("TICKET_GITHUB_KEY", "env-github-token");
+
+    let toml_str = r#"
+        [project]
+        name = "test"
+        path = "/tmp/test"
+
+        [output]
+        dir = "./out"
+
+        [scanner]
+        max_file_size_kb = 100
+
+        [llm]
+        timeout_secs = 30
+        max_retries = 2
+        retry_backoff_ms = 1000
+
+        [llm.phases.discovery]
+        base_url = "http://test"
+        model = "test"
+
+        [llm.phases.verification]
+        base_url = "http://test"
+        model = "test"
+
+        [llm.phases.aggregation]
+        base_url = "http://test"
+        model = "test"
+
+        [tickets]
+        [[tickets.systems]]
+        system_type = "github"
+        url = "https://github.com/org/repo"
+        api_key = "explicit-token"
+        project = "myproject"
+    "#;
+
+    let mut config: ScannerConfig = toml::from_str(toml_str).unwrap();
+    apply_env_overrides(&mut config);
+
+    assert_eq!(config.tickets.systems.len(), 1);
+    assert_eq!(
+        config.tickets.systems[0].api_key,
+        Some("explicit-token".to_string())
+    );
+}
+
+#[test]
+#[serial]
+fn test_ticket_env_overrides_no_env_var() {
+    let mut guard = EnvVarGuard::new();
+    guard.clear("TICKET_GITHUB_KEY");
+
+    let toml_str = r#"
+        [project]
+        name = "test"
+        path = "/tmp/test"
+
+        [output]
+        dir = "./out"
+
+        [scanner]
+        max_file_size_kb = 100
+
+        [llm]
+        timeout_secs = 30
+        max_retries = 2
+        retry_backoff_ms = 1000
+
+        [llm.phases.discovery]
+        base_url = "http://test"
+        model = "test"
+
+        [llm.phases.verification]
+        base_url = "http://test"
+        model = "test"
+
+        [llm.phases.aggregation]
+        base_url = "http://test"
+        model = "test"
+
+        [tickets]
+        [[tickets.systems]]
+        system_type = "github"
+        url = "https://github.com/org/repo"
+        project = "myproject"
+    "#;
+
+    let mut config: ScannerConfig = toml::from_str(toml_str).unwrap();
+    apply_env_overrides(&mut config);
+
+    assert_eq!(config.tickets.systems.len(), 1);
+    assert!(config.tickets.systems[0].api_key.is_none());
+}
+
+#[test]
+#[serial]
+fn test_ticket_env_overrides_unknown_system_type() {
+    let mut guard = EnvVarGuard::new();
+    guard.set("TICKET_GITHUB_KEY", "env-github-token");
+
+    let toml_str = r#"
+        [project]
+        name = "test"
+        path = "/tmp/test"
+
+        [output]
+        dir = "./out"
+
+        [scanner]
+        max_file_size_kb = 100
+
+        [llm]
+        timeout_secs = 30
+        max_retries = 2
+        retry_backoff_ms = 1000
+
+        [llm.phases.discovery]
+        base_url = "http://test"
+        model = "test"
+
+        [llm.phases.verification]
+        base_url = "http://test"
+        model = "test"
+
+        [llm.phases.aggregation]
+        base_url = "http://test"
+        model = "test"
+
+        [tickets]
+        [[tickets.systems]]
+        system_type = "jira"
+        url = "https://company.atlassian.net"
+        project = "SEC"
+    "#;
+
+    let mut config: ScannerConfig = toml::from_str(toml_str).unwrap();
+    apply_env_overrides(&mut config);
+
+    assert_eq!(config.tickets.systems.len(), 1);
+    assert!(config.tickets.systems[0].api_key.is_none());
+}
+
 fn base_config_toml() -> String {
     r#"
         [project]

@@ -29,7 +29,8 @@ pub async fn run_auto_patching(
     let patcher = crate::staging::AutoPatcher::new(target_path.to_path_buf());
     let patching_config = crate::staging::PatchingConfig::default();
 
-    match patcher.execute_batch(&findings, &patching_config) {
+    match patcher.execute_batch_with_vuln_spec(&findings, &patching_config, Some(&config.vuln_spec))
+    {
         Ok(patched_findings) => {
             tracing::info!(
                 "Auto patching: {} findings processed",

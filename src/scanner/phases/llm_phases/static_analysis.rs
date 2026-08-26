@@ -161,6 +161,11 @@ pub async fn run_llm_static_analysis(
         let mut llm_findings = Vec::new();
         let mut new_analyzed_files: Vec<String> = analyzed_files.to_vec();
 
+        // Initialize vuln_spec index if enabled
+        if config.vuln_spec.enabled {
+            crate::vuln_spec::initialize_spec_index(&config.vuln_spec);
+        }
+
         // Load CWE knowledge base for triple-path context
         let cwe_kb = CweKnowledgeBase::load_embedded().ok();
 

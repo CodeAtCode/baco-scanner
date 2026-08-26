@@ -41,6 +41,22 @@ pub fn apply_env_overrides(config: &mut crate::config::ScannerConfig) {
             }
         }
     }
+
+    apply_ticket_env_overrides(config);
+}
+
+fn apply_ticket_env_overrides(config: &mut crate::config::ScannerConfig) {
+    for system in &mut config.tickets.systems {
+        if system.system_type == "github" && system.api_key.is_none() {
+            if let Ok(key) = env::var("TICKET_GITHUB_KEY") {
+                system.api_key = Some(key);
+            }
+        } else if system.system_type == "gitlab" && system.api_key.is_none() {
+            if let Ok(key) = env::var("TICKET_GITLAB_KEY") {
+                system.api_key = Some(key);
+            }
+        }
+    }
 }
 
 /// Guard for environment variables that auto-cleans on drop

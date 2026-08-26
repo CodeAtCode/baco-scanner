@@ -242,6 +242,23 @@ url = "https://api.github.com"
 credentials.token = "${GITHUB_TOKEN}"
 ```
 
+## Output Configuration
+
+```toml
+[output]
+# Directory where reports and checkpoints will be written
+dir = "./baco-output"
+# Evidence gate (default: false). When true, only findings classified as
+# verified or supported reach report.html and report.sarif; findings.json
+# always contains every finding with its verification_tier attached.
+evidence_gate = false
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `dir` | str | `"./baco-output"` | Output directory for reports and checkpoints |
+| `evidence_gate` | bool | `false` | When true, only findings classified as verified or supported by the evidence gate reach report.html and the SARIF output. findings.json always contains every finding with its verification_tier attached. |
+
 ## Output Formats
 
 - **findings.json**: Complete vulnerability data with all 16 fields

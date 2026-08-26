@@ -3,7 +3,9 @@
 //! Tests for specification extraction, RAG retrieval, and prompt augmentation.
 
 use baco::vuln_spec::extractor;
+use baco::vuln_spec::retriever;
 use baco::vuln_spec::schema::{DomainCategory, SecuritySpecification, VulnSpecConfig};
+use std::io::Write;
 
 // ============================================================================
 // Schema Tests
@@ -171,4 +173,136 @@ fn test_mock_llm_response_parsing() {
         parsed.get("fix_code").unwrap().as_str().unwrap(),
         "element.textContent = escapeHtml(userInput);"
     );
+}
+
+// ============================================================================
+// Retriever Tests
+// ===========================================================================
+
+#[cfg(test)]
+mod retriever_tests {
+    use super::*;
+    use std::sync::Mutex;
+
+    static INDEX_LOCK: Mutex<()> = Mutex::new(());
+
+    #[test]
+    fn test_retrieve_relevant_specs_after_build() {
+        let _guard = INDEX_LOCK.lock().unwrap();
+
+        // Clear index first
+        retriever::clear_index();
+
+        let spec = SecuritySpecification {
+            id: "test-retrieve-001".to_string(),
+            vuln_type: "CWE-89".to_string(),
+            description: "SQL injection vulnerability in database queries".to_string(),
+            safe_behavior_pattern: "Use parameterized queries to prevent SQL injection".to_string(),
+            project_domain: "database".to_string(),
+            source_patch_hash: "test123".to_string(),
+            category: DomainCategory::DomainSpecific("database".to_string()),
+        };
+
+        // Build index with one spec
+        retriever::build_embedding_index(std::slice::from_ref(&spec)).unwrap();
+
+        // Retrieve with matching query
+        let results =
+            retriever::retrieve_relevant_specs("SELECT * FROM users WHERE id = ?", "CWE-89", 5);
+
+        // Should return non-empty results containing our spec
+        assert!(!results.is_empty(), "Should retrieve relevant specs");
+        assert!(
+            results.iter().any(|s| s.id == spec.id),
+            "Should contain the spec we added"
+        );
+    }
+
+    #[test]
+    fn test_initialize_spec_index_with_temp_file() {
+        let _guard = INDEX_LOCK.lock().unwrap();
+
+        // Clear index first
+        retriever::clear_index();
+
+        // Create temp file with specs
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db_path = temp_dir.path().join("test_vuln_spec_db.json");
+
+        let specs = vec![
+            SecuritySpecification {
+                id: "init-test-1".to_string(),
+                vuln_type: "CWE-79".to_string(),
+                description: "XSS vulnerability".to_string(),
+                safe_behavior_pattern: "Sanitize input".to_string(),
+                project_domain: "web".to_string(),
+                source_patch_hash: "hash1".to_string(),
+                category: DomainCategory::General,
+            },
+            SecuritySpecification {
+                id: "init-test-2".to_string(),
+                vuln_type: "CWE-89".to_string(),
+                description: "SQL injection".to_string(),
+                safe_behavior_pattern: "Use parameterized queries".to_string(),
+                project_domain: "database".to_string(),
+                source_patch_hash: "hash2".to_string(),
+                category: DomainCategory::DomainSpecific("database".to_string()),
+            },
+        ];
+
+        // Write specs to temp file
+        let json = serde_json::to_string(&specs).unwrap();
+        let mut file = std::fs::File::create(&db_path).unwrap();
+        file.write_all(json.as_bytes()).unwrap();
+
+        // Initialize index
+        let config = VulnSpecConfig {
+            enabled: true,
+            db_path: db_path.to_string_lossy().to_string(),
+            auto_extract_from_patches: false,
+        };
+
+        let count = baco::vuln_spec::initialize_spec_index(&config);
+
+        assert_eq!(count, 2, "Should load 2 specs from file");
+
+        // Verify retrieval works
+        let stats = retriever::get_index_stats();
+        assert_eq!(stats.num_documents, 2);
+    }
+
+    #[test]
+    fn test_extract_and_add_specs_to_index() {
+        let _guard = INDEX_LOCK.lock().unwrap();
+
+        // Clear index first
+        retriever::clear_index();
+
+        let patch = r#"--- a/src/crypto.rs
++++ b/src/crypto.rs
+@@ -10,5 +10,6 @@
+-    let query = format!("SELECT * FROM secrets WHERE key = {}", user_input);
+-    db.execute(&query);
++    let query = "SELECT * FROM secrets WHERE key = ?";
++    let stmt = db.prepare(query).unwrap();
++    stmt.execute(&[user_input]).unwrap();
+"#;
+
+        // Extract specs from patch
+        let specs = extractor::extract_from_patch(patch);
+        assert!(!specs.is_empty(), "Should extract at least one spec");
+
+        // Add to index
+        let count = retriever::add_specs_to_index(&specs).unwrap();
+        assert!(count > 0, "Should add specs to index");
+
+        // Verify retrieval works
+        let stats = retriever::get_index_stats();
+        assert!(stats.num_documents > 0, "Index should have documents");
+
+        // Try to retrieve
+        let results =
+            retriever::retrieve_relevant_specs("SELECT * FROM secrets WHERE key", "CWE-89", 5);
+        assert!(!results.is_empty(), "Should retrieve the added spec");
+    }
 }

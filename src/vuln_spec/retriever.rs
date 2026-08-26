@@ -26,6 +26,8 @@ pub struct SpecEmbeddingIndex {
     embeddings: Vec<f32>,
     /// Map from spec ID to document index
     spec_to_doc: HashMap<String, usize>,
+    /// Map from document index to spec (for retrieval)
+    specs_by_doc: HashMap<usize, SecuritySpecification>,
     /// BM25 indexer (simplified implementation)
     bm25_index: Bm25Index,
 }
@@ -36,15 +38,23 @@ impl SpecEmbeddingIndex {
             documents: Vec::new(),
             embeddings: Vec::new(),
             spec_to_doc: HashMap::new(),
+            specs_by_doc: HashMap::new(),
             bm25_index: Bm25Index::new(),
         }
     }
 
-    fn add_document(&mut self, spec_id: &str, text: &str, embedding: Vec<f32>) {
+    fn add_document(
+        &mut self,
+        spec_id: &str,
+        text: &str,
+        embedding: Vec<f32>,
+        spec: SecuritySpecification,
+    ) {
         let doc_idx = self.documents.len();
         self.documents.push(text.to_string());
         self.embeddings.extend(embedding);
         self.spec_to_doc.insert(spec_id.to_string(), doc_idx);
+        self.specs_by_doc.insert(doc_idx, spec);
         self.bm25_index.index(doc_idx, text);
     }
 
@@ -185,7 +195,7 @@ pub fn build_embedding_index(specs: &[SecuritySpecification]) -> Result<(), Stri
         // Generate simple embedding (in production, use actual embedding model)
         let embedding = generate_embedding(&doc_text);
 
-        index.add_document(&spec.id, &doc_text, embedding);
+        index.add_document(&spec.id, &doc_text, embedding, spec.clone());
     }
 
     Ok(())
@@ -308,15 +318,10 @@ pub fn retrieve_relevant_specs(
     // Map document indices back to specifications
     let index = EMBEDDING_INDEX.read().expect("Failed to acquire read lock");
 
-    let results = Vec::new();
+    let mut results = Vec::new();
     for (doc_idx, _score) in search_results {
-        // Find spec with this document index
-        for idx in index.spec_to_doc.values() {
-            if *idx == doc_idx {
-                // This is a simplified lookup - in production, store spec references
-                // For now, return empty specs (actual implementations would store refs)
-                break;
-            }
+        if let Some(spec) = index.specs_by_doc.get(&doc_idx) {
+            results.push(spec.clone());
         }
     }
 
@@ -348,6 +353,32 @@ pub fn clear_index() {
         .write()
         .expect("Failed to acquire write lock");
     *index = SpecEmbeddingIndex::new();
+    // Reset the initialization flag so it can be re-initialized
+    crate::vuln_spec::reset_init_flag();
+}
+
+/// Add specifications to the existing index without clearing it
+pub fn add_specs_to_index(specs: &[SecuritySpecification]) -> Result<usize, String> {
+    let mut index = EMBEDDING_INDEX
+        .write()
+        .map_err(|e| format!("Failed to acquire lock: {}", e))?;
+
+    let initial_count = index.documents.len();
+
+    for spec in specs {
+        // Create document text from specification
+        let doc_text = format!(
+            "{} {} {} {}",
+            spec.description, spec.safe_behavior_pattern, spec.vuln_type, spec.project_domain
+        );
+
+        // Generate simple embedding (in production, use actual embedding model)
+        let embedding = generate_embedding(&doc_text);
+
+        index.add_document(&spec.id, &doc_text, embedding, spec.clone());
+    }
+
+    Ok(index.documents.len() - initial_count)
 }
 
 /// Get index statistics
@@ -373,6 +404,12 @@ mod tests {
     use std::sync::Mutex;
 
     static INDEX_LOCK: Mutex<()> = Mutex::new(());
+
+    // Test helper to get spec count
+    fn get_spec_count() -> usize {
+        let index = EMBEDDING_INDEX.read().expect("Failed to acquire read lock");
+        index.specs_by_doc.len()
+    }
 
     #[test]
     fn test_build_embedding_index() {
@@ -404,6 +441,7 @@ mod tests {
         let stats = get_index_stats();
         assert!(stats.num_documents >= 2);
         assert!(stats.num_embeddings >= 2);
+        assert_eq!(get_spec_count(), 2);
     }
 
     #[test]

@@ -161,6 +161,16 @@ impl AutoPatcher {
         findings: &[crate::findings::VulnerabilityFinding],
         config: &PatchingConfig,
     ) -> AutoPatchResult<Vec<crate::findings::VulnerabilityFinding>> {
+        self.execute_batch_with_vuln_spec(findings, config, None)
+    }
+
+    /// Execute batch auto-patching with optional vuln_spec config for auto-extraction
+    pub fn execute_batch_with_vuln_spec(
+        &self,
+        findings: &[crate::findings::VulnerabilityFinding],
+        config: &PatchingConfig,
+        vuln_spec_config: Option<&crate::vuln_spec::VulnSpecConfig>,
+    ) -> AutoPatchResult<Vec<crate::findings::VulnerabilityFinding>> {
         let mut patched_findings = Vec::new();
         let mut patch_count = 0;
 
@@ -180,6 +190,37 @@ impl AutoPatcher {
 
             // Generate patch
             let patch = self.generate_patch(&finding.title, code_snippet, &finding.file_path)?;
+
+            // Auto-extract specs from patch if enabled
+            if let Some(vs_config) = vuln_spec_config {
+                if vs_config.enabled && vs_config.auto_extract_from_patches {
+                    let specs = crate::vuln_spec::extractor::extract_from_patch(&patch.diff);
+                    if !specs.is_empty() {
+                        // Set domain category if not general
+                        let domain =
+                            crate::vuln_spec::extractor::extract_domain_from_patch(&patch.diff);
+                        let mut specs_with_domain = specs;
+                        for spec in &mut specs_with_domain {
+                            if domain != "general" {
+                                spec.category =
+                                    crate::vuln_spec::schema::DomainCategory::DomainSpecific(
+                                        domain.clone(),
+                                    );
+                            }
+                        }
+
+                        if let Ok(count) =
+                            crate::vuln_spec::retriever::add_specs_to_index(&specs_with_domain)
+                        {
+                            tracing::debug!(
+                                "Added {} specs from auto-generated patch (domain: {})",
+                                count,
+                                domain
+                            );
+                        }
+                    }
+                }
+            }
 
             // Validate patch
             let validation = self.validate_patch(&patch)?;
