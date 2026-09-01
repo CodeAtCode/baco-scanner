@@ -48,6 +48,11 @@ Return JSON array with format:
 
 CRITICAL: ONLY report XSS vulnerabilities. Ignore all other attack classes.
 
+## Scope — stay in your lane
+
+OWNED CLASS: Cross-site scripting (reflected, stored, DOM-based), SSTI that leads to XSS.
+Anything outside this list is not your finding — if you trip over an adjacent issue (CSRF which is separate, injection, auth bypass), emit it at info severity with title prefix '[handoff: <domain>]' and move on. Staying in lane keeps precision and token cost down.
+
 Code input will be provided at runtime.
 
 ---

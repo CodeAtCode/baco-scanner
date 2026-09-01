@@ -21,6 +21,9 @@ mod tests {
             retry_backoff_ms: 1000,
             temperature: 0.5,
             max_reasoning_tokens: None,
+            enable_llm_cache: false,
+            cache_dir: None,
+            max_concurrent: 3,
         };
 
         let client = LlmClient::new(llm_config);
@@ -263,8 +266,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_truncate_code_various_sizes() {
+    #[test]
+    fn test_truncate_code_various_sizes() {
         let analyzer = create_analyzer();
 
         // Test 1: within limit
@@ -274,13 +277,15 @@ mod tests {
             assert_eq!(truncated, code);
         }
 
-        // Test 2: exceeds limit
+        // Test 2: exceeds limit — the truncation notice must fit within
+        // the 8000-byte budget (content shrinks to make room)
         {
             let long_code = "x".repeat(10000);
             let truncated = analyzer.truncate_code(&long_code);
-            assert_eq!(&truncated[..8000], "x".repeat(8000));
+            assert!(truncated.len() <= 8000);
             assert!(truncated.contains("[truncated"));
-            assert!(truncated.contains("2000 chars omitted"));
+            assert!(truncated.contains("chars omitted"));
+            assert!(truncated.starts_with(&"x".repeat(100)));
         }
     }
 
@@ -297,6 +302,9 @@ mod tests {
             retry_backoff_ms: 1000,
             temperature: 0.5,
             max_reasoning_tokens: None,
+            enable_llm_cache: false,
+            cache_dir: None,
+            max_concurrent: 3,
         };
 
         let client = LlmClient::new(llm_config);
@@ -326,6 +334,9 @@ mod tests {
             retry_backoff_ms: 1000,
             temperature: 0.5,
             max_reasoning_tokens: None,
+            enable_llm_cache: false,
+            cache_dir: None,
+            max_concurrent: 3,
         };
 
         let client = LlmClient::new(llm_config);
@@ -357,6 +368,9 @@ mod tests {
             retry_backoff_ms: 1000,
             temperature: 0.5,
             max_reasoning_tokens: None,
+            enable_llm_cache: false,
+            cache_dir: None,
+            max_concurrent: 3,
         };
 
         let client = LlmClient::new(llm_config);

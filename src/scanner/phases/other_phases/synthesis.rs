@@ -58,6 +58,9 @@ pub async fn run_rule_synthesis(
         retry_backoff_ms: config.llm.retry_backoff_ms,
         temperature: config.llm.temperature,
         max_reasoning_tokens: config.llm.max_reasoning_tokens,
+        enable_llm_cache: false,
+        cache_dir: None,
+        max_concurrent: 3,
     };
     let client = crate::llm::LlmClient::with_metrics(llm_config, Some(metrics_tracker.clone()));
 
@@ -188,6 +191,9 @@ pub async fn run_exploit_synth(
         retry_backoff_ms: config.llm.retry_backoff_ms,
         temperature: config.llm.temperature,
         max_reasoning_tokens: config.llm.max_reasoning_tokens,
+        enable_llm_cache: false,
+        cache_dir: None,
+        max_concurrent: 3,
     };
     let client = crate::llm::LlmClient::with_metrics(llm_config, Some(metrics_tracker.clone()));
 
@@ -309,6 +315,9 @@ pub async fn run_validate(
         retry_backoff_ms: config.llm.retry_backoff_ms,
         temperature: config.llm.temperature,
         max_reasoning_tokens: config.llm.max_reasoning_tokens,
+        enable_llm_cache: false,
+        cache_dir: None,
+        max_concurrent: 3,
     };
     let client = crate::llm::LlmClient::with_metrics(llm_config, Some(metrics_tracker.clone()));
 

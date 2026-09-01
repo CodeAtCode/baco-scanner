@@ -45,6 +45,9 @@ fn test_llm_config_from_env() {
         retry_backoff_ms: 2000,
         temperature: 0.7,
         max_reasoning_tokens: Some(1024),
+        enable_llm_cache: false,
+        cache_dir: None,
+        max_concurrent: 3,
     };
 
     assert_eq!(config.base_url, "https://api.custom.com/v1");
@@ -67,6 +70,9 @@ fn test_llm_config_invalid() {
         retry_backoff_ms: 0,
         temperature: 0.0,
         max_reasoning_tokens: None,
+        enable_llm_cache: false,
+        cache_dir: None,
+        max_concurrent: 3,
     };
 
     // Config allows invalid values - validation happens at runtime
@@ -87,6 +93,9 @@ fn test_llm_config_get_models_priority() {
         retry_backoff_ms: 1000,
         temperature: 0.5,
         max_reasoning_tokens: None,
+        enable_llm_cache: false,
+        cache_dir: None,
+        max_concurrent: 3,
     };
 
     let models = config.get_models();
@@ -134,6 +143,9 @@ fn test_llm_client_creation() {
         retry_backoff_ms: 1000,
         temperature: 0.5,
         max_reasoning_tokens: None,
+        enable_llm_cache: false,
+        cache_dir: None,
+        max_concurrent: 3,
     };
 
     let client = LlmClient::new(config);
@@ -152,6 +164,9 @@ fn test_llm_client_with_multiple_models() {
         retry_backoff_ms: 1000,
         temperature: 0.5,
         max_reasoning_tokens: None,
+        enable_llm_cache: false,
+        cache_dir: None,
+        max_concurrent: 3,
     };
 
     let client = LlmClient::new(config);

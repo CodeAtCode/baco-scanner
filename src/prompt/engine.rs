@@ -22,6 +22,7 @@ pub struct PromptEngine {
     pub(crate) defaults: DefaultPrompts,
     pub(crate) overrides: HashMap<String, String>,
     pub(crate) project_type: ProjectType,
+    hunt_prompts: HashMap<String, String>,
 }
 
 impl PromptEngine {
@@ -74,10 +75,14 @@ impl PromptEngine {
             reporting: loaded_prompts.get("reporting").cloned().unwrap_or_default(),
         };
 
+        // Load hunt prompts
+        let hunt_prompts = loader::load_hunt_prompts(None);
+
         Self {
             defaults,
             overrides,
             project_type: ProjectType::Web, // default project type
+            hunt_prompts,
         }
     }
 
@@ -141,6 +146,89 @@ impl PromptEngine {
 
         result
     }
+
+    /// Get prompt for a specific hunt domain
+    pub fn get_hunt_prompt(&self, domain: &str) -> Option<String> {
+        self.hunt_prompts
+            .get(domain)
+            .filter(|s| !s.is_empty())
+            .cloned()
+    }
+
+    /// Get list of available hunt domains
+    pub fn available_hunt_domains(&self) -> Vec<String> {
+        let mut domains: Vec<String> = self.hunt_prompts.keys().cloned().collect();
+        domains.sort();
+        domains
+    }
+
+    /// Select hunt domains based on programming languages
+    /// Language matching is case-insensitive and uses contains() for substring matching
+    pub fn select_hunt_domains(languages: &[String]) -> Vec<String> {
+        // Language to domains mapping table
+        // Each language maps to a list of relevant security domains
+        let lang_to_domains: Vec<(&[&str], &[&str])> = vec![
+            // C/C++/H -> injection, crypto, resource, memory_safety
+            (
+                &["c", "cpp", "h"],
+                &["injection", "crypto", "resource", "memory_safety"],
+            ),
+            // Rust -> injection, crypto, memory_safety
+            (&["rust"], &["injection", "crypto", "memory_safety"]),
+            // JavaScript/TypeScript -> xss, injection, auth, path_traversal
+            (
+                &["javascript", "typescript"],
+                &["xss", "injection", "auth", "path_traversal"],
+            ),
+            // PHP -> xss, injection, path_traversal, deserialization
+            (
+                &["php"],
+                &["xss", "injection", "path_traversal", "deserialization"],
+            ),
+            // Python -> injection, auth, path_traversal
+            (&["python"], &["injection", "auth", "path_traversal"]),
+            // Java/C# -> injection, auth, crypto, deserialization
+            (
+                &["java", "csharp"],
+                &["injection", "auth", "crypto", "deserialization"],
+            ),
+            // Go -> injection, crypto, resource
+            (&["go"], &["injection", "crypto", "resource"]),
+        ];
+
+        let mut selected_domains: std::collections::HashSet<String> =
+            std::collections::HashSet::new();
+
+        for lang in languages {
+            let lang_lower = lang.to_lowercase();
+
+            // Find matching language entry
+            for (lang_list, domains) in &lang_to_domains {
+                // Check if this language matches any in the list
+                for &l in *lang_list {
+                    if lang_lower == l {
+                        for &d in *domains {
+                            selected_domains.insert(d.to_string());
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        // If no languages matched, use default
+        if selected_domains.is_empty() {
+            for &d in &["injection", "auth"] {
+                selected_domains.insert(d.to_string());
+            }
+        }
+
+        // Convert to sorted vec for determinism
+        let mut result: Vec<String> = selected_domains.into_iter().collect();
+        result.sort();
+        result
+    }
+
     /// Get common variables for all templates
     fn get_common_variables(&self) -> HashMap<String, String> {
         let mut vars = TemplateVariables::new();

@@ -231,6 +231,9 @@ mod parse_response_tests {
             retry_backoff_ms: 1000,
             temperature: 0.5,
             max_reasoning_tokens: None,
+            enable_llm_cache: false,
+            cache_dir: None,
+            max_concurrent: 3,
         };
         let client = LlmClient::new(config);
         LlmAnalyzer::new(client, vec!["rust".to_string()], 1024, &Default::default())

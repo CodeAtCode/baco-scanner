@@ -19,3 +19,6 @@ mod triple_path;
 
 // T3.1: CPG-guided slicing integration tests
 mod cpg_pipeline;
+
+// Eval harness oracle scoring tests
+mod eval_oracle;

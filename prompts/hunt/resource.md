@@ -48,6 +48,11 @@ Return JSON array with format:
 
 CRITICAL: ONLY report resource handling vulnerabilities. Ignore all other attack classes.
 
+## Scope — stay in your lane
+
+OWNED CLASS: Resource exhaustion (memory, CPU, file descriptors), integer overflows in allocation, DoS via unbounded operations, ReDoS.
+Anything outside this list is not your finding — if you trip over an adjacent issue (buffer overflow which is memory_safety, injection via resource names), emit it at info severity with title prefix '[handoff: <domain>]' and move on. Staying in lane keeps precision and token cost down.
+
 Code input will be provided at runtime.
 
 ---

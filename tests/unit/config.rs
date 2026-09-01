@@ -990,7 +990,7 @@ fn test_performance_settings_defaults() {
     assert!(!settings.enable_incremental_scan);
     assert!(!settings.enable_threat_modeling);
     assert!(settings.enable_root_cause_dedup);
-    assert!(settings.enable_multi_verifier);
+    assert!(!settings.enable_multi_verifier);
     assert!(!settings.enable_auto_patching);
     assert!(!settings.enable_poc_compilation);
     assert!(settings.enable_confidence_refinement);
@@ -1216,7 +1216,8 @@ fn test_example_toml_deserializes() {
     let config = ScannerConfig::from_file("config.example.toml");
     assert!(
         config.is_ok(),
-        "config.example.toml should deserialize successfully"
+        "config.example.toml should deserialize successfully: {:?}",
+        config.as_ref().err()
     );
 }
 

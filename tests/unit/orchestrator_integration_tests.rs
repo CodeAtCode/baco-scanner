@@ -43,6 +43,7 @@ fn create_test_scanner_config() -> ScannerConfig {
         output: OutputConfig {
             dir: "/tmp/test_output".to_string(),
             evidence_gate: false,
+            include_rejected: false,
         },
         agent: AgentConfig::default(),
         tickets: Default::default(),
@@ -59,6 +60,9 @@ fn create_test_scanner_config() -> ScannerConfig {
         pacvd: Default::default(),
         agent_flow: Default::default(),
         vuln_spec: Default::default(),
+        citation_verification: Default::default(),
+        prior_runs: Default::default(),
+        org_context: Default::default(),
     }
 }
 

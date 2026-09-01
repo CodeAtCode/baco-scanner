@@ -182,14 +182,11 @@ fn test_mock_llm_response_parsing() {
 #[cfg(test)]
 mod retriever_tests {
     use super::*;
-    use std::sync::Mutex;
-
-    static INDEX_LOCK: Mutex<()> = Mutex::new(());
+    use serial_test::serial;
 
     #[test]
+    #[serial]
     fn test_retrieve_relevant_specs_after_build() {
-        let _guard = INDEX_LOCK.lock().unwrap();
-
         // Clear index first
         retriever::clear_index();
 
@@ -219,9 +216,8 @@ mod retriever_tests {
     }
 
     #[test]
+    #[serial]
     fn test_initialize_spec_index_with_temp_file() {
-        let _guard = INDEX_LOCK.lock().unwrap();
-
         // Clear index first
         retriever::clear_index();
 
@@ -272,9 +268,8 @@ mod retriever_tests {
     }
 
     #[test]
+    #[serial]
     fn test_extract_and_add_specs_to_index() {
-        let _guard = INDEX_LOCK.lock().unwrap();
-
         // Clear index first
         retriever::clear_index();
 
@@ -494,6 +489,7 @@ fn test_execute_batch_with_vuln_spec_disabled() {
 }
 
 #[test]
+#[serial]
 fn test_execute_batch_with_vuln_spec_empty_findings() {
     use baco::staging::compiler::AutoPatcher;
     use baco::staging::compiler::PatchingConfig;
@@ -631,6 +627,7 @@ fn test_execute_batch_with_vuln_spec_non_security_patch() {
 }
 
 #[test]
+#[serial]
 fn test_retrieve_with_domain_filter_matching_domain() {
     // Clear index first
     retriever::clear_index();
@@ -664,6 +661,7 @@ fn test_retrieve_with_domain_filter_matching_domain() {
 }
 
 #[test]
+#[serial]
 fn test_retrieve_with_domain_filter_excludes_other_domains() {
     // Clear index first
     retriever::clear_index();
@@ -707,6 +705,7 @@ fn test_retrieve_with_domain_filter_excludes_other_domains() {
 }
 
 #[test]
+#[serial]
 fn test_retrieve_with_domain_filter_empty_index() {
     // Clear index to ensure it's empty
     retriever::clear_index();
@@ -727,6 +726,7 @@ fn test_retrieve_with_domain_filter_empty_index() {
 }
 
 #[test]
+#[serial]
 fn test_initialize_spec_index_nonexistent_db_path() {
     // Clear index first
     retriever::clear_index();
@@ -745,6 +745,7 @@ fn test_initialize_spec_index_nonexistent_db_path() {
 }
 
 #[test]
+#[serial]
 fn test_initialize_spec_index_corrupt_json() {
     // Clear index first
     retriever::clear_index();
@@ -774,6 +775,7 @@ fn test_initialize_spec_index_corrupt_json() {
 }
 
 #[test]
+#[serial]
 fn test_initialize_spec_index_idempotent() {
     // Clear index first
     retriever::clear_index();

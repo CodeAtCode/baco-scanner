@@ -47,6 +47,11 @@ Return JSON array with format:
 
 CRITICAL: ONLY report cryptographic vulnerabilities. Ignore all other attack classes.
 
+## Scope — stay in your lane
+
+OWNED CLASS: Weak cryptographic algorithms (MD5, SHA1, DES, RC4), predictable randomness, hardcoded keys/secrets, timing attacks on crypto.
+Anything outside this list is not your finding — if you trip over an adjacent issue (key leakage via injection, auth bypass via weak session tokens), emit it at info severity with title prefix '[handoff: <domain>]' and move on. Staying in lane keeps precision and token cost down.
+
 Code input will be provided at runtime.
 
 ---

@@ -3,7 +3,14 @@
 use crate::findings::VulnerabilityFinding;
 
 /// Type alias for phase result
-pub(crate) type PhaseResult = Result<(Vec<VulnerabilityFinding>, Vec<String>), String>;
+pub(crate) type PhaseResult = Result<
+    (
+        Vec<VulnerabilityFinding>,
+        Vec<String>,
+        Vec<crate::scanner::phases::llm_phases::RejectedFinding>,
+    ),
+    String,
+>;
 
 /// Log and aggregate LLM static analysis results.
 /// This helper consolidates the common pattern for handling LLM phase results.
@@ -12,7 +19,7 @@ pub(crate) fn log_and_aggregate_llm_results(
     findings: &mut Vec<VulnerabilityFinding>,
     analyzed_files: &mut Vec<String>,
 ) {
-    if let Some(Ok((llm_findings, new_files))) = llm_static_result {
+    if let Some(Ok((llm_findings, new_files, _))) = llm_static_result {
         tracing::info!("[SCANNER] Added {} LLM findings", llm_findings.len());
         if !llm_findings.is_empty() {
             tracing::debug!(
@@ -72,6 +79,7 @@ mod tests {
         let llm_result = Some(Ok((
             vec![create_test_finding("finding1")],
             vec!["file1.rs".to_string()],
+            Vec::new(),
         )));
 
         let mut findings = vec![create_test_finding("existing")];
@@ -85,7 +93,7 @@ mod tests {
 
     #[test]
     fn test_log_and_aggregate_some_ok_empty_findings() {
-        let llm_result = Some(Ok((vec![], vec!["file1.rs".to_string()])));
+        let llm_result = Some(Ok((vec![], vec!["file1.rs".to_string()], Vec::new())));
 
         let mut findings = vec![create_test_finding("existing")];
         let mut analyzed_files = vec!["old.rs".to_string()];
@@ -131,6 +139,7 @@ mod tests {
                 create_test_finding("finding3"),
             ],
             vec!["file1.rs".to_string()],
+            Vec::new(),
         )));
 
         let mut findings = vec![create_test_finding("existing")];

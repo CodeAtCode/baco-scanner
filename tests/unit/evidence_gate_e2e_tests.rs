@@ -213,7 +213,7 @@ fn test_json_gate_on_tags_tiers_keeps_all_findings() {
     // back-fills verification_tier on every finding.
     let findings = mixed_findings();
     let path = json_path("gate-on");
-    write_findings_json(&findings, &path, None, Some(&gate_config())).unwrap();
+    write_findings_json(&findings, &[], &path, None, Some(&gate_config())).unwrap();
     let raw = std::fs::read_to_string(&path).unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&raw).unwrap();
     let arr = parsed
@@ -239,7 +239,7 @@ fn test_json_gate_on_tags_tiers_keeps_all_findings() {
 fn test_json_gate_off_all_findings_tier_null() {
     let findings = mixed_findings();
     let path = json_path("gate-off");
-    write_findings_json(&findings, &path, None, Some(&ScannerConfig::default())).unwrap();
+    write_findings_json(&findings, &[], &path, None, Some(&ScannerConfig::default())).unwrap();
     let raw = std::fs::read_to_string(&path).unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&raw).unwrap();
     let arr = parsed
@@ -260,7 +260,7 @@ fn test_json_gate_off_all_findings_tier_null() {
 #[test]
 fn test_json_gate_on_empty_findings_valid_empty_array() {
     let path = json_path("gate-on-empty");
-    write_findings_json(&[], &path, None, Some(&gate_config())).unwrap();
+    write_findings_json(&[], &[], &path, None, Some(&gate_config())).unwrap();
     let parsed: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
     let arr = parsed
@@ -318,7 +318,7 @@ fn json_gate_on_includes_all_findings_with_tiers() {
     ];
     let path = "/tmp/baco_e2e_gate.json";
     let cfg = gate_config();
-    write_findings_json(&findings, path, None, Some(&cfg)).unwrap();
+    write_findings_json(&findings, &[], path, None, Some(&cfg)).unwrap();
     let content = std::fs::read_to_string(path).unwrap();
     let _ = std::fs::remove_file(path);
     let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
@@ -396,7 +396,7 @@ fn json_gate_on_top_level_array_with_tiers() {
     ];
     let path = "/tmp/lane_c_json_gate_on.json";
     let cfg = gate_config();
-    write_findings_json(&findings, path, None, Some(&cfg)).unwrap();
+    write_findings_json(&findings, &[], path, None, Some(&cfg)).unwrap();
     let content = std::fs::read_to_string(path).unwrap();
     let _ = std::fs::remove_file(path);
     let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
@@ -428,7 +428,7 @@ fn json_gate_off_all_findings_present() {
     ];
     let path = "/tmp/lane_c_json_gate_off.json";
     let cfg = ScannerConfig::default(); // gate OFF
-    write_findings_json(&findings, path, None, Some(&cfg)).unwrap();
+    write_findings_json(&findings, &[], path, None, Some(&cfg)).unwrap();
     let content = std::fs::read_to_string(path).unwrap();
     let _ = std::fs::remove_file(path);
     let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();

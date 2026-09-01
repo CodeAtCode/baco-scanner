@@ -44,6 +44,11 @@ Return JSON array with format:
 
 CRITICAL: ONLY report injection vulnerabilities. Ignore all other attack classes.
 
+## Scope — stay in your lane
+
+OWNED CLASS: SQL injection, command injection, LDAP injection, format string injection, header/CRLF injection.
+Anything outside this list is not your finding — if you trip over an adjacent issue (auth bypass, XSS, path traversal), emit it at info severity with title prefix '[handoff: <domain>]' and move on. Staying in lane keeps precision and token cost down.
+
 Code input will be provided at runtime.
 
 ---

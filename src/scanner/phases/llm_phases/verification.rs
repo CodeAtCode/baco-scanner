@@ -4,17 +4,24 @@ use crate::error::ScanResult;
 use crate::findings::VerificationStatus;
 use crate::findings::VulnerabilityFinding;
 use crate::llm;
+use crate::org_context;
 use crate::poc_compiler::PocCompiler;
 use crate::poc_generation::{PoCFormat, PoCGenerationEngine};
+use crate::prompt::loader::load_hunt_prompts;
 use crate::prompt::templates::cwe_to_hunt_domain;
 use crate::scanner::phases::PhaseConfig;
+use serde::Deserialize;
+use std::fs;
 use std::sync::Arc;
+
+/// Rejected finding with its rejection reason.
+pub type RejectedFinding = (VulnerabilityFinding, String);
 
 /// Run LLM verification phase (phase 8 of 24).
 pub async fn run_llm_verification(
     scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,
-) -> ScanResult<(Vec<VulnerabilityFinding>, Vec<String>)> {
+) -> ScanResult<(Vec<VulnerabilityFinding>, Vec<String>, Vec<RejectedFinding>)> {
     let PhaseConfig {
         phase: _,
         mut findings,
@@ -106,6 +113,9 @@ pub async fn run_llm_verification(
             }
         } else {
             // Non-agent mode: use direct LLM verification
+            // Load hunt prompts once for all findings
+            let hunt_prompts = load_hunt_prompts(None);
+
             for (i, finding) in findings.iter_mut().enumerate() {
                 let progress_pct = if total_findings > 0 {
                     ((i as f64 / total_findings as f64) * 100.0) as u64
@@ -122,7 +132,7 @@ pub async fn run_llm_verification(
                     finding.title
                 ));
 
-                // Build verification prompt with optional hunt context
+                // Build verification prompt with code context and hunt domain guidance
                 let mut prompt_text = format!(
                     "Vulnerability: {}\nLocation: {}:{}\nDescription: {}\nSources: {:?}",
                     finding.title,
@@ -132,40 +142,68 @@ pub async fn run_llm_verification(
                     finding.sources
                 );
 
+                // Add code snippet from finding if available
+                if let Some(ref snippet) = finding.code_snippet {
+                    prompt_text.push_str(&format!("\n\nVulnerable code:\n```\n{}\n```", snippet));
+                }
+
+                // Add surrounding code context from disk (±5 lines)
+                if let Some(line_num) = finding.line_number {
+                    if let Ok(content) = fs::read_to_string(&finding.file_path) {
+                        let lines: Vec<&str> = content.lines().collect();
+                        let start = if line_num >= 6 {
+                            (line_num - 6) as usize
+                        } else {
+                            0
+                        };
+                        let end = std::cmp::min(line_num as usize + 5, lines.len());
+                        let context_lines: Vec<String> = (start..end)
+                            .map(|i| format!("{:5}: {}", i + 1, lines[i]))
+                            .collect();
+                        prompt_text.push_str(&format!(
+                            "\n\nCode context ({}:{})\n{}",
+                            finding.file_path,
+                            line_num,
+                            context_lines.join("\n")
+                        ));
+                    }
+                }
+
                 // Append hunt domain context if CWE maps to a hunt domain
                 if let Some(domain) = finding
                     .cwe_id
                     .as_ref()
                     .and_then(|cwe| cwe_to_hunt_domain(cwe))
                 {
-                    // Note: hunt_prompts would need to be loaded and passed in - for now we add a placeholder
-                    // In a full implementation, hunt_prompts would be loaded via load_hunt_prompts()
-                    prompt_text.push_str(&format!(
-                        "\n\n[Hunt context: {} vulnerability - analyze with domain-specific patterns]",
-                        domain
-                    ));
+                    if let Some(hunt_prompt) = hunt_prompts.get(domain) {
+                        if !hunt_prompt.is_empty() {
+                            prompt_text.push_str(&format!(
+                                "\n\n=== HUNT DOMAIN GUIDANCE ({}) ===\n{}\n=== END HUNT GUIDANCE ===",
+                                domain,
+                                hunt_prompt
+                            ));
+                        }
+                    }
+                }
+
+                // Append org-context block if available
+                if let Some(ref org_ctx) = org_context::render(&config.org_context) {
+                    prompt_text.push_str("\n\n");
+                    prompt_text.push_str(org_ctx);
                 }
 
                 let messages = vec![
                     llm::ChatMessage::system(
-                        "You are a security vulnerability verifier. Analyze the finding and determine if it's a true positive, false positive, or needs review. Return JSON with verification_status (confirmed/false_positive/needs_review) and verification_notes."
+                        "You are a security vulnerability verifier. Analyze the finding and determine if it's a true positive, false positive, or needs review.\n\nSTRICT OUTPUT FORMAT: Return ONLY valid JSON with no prose outside the JSON object.\n\nJSON schema:\n{\n  \"verification_status\": \"confirmed|false_positive|needs_review\",\n  \"verification_notes\": \"detailed reasoning for the verdict\"\n}\n\nDo NOT include any text before or after the JSON."
                     ),
                     llm::ChatMessage::user(&prompt_text)
                 ];
                 let result = client.chat(&messages).await;
 
                 if let Ok(response_with_model) = result {
-                    if response_with_model.content.contains("confirmed") {
-                        finding.verification_status = Some(VerificationStatus::Confirmed);
-                        finding.verification_notes =
-                            Some("LLM verified as true positive".to_string());
-                    } else if response_with_model.content.contains("false_positive") {
-                        finding.verification_status = Some(VerificationStatus::FalsePositive);
-                        finding.verification_notes = Some(response_with_model.content.clone());
-                    } else {
-                        finding.verification_status = Some(VerificationStatus::NeedsReview);
-                        finding.verification_notes = Some(response_with_model.content.clone());
-                    }
+                    let (status, notes) = parse_verification_verdict(&response_with_model.content);
+                    finding.verification_status = Some(status);
+                    finding.verification_notes = Some(notes);
                     finding.add_evidence(
                         crate::evidence::EvidenceSource::LlmAnalysis("verification".into()),
                         0.8,
@@ -287,5 +325,56 @@ pub async fn run_llm_verification(
     }
 
     pb.set_position(pb.position() + 100);
-    Ok((findings, analyzed_files.to_vec()))
+
+    // Separate rejected findings (FalsePositive status) with their reasons
+    let mut kept_findings = Vec::new();
+    let mut rejected_findings = Vec::new();
+
+    for finding in findings {
+        match finding.verification_status {
+            Some(VerificationStatus::FalsePositive) => {
+                let reason = finding.verification_notes.clone().unwrap_or_else(|| {
+                    "Marked as false positive during LLM verification".to_string()
+                });
+                rejected_findings.push((finding, reason));
+            }
+            _ => kept_findings.push(finding),
+        }
+    }
+
+    Ok((kept_findings, analyzed_files.to_vec(), rejected_findings))
+}
+
+/// Parse a strict-JSON verification verdict from LLM output.
+///
+/// Code fences are stripped; if the text does not parse as the verdict
+/// object, the finding degrades to `NeedsReview` with the raw response
+/// preserved in the notes.
+pub fn parse_verification_verdict(content: &str) -> (VerificationStatus, String) {
+    #[derive(Deserialize, Debug)]
+    struct VerificationVerdict {
+        #[serde(rename = "verification_status")]
+        status: String,
+        #[serde(rename = "verification_notes")]
+        notes: Option<String>,
+    }
+
+    let cleaned = content
+        .trim_start_matches("```")
+        .trim_end_matches("```")
+        .trim_start_matches("json")
+        .trim();
+
+    match serde_json::from_str::<VerificationVerdict>(cleaned) {
+        Ok(verdict) => {
+            let status = match verdict.status.as_str() {
+                "confirmed" => VerificationStatus::Confirmed,
+                "false_positive" => VerificationStatus::FalsePositive,
+                _ => VerificationStatus::NeedsReview,
+            };
+            let notes = verdict.notes.unwrap_or_default();
+            (status, notes)
+        }
+        Err(_) => (VerificationStatus::NeedsReview, content.to_string()),
+    }
 }

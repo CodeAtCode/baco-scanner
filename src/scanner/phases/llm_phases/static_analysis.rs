@@ -112,6 +112,7 @@ pub async fn run_llm_static_analysis(
         &config.project.languages,
         config.scanner.max_file_size_kb * 1024,
         &config.scanner.exclude_paths,
+        config.scanner.performance.enable_file_filtering,
     )
     .unwrap_or(crate::indexer::FileIndex {
         files: Vec::new(),
@@ -147,6 +148,9 @@ pub async fn run_llm_static_analysis(
             retry_backoff_ms: config.llm.retry_backoff_ms,
             temperature: 0.5,
             max_reasoning_tokens: config.llm.max_reasoning_tokens,
+            enable_llm_cache: false,
+            cache_dir: None,
+            max_concurrent: 3,
         };
 
         let client =

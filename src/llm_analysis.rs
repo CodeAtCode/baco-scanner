@@ -418,15 +418,26 @@ impl LlmAnalyzer {
 
     /// Retrieve relevant CWE specifications based on file path and code content (public)
     pub fn truncate_code(&self, code: &str) -> String {
-        let max_chars = 8000; // Keep under context limits
-        if code.len() <= max_chars {
-            code.to_string()
-        } else {
-            format!(
-                "{}...\n[truncated - {} chars omitted]",
-                &code[..max_chars],
-                code.len() - max_chars
-            )
+        let max_bytes = 8000; // Total budget for content plus truncation notice
+        if code.len() <= max_bytes {
+            return code.to_string();
+        }
+        fn prev_char_boundary(s: &str, mut i: usize) -> usize {
+            while i > 0 && !s.is_char_boundary(i) {
+                i -= 1;
+            }
+            i
+        }
+        let mut boundary = prev_char_boundary(code, max_bytes);
+        loop {
+            let notice = format!(
+                "...\n[truncated - {} chars omitted]",
+                code[boundary..].chars().count()
+            );
+            if boundary + notice.len() <= max_bytes {
+                return format!("{}{}", &code[..boundary], notice);
+            }
+            boundary = prev_char_boundary(code, boundary - 1);
         }
     }
 

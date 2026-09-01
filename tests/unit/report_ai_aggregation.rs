@@ -30,6 +30,9 @@ fn make_config() -> LlmConfig {
         retry_backoff_ms: 1000,
         temperature: 0.5,
         max_reasoning_tokens: None,
+        enable_llm_cache: false,
+        cache_dir: None,
+        max_concurrent: 3,
     }
 }
 
@@ -44,6 +47,9 @@ fn make_config_empty() -> LlmConfig {
         retry_backoff_ms: 1000,
         temperature: 0.5,
         max_reasoning_tokens: None,
+        enable_llm_cache: false,
+        cache_dir: None,
+        max_concurrent: 3,
     }
 }
 

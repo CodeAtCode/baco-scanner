@@ -173,6 +173,7 @@ pub fn generate_architecture_static(target_path: &Path) -> String {
             "node_modules/".to_string(),
             ".git/".to_string(),
         ],
+        true, // enable_file_filtering
     );
 
     let file_count = file_index.as_ref().map(|i| i.files.len()).unwrap_or(0);
@@ -543,6 +544,9 @@ mod tests {
             retry_backoff_ms: 0,
             temperature: 0.5,
             max_reasoning_tokens: None,
+            enable_llm_cache: false,
+            cache_dir: None,
+            max_concurrent: 3,
         };
         let client = crate::llm::LlmClient::new(config);
 
@@ -581,6 +585,9 @@ mod tests {
             retry_backoff_ms: 0,
             temperature: 0.5,
             max_reasoning_tokens: None,
+            enable_llm_cache: false,
+            cache_dir: None,
+            max_concurrent: 3,
         };
         let client = crate::llm::LlmClient::new(config);
 
@@ -618,6 +625,9 @@ mod tests {
             retry_backoff_ms: 0,
             temperature: 0.5,
             max_reasoning_tokens: None,
+            enable_llm_cache: false,
+            cache_dir: None,
+            max_concurrent: 3,
         };
         let client = crate::llm::LlmClient::new(config);
 
@@ -660,6 +670,9 @@ mod tests {
             retry_backoff_ms: 0,
             temperature: 0.5,
             max_reasoning_tokens: None,
+            enable_llm_cache: false,
+            cache_dir: None,
+            max_concurrent: 3,
         };
         let client = crate::llm::LlmClient::new(config);
 
@@ -700,6 +713,9 @@ mod tests {
             retry_backoff_ms: 0,
             temperature: 0.5,
             max_reasoning_tokens: None,
+            enable_llm_cache: false,
+            cache_dir: None,
+            max_concurrent: 3,
         };
         let client = crate::llm::LlmClient::new(config);
 

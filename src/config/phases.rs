@@ -66,7 +66,7 @@ pub fn default_enable_root_cause_dedup() -> bool {
 }
 
 pub fn default_enable_multi_verifier() -> bool {
-    true
+    false
 }
 
 pub fn default_enable_auto_patching() -> bool {
@@ -124,6 +124,7 @@ impl Default for NormalizationConfig {
 
 /// Configuration for CPG-guided slicing (T3.1)
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+#[serde(default)]
 pub struct CpgConfig {
     /// Whether CPG slicing is enabled
     pub enabled: bool,
@@ -145,6 +146,7 @@ impl Default for CpgConfig {
 
 /// Configuration for exploit synthesis (T3.2)
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+#[serde(default)]
 pub struct ExploitConfig {
     /// Whether exploit synthesis is enabled
     pub enabled: bool,
@@ -172,6 +174,7 @@ impl Default for ExploitConfig {
 /// LLM-as-judge rationale validation: evaluates the soundness of reasoning
 /// behind each finding and adjusts confidence accordingly (+0.10 sound, -0.20 flawed).
 #[derive(Debug, Clone, Default, serde::Deserialize, serde::Serialize)]
+#[serde(default)]
 pub struct ValidateConfig {
     /// Whether the Validate phase is enabled
     pub enabled: bool,
@@ -294,10 +297,6 @@ impl Default for AgentFlowConfig {
             requires_instrumented_target: false,
         }
     }
-}
-
-pub fn default_true() -> bool {
-    true
 }
 
 pub fn default_policy_samples() -> u8 {

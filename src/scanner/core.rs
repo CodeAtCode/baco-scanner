@@ -14,7 +14,11 @@ use tokio::sync::watch;
 
 // Type alias for phase result to reduce complexity
 #[allow(dead_code)]
-type PhaseResult = crate::error::ScanResult<(Vec<VulnerabilityFinding>, Vec<String>)>;
+type PhaseResult = crate::error::ScanResult<(
+    Vec<VulnerabilityFinding>,
+    Vec<String>,
+    Vec<crate::scanner::phases::llm_phases::RejectedFinding>,
+)>;
 
 pub struct ScannerState {
     pub findings: Vec<VulnerabilityFinding>,
@@ -23,6 +27,7 @@ pub struct ScannerState {
     pub errors: Vec<String>,
     pub cve_entries: Vec<CveEntry>,
     pub project_stack: Option<ProjectStack>,
+    pub rejected_findings: Vec<crate::scanner::phases::llm_phases::RejectedFinding>,
 }
 
 pub struct Scanner {
@@ -117,6 +122,7 @@ impl Scanner {
             errors: Vec::new(),
             cve_entries: Vec::new(),
             project_stack: None,
+            rejected_findings: Vec::new(),
         });
 
         let output_dir = PathBuf::from(&config.output.dir);
@@ -172,6 +178,7 @@ mod tests {
             output: OutputConfig {
                 dir: "/tmp/test-output".to_string(),
                 evidence_gate: false,
+                include_rejected: false,
             },
             scanner: crate::config::ScannerSettings {
                 max_file_size_kb: 1024,
@@ -187,6 +194,8 @@ mod tests {
                 phases: LlmPhasesConfig::default(),
                 temperature: 0.5,
                 max_reasoning_tokens: None,
+                enable_llm_cache: false,
+                cache_dir: None,
             },
             tickets: crate::config::TicketConfig::default(),
             agent: crate::config::AgentConfig::default(),
@@ -203,6 +212,9 @@ mod tests {
             pacvd: Default::default(),
             agent_flow: Default::default(),
             vuln_spec: Default::default(),
+            citation_verification: Default::default(),
+            prior_runs: Default::default(),
+            org_context: Default::default(),
         }
     }
 

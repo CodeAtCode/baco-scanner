@@ -34,7 +34,7 @@ BACO uses a **data-driven PhaseGraph** (`src/scanner/pipeline/orchestrator.rs`) 
 | 15 | AI Aggregation | `llm.phases.aggregation` (API key present) |
 | 16 | Threat Modeling | `aggregation.tier_2_features.enabled=false` |
 | 17 | Root Cause Deduplication | `aggregation.root_cause_dedup=true` |
-| 18 | Multi-Verifier | `aggregation.multi_verifier=true` |
+| 18 | Multi-Verifier (experimental stub, disabled by default) | `aggregation.multi_verifier=false` |
 | 19 | Auto-Patching | `aggregation.auto_patching=false` |
 | 20 | CVE Bootstrap | `aggregation.cve_bootstrap=true` |
 | 21 | PoC Compilation | `aggregation.poc_compilation=false` |
@@ -92,4 +92,46 @@ flowchart LR
 ```
 
 **Checkpoint markers**: Checkpoints are saved after each major phase, enabling resume from any point in the pipeline.
+
+## Verification & Calibration Layer
+
+The pipeline includes several verification gates and calibration layers that augment the core phases:
+
+### Citation Verification Gate (Reporting Phase)
+
+Before rendering the final report, deterministic checks verify that all citations (file paths + line ranges) match the scanned source tree. Findings failing this check have their confidence score halved and a note added explaining the discrepancy.
+
+Configured via `[citation_verification] enabled = true`.
+
+### Prior-Runs Store (Discovery Phase)
+
+Cross-run findings history: Confirmed and FalsePositive findings from prior scans (saved under `{output_dir}/runs/`) are injected as skip-lists into discovery prompts. This reduces redundant analysis on subsequent scans of the same codebase.
+
+Configured via `[prior_runs] enabled = true` with `max_runs` controlling how many recent runs to load.
+
+### Org-Context Profile (Discovery + Verification Phases)
+
+Organizational policy profile injected into prompts for calibration. Fields include:
+- `stack`: Technology stack (e.g., `["php", "javascript"]`)
+- `infra`: Infrastructure (e.g., `["aws", "docker"]`)
+- `data_sensitivity`: Data classification (e.g., `"pii"`)
+- `secret_storage`: Secret management location (e.g., `"vault"` prevents `${VAULT_TOKEN}` false positives)
+- `risk_tolerance`: Risk posture
+- `severity_rules`: Per-rule severity overrides
+
+See technique #5 in [`docs/argus-analysis.md`](argus-analysis.md).
+
+### Domain-Routed Hunt Prompts (Discovery Phase)
+
+Per-attack-class prompt modules from `prompts/hunt/` (injection, auth, authz_absence, xss, path_traversal, crypto, resource, deserialization, memory_safety) selected by target languages and appended to discovery prompts. Each module includes scope/lane discipline sections; the verification prompt has a skeptical self-refutation gate + untrusted-content framing.
+
+Configured via `[scanner.performance] enable_hunt_prompts = true`.
+
+### Exploit Synthesis Marker (Exploit Synthesis Phase)
+
+When the Docker sandbox is unavailable, unverifiable findings are marked with `requires_deployment_testing` to indicate they need deployment-level verification.
+
+### Eval Harness (External)
+
+Known-answer oracle scoring under `eval/` with labeled vulnerable/secure fixture pairs and oracle files. Recall/precision scoring via `src/eval.rs`; end-to-end runs require `BACO_EVAL=1` + LLM key. See [`eval/README.md`](../eval/README.md).
 

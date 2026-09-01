@@ -6,8 +6,120 @@ use crate::scanner::checkpoint::{load_checkpoint_findings, save_checkpoint};
 use crate::scanner::helpers::log_and_aggregate_llm_results;
 
 use indicatif::{ProgressBar, ProgressStyle};
+use std::collections::BTreeMap;
+use std::sync::Arc;
+use tokio::sync::Semaphore;
 
 use std::time::Instant;
+
+/// Structural deduplication: group findings by (file, cwe_id), cluster by
+/// line proximity (consecutive lines within ±2 chain into one cluster),
+/// keep highest-sources/highest-confidence, merge sources.
+pub fn structural_dedup(findings: &mut Vec<VulnerabilityFinding>) -> usize {
+    let before = findings.len();
+
+    #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+    struct GroupKey {
+        file_path: String,
+        cwe_id: Option<String>,
+    }
+
+    // BTreeMap for deterministic grouping; original order is restored on rebuild
+    let mut groups: BTreeMap<GroupKey, Vec<usize>> = BTreeMap::new();
+
+    for (i, finding) in findings.iter().enumerate() {
+        let key = GroupKey {
+            file_path: finding.file_path.clone(),
+            cwe_id: finding.cwe_id.clone(),
+        };
+        groups.entry(key).or_default().push(i);
+    }
+
+    // Fixed-width line buckets cannot honor a ±2 tolerance (boundary pairs
+    // split), so clusters grow while consecutive lines stay within ±2
+    let mut clusters: Vec<Vec<usize>> = Vec::new();
+    for (_, mut indices) in groups {
+        indices.sort_by_key(|&i| findings[i].line_number.unwrap_or(0));
+        let mut current: Vec<usize> = Vec::new();
+        let mut prev_line: Option<u32> = None;
+        for idx in indices {
+            let line = findings[idx].line_number.unwrap_or(0);
+            let starts_new_cluster = prev_line.is_some_and(|p| line.saturating_sub(p) > 2);
+            if starts_new_cluster {
+                clusters.push(std::mem::take(&mut current));
+            }
+            current.push(idx);
+            prev_line = Some(line);
+        }
+        if !current.is_empty() {
+            clusters.push(current);
+        }
+    }
+
+    // Process each cluster
+    let mut kept_indices = std::collections::HashSet::new();
+    let mut merged_count = 0;
+
+    for indices in clusters {
+        if indices.len() == 1 {
+            // Single finding in cluster - keep it
+            kept_indices.insert(indices[0]);
+            continue;
+        }
+
+        // Multiple findings - keep the one with most sources, or highest confidence on tie
+        let mut best_idx = indices[0];
+        let mut best_sources = findings[best_idx].sources.len();
+        let mut best_confidence = findings[best_idx].confidence_score;
+
+        for &idx in indices.iter().skip(1) {
+            let num_sources = findings[idx].sources.len();
+            let confidence = findings[idx].confidence_score;
+
+            if num_sources > best_sources
+                || (num_sources == best_sources && confidence > best_confidence)
+            {
+                best_idx = idx;
+                best_sources = num_sources;
+                best_confidence = confidence;
+            }
+        }
+
+        // Merge sources from all other findings into the best one
+        // First, collect all unique sources to avoid borrow issues
+        let mut all_sources: Vec<String> = Vec::new();
+        for &idx in &indices {
+            for source in &findings[idx].sources {
+                if !all_sources.contains(source) {
+                    all_sources.push(source.clone());
+                }
+            }
+        }
+        findings[best_idx].sources = all_sources;
+        merged_count += indices.len() - 1;
+
+        kept_indices.insert(best_idx);
+    }
+
+    // Rebuild findings vector with only kept findings (preserving original order)
+    let mut new_findings = Vec::with_capacity(kept_indices.len());
+    for (i, finding) in findings.drain(..).enumerate() {
+        if kept_indices.contains(&i) {
+            new_findings.push(finding);
+        }
+    }
+    *findings = new_findings;
+
+    let after = findings.len();
+    tracing::info!(
+        "Structural dedup: {} findings -> {} ({} merged)",
+        before,
+        after,
+        merged_count
+    );
+
+    merged_count
+}
 
 /// Execute parallel phases (Indexing, Semgrep, LlmStaticAnalysis)
 async fn run_parallel_phases(
@@ -18,6 +130,10 @@ async fn run_parallel_phases(
     completed_phases: &[ScanPhase],
 ) -> Result<(Vec<VulnerabilityFinding>, Vec<String>), String> {
     let is_phase_completed = |phase: &ScanPhase| completed_phases.contains(phase);
+
+    // Create semaphore for parallel task limiting
+    let max_parallel = scanner.config.scanner.performance.max_parallel_tasks;
+    let semaphore = Arc::new(Semaphore::new(max_parallel));
 
     tracing::info!(
         "\u{1B}[34m[SCANNER]\u{1B}[0m Starting parallel phases: Indexing, Semgrep, LLM Static Analysis..."
@@ -36,7 +152,9 @@ async fn run_parallel_phases(
         let this = scanner;
         let pb = pb.clone();
         let initial_findings = findings.clone();
+        let sem_perm = semaphore.clone();
         Some(async move {
+            let _permit = sem_perm.acquire().await;
             this.run_phase(&ScanPhase::Indexing, initial_findings, &pb, &[])
                 .await
         })
@@ -49,7 +167,9 @@ async fn run_parallel_phases(
         let this = scanner;
         let pb = pb.clone();
         let initial_findings = findings.clone();
+        let sem_perm = semaphore.clone();
         Some(async move {
+            let _permit = sem_perm.acquire().await;
             this.run_phase(&ScanPhase::Semgrep, initial_findings, &pb, &[])
                 .await
         })
@@ -83,7 +203,9 @@ async fn run_parallel_phases(
             let pb = pb.clone();
             let initial_findings = findings.clone();
             let analyzed_files_clone = analyzed_files.clone();
+            let sem_perm = semaphore.clone();
             Some(async move {
+                let _permit = sem_perm.acquire().await;
                 this.run_phase(
                     &ScanPhase::LlmStaticAnalysis,
                     initial_findings,
@@ -105,7 +227,9 @@ async fn run_parallel_phases(
         let this = scanner;
         let pb = pb.clone();
         let initial_findings = findings.clone();
+        let sem_perm = semaphore.clone();
         Some(async move {
+            let _permit = sem_perm.acquire().await;
             this.run_phase(&ScanPhase::CpgSlice, initial_findings, &pb, &[])
                 .await
         })
@@ -189,18 +313,21 @@ async fn run_parallel_phases(
     let parallel_duration = start_time.elapsed();
     tracing::info!("Parallel phases completed in {:?}", parallel_duration);
 
-    if let Some(Ok((mut index_findings, _))) = indexing_result {
+    if let Some(Ok((mut index_findings, _, _))) = indexing_result {
         findings.append(&mut index_findings);
     }
-    if let Some(Ok((mut semgrep_findings, _))) = semgrep_result {
+    if let Some(Ok((mut semgrep_findings, _, _))) = semgrep_result {
         findings.append(&mut semgrep_findings);
     }
-    if let Some(Ok((mut cpg_findings, _))) = cpg_slice_result {
+    if let Some(Ok((mut cpg_findings, _, _))) = cpg_slice_result {
         findings.append(&mut cpg_findings);
     }
     log_and_aggregate_llm_results(&llm_static_result, &mut findings, &mut analyzed_files);
 
     tracing::info!("After parallel phases: {} findings total", findings.len());
+
+    // Apply structural deduplication before sequential phases
+    structural_dedup(&mut findings);
 
     scanner.state.send_modify(|s| {
         s.current_phase = ScanPhase::CpgSlice;
@@ -414,9 +541,18 @@ async fn run_sequential_phases(
 
         let phase_start = Instant::now();
 
-        (findings, analyzed_files) = scanner
+        let (new_findings, new_analyzed_files, rejected_findings) = scanner
             .run_phase(phase, findings, pb, &analyzed_files)
             .await?;
+
+        // Store rejected findings for later use in reporting
+        if !rejected_findings.is_empty() {
+            scanner.state.send_modify(|s| {
+                s.rejected_findings = rejected_findings;
+            });
+        }
+
+        (findings, analyzed_files) = (new_findings, new_analyzed_files);
         let phase_duration = phase_start.elapsed();
         tracing::info!("Phase {:?} completed in {:?}", phase, phase_duration);
 

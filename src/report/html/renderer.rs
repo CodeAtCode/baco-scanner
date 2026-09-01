@@ -13,7 +13,7 @@ pub fn generate_html_report(
     findings: &[VulnerabilityFinding],
     output_path: &str,
     config: Option<&ScannerConfig>,
-    llm_metrics: Option<crate::report::json::LlmMetricsSummary>,
+    rejected_findings: Option<&[(crate::findings::VulnerabilityFinding, String)]>,
 ) -> Result<(), String> {
     let gate_enabled = config.map(|c| c.output.evidence_gate).unwrap_or(false);
 
@@ -135,98 +135,8 @@ pub fn generate_html_report(
         .count();
     let already_reported = findings.iter().filter(|f| f.already_reported).count();
 
-    // Format LLM metrics
-    let llm_metrics_html = if let Some(metrics) = llm_metrics {
-        let models_html: String = metrics
-            .models
-            .iter()
-            .map(|m| {
-                format!(
-                    r#"<div class="metric-card">
-                        <div class="metric-label">{}</div>
-                        <div class="metric-value">{} requests</div>
-                        <div class="metric-detail">{} successful, {} failed, {} cached</div>
-                        <div class="metric-detail">{} tokens</div>
-                    </div>"#,
-                    html_escape::encode_text(&m.model_name),
-                    m.total_requests,
-                    m.successful_requests,
-                    m.failed_requests,
-                    m.cached_requests,
-                    m.total_tokens
-                )
-            })
-            .collect::<Vec<_>>()
-            .join("");
-
-        let operations_html: String = metrics
-            .operations
-            .iter()
-            .map(|o| {
-                format!(
-                    r#"<div class="metric-card">
-                        <div class="metric-label">{} ({})</div>
-                        <div class="metric-value">{} requests</div>
-                        <div class="metric-detail">{} successful, {} failed</div>
-                    </div>"#,
-                    html_escape::encode_text(&o.operation),
-                    html_escape::encode_text(&o.phase),
-                    o.requests,
-                    o.successful,
-                    o.failed
-                )
-            })
-            .collect::<Vec<_>>()
-            .join("");
-
-        format!(
-            r#"<div class="llm-metrics-section">
-                <h2>LLM Usage Statistics</h2>
-                <div class="metrics-summary">
-                    <div class="metric-summary-item">
-                        <div class="metric-label">Total Requests</div>
-                        <div class="metric-value">{}</div>
-                    </div>
-                    <div class="metric-summary-item">
-                        <div class="metric-label">Successful</div>
-                        <div class="metric-value success">{}</div>
-                    </div>
-                    <div class="metric-summary-item">
-                        <div class="metric-label">Failed</div>
-                        <div class="metric-value error">{}</div>
-                    </div>
-                    <div class="metric-summary-item">
-                        <div class="metric-label">Cached</div>
-                        <div class="metric-value">{}</div>
-                    </div>
-                    <div class="metric-summary-item">
-                        <div class="metric-label">Total Tokens</div>
-                        <div class="metric-value">{}</div>
-                    </div>
-                    <div class="metric-summary-item">
-                        <div class="metric-label">Avg Latency</div>
-                        <div class="metric-value">{:.0} ms</div>
-                    </div>
-                </div>
-                
-                <h3>By Model</h3>
-                <div class="metrics-grid">{}</div>
-                
-                <h3>By Operation</h3>
-                <div class="metrics-grid">{}</div>
-            </div>"#,
-            metrics.total_requests,
-            metrics.successful_requests,
-            metrics.failed_requests,
-            metrics.cached_requests,
-            metrics.total_tokens,
-            metrics.avg_latency_ms,
-            models_html,
-            operations_html
-        )
-    } else {
-        String::new()
-    };
+    // Format LLM metrics - removed, not used in current implementation
+    let llm_metrics_html = String::new();
     // Add empty state message if no findings
     let empty_state = if total_findings == 0 {
         build_empty_state_message()
@@ -375,6 +285,8 @@ pub fn generate_html_report(
         .severity.unverified {{ background: #6c757d; color: white; }}
         .unverified-appendix {{ margin-top: 40px; padding: 20px; background: #f8f9fa; border: 1px dashed #adb5bd; border-radius: 6px; }}
         .unverified-appendix h2 {{ margin-top: 0; color: #495057; }}
+        .rejected-appendix {{ margin-top: 40px; padding: 20px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px; }}
+        .rejected-appendix h2 {{ margin-top: 0; color: #856404; }}
         .finding.unverified {{ border-left-color: #6c757d; opacity: 0.85; }}
         
         .meta {{ color: #495057; font-size: 0.9rem; margin: 10px 0; background: #f8f9fa; padding: 10px; border-radius: 4px; }}
@@ -553,52 +465,105 @@ pub fn generate_html_report(
     }
 
     // Append unverified findings section when gate is enabled
-    let appendix_html = if gate_enabled && !unverified_findings.is_empty() {
-        let appendix_findings: String = unverified_findings
-            .iter()
-            .map(|f| {
-                let evidence_detail = f
-                    .evidence
-                    .first()
-                    .map(|e| e.detail.as_str())
-                    .unwrap_or("No evidence detail available");
-                let line = f
-                    .line_number
-                    .map(|l| l.to_string())
-                    .unwrap_or("N/A".to_string());
-                format!(
-                    r#"<div class="finding unverified">
-                        <div class="finding-header">
-                            <h3>{}</h3>
-                            <span class="severity unverified">Unverified</span>
-                        </div>
-                        <div class="meta">
-                            <strong>File:</strong> {} | <strong>Line:</strong> {}
-                        </div>
-                        <div class="finding-details">
-                            <p><strong>Reason:</strong> {}</p>
-                        </div>
-                    </div>"#,
-                    html_escape::encode_text(&f.title),
-                    html_escape::encode_text(&f.file_path),
-                    line,
-                    html_escape::encode_text(evidence_detail)
-                )
-            })
-            .collect::<Vec<_>>()
-            .join("");
+    let include_rejected = config.map(|c| c.output.include_rejected).unwrap_or(false);
 
-        format!(
-            r#"<section class="unverified-appendix">
-                <h2>Appendix: Unverified Findings</h2>
-                <p class="finding-count">{} unverified findings excluded from main report</p>
-                {}            </section>
+    let appendix_html = {
+        let mut sections = Vec::new();
+
+        // Unverified findings appendix
+        if gate_enabled && !unverified_findings.is_empty() {
+            let appendix_findings: String = unverified_findings
+                .iter()
+                .map(|f| {
+                    let evidence_detail = f
+                        .evidence
+                        .first()
+                        .map(|e| e.detail.as_str())
+                        .unwrap_or("No evidence detail available");
+                    let line = f
+                        .line_number
+                        .map(|l| l.to_string())
+                        .unwrap_or("N/A".to_string());
+                    format!(
+                        r#"<div class="finding unverified">
+                            <div class="finding-header">
+                                <h3>{}</h3>
+                                <span class="severity unverified">Unverified</span>
+                            </div>
+                            <div class="meta">
+                                <strong>File:</strong> {} | <strong>Line:</strong> {}
+                            </div>
+                            <div class="finding-details">
+                                <p><strong>Reason:</strong> {}</p>
+                            </div>
+                        </div>"#,
+                        html_escape::encode_text(&f.title),
+                        html_escape::encode_text(&f.file_path),
+                        line,
+                        html_escape::encode_text(evidence_detail)
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("");
+
+            sections.push(format!(
+                r#"<section class="unverified-appendix">
+                    <h2>Appendix: Unverified Findings</h2>
+                    <p class="finding-count">{} unverified findings excluded from main report</p>
+                    {}</section>
 "#,
-            unverified_findings.len(),
-            appendix_findings
-        )
-    } else {
-        String::new()
+                unverified_findings.len(),
+                appendix_findings
+            ));
+        }
+
+        // Rejected findings appendix
+        if include_rejected {
+            if let Some(rejected) = rejected_findings {
+                if !rejected.is_empty() {
+                    let rejected_findings_html: String = rejected
+                        .iter()
+                        .map(|(f, reason)| {
+                            let line = f
+                                .line_number
+                                .map(|l| l.to_string())
+                                .unwrap_or("N/A".to_string());
+                            format!(
+                                r#"<div class="finding rejected">
+                                    <div class="finding-header">
+                                        <h3>{}</h3>
+                                        <span class="severity rejected">Dismissed</span>
+                                    </div>
+                                    <div class="meta">
+                                        <strong>File:</strong> {} | <strong>Line:</strong> {}
+                                    </div>
+                                    <div class="finding-details">
+                                        <p><strong>Rejection Reason:</strong> {}</p>
+                                    </div>
+                                </div>"#,
+                                html_escape::encode_text(&f.title),
+                                html_escape::encode_text(&f.file_path),
+                                line,
+                                html_escape::encode_text(reason)
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                        .join("");
+
+                    sections.push(format!(
+                        r#"<section class="rejected-appendix">
+                            <h2>Investigated & Dismissed</h2>
+                            <p class="finding-count">{} findings were investigated and dismissed</p>
+                            {}</section>
+"#,
+                        rejected.len(),
+                        rejected_findings_html
+                    ));
+                }
+            }
+        }
+
+        sections.join("")
     };
 
     html.push_str(&format!(

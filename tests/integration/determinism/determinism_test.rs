@@ -20,6 +20,7 @@ fn index_project(path: &std::path::Path) -> Result<FileIndex, std::io::Error> {
         &["rust".to_string(), "python".to_string()],
         512 * 1024,
         &[],
+        false,
     )
 }
 

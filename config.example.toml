@@ -22,11 +22,12 @@ languages = ["c", "python"]
 # Directory where reports and checkpoints will be written
 dir = "./baco-output"
 evidence_gate = false
+# Include rejected findings (investigated & dismissed) in JSON/HTML reports
+# Default: false
+include_rejected = false
 
 # Scanner settings
 [scanner]
-# Number of days to look back in git history for commit analysis
-commit_lookback_days = 90
 # Maximum file size in KB to index (skip larger files)
 max_file_size_kb = 512
 # Paths to exclude from scanning (use glob patterns like "tests/" or "docs/*")
@@ -42,8 +43,6 @@ exclude_rules = ["html.security.plaintext-http-link", "html.security.plaintext-h
 enable_incremental_scan = false
 # Maximum number of parallel tasks for scanning operations
 max_parallel_tasks = 4
-# Enable LLM response caching to avoid redundant API calls
-enable_llm_cache = false
 # Enable file filtering to reduce false positives
 enable_file_filtering = true
 
@@ -57,9 +56,10 @@ enable_threat_modeling = false
 # Root-cause deduplication (collapses findings that share the same root cause)
 # Default: true
 enable_root_cause_dedup = true
-# Multi-verifier cross-checking (runs additional LLM verification passes)
-# Default: true
-enable_multi_verifier = true
+# Multi-verifier cross-checking (experimental stub — hash-based placeholder,
+# not real verification; disabled by default)
+# Default: false
+enable_multi_verifier = false
 # Auto-patching (generates and validates fix patches in a staging worktree)
 # Writes code files and runs git commands — opt-in for safety
 # Default: false
@@ -77,8 +77,11 @@ enable_cve_bootstrap = true
 # Variant search (searches for variant instances of the same vulnerability pattern)
 # Default: true
 enable_variant_search = true
+# Domain-routed hunt prompts: select per-attack-class prompt modules from
+# prompts/hunt/ based on the target's languages during LLM discovery
+# Default: false
+enable_hunt_prompts = false
 
-# LLM configuration with per-phase settings
 # LLM configuration with per-phase settings
 [llm]
 # Timeout in seconds for LLM API requests
@@ -92,6 +95,8 @@ max_concurrent = 4
 # LLM temperature for response randomness (0.0 = deterministic, 1.0 = creative)
 # Default: 0.5 for security scanner determinism
 temperature = 0.5
+# Enable LLM response caching to avoid redundant API calls
+enable_llm_cache = false
 # P2.1: Truncated generation — caps reasoning tokens before forcing final answer
 # max_reasoning_tokens = 2048
 
@@ -257,11 +262,29 @@ project = "libxml2"
 # Whether to auto-select the level based on the configured LLM model
 # auto_level = false
 
-# Multi-agent harness synthesis (P5: AgentFlow)
-[agent_flow]
-# Whether AgentFlow is enabled
+# Citation verification gate: deterministic checks that report citations
+# (file existence, line ranges) match the scanned tree before rendering.
+# Findings failing the check get demoted confidence and a note.
+# Default: false
+[citation_verification]
+enabled = false
+
+# Prior-runs store: cross-run findings history for skip directives and
+# coverage gap targeting on subsequent scans of the same output dir.
+# Default: false
+[prior_runs]
+enabled = false
+# How many prior runs to load (most recent first)
+max_runs = 5
+
+# Org-context profile: organizational policy for prompt calibration
+# (Argus technique #5). Massive false-positive reducer: knowing where
+# secrets live prevents placeholder-as-leak findings.
+# [org_context]
 # enabled = false
-# Maximum search-loop iterations
-# max_iterations = 10
-# Whether the target must be built with coverage/sanitizer instrumentation
-# requires_instrumented_target = false
+# stack = ["php", "javascript"]
+# infra = ["aws", "docker"]
+# data_sensitivity = "pii"  # "pii" → treat personal data exposure as High severity
+# secret_storage = "vault"  # "vault" → ${VAULT_TOKEN} refs are placeholders, NOT leaks
+# risk_tolerance = "low"  # does NOT mean only report criticals — prioritize ruthlessly, report everything real
+# severity_rules = { "XSS" = "Critical", "SQLi" = "Critical" }  # OVERRIDE lines for specific rules

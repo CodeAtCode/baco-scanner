@@ -153,14 +153,11 @@ pub async fn save_checkpoint(
 
     let json_path = format!("{}/findings.json", config.output.dir);
     #[allow(clippy::needless_borrow)]
-    let llm_metrics = metrics_tracker.finalize().await;
+    let _llm_metrics = metrics_tracker.finalize().await;
     #[allow(clippy::needless_borrow)]
-    if let Err(e) = crate::report::json::write_findings_json(
-        &findings,
-        json_path.as_str(),
-        Some(llm_metrics),
-        None,
-    ) {
+    if let Err(e) =
+        crate::report::json::write_findings_json(&findings, &[], json_path.as_str(), None, None)
+    {
         tracing::warn!("Failed to write findings.json during {:?}: {}", phase, e);
     }
 

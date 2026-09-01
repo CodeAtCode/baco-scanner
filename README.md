@@ -41,10 +41,6 @@ cp config.example.toml my-config.toml
 # Edit my-config.toml: set [project] path to your target code
 ./target/release/baco scan --config my-config.toml
 
-# First scan sequence:
-# 1. Set your LLM API key (via env or config file)
-# 2. Run the scan: ./target/release/baco scan --config my-config.toml
-# 3. Open the report: baco-output/report.html
 - **24 phases run**: 4 parallel (Indexing, Semgrep, CpgSlice, LlmStaticAnalysis) + 20 sequential — see [Architecture](docs/architecture.md)
 - **Output in `baco-output/`**: `findings.json`, `report.html`, `report.sarif`, `checkpoint.json`
 - **Checkpoint file**: The scanner writes `checkpoint.json` after each phase. Re-running the scan auto-resumes from the checkpoint; use `./target/release/baco resume --checkpoint baco-output/checkpoint.json` for manual control.
@@ -65,6 +61,16 @@ cp config.example.toml my-config.toml
 - **Multiple outputs**: JSON, HTML, SARIF
 - **Config-driven**: TOML config with env var overrides
 - **Ticket systems**: Configurable via `[[tickets.systems]]` TOML blocks (supports any system type via `system_type` field) — see [Configuration](docs/configuration.md) for setup
+
+## Evidence & Verification Techniques
+
+- **Citation verification**: Deterministic file existence + line range checks in Reporting phase; failures halve confidence + add note — see [`docs/argus-analysis.md`](docs/argus-analysis.md)
+- **Cross-run prior-findings skip lists**: Confirmed/FalsePositive findings from prior scans injected into discovery prompts to reduce redundancy
+- **Domain-routed hunt prompts**: Per-attack-class modules (`prompts/hunt/`) selected by target languages; verification prompt includes skeptical self-refutation gate + untrusted-content framing — see [`docs/cloudflare-security-audit-skill-analysis.md`](docs/cloudflare-security-audit-skill-analysis.md)
+- **Rejected-findings persistence**: `include_rejected = true` persists "rejected" array in JSON + "Investigated & Dismissed" appendix in HTML
+- **Requires-deployment-testing marker**: Exploit synthesis marks unverifiable findings when Docker sandbox unavailable
+- **Org-context calibration**: Organizational policy profile (stack, infra, secret_storage, data_sensitivity, severity_rules) injected into prompts to reduce false positives — see [`docs/argus-analysis.md`](docs/argus-analysis.md)
+- **Eval oracles**: Known-answer harness under `eval/` with labeled vulnerable/secure fixtures; recall/precision scoring via `BACO_EVAL=1` — see [`eval/README.md`](eval/README.md)
 
 ## Supported Languages
 

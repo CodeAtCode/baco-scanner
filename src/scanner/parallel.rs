@@ -6,8 +6,18 @@ use crate::scanner::helpers::log_and_aggregate_llm_results;
 
 use indicatif::ProgressBar;
 
-/// Type alias for phase result
+/// Type alias for phase result (legacy 2-tuple for parallel phases that don't produce rejected findings)
 type PhaseResult = Result<(Vec<VulnerabilityFinding>, Vec<String>), String>;
+
+/// Type alias for full phase result with rejected findings (3-tuple)
+type FullPhaseResult = Result<
+    (
+        Vec<VulnerabilityFinding>,
+        Vec<String>,
+        Vec<crate::scanner::phases::llm_phases::RejectedFinding>,
+    ),
+    String,
+>;
 
 /// Configuration for parallel phase execution
 #[allow(dead_code)]
@@ -52,6 +62,7 @@ mod tests {
         let llm_static_result = Ok((
             vec![create_test_finding_simple("LLM", Severity::Critical)],
             vec!["file3.rs".to_string()],
+            Vec::new(),
         ));
 
         let (combined_findings, analyzed_files) = combine_parallel_results(
@@ -119,6 +130,7 @@ mod tests {
         let llm_static_result = Ok((
             vec![create_test_finding_simple("LLM", Severity::Critical)],
             vec!["file3.rs".to_string()],
+            Vec::new(),
         ));
 
         let (combined_findings, analyzed_files) = combine_parallel_results(
@@ -182,7 +194,7 @@ pub fn combine_parallel_results(
     mut findings: Vec<VulnerabilityFinding>,
     indexing_result: Option<PhaseResult>,
     semgrep_result: Option<PhaseResult>,
-    llm_static_result: Option<PhaseResult>,
+    llm_static_result: Option<FullPhaseResult>,
 ) -> (Vec<VulnerabilityFinding>, Vec<String>) {
     let mut analyzed_files = Vec::new();
 

@@ -14,6 +14,7 @@ pub use specifications::*;
 pub use tickets::*;
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fmt;
 use std::fs;
 use std::path::PathBuf;
@@ -58,6 +59,12 @@ pub struct ScannerConfig {
     pub agent_flow: AgentFlowConfig,
     #[serde(default)]
     pub vuln_spec: VulnSpecConfig,
+    #[serde(default)]
+    pub citation_verification: CitationVerificationConfig,
+    #[serde(default)]
+    pub prior_runs: PriorRunsConfig,
+    #[serde(default)]
+    pub org_context: OrgContextConfig,
 }
 
 /// Config error with field path and TOML location information
@@ -213,6 +220,39 @@ pub struct OutputConfig {
     pub dir: String,
     #[serde(default)]
     pub evidence_gate: bool,
+    #[serde(default)]
+    pub include_rejected: bool,
+}
+
+/// Citation verification gate: deterministic checks that report citations
+/// (file existence, line ranges) match the scanned tree before rendering.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct CitationVerificationConfig {
+    pub enabled: bool,
+}
+
+/// Prior-runs store: cross-run findings history used for skip directives
+/// and coverage gap targeting on subsequent scans.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct PriorRunsConfig {
+    pub enabled: bool,
+    #[serde(default = "default_prior_runs_max")]
+    pub max_runs: usize,
+}
+
+impl Default for PriorRunsConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            max_runs: default_prior_runs_max(),
+        }
+    }
+}
+
+pub fn default_prior_runs_max() -> usize {
+    5
 }
 
 // Default value functions - these need to be in mod.rs so they can be referenced
@@ -235,6 +275,31 @@ pub fn default_tool_timeout() -> u64 {
 
 pub fn default_trusted_paths() -> Vec<String> {
     vec![".".to_string()]
+}
+
+pub fn default_true() -> bool {
+    true
+}
+
+pub fn default_four() -> usize {
+    4
+}
+
+/// Org-context profile: prompt calibration from organizational policy.
+/// (Argus technique #5 + symlink containment #6 filesystem half)
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct OrgContextConfig {
+    pub enabled: bool,
+    #[serde(default)]
+    pub stack: Vec<String>,
+    #[serde(default)]
+    pub infra: Vec<String>,
+    pub data_sensitivity: Option<String>,
+    pub secret_storage: Option<String>,
+    pub risk_tolerance: Option<String>,
+    #[serde(default)]
+    pub severity_rules: HashMap<String, String>,
 }
 
 pub fn default_llm_static_analysis() -> String {

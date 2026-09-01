@@ -815,6 +815,9 @@ async fn test_generate_threat_model_with_llm_fallback_to_static() {
         retry_backoff_ms: 0,
         temperature: 0.5,
         max_reasoning_tokens: None,
+        enable_llm_cache: false,
+        cache_dir: None,
+        max_concurrent: 3,
     };
     let client = LlmClient::new(config);
 
@@ -852,6 +855,9 @@ async fn test_generate_threat_model_with_llm_fallback_empty_api_key() {
         retry_backoff_ms: 0,
         temperature: 0.5,
         max_reasoning_tokens: None,
+        enable_llm_cache: false,
+        cache_dir: None,
+        max_concurrent: 3,
     };
     let client = LlmClient::new(config);
 
@@ -888,6 +894,9 @@ async fn test_generate_threat_model_with_llm_fallback_architecture_aware() {
         retry_backoff_ms: 0,
         temperature: 0.5,
         max_reasoning_tokens: None,
+        enable_llm_cache: false,
+        cache_dir: None,
+        max_concurrent: 3,
     };
     let client = LlmClient::new(config);
 
@@ -929,6 +938,9 @@ async fn test_generate_threat_model_with_llm_fallback_all_stride_categories() {
         retry_backoff_ms: 0,
         temperature: 0.5,
         max_reasoning_tokens: None,
+        enable_llm_cache: false,
+        cache_dir: None,
+        max_concurrent: 3,
     };
     let client = LlmClient::new(config);
 
@@ -968,6 +980,9 @@ async fn test_generate_threat_model_with_llm_fallback_various_architectures() {
         retry_backoff_ms: 0,
         temperature: 0.5,
         max_reasoning_tokens: None,
+        enable_llm_cache: false,
+        cache_dir: None,
+        max_concurrent: 3,
     };
     let client = LlmClient::new(config);
 

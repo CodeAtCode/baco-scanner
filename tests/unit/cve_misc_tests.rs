@@ -648,6 +648,7 @@ fn test_index_project_empty_directory() {
         &["rust".to_string()],
         1024 * 1024,
         &[],
+        false,
     )
     .unwrap();
 
@@ -667,6 +668,7 @@ fn test_index_project_single_file() {
         &["rust".to_string()],
         1024 * 1024,
         &[],
+        false,
     )
     .unwrap();
 
@@ -708,6 +710,7 @@ fn test_index_project_multiple_languages() {
         ],
         1024 * 1024,
         &[],
+        false,
     )
     .unwrap();
 
@@ -730,6 +733,7 @@ fn test_index_project_excludes_directory() {
         &["rust".to_string()],
         1024 * 1024,
         &["tests/".to_string()],
+        false,
     )
     .unwrap();
 
@@ -752,6 +756,7 @@ fn test_index_project_excludes_subdirectory() {
         &["rust".to_string()],
         1024 * 1024,
         &["tests/".to_string()],
+        false,
     )
     .unwrap();
 
@@ -770,6 +775,7 @@ fn test_index_project_over_size_limit() {
         &["rust".to_string()],
         1000, // max_size in bytes
         &[],
+        false,
     )
     .unwrap();
 
@@ -783,6 +789,7 @@ fn test_index_project_nonexistent_path() {
         &["rust".to_string()],
         1024 * 1024,
         &[],
+        false,
     );
 
     assert!(result.is_err());
@@ -799,6 +806,7 @@ fn test_index_project_with_incremental_none() {
         1024 * 1024,
         &[],
         None,
+        false,
     )
     .unwrap();
 
@@ -820,6 +828,7 @@ fn test_index_project_with_incremental_with_previous() {
         1024 * 1024,
         &[],
         Some(prev_store),
+        false,
     )
     .unwrap();
 
@@ -840,6 +849,7 @@ fn test_index_project_incremental_basic() {
         1024 * 1024,
         &[],
         None,
+        false,
     )
     .unwrap();
 
@@ -857,6 +867,7 @@ fn test_index_project_incremental_nonexistent_path() {
         1024 * 1024,
         &[],
         None,
+        false,
     );
 
     assert!(result.is_err());

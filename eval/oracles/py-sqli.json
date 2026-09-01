@@ -1,0 +1,18 @@
+{
+  "target": "py-sqli",
+  "description": "SQL injection via Python f-string interpolation in SQL queries",
+  "expected_findings": [
+    {
+      "file_path": "vulnerable.py",
+      "line": 15,
+      "cwe_id": "CWE-89",
+      "class": "SQL Injection"
+    }
+  ],
+  "expected_suppressed": [
+    {
+      "file_path": "safe_twin.py",
+      "reason": "Parameterized query twin - uses %s placeholder instead of f-string interpolation"
+    }
+  ]
+}

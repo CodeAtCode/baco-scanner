@@ -1,8 +1,11 @@
 use crate::agent::ToolCall;
+pub use crate::llm_cache;
 pub use crate::llm_metrics::LlmMetricsTracker;
+use crate::rate_limiter::RateLimiter;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::OnceLock;
 use std::time::Duration;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -19,6 +22,16 @@ pub struct LlmConfig {
     pub temperature: f32,
     #[serde(default)]
     pub max_reasoning_tokens: Option<usize>,
+    #[serde(default)]
+    pub enable_llm_cache: bool,
+    #[serde(default)]
+    pub cache_dir: Option<String>,
+    #[serde(default = "default_max_concurrent")]
+    pub max_concurrent: usize,
+}
+
+fn default_max_concurrent() -> usize {
+    3
 }
 
 fn default_runtime_temperature() -> f32 {
@@ -131,8 +144,23 @@ impl Default for LlmConfig {
             retry_backoff_ms: 1000,
             temperature: 0.5,
             max_reasoning_tokens: None,
+            enable_llm_cache: false,
+            cache_dir: None,
+            max_concurrent: 3,
         }
     }
+}
+
+/// Shared HTTP client, initialized once
+static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+
+fn get_client() -> &'static reqwest::Client {
+    CLIENT.get_or_init(|| {
+        reqwest::Client::builder()
+            .connect_timeout(Duration::from_secs(10))
+            .build()
+            .expect("Failed to create HTTP client")
+    })
 }
 
 #[derive(Clone)]
@@ -140,6 +168,7 @@ pub struct LlmClient {
     config: LlmConfig,
     model_selector: Option<Arc<ModelSelector>>,
     metrics_tracker: Option<LlmMetricsTracker>,
+    rate_limiter: Arc<RateLimiter>,
 }
 
 impl LlmClient {
@@ -160,10 +189,14 @@ impl LlmClient {
             None
         };
 
+        let max_concurrent = config.max_concurrent.max(1);
+        let rate_limiter = Arc::new(RateLimiter::new(max_concurrent));
+
         Self {
             config,
             model_selector,
             metrics_tracker: tracker,
+            rate_limiter,
         }
     }
 
@@ -202,6 +235,26 @@ impl LlmClient {
         }
     }
 
+    /// Classify whether a response status should be retried.
+    /// Returns (should_retry, retry_after_secs).
+    pub fn classify_retryable(status: u16, retry_after: Option<u64>) -> (bool, Option<u64>) {
+        match status {
+            // Fail fast on client errors
+            400 => (false, None),
+            401 | 403 => (false, None),
+            // Retry on timeout, rate limit, and server errors
+            408 | 429 | 500..=599 => {
+                if status == 429 {
+                    // Honor Retry-After header on 429
+                    (true, retry_after)
+                } else {
+                    (true, None)
+                }
+            }
+            _ => (false, None),
+        }
+    }
+
     /// Try a single chat request against the given URL
     async fn try_chat_request(
         &self,
@@ -213,10 +266,12 @@ impl LlmClient {
         let model = self.get_current_model();
         let start_time = std::time::Instant::now();
 
-        let client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(self.config.timeout))
-            .build()
-            .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+        // Acquire rate limiter permit
+        let _permit = self
+            .rate_limiter
+            .acquire()
+            .await
+            .map_err(|e| format!("Failed to acquire rate limiter permit: {}", e))?;
 
         let mut retries = 0;
         let max_attempts = self.config.max_retries;
@@ -230,8 +285,9 @@ impl LlmClient {
                 model
             );
 
-            let response = client
+            let response = get_client()
                 .post(&url)
+                .timeout(Duration::from_secs(self.config.timeout))
                 .header("Content-Type", "application/json")
                 .header("Authorization", format!("Bearer {}", self.config.api_key))
                 .json(&payload)
@@ -276,7 +332,15 @@ impl LlmClient {
                     ));
                 }
                 Ok(resp) => {
-                    let status = resp.status();
+                    let status = resp.status().as_u16();
+
+                    // Extract Retry-After header before consuming resp
+                    let retry_after = resp
+                        .headers()
+                        .get("Retry-After")
+                        .and_then(|v| v.to_str().ok())
+                        .and_then(|s| s.parse::<u64>().ok());
+
                     let error = resp.text().await.unwrap_or_default();
                     tracing::warn!(
                         "LLM request failed with status {} (attempt {}/{}) to {}",
@@ -285,7 +349,24 @@ impl LlmClient {
                         max_attempts,
                         url
                     );
-                    if retries + 1 >= max_attempts {
+
+                    // Classify the error
+                    let (should_retry, _) = Self::classify_retryable(status, retry_after);
+
+                    // Fail fast on 400/401/403
+                    if status == 400 {
+                        return Err(format!(
+                            "Malformed LLM request (400): {}",
+                            error.chars().take(200).collect::<String>()
+                        ));
+                    }
+                    if status == 401 || status == 403 {
+                        return Err(
+                            "LLM authentication failed (401/403) — check the API key".to_string()
+                        );
+                    }
+
+                    if !should_retry || retries + 1 >= max_attempts {
                         record_failure_metrics(
                             self,
                             model.clone(),
@@ -302,14 +383,26 @@ impl LlmClient {
                             model
                         ));
                     }
+
+                    // Honor Retry-After on 429
+                    let backoff = match (status, retry_after) {
+                        (429, Some(secs)) => secs * 1000,
+                        _ => self.config.retry_backoff_ms * (retries + 1) as u64,
+                    };
+                    retries += 1;
+                    tracing::debug!("Retrying after {}ms", backoff);
+                    tokio::time::sleep(Duration::from_millis(backoff)).await;
                 }
                 Err(e) => {
+                    // Network/timeout errors are retryable
+                    let is_timeout = e.is_timeout();
                     let (status, url_e, kind) = get_error_details(&e);
                     tracing::warn!(
                         "LLM request error on model '{}': {}\n(status: {}, type: {}, url: {}) (attempt {}/{})",
                         model, e, status, kind, url_e, retries + 1, max_attempts
                     );
-                    if retries + 1 >= max_attempts {
+
+                    if !is_timeout && retries + 1 >= max_attempts {
                         record_failure_metrics(
                             self,
                             model.clone(),
@@ -327,12 +420,12 @@ impl LlmClient {
                             model
                         ));
                     }
+
+                    retries += 1;
+                    let backoff = self.config.retry_backoff_ms * retries as u64;
+                    tokio::time::sleep(Duration::from_millis(backoff)).await;
                 }
             }
-
-            retries += 1;
-            let backoff = self.config.retry_backoff_ms * retries as u64;
-            tokio::time::sleep(Duration::from_millis(backoff)).await;
         }
     }
 
@@ -346,10 +439,12 @@ impl LlmClient {
         let model = self.get_current_model();
         let start_time = std::time::Instant::now();
 
-        let client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(self.config.timeout))
-            .build()
-            .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+        // Acquire rate limiter permit
+        let _permit = self
+            .rate_limiter
+            .acquire()
+            .await
+            .map_err(|e| format!("Failed to acquire rate limiter permit: {}", e))?;
 
         let mut retries = 0;
         let max_attempts = self.config.max_retries;
@@ -363,8 +458,9 @@ impl LlmClient {
                 model
             );
 
-            let response = client
+            let response = get_client()
                 .post(&url)
+                .timeout(Duration::from_secs(self.config.timeout))
                 .header("Content-Type", "application/json")
                 .header("Authorization", format!("Bearer {}", self.config.api_key))
                 .json(&payload)
@@ -449,7 +545,15 @@ impl LlmClient {
                     });
                 }
                 Ok(resp) => {
-                    let status = resp.status();
+                    let status = resp.status().as_u16();
+
+                    // Extract Retry-After header before consuming resp
+                    let retry_after = resp
+                        .headers()
+                        .get("Retry-After")
+                        .and_then(|v| v.to_str().ok())
+                        .and_then(|s| s.parse::<u64>().ok());
+
                     let error = resp.text().await.unwrap_or_default();
                     tracing::warn!(
                         "LLM request with tools failed with status {} (attempt {}/{}) to {}",
@@ -458,7 +562,24 @@ impl LlmClient {
                         max_attempts,
                         url
                     );
-                    if retries + 1 >= max_attempts {
+
+                    // Classify the error
+                    let (should_retry, _) = Self::classify_retryable(status, retry_after);
+
+                    // Fail fast on 400/401/403
+                    if status == 400 {
+                        return Err(format!(
+                            "Malformed LLM request (400): {}",
+                            error.chars().take(200).collect::<String>()
+                        ));
+                    }
+                    if status == 401 || status == 403 {
+                        return Err(
+                            "LLM authentication failed (401/403) — check the API key".to_string()
+                        );
+                    }
+
+                    if !should_retry || retries + 1 >= max_attempts {
                         return Err(format!(
                             "LLM API request failed after {} retries to URL {}\nStatus: {}\nResponse: {}\nModel: {}",
                             max_attempts.saturating_sub(1),
@@ -468,14 +589,26 @@ impl LlmClient {
                             model
                         ));
                     }
+
+                    // Honor Retry-After on 429
+                    let backoff = match (status, retry_after) {
+                        (429, Some(secs)) => secs * 1000,
+                        _ => self.config.retry_backoff_ms * (retries + 1) as u64,
+                    };
+                    retries += 1;
+                    tracing::debug!("Retrying after {}ms", backoff);
+                    tokio::time::sleep(Duration::from_millis(backoff)).await;
                 }
                 Err(e) => {
+                    // Network/timeout errors are retryable
+                    let is_timeout = e.is_timeout();
                     let (status, url_e, kind) = get_error_details(&e);
                     tracing::warn!(
                         "LLM request error on model '{}': {}\n(status: {}, type: {}, url: {}) (attempt {}/{})",
                         model, e, status, kind, url_e, retries + 1, max_attempts
                     );
-                    if retries + 1 >= max_attempts {
+
+                    if !is_timeout && retries + 1 >= max_attempts {
                         return Err(format!(
                             "LLM HTTP request failed after {} retries\nError: {:?}\nStatus: {}\nType: {}\nURL: {}\nEndpoint: {}chat/completions\nModel: {}",
                             max_attempts.saturating_sub(1),
@@ -487,18 +620,19 @@ impl LlmClient {
                             model
                         ));
                     }
+
+                    retries += 1;
+                    let backoff = self.config.retry_backoff_ms * retries as u64;
+                    tokio::time::sleep(Duration::from_millis(backoff)).await;
                 }
             }
-
-            retries += 1;
-            let backoff = self.config.retry_backoff_ms * retries as u64;
-            tokio::time::sleep(Duration::from_millis(backoff)).await;
         }
     }
 
     pub async fn chat(&self, messages: &[ChatMessage]) -> Result<ChatResponseWithModel, String> {
+        let model = self.get_current_model();
         let mut payload = serde_json::json!({
-            "model": self.get_current_model(),
+            "model": model,
             "messages": messages,
             "temperature": self.config.temperature
         });
@@ -509,6 +643,51 @@ impl LlmClient {
 
         let tokens_prompt: usize = messages.iter().map(|m| m.content.len() / 4).sum();
 
+        // Check cache if enabled
+        if self.config.enable_llm_cache {
+            let cache_dir =
+                crate::llm_cache::get_effective_cache_dir(self.config.cache_dir.as_ref());
+
+            // Compute cache key
+            let messages_json = serde_json::to_vec(messages)
+                .map_err(|e| format!("Failed to serialize messages: {}", e))?;
+            let cache_key = crate::llm_cache::compute_cache_key(
+                &model,
+                &self.config.base_url,
+                self.config.temperature,
+                self.config.max_reasoning_tokens,
+                &messages_json,
+            );
+
+            // Try to read from cache
+            match crate::llm_cache::read_cached_response(&cache_dir, &cache_key) {
+                Ok(Some(cached_content)) => {
+                    tracing::info!("Cache hit for key {}", cache_key);
+                    // Record cached request metric
+                    if let Some(ref tracker) = self.metrics_tracker {
+                        tracker
+                            .record_cached_request(&model, "chat", "unknown", tokens_prompt as u64)
+                            .await;
+                    }
+                    // Parse cached response
+                    let cached_response: serde_json::Value = serde_json::from_str(&cached_content)
+                        .map_err(|e| format!("Failed to parse cached response: {}", e))?;
+                    let content = cached_response
+                        .get("content")
+                        .and_then(|c| c.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    return Ok(ChatResponseWithModel::new(content, model));
+                }
+                Ok(None) => {
+                    tracing::debug!("Cache miss for key {}", cache_key);
+                }
+                Err(e) => {
+                    tracing::warn!("Cache read error: {}", e);
+                }
+            }
+        }
+
         let chat_url = chat_endpoint(&self.config.base_url);
         tracing::info!("Trying LLM API at: {}", chat_url);
 
@@ -516,7 +695,36 @@ impl LlmClient {
             .try_chat_request(&self.config.base_url, payload, tokens_prompt)
             .await
         {
-            Ok(response) => Ok(response),
+            Ok(response) => {
+                // Best-effort write to cache if enabled
+                if self.config.enable_llm_cache {
+                    let cache_dir =
+                        crate::llm_cache::get_effective_cache_dir(self.config.cache_dir.as_ref());
+                    let messages_json = serde_json::to_vec(messages)
+                        .map_err(|e| format!("Failed to serialize messages: {}", e))?;
+                    let cache_key = crate::llm_cache::compute_cache_key(
+                        &model,
+                        &self.config.base_url,
+                        self.config.temperature,
+                        self.config.max_reasoning_tokens,
+                        &messages_json,
+                    );
+                    let cache_content = serde_json::json!({
+                        "content": response.content,
+                        "model": response.model_used,
+                        "timestamp": chrono::Utc::now().to_rfc3339()
+                    })
+                    .to_string();
+                    if let Err(e) = crate::llm_cache::write_cached_response(
+                        &cache_dir,
+                        &cache_key,
+                        &cache_content,
+                    ) {
+                        tracing::warn!("Failed to write cache: {}", e);
+                    }
+                }
+                Ok(response)
+            }
             Err(e) => {
                 tracing::warn!("LLM API {} failed: {}", chat_url, e);
                 Err("LLM API request failed".to_string())
@@ -551,14 +759,93 @@ impl LlmClient {
             payload["max_tokens"] = serde_json::json!(max_tokens);
         }
 
+        // Check cache if enabled
+        if self.config.enable_llm_cache {
+            let cache_dir =
+                crate::llm_cache::get_effective_cache_dir(self.config.cache_dir.as_ref());
+
+            // Compute cache key (include tools in the key)
+            let payload_for_cache = serde_json::to_vec(&payload)
+                .map_err(|e| format!("Failed to serialize payload: {}", e))?;
+            let cache_key = crate::llm_cache::compute_cache_key(
+                &model,
+                &self.config.base_url,
+                self.config.temperature,
+                self.config.max_reasoning_tokens,
+                &payload_for_cache,
+            );
+
+            // Try to read from cache
+            match crate::llm_cache::read_cached_response(&cache_dir, &cache_key) {
+                Ok(Some(cached_content)) => {
+                    tracing::info!("Cache hit for key {}", cache_key);
+                    // Record cached request metric
+                    if let Some(ref tracker) = self.metrics_tracker {
+                        tracker
+                            .record_cached_request(&model, "chat_with_tools", "unknown", 0)
+                            .await;
+                    }
+                    // Parse cached response
+                    let cached_response: serde_json::Value = serde_json::from_str(&cached_content)
+                        .map_err(|e| format!("Failed to parse cached response: {}", e))?;
+                    let content = cached_response
+                        .get("content")
+                        .and_then(|c| c.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    return Ok(ChatResponse {
+                        content,
+                        tool_calls: vec![],
+                        raw: cached_response,
+                        model_used: model,
+                    });
+                }
+                Ok(None) => {
+                    tracing::debug!("Cache miss for key {}", cache_key);
+                }
+                Err(e) => {
+                    tracing::warn!("Cache read error: {}", e);
+                }
+            }
+        }
+
         let chat_url = chat_endpoint(&self.config.base_url);
         tracing::info!("Trying LLM API (with tools) at: {}", chat_url);
 
         match self
-            .try_chat_with_tools_request(&self.config.base_url, payload)
+            .try_chat_with_tools_request(&self.config.base_url, payload.clone())
             .await
         {
-            Ok(response) => Ok(response),
+            Ok(response) => {
+                // Best-effort write to cache if enabled
+                if self.config.enable_llm_cache {
+                    let cache_dir =
+                        crate::llm_cache::get_effective_cache_dir(self.config.cache_dir.as_ref());
+                    let payload_for_cache = serde_json::to_vec(&payload)
+                        .map_err(|e| format!("Failed to serialize payload: {}", e))?;
+                    let cache_key = crate::llm_cache::compute_cache_key(
+                        &model,
+                        &self.config.base_url,
+                        self.config.temperature,
+                        self.config.max_reasoning_tokens,
+                        &payload_for_cache,
+                    );
+                    let cache_content = serde_json::json!({
+                        "content": response.content,
+                        "model": response.model_used,
+                        "timestamp": chrono::Utc::now().to_rfc3339()
+                    })
+                    .to_string();
+                    if let Err(e) = crate::llm_cache::write_cached_response(
+                        &cache_dir,
+                        &cache_key,
+                        &cache_content,
+                    ) {
+                        tracing::warn!("Failed to write cache: {}", e);
+                    }
+                }
+                Ok(response)
+            }
             Err(e) => {
                 tracing::warn!("LLM API (with tools) {} failed: {}", chat_url, e);
                 Err("LLM API request failed".to_string())
@@ -795,6 +1082,9 @@ pub fn create_llm_client_with_metrics(
         retry_backoff_ms: scanner.config.llm.retry_backoff_ms,
         temperature: 0.5,
         max_reasoning_tokens: scanner.config.llm.max_reasoning_tokens,
+        enable_llm_cache: false,
+        cache_dir: None,
+        max_concurrent: 3,
     };
 
     Some(LlmClient::with_metrics(

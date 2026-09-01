@@ -41,6 +41,7 @@ fn create_test_config() -> config::ScannerConfig {
         output: baco::config::OutputConfig {
             dir: "/tmp/test_output".to_string(),
             evidence_gate: false,
+            include_rejected: false,
         },
         scanner: ScannerSettings {
             max_file_size_kb: 1024,
@@ -70,6 +71,9 @@ fn create_test_config() -> config::ScannerConfig {
         pacvd: Default::default(),
         agent_flow: Default::default(),
         vuln_spec: Default::default(),
+        citation_verification: Default::default(),
+        prior_runs: Default::default(),
+        org_context: Default::default(),
     }
 }
 
@@ -103,7 +107,7 @@ async fn run_phase_skip_test(
     };
     let result = run_phase(&scanner, phase_config).await;
     assert!(result.is_ok());
-    let (updated, _) = result.unwrap();
+    let (updated, _, _) = result.unwrap();
     assert_eq!(updated.len(), findings.len());
 }
 
@@ -157,7 +161,7 @@ async fn test_indexing_phase_preserves_findings() {
     };
     let result = run_phase(&scanner, phase_config).await;
     assert!(result.is_ok());
-    let (updated, _) = result.unwrap();
+    let (updated, _, _) = result.unwrap();
     assert_eq!(updated.len(), 1);
 }
 
@@ -383,7 +387,7 @@ async fn test_phases_skip_when_disabled() {
             phase,
             description
         );
-        let (updated, _) = result.unwrap();
+        let (updated, _, _) = result.unwrap();
         assert_eq!(
             updated.len(),
             findings.len(),
@@ -420,7 +424,7 @@ async fn test_ticket_crossref_skips_when_empty_systems() {
     };
     let result = run_phase(&scanner, phase_config).await;
     assert!(result.is_ok());
-    let (updated, _) = result.unwrap();
+    let (updated, _, _) = result.unwrap();
     assert_eq!(updated.len(), findings.len());
 }
 
@@ -453,7 +457,7 @@ async fn test_git_analysis_on_valid_repo() {
     };
     let result = run_phase(&scanner, phase_config).await;
     assert!(result.is_ok());
-    let (updated, _) = result.unwrap();
+    let (updated, _, _) = result.unwrap();
     assert_eq!(updated.len(), findings.len());
 }
 
@@ -486,7 +490,7 @@ async fn test_cross_file_analysis_basic() {
     };
     let result = run_phase(&scanner, phase_config).await;
     assert!(result.is_ok());
-    let (updated, _) = result.unwrap();
+    let (updated, _, _) = result.unwrap();
     assert!(updated.len() >= findings.len());
 }
 
@@ -516,7 +520,7 @@ async fn test_ai_aggregation_basic() {
     };
     let result = run_phase(&scanner, phase_config).await;
     assert!(result.is_ok());
-    let (updated, _) = result.unwrap();
+    let (updated, _, _) = result.unwrap();
     assert!(updated.len() >= findings.len());
 }
 
@@ -550,7 +554,7 @@ async fn test_reporting_phase_basic() {
     };
     let result = run_phase(&scanner, phase_config).await;
     assert!(result.is_ok());
-    let (updated, _) = result.unwrap();
+    let (updated, _, _) = result.unwrap();
     assert_eq!(updated.len(), findings.len());
 }
 
@@ -577,7 +581,7 @@ async fn test_reporting_phase_empty_findings() {
     };
     let result = run_phase(&scanner, phase_config).await;
     assert!(result.is_ok());
-    let (updated, _) = result.unwrap();
+    let (updated, _, _) = result.unwrap();
     assert!(updated.is_empty());
 }
 
@@ -611,7 +615,7 @@ async fn test_empty_findings_handling() {
     };
     let result = run_phase(&scanner, phase_config).await;
     assert!(result.is_ok());
-    let (updated, _) = result.unwrap();
+    let (updated, _, _) = result.unwrap();
     assert!(updated.is_empty());
 }
 
@@ -639,7 +643,7 @@ async fn test_large_finding_count_handling() {
     };
     let result = run_phase(&scanner, phase_config).await;
     assert!(result.is_ok());
-    let (updated, _) = result.unwrap();
+    let (updated, _, _) = result.unwrap();
     assert_eq!(updated.len(), findings.len());
 }
 
@@ -670,7 +674,7 @@ async fn test_mixed_severity_findings_indexing() {
     };
     let result = run_phase(&scanner, phase_config).await;
     assert!(result.is_ok());
-    let (updated, _) = result.unwrap();
+    let (updated, _, _) = result.unwrap();
     assert_eq!(updated.len(), findings.len());
 }
 
@@ -700,7 +704,7 @@ async fn test_analyzed_files_preserved() {
     };
     let result = run_phase(&scanner, phase_config).await;
     assert!(result.is_ok());
-    let (_, updated_analyzed_files) = result.unwrap();
+    let (_, updated_analyzed_files, _) = result.unwrap();
     assert_eq!(updated_analyzed_files.len(), analyzed_files.len());
 }
 
@@ -773,7 +777,7 @@ async fn test_complete_phase_marker() {
     };
     let result = run_phase(&scanner, phase_config).await;
     assert!(result.is_ok());
-    let (updated, _) = result.unwrap();
+    let (updated, _, _) = result.unwrap();
     assert_eq!(updated.len(), findings.len());
 }
 
@@ -799,7 +803,7 @@ async fn test_phase_with_single_finding() {
     };
     let result = run_phase(&scanner, phase_config).await;
     assert!(result.is_ok());
-    let (updated, _) = result.unwrap();
+    let (updated, _, _) = result.unwrap();
     assert_eq!(updated.len(), 1);
 }
 
@@ -828,7 +832,7 @@ async fn test_phase_preserves_finding_metadata() {
     };
     let result = run_phase(&scanner, phase_config).await;
     assert!(result.is_ok());
-    let (updated, _) = result.unwrap();
+    let (updated, _, _) = result.unwrap();
     assert_eq!(updated.len(), 1);
     assert_eq!(updated[0].id, "meta-1");
 }
@@ -881,7 +885,7 @@ async fn test_security_agent_skips_when_disabled() {
     };
     let result = run_phase(&scanner, phase_config).await;
     assert!(result.is_ok());
-    let (updated, _) = result.unwrap();
+    let (updated, _, _) = result.unwrap();
     assert_eq!(updated.len(), findings.len());
 }
 
@@ -909,7 +913,7 @@ async fn test_threat_modeling_phase_basic() {
     };
     let result = run_phase(&scanner, phase_config).await;
     assert!(result.is_ok());
-    let (updated, _) = result.unwrap();
+    let (updated, _, _) = result.unwrap();
     assert_eq!(updated.len(), findings.len());
 }
 
@@ -1593,7 +1597,7 @@ async fn test_confidence_scoring_with_findings() {
 
     let result = run_phase(&scanner, phase_config).await;
     assert!(result.is_ok());
-    let (updated, _) = result.unwrap();
+    let (updated, _, _) = result.unwrap();
     assert_eq!(updated.len(), findings.len());
 }
 
@@ -1627,7 +1631,7 @@ async fn test_root_cause_dedup_with_findings() {
 
     let result = run_phase(&scanner, phase_config).await;
     assert!(result.is_ok());
-    let (updated, _) = result.unwrap();
+    let (updated, _, _) = result.unwrap();
     assert!(updated.len() <= findings.len());
 }
 
@@ -1657,7 +1661,7 @@ async fn test_ticket_crossref_empty_systems_noop() {
 
     let result = run_phase(&scanner, phase_config).await;
     assert!(result.is_ok());
-    let (updated, _) = result.unwrap();
+    let (updated, _, _) = result.unwrap();
     assert_eq!(updated.len(), findings.len());
     // No ticket reference should be set
     assert!(updated[0].ticket_reference.is_none());
@@ -1689,7 +1693,7 @@ async fn test_llm_verification_with_findings() {
 
     let result = run_phase(&scanner, phase_config).await;
     assert!(result.is_ok());
-    let (updated, _) = result.unwrap();
+    let (updated, _, _) = result.unwrap();
     assert_eq!(updated.len(), findings.len());
 }
 

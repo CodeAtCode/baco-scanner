@@ -14,6 +14,14 @@ pub struct LlmConfig {
     pub phases: LlmPhasesConfig,
     #[serde(default)]
     pub max_reasoning_tokens: Option<usize>,
+    #[serde(default = "default_enable_llm_cache")]
+    pub enable_llm_cache: bool,
+    #[serde(default)]
+    pub cache_dir: Option<String>,
+}
+
+fn default_enable_llm_cache() -> bool {
+    false
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

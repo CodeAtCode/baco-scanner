@@ -485,7 +485,7 @@ fn run_report(input: &Path, format: &str, quiet: bool) -> Result<(), Box<dyn std
         }
         "json" => {
             use baco::report::json::write_findings_json;
-            write_findings_json(&findings, &output_path.to_string_lossy(), None, None)
+            write_findings_json(&findings, &[], &output_path.to_string_lossy(), None, None)
                 .map_err(|e| format!("Failed to generate JSON report: {}", e))?;
         }
         "sarif" => {
@@ -554,6 +554,9 @@ async fn run_verify(input: &Path, quiet: bool) -> Result<(), Box<dyn std::error:
         retry_backoff_ms: config.llm.retry_backoff_ms,
         temperature: 0.5,
         max_reasoning_tokens: config.llm.max_reasoning_tokens,
+        enable_llm_cache: false,
+        cache_dir: None,
+        max_concurrent: 3,
     });
     for finding in findings.iter_mut() {
         tracing::info!("Verifying finding: {}", finding.id);

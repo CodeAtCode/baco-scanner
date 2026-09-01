@@ -5,6 +5,8 @@ mod core;
 mod env;
 mod helpers;
 mod orchestrator;
+
+pub use orchestrator::structural_dedup;
 pub(crate) mod parallel;
 pub mod phases;
 mod pipeline;
@@ -39,7 +41,14 @@ impl Scanner {
         findings: Vec<VulnerabilityFinding>,
         pb: &indicatif::ProgressBar,
         analyzed_files: &[String],
-    ) -> Result<(Vec<VulnerabilityFinding>, Vec<String>), String> {
+    ) -> Result<
+        (
+            Vec<VulnerabilityFinding>,
+            Vec<String>,
+            Vec<crate::scanner::phases::llm_phases::RejectedFinding>,
+        ),
+        String,
+    > {
         phases::run_phase(
             self,
             phases::PhaseConfig {
@@ -125,6 +134,7 @@ mod tests {
             output: crate::config::OutputConfig {
                 dir: "/tmp/test_output".to_string(),
                 evidence_gate: false,
+                include_rejected: false,
             },
             agent: AgentConfig::default(),
             tickets: crate::config::TicketConfig { systems: vec![] },
@@ -141,6 +151,9 @@ mod tests {
             pacvd: Default::default(),
             agent_flow: Default::default(),
             vuln_spec: Default::default(),
+            citation_verification: Default::default(),
+            prior_runs: Default::default(),
+            org_context: Default::default(),
         }
     }
 
@@ -202,7 +215,7 @@ mod tests {
             .await;
         assert!(result.is_ok());
 
-        let (findings, analyzed_files) = result.unwrap();
+        let (findings, analyzed_files, _rejected) = result.unwrap();
         assert!(findings.is_empty());
         assert_eq!(analyzed_files.len(), 0);
     }
@@ -224,7 +237,7 @@ mod tests {
             .await;
 
         assert!(result.is_ok());
-        let (findings, _) = result.unwrap();
+        let (findings, _, _) = result.unwrap();
         assert_eq!(findings.len(), 2);
     }
 
@@ -246,7 +259,7 @@ mod tests {
             .await;
 
         assert!(result.is_ok());
-        let (findings, _) = result.unwrap();
+        let (findings, _, _) = result.unwrap();
         assert_eq!(findings.len(), 3);
     }
 
@@ -269,7 +282,7 @@ mod tests {
             .await;
 
         assert!(result.is_ok());
-        let (findings, _) = result.unwrap();
+        let (findings, _, _) = result.unwrap();
         assert_eq!(findings.len(), 4);
     }
 }

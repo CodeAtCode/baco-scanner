@@ -47,6 +47,7 @@ pub async fn run_indexing(
         config.scanner.max_file_size_kb * 1024,
         &config.scanner.exclude_paths,
         Some(pb),
+        config.scanner.performance.enable_file_filtering,
     ) {
         Ok(result) => result,
         Err(e) => {

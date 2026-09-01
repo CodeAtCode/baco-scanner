@@ -204,6 +204,7 @@ pub fn create_test_config() -> ScannerConfig {
         output: OutputConfig {
             dir: "/tmp/baco-test-output".to_string(),
             evidence_gate: false,
+            include_rejected: false,
         },
         scanner: ScannerSettings {
             max_file_size_kb: 1024,
@@ -256,6 +257,8 @@ pub fn create_test_config() -> ScannerConfig {
             },
             temperature: 0.5,
             max_reasoning_tokens: None,
+            enable_llm_cache: false,
+            cache_dir: None,
         },
         tickets: TicketConfig::default(),
         agent: AgentConfig {
@@ -275,6 +278,9 @@ pub fn create_test_config() -> ScannerConfig {
         pacvd: Default::default(),
         agent_flow: Default::default(),
         vuln_spec: Default::default(),
+        citation_verification: Default::default(),
+        prior_runs: Default::default(),
+        org_context: Default::default(),
     }
 }
 
@@ -291,6 +297,7 @@ pub fn create_minimal_config() -> ScannerConfig {
         output: OutputConfig {
             dir: "/tmp/baco_test_output".to_string(),
             evidence_gate: false,
+            include_rejected: false,
         },
         scanner: ScannerSettings {
             max_file_size_kb: 1024,
@@ -325,6 +332,9 @@ pub fn create_minimal_config() -> ScannerConfig {
         pacvd: Default::default(),
         agent_flow: Default::default(),
         vuln_spec: Default::default(),
+        citation_verification: Default::default(),
+        prior_runs: Default::default(),
+        org_context: Default::default(),
     }
 }
 

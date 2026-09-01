@@ -63,6 +63,9 @@ fn create_valid_config() -> LlmConfig {
         retry_backoff_ms: 0,
         temperature: 0.5,
         max_reasoning_tokens: None,
+        enable_llm_cache: false,
+        cache_dir: None,
+        max_concurrent: 3,
     }
 }
 
@@ -78,6 +81,9 @@ fn create_empty_config() -> LlmConfig {
         retry_backoff_ms: 0,
         temperature: 0.5,
         max_reasoning_tokens: None,
+        enable_llm_cache: false,
+        cache_dir: None,
+        max_concurrent: 3,
     }
 }
 
@@ -107,6 +113,9 @@ fn test_enrichment_service_new_with_empty_api_key_no_client() {
         retry_backoff_ms: 1000,
         temperature: 0.5,
         max_reasoning_tokens: None,
+        enable_llm_cache: false,
+        cache_dir: None,
+        max_concurrent: 3,
     };
     let service = EnrichmentService::new(&config);
     let _ = service;
@@ -124,6 +133,9 @@ fn test_enrichment_service_new_with_empty_base_url_no_client() {
         retry_backoff_ms: 1000,
         temperature: 0.5,
         max_reasoning_tokens: None,
+        enable_llm_cache: false,
+        cache_dir: None,
+        max_concurrent: 3,
     };
     let service = EnrichmentService::new(&config);
     let _ = service;

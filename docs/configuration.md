@@ -18,7 +18,6 @@ model = "mistral-small"
 [scanner.performance]
 enable_incremental_scan = false
 max_parallel_tasks = 4
-enable_llm_cache = false
 enable_file_filtering = true
 ```
 
@@ -51,8 +50,6 @@ The `[scanner.performance]` section controls incremental scanning and which opti
 enable_incremental_scan = false
 # Maximum number of parallel tasks for scanning operations
 max_parallel_tasks = 4
-# Enable LLM response caching to avoid redundant API calls
-enable_llm_cache = false
 # Enable file filtering to reduce false positives
 enable_file_filtering = true
 
@@ -252,12 +249,15 @@ dir = "./baco-output"
 # verified or supported reach report.html and report.sarif; findings.json
 # always contains every finding with its verification_tier attached.
 evidence_gate = false
+# Include rejected findings (investigated & dismissed) in JSON/HTML reports
+include_rejected = false
 ```
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `dir` | str | `"./baco-output"` | Output directory for reports and checkpoints |
 | `evidence_gate` | bool | `false` | When true, only findings classified as verified or supported by the evidence gate reach report.html and the SARIF output. findings.json always contains every finding with its verification_tier attached. |
+| `include_rejected` | bool | `false` | When true, rejected findings (investigated & dismissed) are persisted in the JSON report's `rejected` array and shown in the HTML report's "Investigated & Dismissed" appendix. |
 
 ## Output Formats
 
@@ -403,6 +403,80 @@ enabled = false
 level = 2
 auto_level = false
 ```
+
+### Citation Verification Gate
+
+Deterministic verification that report citations (file paths + line ranges) match the scanned source tree before rendering. Findings failing the check have confidence halved and a note added.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | bool | `false` | Enable citation verification gate |
+
+```toml
+[citation_verification]
+enabled = false
+```
+
+See [`docs/argus-analysis.md`](argus-analysis.md) for the technique rationale.
+
+### Prior-Runs Store
+
+Cross-run findings history: Confirmed/FalsePositive findings from prior scans are injected as skip-lists into discovery prompts, reducing redundant analysis. Runs saved under `{output_dir}/runs/`.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | bool | `false` | Enable prior-runs store |
+| `max_runs` | int | `5` | Number of recent runs to load (most recent first) |
+
+```toml
+[prior_runs]
+enabled = false
+max_runs = 5
+```
+
+### Org-Context Profile
+
+Organizational policy profile injected into discovery and verification prompts for calibration. Prevents false positives by encoding where secrets live, stack/infra context, and severity preferences.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | bool | `false` | Enable org-context profile |
+| `stack` | array | `[]` | Technology stack (e.g., `["php", "javascript"]`) |
+| `infra` | array | `[]` | Infrastructure (e.g., `["aws", "docker"]`) |
+| `data_sensitivity` | str | `None` | Data classification (e.g., `"pii"` → treat personal data as High) |
+| `secret_storage` | str | `None` | Secret management location (e.g., `"vault"` → `${VAULT_TOKEN}` refs are placeholders, NOT leaks) |
+| `risk_tolerance` | str | `None` | Risk posture (e.g., `"low"` → prioritize ruthlessly, report everything real) |
+| `severity_rules` | map | `{}` | Per-rule severity overrides (e.g., `{ "XSS" = "Critical" }`) |
+
+```toml
+[org_context]
+enabled = false
+stack = ["php", "javascript"]
+infra = ["aws", "docker"]
+data_sensitivity = "pii"
+secret_storage = "vault"
+risk_tolerance = "low"
+severity_rules = { "XSS" = "Critical", "SQLi" = "Critical" }
+```
+
+See [`docs/argus-analysis.md`](argus-analysis.md) for technique #5 (prompt calibration).
+
+### Domain-Routed Hunt Prompts
+
+Per-attack-class prompt modules from `prompts/hunt/` selected by target languages during LLM discovery. Each module includes scope/lane discipline sections; verification prompt has skeptical self-refutation gate + untrusted-content framing.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enable_hunt_prompts` | bool | `false` | Enable domain-routed hunt prompts |
+
+```toml
+[scanner.performance]
+enable_hunt_prompts = false
+```
+
+Available modules: `injection.md`, `auth.md`, `authz_absence.md`, `xss.md`, `path_traversal.md`, `crypto.md`, `resource.md`, `deserialization.md`, `memory_safety.md`.
+
+See [`docs/cloudflare-security-audit-skill-analysis.md`](cloudflare-security-audit-skill-analysis.md) for the technique rationale.
 
 ### AgentFlow Multi-Agent Harness Synthesis (P5) — arXiv:2605.11835
 

@@ -1,7 +1,13 @@
 //! Multi-Verifier Module
 //!
-//! Implements majority voting for vulnerability verification with N verifiers.
-//! Uses circuit breaker pattern for API failure handling.
+//! ⚠️ EXPERIMENTAL STUB — DISABLED BY DEFAULT
+//!
+//! This module implements a hash-based stub for majority voting verification.
+//! The verdicts are NOT real evidence — they are computed as `simple_hash(finding_id) % 3`
+//! plus simple keyword matches (TODO/FIXME → Rejected, unsafe/spawn → Confirmed).
+//!
+//! This is a placeholder implementation disabled by default (`enable_multi_verifier=false`)
+//! until proper verification logic is implemented.
 
 use crate::scanner_types::{poc::VerifierVerdict, MajorityVerdict};
 use std::collections::HashMap;

@@ -2,6 +2,8 @@ use crate::vuln_spec::schema::VulnSpecConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use crate::config::{default_four, default_true};
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ScannerSettings {
     pub max_file_size_kb: u64,
@@ -24,6 +26,11 @@ pub struct PerformanceSettings {
     pub enable_incremental_scan: bool,
     #[serde(default)]
     pub early_termination_threshold: f32,
+    // Phantom config keys - implemented
+    #[serde(default = "default_true")]
+    pub enable_file_filtering: bool,
+    #[serde(default = "default_four")]
+    pub max_parallel_tasks: usize,
     // v3 feature flags
     #[serde(default = "crate::config::default_enable_threat_modeling")]
     pub enable_threat_modeling: bool,
@@ -41,6 +48,10 @@ pub struct PerformanceSettings {
     pub enable_cve_bootstrap: bool,
     #[serde(default = "crate::config::default_enable_variant_search")]
     pub enable_variant_search: bool,
+    /// Domain-routed hunt prompts: select per-attack-class prompt modules
+    /// from the target's languages during LLM discovery
+    #[serde(default)]
+    pub enable_hunt_prompts: bool,
     /// VulInSpec configuration
     #[serde(default)]
     pub vuln_spec: VulnSpecConfig,
@@ -51,6 +62,8 @@ impl Default for PerformanceSettings {
         Self {
             enable_incremental_scan: false,
             early_termination_threshold: 1000.0,
+            enable_file_filtering: default_true(),
+            max_parallel_tasks: default_four(),
             enable_threat_modeling: crate::config::default_enable_threat_modeling(),
             enable_root_cause_dedup: crate::config::default_enable_root_cause_dedup(),
             enable_multi_verifier: crate::config::default_enable_multi_verifier(),
@@ -59,6 +72,7 @@ impl Default for PerformanceSettings {
             enable_confidence_refinement: crate::config::default_enable_confidence_refinement(),
             enable_cve_bootstrap: crate::config::default_enable_cve_bootstrap(),
             enable_variant_search: crate::config::default_enable_variant_search(),
+            enable_hunt_prompts: false,
             vuln_spec: VulnSpecConfig::default(),
         }
     }

@@ -24,8 +24,16 @@ impl FileIndex {
         languages: &[String],
         max_size: u64,
         excludes: &[String],
+        enable_file_filtering: bool,
     ) -> Result<Self, std::io::Error> {
-        Self::index_project_with_incremental(project_path, languages, max_size, excludes, None)
+        Self::index_project_with_incremental(
+            project_path,
+            languages,
+            max_size,
+            excludes,
+            None,
+            enable_file_filtering,
+        )
     }
 
     pub fn index_project_with_incremental(
@@ -34,22 +42,47 @@ impl FileIndex {
         max_size: u64,
         excludes: &[String],
         previous_hash_store: Option<FileHashStore>,
+        enable_file_filtering: bool,
     ) -> Result<Self, std::io::Error> {
         let mut files = Vec::new();
         let mut total_size = 0u64;
 
         let lang_extensions = get_language_extensions(languages);
 
+        // Canonicalize the scan root once for symlink containment check
+        let canonical_root =
+            std::fs::canonicalize(project_path).unwrap_or_else(|_| PathBuf::from(project_path));
+
         let walk = WalkDir::new(project_path).into_iter();
         for entry in walk {
             let entry = entry?;
             let entry_path = entry.path();
-            if should_exclude(entry_path, excludes) {
+            if should_exclude(entry_path, excludes, enable_file_filtering) {
                 continue;
             }
             if !entry.file_type().is_file() {
                 continue;
             }
+
+            // Symlink containment: resolve real path and check it's under the scan root
+            if entry
+                .path()
+                .symlink_metadata()
+                .ok()
+                .is_some_and(|m| m.file_type().is_symlink())
+            {
+                if let Ok(real_path) = std::fs::canonicalize(entry.path()) {
+                    if !real_path.starts_with(&canonical_root) {
+                        tracing::debug!(
+                            "Skipping symlink {:?} -> {:?}: escapes scan root",
+                            entry_path,
+                            real_path
+                        );
+                        continue;
+                    }
+                }
+            }
+
             let metadata = entry.metadata()?;
             let size = metadata.len();
             if size > max_size {
@@ -91,6 +124,7 @@ impl FileIndex {
         max_size: u64,
         excludes: &[String],
         pb: Option<&indicatif::ProgressBar>,
+        enable_file_filtering: bool,
     ) -> Result<(Self, FileHashStore), std::io::Error> {
         if !std::path::Path::new(project_path).exists() {
             tracing::error!("\u{1B}[31m[INDEXING]\u{1B}[0m ERROR: Path does not exist!");
@@ -104,18 +138,43 @@ impl FileIndex {
         let mut total_size = 0u64;
 
         let lang_extensions = get_language_extensions(languages);
+        let _enable_file_filtering = enable_file_filtering; // Capture parameter for use in loop
+
+        // Canonicalize the scan root once for symlink containment check
+        let canonical_root =
+            std::fs::canonicalize(project_path).unwrap_or_else(|_| PathBuf::from(project_path));
 
         let walk = WalkDir::new(project_path).into_iter();
 
         for entry in walk {
             let entry = entry?;
             let entry_path = entry.path();
-            if should_exclude(entry_path, excludes) {
+            if should_exclude(entry_path, excludes, _enable_file_filtering) {
                 continue;
             }
             if !entry.file_type().is_file() {
                 continue;
             }
+
+            // Symlink containment: resolve real path and check it's under the scan root
+            if entry
+                .path()
+                .symlink_metadata()
+                .ok()
+                .is_some_and(|m| m.file_type().is_symlink())
+            {
+                if let Ok(real_path) = std::fs::canonicalize(entry.path()) {
+                    if !real_path.starts_with(&canonical_root) {
+                        tracing::debug!(
+                            "Skipping symlink {:?} -> {:?}: escapes scan root",
+                            entry_path,
+                            real_path
+                        );
+                        continue;
+                    }
+                }
+            }
+
             let metadata = entry.metadata()?;
             let size = metadata.len();
             if size > max_size {
@@ -222,11 +281,38 @@ fn get_language_extensions(languages: &[String]) -> std::collections::HashMap<St
     map
 }
 
-fn should_exclude(path: &Path, excludes: &[String]) -> bool {
+fn should_exclude(path: &Path, excludes: &[String], enable_file_filtering: bool) -> bool {
     let path_str = path.to_string_lossy().to_lowercase();
-    excludes
+
+    // Check user-provided excludes
+    if excludes
         .iter()
         .any(|ex| path_str.contains(ex.to_lowercase().as_str()))
+    {
+        return true;
+    }
+
+    // Built-in exclusions when file filtering is enabled
+    if enable_file_filtering {
+        // Minified/bundled files
+        if path_str.ends_with(".min.js")
+            || path_str.ends_with(".min.css")
+            || path_str.ends_with(".bundle.js")
+            || path_str.ends_with(".map")
+        {
+            return true;
+        }
+        // node_modules and vendor directories
+        if path_str.contains("/node_modules/")
+            || path_str.contains("/vendor/")
+            || path_str.starts_with("vendor/")
+            || path_str.starts_with("/vendor")
+        {
+            return true;
+        }
+    }
+
+    false
 }
 
 #[cfg(test)]
@@ -246,6 +332,7 @@ mod tests {
             &["c".to_string()],
             1024 * 1024,
             &[],
+            true,
         )
         .unwrap();
 
@@ -265,6 +352,7 @@ mod tests {
             &["c".to_string()],
             1024 * 1024,
             &[],
+            true,
         )
         .unwrap();
 
@@ -307,6 +395,7 @@ mod tests {
             ],
             1024 * 1024,
             &[],
+            true,
         )
         .unwrap();
 
@@ -351,21 +440,21 @@ mod tests {
     #[test]
     fn test_should_exclude_matches() {
         let path = std::path::Path::new("src/tests/config.toml");
-        assert!(should_exclude(path, &["tests/".to_string()]));
-        assert!(should_exclude(path, &["/tests/".to_string()]));
+        assert!(should_exclude(path, &["tests/".to_string()], true));
+        assert!(should_exclude(path, &["/tests/".to_string()], true));
     }
 
     #[test]
     fn test_should_exclude_no_match() {
         let path = std::path::Path::new("src/main.rs");
-        assert!(!should_exclude(path, &["tests/".to_string()]));
-        assert!(!should_exclude(path, &["docs/".to_string()]));
+        assert!(!should_exclude(path, &["tests/".to_string()], true));
+        assert!(!should_exclude(path, &["docs/".to_string()], true));
     }
 
     #[test]
     fn test_should_exclude_subdirectory() {
         let path = std::path::Path::new("src/tests/utils/config.rs");
-        assert!(should_exclude(path, &["tests/".to_string()]));
+        assert!(should_exclude(path, &["tests/".to_string()], true));
     }
 
     #[test]
@@ -384,6 +473,7 @@ mod tests {
             &["c".to_string()],
             1024 * 1024,
             &[],
+            true,
         )
         .unwrap();
 
@@ -399,9 +489,14 @@ mod tests {
         let large_file = temp_dir.join("large.c");
         fs::write(&large_file, "0".repeat(2000).as_str()).unwrap();
 
-        let index =
-            FileIndex::index_project(temp_dir.to_str().unwrap(), &["c".to_string()], 1000, &[])
-                .unwrap();
+        let index = FileIndex::index_project(
+            temp_dir.to_str().unwrap(),
+            &["c".to_string()],
+            1000,
+            &[],
+            false,
+        )
+        .unwrap();
 
         assert_eq!(index.files.len(), 0);
 
@@ -422,6 +517,7 @@ mod tests {
             &["c".to_string()],
             1024 * 1024,
             &["tests/".to_string()],
+            false,
         )
         .unwrap();
 
@@ -437,6 +533,7 @@ mod tests {
             &["c".to_string()],
             1024 * 1024,
             &[],
+            false,
         );
         assert!(result.is_err());
     }

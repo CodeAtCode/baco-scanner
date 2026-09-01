@@ -4,6 +4,8 @@ use crate::cve_bootstrap::CveBootstrapper;
 use crate::error::ScanResult;
 use crate::findings::VulnerabilityFinding;
 use crate::llm;
+use crate::org_context;
+use crate::prompt::engine::PromptEngine;
 use crate::scanner::phases::PhaseConfig;
 use std::sync::Arc;
 
@@ -128,6 +130,61 @@ pub async fn run_llm_discovery(
         let client = crate::llm::create_llm_client_with_metrics(scanner, "discovery")
             .expect("Failed to create LLM client for discovery phase");
 
+        // Build prior runs skip list if enabled
+        let prior_skip_list = if config.prior_runs.enabled {
+            let prior_findings = crate::run_store::load_prior_runs(
+                std::path::Path::new(&config.output.dir),
+                config.prior_runs.max_runs,
+            );
+            let prior_knowledge = crate::run_store::build_prior_knowledge(&prior_findings);
+
+            if prior_knowledge.skip_keys.is_empty() {
+                None
+            } else {
+                // Cap at 50 entries
+                let mut skip_entries: Vec<String> = prior_knowledge
+                    .skip_keys
+                    .iter()
+                    .zip(prior_findings.iter())
+                    .take(50)
+                    .map(|(key, f)| format!("- {} at {}", key, f.file_path))
+                    .collect();
+
+                if prior_knowledge.skip_keys.len() > 50 {
+                    let more = prior_knowledge.skip_keys.len() - 50;
+                    skip_entries.push(format!("+ {} more", more));
+                }
+
+                Some(format!(
+                    "KNOWN FINDINGS FROM PRIOR RUNS (do not re-report these; seek NEW distinct issues):\n{}",
+                    skip_entries.join("\n")
+                ))
+            }
+        } else {
+            None
+        };
+
+        // Build hunt prompt context if enabled
+        let hunt_context = if config.scanner.performance.enable_hunt_prompts {
+            let engine = PromptEngine::new();
+            let selected_domains = PromptEngine::select_hunt_domains(&config.project.languages);
+
+            let mut contexts: Vec<String> = Vec::new();
+            for domain in selected_domains {
+                if let Some(prompt) = engine.get_hunt_prompt(&domain) {
+                    contexts.push(format!("\n\n=== HUNT MODULE: {} ===\n{}", domain, prompt));
+                }
+            }
+
+            if contexts.is_empty() {
+                None
+            } else {
+                Some(contexts.join(""))
+            }
+        } else {
+            None
+        };
+
         // Enrich each finding's description
         let total_findings = findings.len();
         let use_agent_mode = config.agent.enabled;
@@ -191,12 +248,8 @@ pub async fn run_llm_discovery(
                 }
             } else {
                 // Simple mode: also request fix_code in JSON format
-                let messages = vec![
-                    llm::ChatMessage::system(
-                        "You are a security vulnerability analyzer. Output valid JSON only.",
-                    ),
-                    llm::ChatMessage::user(&format!(
-                        r#"Vulnerability: {}
+                let mut user_prompt = format!(
+                    r#"Vulnerability: {}
 Location: {}:{}
 Current description: {}
 
@@ -205,11 +258,33 @@ Respond with ONLY JSON:
   "description": "Enriched description",
   "fix_code": "The secure version of the code"
 }}"#,
-                        finding.title,
-                        finding.file_path,
-                        finding.line_number.unwrap_or(0),
-                        finding.description
-                    )),
+                    finding.title,
+                    finding.file_path,
+                    finding.line_number.unwrap_or(0),
+                    finding.description
+                );
+
+                // Prepend prior runs skip list if available
+                if let Some(ref skip_list) = prior_skip_list {
+                    user_prompt = format!("{}\n\n{}", skip_list, user_prompt);
+                }
+
+                // Append hunt context if available
+                if let Some(ref hunt_ctx) = hunt_context {
+                    user_prompt.push_str(hunt_ctx);
+                }
+
+                // Append org-context block if available
+                if let Some(ref org_ctx) = org_context::render(&config.org_context) {
+                    user_prompt.push_str("\n\n");
+                    user_prompt.push_str(org_ctx);
+                }
+
+                let messages = vec![
+                    llm::ChatMessage::system(
+                        "You are a security vulnerability analyzer. Output valid JSON only.",
+                    ),
+                    llm::ChatMessage::user(&user_prompt),
                 ];
                 if let Ok(response_with_model) = client.chat(&messages).await {
                     if let Ok(parsed) =

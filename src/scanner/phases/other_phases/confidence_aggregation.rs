@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::error::ScanResult;
 use crate::findings::VulnerabilityFinding;
@@ -105,6 +105,9 @@ pub async fn run_ai_aggregation(
         retry_backoff_ms: config.llm.retry_backoff_ms,
         temperature: 0.5,
         max_reasoning_tokens: None,
+        enable_llm_cache: false,
+        cache_dir: None,
+        max_concurrent: 3,
     };
 
     let aggregation = crate::report::ai_aggregation::AiAggregationPhase::new(llm_config);
@@ -119,12 +122,16 @@ pub async fn run_ai_aggregation(
 
 /// Run reporting phase (phase 24 of 24).
 pub async fn run_reporting(
-    _scanner: &crate::scanner::Scanner,
+    scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,
-) -> ScanResult<(Vec<VulnerabilityFinding>, Vec<String>)> {
+) -> ScanResult<(
+    Vec<VulnerabilityFinding>,
+    Vec<String>,
+    Vec<crate::scanner::phases::llm_phases::RejectedFinding>,
+)> {
     let PhaseConfig {
         phase: _,
-        findings,
+        mut findings,
         pb,
         analyzed_files,
         metrics_tracker,
@@ -138,23 +145,47 @@ pub async fn run_reporting(
     // Finalize metrics and get summary
     let llm_metrics = metrics_tracker.finalize().await;
 
+    // Run citation verification if enabled
+    if config.citation_verification.enabled {
+        let report = crate::citation_verification::verify_citations(
+            &mut findings,
+            Path::new(&config.project.path),
+        );
+        tracing::info!(
+            "Citation verification: {}/{} passed, {} failed",
+            report.passed,
+            report.checked,
+            report.failed
+        );
+    }
+
+    // Get rejected findings from scanner state
+    let rejected_findings = scanner.state.borrow().rejected_findings.clone();
+
     let json_path = format!("{}/findings.json", config.output.dir);
     if let Err(e) = crate::report::json::write_findings_json(
         &findings,
+        &rejected_findings,
         json_path.as_str(),
         Some(llm_metrics),
-        None,
+        Some(config),
     ) {
         tracing::warn!("Failed to write JSON report: {}", e);
+    } else if config.prior_runs.enabled {
+        // Save current run findings to prior runs store
+        crate::run_store::save_run(std::path::Path::new(&config.output.dir), &findings);
     }
 
     let html_path = format!("{}/report.html", config.output.dir);
-    if let Err(e) =
-        crate::report::html::generate_html_report(&findings, &html_path, Some(config), None)
-    {
+    if let Err(e) = crate::report::html::generate_html_report(
+        &findings,
+        &html_path,
+        Some(config),
+        Some(&rejected_findings),
+    ) {
         tracing::warn!("Failed to write HTML report: {}", e);
     }
 
     pb.set_position(pb.position() + 100);
-    Ok((findings, analyzed_files.to_vec()))
+    Ok((findings, analyzed_files.to_vec(), rejected_findings))
 }

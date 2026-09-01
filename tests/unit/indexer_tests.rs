@@ -55,6 +55,7 @@ fn test_index_project_single_file() {
         &["c".to_string()],
         1024 * 1024,
         &[],
+        false,
     )
     .unwrap();
 
@@ -72,6 +73,7 @@ fn test_index_project_empty_directory() {
         &["c".to_string()],
         1024 * 1024,
         &[],
+        false,
     )
     .unwrap();
 
@@ -108,6 +110,7 @@ fn test_index_project_multiple_languages() {
         ],
         1024 * 1024,
         &[],
+        false,
     )
     .unwrap();
 
@@ -127,6 +130,7 @@ fn test_index_project_excludes_non_matching_extensions() {
         &["c".to_string()],
         1024 * 1024,
         &[],
+        false,
     )
     .unwrap();
 
@@ -148,6 +152,7 @@ fn test_index_project_with_excludes() {
         &["c".to_string()],
         1024 * 1024,
         &["tests/".to_string()],
+        false,
     )
     .unwrap();
 
@@ -167,6 +172,7 @@ fn test_index_project_over_size_limit() {
         &["c".to_string()],
         1000,
         &[],
+        false,
     )
     .unwrap();
 
@@ -180,6 +186,7 @@ fn test_index_project_invalid_path() {
         &["c".to_string()],
         1024 * 1024,
         &[],
+        false,
     );
 
     assert!(result.is_err());
@@ -201,6 +208,7 @@ fn test_index_project_subdirectories() {
         &["c".to_string()],
         1024 * 1024,
         &[],
+        false,
     )
     .unwrap();
 
@@ -224,6 +232,7 @@ fn test_index_project_incremental_basic() {
         1024 * 1024,
         &[],
         None,
+        false,
     )
     .unwrap();
 
@@ -240,6 +249,7 @@ fn test_index_project_incremental_invalid_path() {
         1024 * 1024,
         &[],
         None,
+        false,
     );
 
     assert!(result.is_err());
@@ -386,6 +396,7 @@ fn test_total_size_calculated_correctly() {
         &["c".to_string()],
         1024 * 1024,
         &[],
+        false,
     )
     .unwrap();
 
@@ -412,6 +423,7 @@ fn test_index_cpp_extensions() {
         &["cpp".to_string()],
         1024 * 1024,
         &[],
+        false,
     )
     .unwrap();
 
@@ -437,6 +449,7 @@ fn test_index_typescript_extensions() {
         &["typescript".to_string()],
         1024 * 1024,
         &[],
+        false,
     )
     .unwrap();
 
@@ -462,6 +475,7 @@ fn test_index_javascript_extensions() {
         &["javascript".to_string()],
         1024 * 1024,
         &[],
+        false,
     )
     .unwrap();
 
@@ -486,6 +500,7 @@ fn test_index_csharp_extension() {
         &["csharp".to_string()],
         1024 * 1024,
         &[],
+        false,
     )
     .unwrap();
 
@@ -511,6 +526,7 @@ fn test_index_excludes_case_insensitive() {
         &["c".to_string()],
         1024 * 1024,
         &["tests/".to_string()],
+        false,
     )
     .unwrap();
 

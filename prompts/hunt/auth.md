@@ -47,6 +47,11 @@ Return JSON array with format:
 
 CRITICAL: ONLY report authentication/authorization vulnerabilities. Ignore all other attack classes.
 
+## Scope — stay in your lane
+
+OWNED CLASS: Authentication logic flaws (bypass, weak crypto, session fixation), session management bugs, privilege escalation via auth flaws.
+Anything outside this list is not your finding — if you trip over an adjacent issue (IDOR/BOLA which belongs to authz_absence, injection, XSS), emit it at info severity with title prefix '[handoff: <domain>]' and move on. Staying in lane keeps precision and token cost down.
+
 Code input will be provided at runtime.
 
 ---

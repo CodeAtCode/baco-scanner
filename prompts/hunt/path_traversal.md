@@ -48,6 +48,11 @@ Return JSON array with format:
 
 CRITICAL: ONLY report path traversal or SSRF vulnerabilities. Ignore all other attack classes.
 
+## Scope — stay in your lane
+
+OWNED CLASS: Path traversal (directory escape, file read/write via path), SSRF (URL fetching to internal/external resources).
+Anything outside this list is not your finding — if you trip over an adjacent issue (file upload vulnerabilities, injection via file content), emit it at info severity with title prefix '[handoff: <domain>]' and move on. Staying in lane keeps precision and token cost down.
+
 Code input will be provided at runtime.
 
 ---

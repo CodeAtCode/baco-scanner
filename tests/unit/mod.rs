@@ -117,6 +117,7 @@ mod scanner_types_tests;
 
 // Additional coverage: scanner phases, pipeline, report/html
 mod pipeline_tests;
+mod rejected_findings_tests;
 mod report_html_tests;
 mod root_cause_dedup_phase_tests;
 
@@ -242,3 +243,33 @@ mod evidence_gate_e2e_tests;
 
 // CVE bootstrap tests
 mod cve_bootstrap_tests;
+
+// Verification verdict parsing tests
+mod verification_verdict_tests;
+
+// Prompt golden tests
+mod prompt_golden_tests;
+
+// truncate_code UTF-8 boundary tests
+mod truncate_code_tests;
+
+// LLM client infrastructure tests (cache, retry policy)
+mod llm_client_infra_tests;
+
+// Structural dedup tests
+mod structural_dedup_tests;
+
+// Citation verification gate tests
+mod citation_verification_tests;
+
+// Cross-run prior-findings store tests
+mod run_store_tests;
+
+// Hunt-prompt engine wiring tests
+mod prompt_hunt_tests;
+
+// Org-context profile and symlink containment tests
+mod org_context_tests;
+
+// Hunt-module scope/skeptical-gate prompt structure tests
+mod prompt_scope_tests;

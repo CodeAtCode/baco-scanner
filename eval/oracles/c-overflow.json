@@ -1,0 +1,18 @@
+{
+  "target": "c-overflow",
+  "description": "Buffer overflow via unbounded memcpy with attacker-controlled length",
+  "expected_findings": [
+    {
+      "file_path": "vulnerable.c",
+      "line": 18,
+      "cwe_id": "CWE-120",
+      "class": "Buffer Copy without Checking Size of Input"
+    }
+  ],
+  "expected_suppressed": [
+    {
+      "file_path": "safe_twin.c",
+      "reason": "Bounded copy twin - uses min(len, BUFFER_SIZE-1) before memcpy"
+    }
+  ]
+}
