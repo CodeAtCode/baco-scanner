@@ -218,6 +218,7 @@ mod tests {
             budget: Default::default(),
             prior_runs: Default::default(),
             org_context: Default::default(),
+            knowledge: Default::default(),
         }
     }
 

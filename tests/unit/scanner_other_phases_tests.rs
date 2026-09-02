@@ -77,6 +77,7 @@ fn create_test_config() -> config::ScannerConfig {
         priority: Default::default(),
         budget: Default::default(),
         org_context: Default::default(),
+        knowledge: Default::default(),
     }
 }
 

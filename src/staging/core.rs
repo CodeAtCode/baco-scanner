@@ -3,6 +3,16 @@
 use crate::staging::error::{StagingError, StagingResult};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Mutex;
+
+/// Monotonic worktree name sequence: nanosecond timestamps can collide across
+/// threads, producing identical worktree paths.
+static WORKTREE_SEQ: AtomicU64 = AtomicU64::new(0);
+
+/// Serializes git worktree mutations against the main repo: concurrent
+/// `git worktree add`/`remove` calls race on .git/worktrees admin state.
+static REPO_GIT_LOCK: Mutex<()> = Mutex::new(());
 
 /// Manages a temporary git worktree for safe patch validation
 pub struct StagingArea {
@@ -15,15 +25,15 @@ impl StagingArea {
     /// Creates a new staging area by cloning the repo into a temp worktree
     pub fn create(repo_path: &Path) -> StagingResult<Self> {
         let original_repo_path = repo_path.to_path_buf();
-        let worktree_path = std::env::temp_dir().join(format!(
-            "baco-staging-{:x}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let seq = WORKTREE_SEQ.fetch_add(1, Ordering::Relaxed);
+        let worktree_path =
+            std::env::temp_dir().join(format!("baco-staging-{}-{}", std::process::id(), seq));
 
         tracing::info!("Creating staging worktree at: {:?}", worktree_path);
+
+        let _guard = REPO_GIT_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
 
         // Create worktree
         let output = Command::new("git")
@@ -132,6 +142,10 @@ impl StagingArea {
         }
 
         tracing::info!("Cleaning up staging worktree at {:?}", self.worktree_path);
+
+        let _guard = REPO_GIT_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
 
         // Attempt git worktree removal, but don't fail if it doesn't work
         let output = match Command::new("git")

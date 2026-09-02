@@ -245,6 +245,12 @@ pub struct PriorityConfig {
     /// Boost factor for small files (< 10KB)
     #[serde(default = "crate::config::default_priority_small_file_boost")]
     pub small_file_boost: f32,
+    /// Path/content patterns that mark a file as an entry point (empty = built-in defaults)
+    #[serde(default)]
+    pub entry_point_patterns: Vec<String>,
+    /// Content substrings that mark a file as security-relevant; a match boosts priority
+    #[serde(default)]
+    pub sink_patterns: Vec<String>,
 }
 
 impl Default for PriorityConfig {
@@ -254,6 +260,8 @@ impl Default for PriorityConfig {
             git_recent_boost: crate::config::default_priority_git_recent_boost(),
             entry_point_boost: crate::config::default_priority_entry_point_boost(),
             small_file_boost: crate::config::default_priority_small_file_boost(),
+            entry_point_patterns: Vec::new(),
+            sink_patterns: Vec::new(),
         }
     }
 }

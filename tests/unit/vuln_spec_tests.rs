@@ -478,7 +478,11 @@ fn test_execute_batch_with_vuln_spec_disabled() {
     let result =
         patcher.execute_batch_with_vuln_spec(&findings, &patching_config, Some(&vuln_spec_config));
 
-    assert!(result.is_ok(), "Should succeed even when disabled");
+    assert!(
+        result.is_ok(),
+        "Should succeed even when disabled: {:?}",
+        result.as_ref().err()
+    );
 
     // Verify index count unchanged (no-op when disabled)
     let final_count = retriever::get_index_stats().num_documents;

@@ -67,7 +67,15 @@ mod priority_scoring_tests {
     #[test]
     fn test_entry_point_boost() {
         let file = make_file_info("src/main.rs", 5000);
-        let score = compute_file_priority_score(&file, 2.0, 1.5, 1.2);
+        let priority = baco::config::PriorityConfig {
+            enabled: false,
+            git_recent_boost: 2.0,
+            entry_point_boost: 1.5,
+            small_file_boost: 1.2,
+            entry_point_patterns: vec![],
+            sink_patterns: vec![],
+        };
+        let score = compute_file_priority_score(&file, &priority);
         // Multiplicative: 2.0 (git) * 1.5 (entry_point) * 1.2 (small_file) = 3.6
         assert!((score - 3.6).abs() < 1e-6, "Expected ~3.6, got {}", score);
     }
@@ -75,42 +83,90 @@ mod priority_scoring_tests {
     #[test]
     fn test_index_entry_point() {
         let file = make_file_info("src/index.ts", 5000);
-        let score = compute_file_priority_score(&file, 2.0, 1.5, 1.2);
+        let priority = baco::config::PriorityConfig {
+            enabled: false,
+            git_recent_boost: 2.0,
+            entry_point_boost: 1.5,
+            small_file_boost: 1.2,
+            entry_point_patterns: vec![],
+            sink_patterns: vec![],
+        };
+        let score = compute_file_priority_score(&file, &priority);
         assert_eq!(score, 1.5 * 1.2);
     }
 
     #[test]
     fn test_app_entry_point() {
         let file = make_file_info("app.py", 5000);
-        let score = compute_file_priority_score(&file, 2.0, 1.5, 1.2);
+        let priority = baco::config::PriorityConfig {
+            enabled: false,
+            git_recent_boost: 2.0,
+            entry_point_boost: 1.5,
+            small_file_boost: 1.2,
+            entry_point_patterns: vec![],
+            sink_patterns: vec![],
+        };
+        let score = compute_file_priority_score(&file, &priority);
         assert_eq!(score, 1.5 * 1.2);
     }
 
     #[test]
     fn test_server_entry_point() {
         let file = make_file_info("server.js", 5000);
-        let score = compute_file_priority_score(&file, 2.0, 1.5, 1.2);
+        let priority = baco::config::PriorityConfig {
+            enabled: false,
+            git_recent_boost: 2.0,
+            entry_point_boost: 1.5,
+            small_file_boost: 1.2,
+            entry_point_patterns: vec![],
+            sink_patterns: vec![],
+        };
+        let score = compute_file_priority_score(&file, &priority);
         assert_eq!(score, 1.5 * 1.2);
     }
 
     #[test]
     fn test_small_file_boost() {
         let file = make_file_info("src/utils.rs", 5000);
-        let score = compute_file_priority_score(&file, 2.0, 1.5, 1.2);
+        let priority = baco::config::PriorityConfig {
+            enabled: false,
+            git_recent_boost: 2.0,
+            entry_point_boost: 1.5,
+            small_file_boost: 1.2,
+            entry_point_patterns: vec![],
+            sink_patterns: vec![],
+        };
+        let score = compute_file_priority_score(&file, &priority);
         assert_eq!(score, 1.2); // small_file only
     }
 
     #[test]
     fn test_large_file_no_boost() {
         let file = make_file_info("src/large.rs", 15000);
-        let score = compute_file_priority_score(&file, 2.0, 1.5, 1.2);
+        let priority = baco::config::PriorityConfig {
+            enabled: false,
+            git_recent_boost: 2.0,
+            entry_point_boost: 1.5,
+            small_file_boost: 1.2,
+            entry_point_patterns: vec![],
+            sink_patterns: vec![],
+        };
+        let score = compute_file_priority_score(&file, &priority);
         assert_eq!(score, 1.0); // no boosts
     }
 
     #[test]
     fn test_non_entry_point() {
         let file = make_file_info("src/utils/helper.rs", 5000);
-        let score = compute_file_priority_score(&file, 2.0, 1.5, 1.2);
+        let priority = baco::config::PriorityConfig {
+            enabled: false,
+            git_recent_boost: 2.0,
+            entry_point_boost: 1.5,
+            small_file_boost: 1.2,
+            entry_point_patterns: vec![],
+            sink_patterns: vec![],
+        };
+        let score = compute_file_priority_score(&file, &priority);
         assert_eq!(score, 1.2); // small_file only
     }
 }

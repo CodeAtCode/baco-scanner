@@ -562,12 +562,7 @@ fn run_dry_run(
 
     for file in files {
         let lang = file.language.clone();
-        let score = compute_file_priority_score(
-            file,
-            config.priority.git_recent_boost,
-            config.priority.entry_point_boost,
-            config.priority.small_file_boost,
-        );
+        let score = compute_file_priority_score(file, &config.priority);
         total_priority += score;
         files_by_lang.entry(lang).or_default().push(file);
     }

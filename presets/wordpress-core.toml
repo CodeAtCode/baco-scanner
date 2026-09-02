@@ -20,11 +20,10 @@ exclude_paths = [
 ]
 
 [scanner.semgrep]
-config = ["p/wordpress", "p/php", "p/security"]
+rulesets = ["p/wordpress", "p/php", "p/security"]
 
 [scanner.performance]
 enable_incremental_scan = true
-enable_llm_cache = true
 enable_root_cause_dedup = true
 enable_multi_verifier = false
 enable_variant_search = true
@@ -35,6 +34,7 @@ enable_threat_modeling = false
 timeout_secs = 90
 max_concurrent = 6
 temperature = 0.2
+enable_llm_cache = true
 
 [llm.phases.discovery]
 models = ["mistral-small"]
@@ -50,7 +50,6 @@ enabled = true
 model = "mistral-small"
 batch_size = 8
 suspicion_threshold = 0.35
-include_code_in_summary = false
 
 [priority]
 entry_point_patterns = [
@@ -96,7 +95,7 @@ sink_patterns = [
   "wp_redirect",
   "wp_kses(",
 ]
-churn_weight = 0.3
+
 
 [budget]
 enabled = true

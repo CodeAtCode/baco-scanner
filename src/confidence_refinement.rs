@@ -199,6 +199,16 @@ impl HistoricalData {
         matches_pattern_collection(&self.high_confidence_patterns, cwe_id, code)
     }
 
+    /// Add literal (non-regex) false-positive patterns for a CWE; regex-escaped on insert
+    /// because the matcher compiles patterns as regexes.
+    pub fn add_literal_false_positive_patterns(&mut self, cwe_id: &str, patterns: &[String]) {
+        let escaped: Vec<String> = patterns.iter().map(|p| regex::escape(p)).collect();
+        self.false_positive_patterns
+            .entry(cwe_id.to_string())
+            .or_default()
+            .extend(escaped);
+    }
+
     /// Check if a finding matches a never-submit pattern.
     /// Returns Some(description) if matched, None otherwise.
     pub fn check_never_submit_pattern(
@@ -260,6 +270,17 @@ impl ConfidenceRefinementPhase {
         Self {
             historical_data: HistoricalData::new(),
         }
+    }
+
+    /// Create a phase seeded with config-provided FP patterns (literal substrings).
+    pub fn with_config_knowledge(knowledge: &crate::config::KnowledgeConfig) -> Self {
+        let mut phase = Self::new();
+        for (cwe, patterns) in &knowledge.fp_patterns {
+            phase
+                .historical_data
+                .add_literal_false_positive_patterns(cwe, patterns);
+        }
+        phase
     }
 
     /// Refine confidence scores for all findings.

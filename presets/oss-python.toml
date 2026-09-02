@@ -39,12 +39,14 @@ exclude_paths = [
 ]
 
 [scanner.semgrep]
-config = ["p/python", "p/bandit", "p/security"]
+rulesets = ["p/python", "p/bandit", "p/security"]
 
 [scanner.performance]
 enable_incremental_scan = true
-enable_llm_cache = true
 enable_multi_verifier = false
+
+[llm]
+enable_llm_cache = true
 
 [llm.phases.discovery]
 models = ["mistral-small"]
@@ -86,7 +88,6 @@ sink_patterns = [
   "pickle.",
   "yaml.load",
 ]
-churn_weight = 0.4
 
 [budget]
 enabled = true

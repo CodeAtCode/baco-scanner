@@ -200,12 +200,7 @@ pub async fn run_llm_static_analysis(
             let mut scored: Vec<_> = files_to_analyze
                 .iter()
                 .map(|f| {
-                    let score = compute_file_priority_score(
-                        f,
-                        config.priority.git_recent_boost,
-                        config.priority.entry_point_boost,
-                        config.priority.small_file_boost,
-                    );
+                    let score = compute_file_priority_score(f, &config.priority);
                     (f, score)
                 })
                 .collect();
@@ -661,32 +656,52 @@ Files to analyze:
 }
 
 /// Compute priority score for a file (T18)
-/// Returns a score based on: entry-point status, recent modification, and file size
+/// Returns a score based on: entry-point status, recent modification, file size,
+/// and optional config-provided entry-point/sink patterns.
 pub fn compute_file_priority_score(
     file_info: &crate::indexer::FileInfo,
-    git_recent_boost: f32,
-    entry_point_boost: f32,
-    small_file_boost: f32,
+    priority: &crate::config::PriorityConfig,
 ) -> f32 {
     let mut score = 1.0;
-    let _path_str = file_info.path.to_string_lossy().to_string();
+    let path_str = file_info.path.to_string_lossy().to_string();
     let filename = file_info
         .path
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_default();
 
-    // Entry-point boost: main.*, index.*, app.*, server.*, __init__.*
-    let entry_point_patterns = [
-        "main.",
-        "index.",
-        "app.",
-        "server.",
-        "__init__.",
-        "__main__.",
-    ];
-    if entry_point_patterns.iter().any(|p| filename.starts_with(p)) {
-        score *= entry_point_boost;
+    // Entry-point boost: configurable patterns or built-in defaults
+    if !priority.entry_point_patterns.is_empty() {
+        // Use config-provided patterns as path substrings
+        if priority
+            .entry_point_patterns
+            .iter()
+            .any(|p| path_str.contains(p))
+        {
+            score *= priority.entry_point_boost;
+        }
+    } else {
+        // Built-in defaults: main.*, index.*, app.*, server.*, __init__.*, __main__.*
+        let builtin_patterns = [
+            "main.",
+            "index.",
+            "app.",
+            "server.",
+            "__init__.",
+            "__main__.",
+        ];
+        if builtin_patterns.iter().any(|p| filename.starts_with(p)) {
+            score *= priority.entry_point_boost;
+        }
+    }
+
+    // Sink boost: content-based security relevance (only for files <= 1MB)
+    if !priority.sink_patterns.is_empty() && file_info.size <= 1_048_576 {
+        if let Ok(content) = std::fs::read_to_string(&file_info.path) {
+            if priority.sink_patterns.iter().any(|p| content.contains(p)) {
+                score *= priority.entry_point_boost; // same relevance boost
+            }
+        }
     }
 
     // Recent modification boost (mtime < 7 days)
@@ -696,7 +711,7 @@ pub fn compute_file_priority_score(
             if let Ok(elapsed) = now.duration_since(modified) {
                 if elapsed.as_secs() < 7 * 24 * 60 * 60 {
                     // 7 days
-                    score *= git_recent_boost;
+                    score *= priority.git_recent_boost;
                 }
             }
         }
@@ -704,7 +719,7 @@ pub fn compute_file_priority_score(
 
     // Small file boost (< 10KB)
     if file_info.size < 10 * 1024 {
-        score *= small_file_boost;
+        score *= priority.small_file_boost;
     }
 
     score

@@ -22,11 +22,10 @@ exclude_paths = [
 ]
 
 [scanner.semgrep]
-config = ["p/wordpress", "p/php", "p/security"]
+rulesets = ["p/wordpress", "p/php", "p/security"]
 
 [scanner.performance]
 enable_incremental_scan = true
-enable_llm_cache = true
 enable_multi_verifier = false
 enable_variant_search = true
 enable_cve_bootstrap = true
@@ -34,6 +33,7 @@ enable_cve_bootstrap = true
 [llm]
 temperature = 0.2
 max_concurrent = 4
+enable_llm_cache = true
 
 [llm.phases.discovery]
 models = ["mistral-small"]

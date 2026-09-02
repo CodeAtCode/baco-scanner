@@ -56,7 +56,9 @@ pub async fn run_confidence_scoring(
     };
 
     // Run confidence refinement
-    let refinement = crate::confidence_refinement::ConfidenceRefinementPhase::new();
+    let refinement = crate::confidence_refinement::ConfidenceRefinementPhase::with_config_knowledge(
+        &config.knowledge,
+    );
     let refined_scores = refinement.run(findings.clone(), &context);
 
     // Apply refined scores to findings

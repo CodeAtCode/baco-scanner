@@ -287,6 +287,7 @@ pub fn create_test_config() -> ScannerConfig {
         budget: Default::default(),
         prior_runs: Default::default(),
         org_context: Default::default(),
+        knowledge: Default::default(),
     }
 }
 
@@ -344,6 +345,7 @@ pub fn create_minimal_config() -> ScannerConfig {
         budget: Default::default(),
         prior_runs: Default::default(),
         org_context: Default::default(),
+        knowledge: Default::default(),
     }
 }
 

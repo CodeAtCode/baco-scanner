@@ -1,4 +1,5 @@
 mod env;
+mod knowledge;
 mod llm;
 mod phases;
 mod scanner;
@@ -7,6 +8,7 @@ mod tickets;
 
 use crate::vuln_spec::schema::VulnSpecConfig;
 pub use env::*;
+pub use knowledge::*;
 pub use llm::*;
 pub use phases::*;
 pub use scanner::*;
@@ -71,6 +73,8 @@ pub struct ScannerConfig {
     pub prior_runs: PriorRunsConfig,
     #[serde(default)]
     pub org_context: OrgContextConfig,
+    #[serde(default)]
+    pub knowledge: KnowledgeConfig,
 }
 
 /// Config error with field path and TOML location information

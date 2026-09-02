@@ -38,14 +38,7 @@ pub struct PresetOverlay {
     #[serde(default)]
     pub agent: Option<crate::config::AgentConfig>,
     #[serde(default)]
-    pub knowledge: Option<KnowledgeConfig>,
-}
-
-/// Knowledge configuration including FP patterns
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct KnowledgeConfig {
-    #[serde(default)]
-    pub fp_patterns: std::collections::HashMap<String, Vec<String>>,
+    pub knowledge: Option<crate::config::KnowledgeConfig>,
 }
 
 impl PresetOverlay {
@@ -124,6 +117,12 @@ impl PresetOverlay {
             base.priority.git_recent_boost = priority.git_recent_boost;
             base.priority.entry_point_boost = priority.entry_point_boost;
             base.priority.small_file_boost = priority.small_file_boost;
+            if !priority.entry_point_patterns.is_empty() {
+                base.priority.entry_point_patterns = priority.entry_point_patterns.clone();
+            }
+            if !priority.sink_patterns.is_empty() {
+                base.priority.sink_patterns = priority.sink_patterns.clone();
+            }
         }
 
         if let Some(ref budget) = self.budget {
@@ -153,8 +152,7 @@ impl PresetOverlay {
 
         if let Some(ref knowledge) = self.knowledge {
             if !knowledge.fp_patterns.is_empty() {
-                // fp_patterns would need to be added to ScannerConfig
-                // For now, this is a placeholder
+                base.knowledge.fp_patterns = knowledge.fp_patterns.clone();
             }
         }
     }
