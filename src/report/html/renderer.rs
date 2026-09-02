@@ -2,9 +2,10 @@ use crate::config::ScannerConfig;
 use crate::evidence::classify_finding;
 use crate::findings::VulnerabilityFinding;
 use chrono::Utc;
+use std::collections::HashMap;
 use std::fs;
 
-use super::finding_renderer::render_finding;
+use super::finding_renderer::render_finding_with_id;
 use super::utilities::{
     build_empty_state_message, build_filter_buttons, build_summary_cards, calculate_severity_stats,
 };
@@ -50,26 +51,28 @@ pub fn generate_html_report(
         }
     }
 
-    // Generate Prism.js scripts for detected languages only
-    let prism_scripts = languages
+    // Embed Prism.js assets inline for self-contained HTML (T31)
+    let prism_core_js = include_str!("assets/prism-core.min.js");
+    let prism_css = include_str!("assets/prism-tomorrow.min.css");
+
+    // Generate language-specific Prism.js includes only for detected languages
+    let prism_language_scripts = languages
         .iter()
-        .filter_map(|lang| {
-            match lang.as_str() {
-                "python" => Some("<script src=\"https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-python.min.js\"></script>"),
-                "javascript" => Some("<script src=\"https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-javascript.min.js\"></script>"),
-                "typescript" => Some("<script src=\"https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-typescript.min.js\"></script>"),
-                "rust" => Some("<script src=\"https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-rust.min.js\"></script>"),
-                "go" => Some("<script src=\"https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-go.min.js\"></script>"),
-                "java" => Some("<script src=\"https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-java.min.js\"></script>"),
-                "c" => Some("<script src=\"https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-c.min.js\"></script>"),
-                "cpp" => Some("<script src=\"https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-cpp.min.js\"></script>"),
-                "sql" => Some("<script src=\"https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-sql.min.js\"></script>"),
-                "yaml" => Some("<script src=\"https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-yaml.min.js\"></script>"),
-                "json" => Some("<script src=\"https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js\"></script>"),
-                "bash" | "sh" => Some("<script src=\"https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-bash.min.js\"></script>"),
-                "diff" => Some("<script src=\"https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-diff.min.js\"></script>"),
-                _ => None,
-            }
+        .filter_map(|lang| match lang.as_str() {
+            "python" => Some(include_str!("assets/prism-python.min.js")),
+            "javascript" => Some(include_str!("assets/prism-javascript.min.js")),
+            "typescript" => Some(include_str!("assets/prism-typescript.min.js")),
+            "rust" => Some(include_str!("assets/prism-rust.min.js")),
+            "go" => Some(include_str!("assets/prism-go.min.js")),
+            "java" => Some(include_str!("assets/prism-java.min.js")),
+            "c" => Some(include_str!("assets/prism-c.min.js")),
+            "cpp" => Some(include_str!("assets/prism-cpp.min.js")),
+            "sql" => Some(include_str!("assets/prism-sql.min.js")),
+            "yaml" => Some(include_str!("assets/prism-yaml.min.js")),
+            "json" => Some(include_str!("assets/prism-json.min.js")),
+            "bash" | "sh" => Some(include_str!("assets/prism-bash.min.js")),
+            "diff" => Some(include_str!("assets/prism-diff.min.js")),
+            _ => None,
         })
         .collect::<Vec<_>>()
         .join("\n    ");
@@ -151,12 +154,15 @@ pub fn generate_html_report(
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BACO Security Report</title>
-    <!-- Prism.js for syntax highlighting -->
-    <link href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
-    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
-    {}
+    <!-- Prism.js embedded inline for self-contained HTML (T31) -->
+    <style>
+{}    </style>
     <script>
-        function filterFindings(severity) {{
+{}    </script>
+    <script>
+{}    </script>
+    <script>
+        function filterFindings(severity) {{{{
             const findings = document.querySelectorAll('.finding');
             findings.forEach(f => {{
                 if (severity === 'all' || f.classList.contains(severity)) {{
@@ -341,6 +347,22 @@ pub fn generate_html_report(
         .collapsible {{ cursor: pointer; user-select: none; }}
         .collapsible::before {{ content: "▼"; margin-right: 8px; font-size: 0.8rem; }}
         .collapsible.collapsed::before {{ content: "▶"; }}
+        
+        /* T32: File grouping styles */
+        .findings-by-file {{ margin: 20px 0; }}
+        .file-group {{ margin: 15px 0; border: 1px solid #dee2e6; border-radius: 6px; background: #f8f9fa; }}
+        .file-group-summary {{ 
+            padding: 12px 15px; 
+            font-weight: 600; 
+            color: #495057; 
+            cursor: pointer;
+            list-style: none;
+            display: flex;
+            align-items: center;
+        }}
+        .file-group-summary::-webkit-details-marker {{ display: none; }}
+        .file-group[open] .file-group-summary {{ border-bottom: 1px solid #dee2e6; background: #e9ecef; }}
+        .file-group .finding {{ margin: 10px 15px; border-left-width: 3px; }}
 
         @media print {{
             body {{ background: white; padding: 0; color: black; }}
@@ -440,7 +462,9 @@ pub fn generate_html_report(
         </div>
         <p class="finding-count">Showing {} findings</p>
     "#,
-        prism_scripts,
+        prism_css,
+        prism_core_js,
+        prism_language_scripts,
         scan_date,
         total_findings,
         models_html,
@@ -459,10 +483,45 @@ pub fn generate_html_report(
         total_findings
     );
 
-    // Generate finding cards
-    for (finding_id, finding) in filtered_findings.iter().enumerate() {
-        html.push_str(&render_finding(finding, finding_id));
+    // T32: Group findings by file for better review flow
+    let mut findings_by_file: HashMap<String, Vec<&VulnerabilityFinding>> = HashMap::new();
+    for finding in &filtered_findings {
+        findings_by_file
+            .entry(finding.file_path.clone())
+            .or_default()
+            .push(finding);
     }
+
+    // Sort files by finding count (descending)
+    let mut sorted_files: Vec<_> = findings_by_file.into_iter().collect();
+    sorted_files.sort_by(|a, b| b.1.len().cmp(&a.1.len()));
+
+    // Generate finding cards grouped by file (T32)
+    html.push_str(r#"<div class="findings-by-file">"#);
+    for (file_path, file_findings) in sorted_files {
+        html.push_str(&format!(
+            r#"<details class="file-group"><summary class="file-group-summary">📄 {} ({}) findings</summary>"#,
+            html_escape::encode_text(&file_path),
+            file_findings.len()
+        ));
+
+        // Render findings within this file group (maintaining severity order within group)
+        let mut sorted_findings = file_findings;
+        sorted_findings.sort_by(|a, b| b.severity.cmp(&a.severity));
+
+        for (finding_id, finding) in sorted_findings.iter().enumerate() {
+            // Use a unique ID that includes the file group
+            let global_id = format!(
+                "{}-{}",
+                html_escape::encode_text(&file_path).replace('/', "-"),
+                finding_id
+            );
+            html.push_str(&render_finding_with_id(finding, &global_id));
+        }
+
+        html.push_str("</details>");
+    }
+    html.push_str("</div>");
 
     // Append unverified findings section when gate is enabled
     let include_rejected = config.map(|c| c.output.include_rejected).unwrap_or(false);
@@ -710,7 +769,7 @@ mod tests {
         let content = std::fs::read_to_string(output_path).unwrap();
         assert!(content.contains("SQL Injection Vulnerability"));
         assert!(content.contains("CWE-89"));
-        assert!(content.contains("finding-0"));
+        assert!(content.contains("src-test.rs-0"));
         assert!(content.contains("severity high"));
 
         let _ = std::fs::remove_file(output_path);
@@ -813,7 +872,7 @@ mod tests {
         assert!(result.is_ok());
 
         let content = std::fs::read_to_string(output_path).unwrap();
-        assert!(content.contains("prism-python"));
+        assert!(content.contains("languages.python"));
         assert!(content.contains("language-diff"));
 
         let _ = std::fs::remove_file(output_path);
@@ -833,7 +892,7 @@ mod tests {
         assert!(result.is_ok());
 
         let content = std::fs::read_to_string(output_path).unwrap();
-        assert!(content.contains("prism-rust"));
+        assert!(content.contains("languages.rust"));
         assert!(content.contains("language-diff"));
 
         let _ = std::fs::remove_file(output_path);

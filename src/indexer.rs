@@ -1,6 +1,8 @@
 pub use crate::incremental_scan::FileHashStore;
+use globset::{GlobSet, GlobSetBuilder};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use tracing::warn;
 use walkdir::WalkDir;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -42,7 +44,7 @@ impl FileIndex {
         max_size: u64,
         excludes: &[String],
         previous_hash_store: Option<FileHashStore>,
-        enable_file_filtering: bool,
+        _enable_file_filtering: bool,
     ) -> Result<Self, std::io::Error> {
         let mut files = Vec::new();
         let mut total_size = 0u64;
@@ -53,11 +55,19 @@ impl FileIndex {
         let canonical_root =
             std::fs::canonicalize(project_path).unwrap_or_else(|_| PathBuf::from(project_path));
 
+        // Build the exclusion matcher
+        let exclude_matcher = ExcludeMatcher::new(excludes).unwrap_or_else(|_| {
+            ExcludeMatcher::new(&[]).expect("Empty patterns should always work")
+        });
+
         let walk = WalkDir::new(project_path).into_iter();
         for entry in walk {
             let entry = entry?;
             let entry_path = entry.path();
-            if should_exclude(entry_path, excludes, enable_file_filtering) {
+
+            // Compute relative path for matching
+            let relative_path = entry_path.strip_prefix(project_path).ok();
+            if exclude_matcher.is_excluded(entry_path, relative_path) {
                 continue;
             }
             if !entry.file_type().is_file() {
@@ -144,12 +154,20 @@ impl FileIndex {
         let canonical_root =
             std::fs::canonicalize(project_path).unwrap_or_else(|_| PathBuf::from(project_path));
 
+        // Build the exclusion matcher
+        let exclude_matcher = ExcludeMatcher::new(excludes).unwrap_or_else(|_| {
+            ExcludeMatcher::new(&[]).expect("Empty patterns should always work")
+        });
+
         let walk = WalkDir::new(project_path).into_iter();
 
         for entry in walk {
             let entry = entry?;
             let entry_path = entry.path();
-            if should_exclude(entry_path, excludes, _enable_file_filtering) {
+
+            // Compute relative path for matching
+            let relative_path = entry_path.strip_prefix(project_path).ok();
+            if exclude_matcher.is_excluded(entry_path, relative_path) {
                 continue;
             }
             if !entry.file_type().is_file() {
@@ -281,38 +299,83 @@ fn get_language_extensions(languages: &[String]) -> std::collections::HashMap<St
     map
 }
 
-fn should_exclude(path: &Path, excludes: &[String], enable_file_filtering: bool) -> bool {
-    let path_str = path.to_string_lossy().to_lowercase();
+/// Glob-based path exclusion matcher.
+///
+/// # Semantics (globset defaults)
+/// - Pattern "src" matches the `src` directory and everything under it (implicit `/**`)
+/// - Pattern "docs/*" matches ANY path under `docs/` (globset `*` crosses `/` by default)
+/// - Pattern "*.min.js" matches any file ending in `.min.js` at ANY depth
+/// - Patterns are matched against the path RELATIVE to the scan root when `relative_path` is provided
+/// - If `relative_path` is `None`, matches against the full absolute path
+///
+/// # Construction
+/// Invalid glob patterns are skipped with a warning; the matcher remains functional for valid patterns.
+pub struct ExcludeMatcher {
+    set: GlobSet,
+}
 
-    // Check user-provided excludes
-    if excludes
-        .iter()
-        .any(|ex| path_str.contains(ex.to_lowercase().as_str()))
-    {
-        return true;
+impl ExcludeMatcher {
+    /// Creates a new `ExcludeMatcher` from a list of glob patterns.
+    ///
+    /// Invalid patterns are skipped with a warning and do not prevent construction.
+    /// Empty pattern list → matcher excludes nothing.
+    pub fn new(patterns: &[String]) -> Result<Self, Box<dyn std::error::Error>> {
+        let mut builder = GlobSetBuilder::new();
+
+        for pat in patterns {
+            if pat.is_empty() {
+                continue;
+            }
+
+            // Normalize trailing slashes so "tests/" behaves like "tests"
+            let pat = pat.trim_end_matches('/');
+
+            // Add pattern as-given with case-insensitive matching
+            match globset::GlobBuilder::new(pat)
+                .case_insensitive(true)
+                .build()
+            {
+                Ok(glob) => {
+                    builder.add(glob);
+                    // If pattern has no wildcard chars, also add implicit /** suffix
+                    // so bare "src" matches src/ and everything under it
+                    if !pat.contains('*') && !pat.contains('?') && !pat.contains('[') {
+                        let nested_pat = format!("{}/**", pat);
+                        if let Ok(glob) = globset::GlobBuilder::new(&nested_pat)
+                            .case_insensitive(true)
+                            .build()
+                        {
+                            builder.add(glob);
+                        } else {
+                            warn!("Failed to build nested glob pattern '{}'", nested_pat);
+                        }
+                    }
+                }
+                Err(e) => {
+                    warn!("Skipping invalid glob pattern '{}': {}", pat, e);
+                }
+            }
+        }
+
+        let set = builder.build()?;
+        Ok(Self { set })
     }
 
-    // Built-in exclusions when file filtering is enabled
-    if enable_file_filtering {
-        // Minified/bundled files
-        if path_str.ends_with(".min.js")
-            || path_str.ends_with(".min.css")
-            || path_str.ends_with(".bundle.js")
-            || path_str.ends_with(".map")
-        {
-            return true;
-        }
-        // node_modules and vendor directories
-        if path_str.contains("/node_modules/")
-            || path_str.contains("/vendor/")
-            || path_str.starts_with("vendor/")
-            || path_str.starts_with("/vendor")
-        {
-            return true;
-        }
+    /// Checks if a path is excluded by this matcher.
+    ///
+    /// # Arguments
+    /// - `path`: The path to check (absolute or relative)
+    /// - `relative_path`: If provided, this is the path relative to the scan root.
+    ///   The matcher will use this for matching instead of `path`. Pass `Some("src/foo.rs")` for
+    ///   a file at `project_root/src/foo.rs`.
+    ///
+    /// # Returns
+    /// `true` if the path matches any exclusion pattern, `false` otherwise.
+    pub fn is_excluded(&self, path: &Path, relative_path: Option<&Path>) -> bool {
+        let path_to_match = relative_path.unwrap_or(path);
+        let path_str = path_to_match.to_string_lossy();
+        self.set.is_match(path_str.as_ref())
     }
-
-    false
 }
 
 #[cfg(test)]
@@ -435,26 +498,6 @@ mod tests {
         assert_eq!(exts.get("c"), Some(&"c".to_string()));
         assert_eq!(exts.get("py"), Some(&"python".to_string()));
         assert_eq!(exts.get("rs"), Some(&"rust".to_string()));
-    }
-
-    #[test]
-    fn test_should_exclude_matches() {
-        let path = std::path::Path::new("src/tests/config.toml");
-        assert!(should_exclude(path, &["tests/".to_string()], true));
-        assert!(should_exclude(path, &["/tests/".to_string()], true));
-    }
-
-    #[test]
-    fn test_should_exclude_no_match() {
-        let path = std::path::Path::new("src/main.rs");
-        assert!(!should_exclude(path, &["tests/".to_string()], true));
-        assert!(!should_exclude(path, &["docs/".to_string()], true));
-    }
-
-    #[test]
-    fn test_should_exclude_subdirectory() {
-        let path = std::path::Path::new("src/tests/utils/config.rs");
-        assert!(should_exclude(path, &["tests/".to_string()], true));
     }
 
     #[test]

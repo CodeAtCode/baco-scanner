@@ -70,7 +70,8 @@ async fn test_mock_llm_exhausted_responses() {
     // Second call fails
     let result = client.chat_with_tools(&[], &[]).await;
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("Exhausted"));
+    let err_msg = format!("{}", result.unwrap_err());
+    assert!(err_msg.contains("Exhausted"));
 }
 
 #[tokio::test]

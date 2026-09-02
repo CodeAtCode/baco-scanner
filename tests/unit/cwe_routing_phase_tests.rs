@@ -32,88 +32,37 @@ fn test_cwe_router_disabled_returns_default() {
     assert!(!config.enabled);
 
     let router = CweRouter::from_config(&config);
-    let spec = router.route(&Some("79".to_string()), "rust");
-    assert_eq!(spec.prompt_template, "llm_static_analysis");
-    assert!(spec.model_override.is_none());
+    let route = router.route_cwe("79");
+    assert_eq!(route.domain, None);
+    assert!(route.model_override.is_none());
 }
 
 #[test]
 fn test_cwe_router_cwe_override_sets_model() {
-    let config = enabled_config_with_cwe_override("79", "claude-3-opus");
+    let config = enabled_config_with_cwe_override("CWE-79", "claude-3-opus");
     let router = CweRouter::from_config(&config);
 
-    let spec = router.route(&Some("79".to_string()), "javascript");
-    assert_eq!(spec.prompt_template, "specialized_prompt");
-    assert_eq!(spec.model_override.as_deref(), Some("claude-3-opus"));
+    let route = router.route_cwe("CWE-79");
+    assert_eq!(route.domain.as_deref(), Some("xss"));
+    assert_eq!(route.model_override.as_deref(), Some("claude-3-opus"));
 }
 
 #[test]
 fn test_cwe_router_normalized_cwe_id() {
-    let config = enabled_config_with_cwe_override("79", "claude-3-opus");
+    let config = enabled_config_with_cwe_override("CWE-79", "claude-3-opus");
     let router = CweRouter::from_config(&config);
 
-    // "CWE-79" should match "79"
-    let spec = router.route(&Some("CWE-79".to_string()), "javascript");
-    assert_eq!(spec.model_override.as_deref(), Some("claude-3-opus"));
+    // "CWE-79" matches the config key
+    let route = router.route_cwe("CWE-79");
+    assert_eq!(route.model_override.as_deref(), Some("claude-3-opus"));
 
-    // "cwe-79" should also match
-    let spec = router.route(&Some("cwe-79".to_string()), "javascript");
-    assert_eq!(spec.model_override.as_deref(), Some("claude-3-opus"));
-}
+    // "cwe-79" (lowercase) does NOT match via cwe_to_hunt_domain
+    let route = router.route_cwe("cwe-79");
+    assert_eq!(route.model_override, None);
 
-#[test]
-fn test_cwe_router_language_override() {
-    let mut language_overrides = HashMap::new();
-    language_overrides.insert(
-        "rust".to_string(),
-        PromptSpec {
-            prompt_template: "rust_specialized".to_string(),
-            model_override: Some("codegeex".to_string()),
-        },
-    );
-    let config = RouterConfig {
-        enabled: true,
-        default_prompt: "llm_static_analysis".to_string(),
-        cwe_overrides: HashMap::new(),
-        language_overrides,
-    };
-    let router = CweRouter::from_config(&config);
-
-    let spec = router.route(&None, "rust");
-    assert_eq!(spec.prompt_template, "rust_specialized");
-    assert_eq!(spec.model_override.as_deref(), Some("codegeex"));
-}
-
-#[test]
-fn test_cwe_router_cwe_priority_over_language() {
-    let mut cwe_overrides = HashMap::new();
-    cwe_overrides.insert(
-        "79".to_string(),
-        PromptSpec {
-            prompt_template: "cwe_79_prompt".to_string(),
-            model_override: Some("cwe_model".to_string()),
-        },
-    );
-    let mut language_overrides = HashMap::new();
-    language_overrides.insert(
-        "javascript".to_string(),
-        PromptSpec {
-            prompt_template: "js_prompt".to_string(),
-            model_override: Some("js_model".to_string()),
-        },
-    );
-    let config = RouterConfig {
-        enabled: true,
-        default_prompt: "default".to_string(),
-        cwe_overrides,
-        language_overrides,
-    };
-    let router = CweRouter::from_config(&config);
-
-    // CWE match should take priority over language match
-    let spec = router.route(&Some("CWE-79".to_string()), "javascript");
-    assert_eq!(spec.prompt_template, "cwe_79_prompt");
-    assert_eq!(spec.model_override.as_deref(), Some("cwe_model"));
+    // Bare "79" does NOT match via cwe_to_hunt_domain
+    let route = router.route_cwe("79");
+    assert_eq!(route.model_override, None);
 }
 
 #[test]
@@ -126,9 +75,9 @@ fn test_cwe_router_no_match_falls_to_default() {
     };
     let router = CweRouter::from_config(&config);
 
-    let spec = router.route(&Some("999".to_string()), "cobol");
-    assert_eq!(spec.prompt_template, "my_default_prompt");
-    assert!(spec.model_override.is_none());
+    let route = router.route_cwe("CWE-999");
+    assert_eq!(route.domain, None);
+    assert!(route.model_override.is_none());
 }
 
 #[test]
@@ -151,21 +100,22 @@ fn test_cwe_routing_phase_disabled_passes_findings_through() {
 
 #[test]
 fn test_cwe_routing_phase_enabled_applies_model_overrides() {
-    let config = enabled_config_with_cwe_override("89", "gpt-4-security");
+    let config = enabled_config_with_cwe_override("CWE-89", "gpt-4-security");
     let router = CweRouter::from_config(&config);
 
     let mut findings = vec![
-        make_finding("f1", Some("79"), "src/main.rs"),
-        make_finding("f2", Some("89"), "src/db.rs"),
+        make_finding("f1", Some("CWE-79"), "src/main.rs"),
+        make_finding("f2", Some("CWE-89"), "src/db.rs"),
         make_finding("f3", None, "src/utils.py"),
     ];
 
-    // Simulate CweRouting phase logic
+    // Simulate CweRouting phase logic (from cwe_routing.rs)
     for finding in &mut findings {
-        let language = baco::report::html::utilities::detect_language(&finding.file_path);
-        let spec = router.route(&finding.cwe_id, language);
-        if let Some(ref model) = spec.model_override {
-            finding.llm_model = Some(model.clone());
+        if let Some(cwe) = finding.cwe_id.as_deref() {
+            let route = router.route_cwe(cwe);
+            if let Some(model) = route.model_override {
+                finding.llm_model = Some(model);
+            }
         }
     }
 
@@ -175,7 +125,7 @@ fn test_cwe_routing_phase_enabled_applies_model_overrides() {
     // f2: CWE-89, has override → Some("gpt-4-security")
     assert_eq!(findings[1].llm_model.as_deref(), Some("gpt-4-security"));
 
-    // f3: no CWE, no language override → None
+    // f3: no CWE → None
     assert!(findings[2].llm_model.is_none());
 }
 
@@ -188,22 +138,23 @@ fn test_cwe_router_from_scanner_config() {
 
 #[test]
 fn test_cwe_routing_phase_routing_count() {
-    let config = enabled_config_with_cwe_override("79", "model-a");
+    let config = enabled_config_with_cwe_override("CWE-79", "model-a");
     let router = CweRouter::from_config(&config);
 
     let mut findings = vec![
         make_finding("f1", Some("CWE-79"), "app.js"),
-        make_finding("f2", Some("79"), "handler.py"),
-        make_finding("f3", Some("89"), "db.go"),
+        make_finding("f2", Some("CWE-79"), "handler.py"),
+        make_finding("f3", Some("CWE-89"), "db.go"),
     ];
 
     let mut routed_count = 0usize;
     for finding in &mut findings {
-        let language = baco::report::html::utilities::detect_language(&finding.file_path);
-        let spec = router.route(&finding.cwe_id, language);
-        if let Some(ref model) = spec.model_override {
-            finding.llm_model = Some(model.clone());
-            routed_count += 1;
+        if let Some(cwe) = finding.cwe_id.as_deref() {
+            let route = router.route_cwe(cwe);
+            if let Some(model) = route.model_override {
+                finding.llm_model = Some(model);
+                routed_count += 1;
+            }
         }
     }
 

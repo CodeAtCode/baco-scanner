@@ -1,0 +1,111 @@
+# BACO preset — LiteLLM (Python/FastAPI gateway)
+[project]
+name = "litellm"
+languages = ["python"]
+
+[scanner]
+max_file_size_kb = 512
+exclude_paths = [
+  "tests/*",
+  "test/*",
+  "tests_local/*",
+  "docs/*",
+  "examples/*",
+  "cookbook/*",
+  "ui/*",
+  ".github/*",
+  "benchmarks/*",
+  "scripts/*",
+  "litellm/_vendor/*",
+  "*.lock",
+]
+
+[scanner.semgrep]
+config = ["p/python", "p/bandit", "p/flask", "p/security"]
+
+[scanner.performance]
+enable_incremental_scan = true
+enable_llm_cache = true
+enable_root_cause_dedup = true
+enable_multi_verifier = false
+enable_variant_search = true
+enable_cve_bootstrap = true
+
+[llm]
+temperature = 0.2
+max_concurrent = 6
+
+[llm.phases.discovery]
+models = ["mistral-small"]
+
+[llm.phases.verification]
+model = "mistral-medium"
+
+[triage]
+enabled = true
+model = "mistral-small"
+batch_size = 10
+suspicion_threshold = 0.30
+
+[priority]
+entry_point_patterns = [
+  "litellm/proxy/",
+  "litellm/proxy/proxy_server.py",
+  "litellm/proxy/auth/",
+  "litellm/proxy/management_endpoints/",
+  "litellm/proxy/openai_files_endpoints/",
+  "litellm/proxy/spend_management/",
+  "litellm/integrations/",
+  "litellm/router.py",
+  "litellm/constants.py",
+]
+sink_patterns = [
+  "requests.",
+  "httpx.",
+  "aiohttp.",
+  "base_url",
+  "api_base",
+  "yaml.load",
+  "yaml.safe_load",
+  "pickle.",
+  "marshal.",
+  "os.system",
+  "subprocess.",
+  "os.popen",
+  "eval(",
+  "exec(",
+  "open(",
+  "os.path.join",
+  "api_key",
+  "master_key",
+  "sk-",
+  "Bearer ",
+  "logging.",
+  "print(",
+  "tempfile.",
+  "shutil.",
+  "Dockerfile",
+  "docker-compose",
+]
+
+[budget]
+enabled = true
+max_llm_calls = 800
+
+[knowledge.fp_patterns]
+"CWE-78" = [
+  "shell=False",
+  "shlex.quote(",
+  "subprocess.run([",
+  "subprocess.Popen([",
+]
+"CWE-79" = ["JSONResponse", "orjson.dumps", "HTTPException"]
+"CWE-611" = ["defusedxml", "xml.etree.ElementTree.fromstring"]
+
+[agent_flow]
+enabled = false
+requires_instrumented_target = false
+
+[agent]
+enabled = false
+trusted_paths = []

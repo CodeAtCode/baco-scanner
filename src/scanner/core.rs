@@ -213,6 +213,9 @@ mod tests {
             agent_flow: Default::default(),
             vuln_spec: Default::default(),
             citation_verification: Default::default(),
+            triage: Default::default(),
+            priority: Default::default(),
+            budget: Default::default(),
             prior_runs: Default::default(),
             org_context: Default::default(),
         }

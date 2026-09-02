@@ -5,6 +5,7 @@ use crate::findings::VulnerabilityFinding;
 use crate::scanner::checkpoint::{load_checkpoint_findings, save_checkpoint};
 use crate::scanner::helpers::log_and_aggregate_llm_results;
 
+use futures::future::join_all;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -240,75 +241,60 @@ async fn run_parallel_phases(
 
     let start_time = Instant::now();
 
-    // Execute all spawned tasks in true parallel using tokio::join! with 4-tuple match
-    let (indexing_result, semgrep_result, llm_static_result, cpg_slice_result) = match (
-        indexing_handle,
-        semgrep_handle,
-        llm_static_handle,
-        cpg_slice_handle,
-    ) {
-        (Some(i), Some(s), Some(l), Some(c)) => {
-            let (ir, sr, lr, cr) = tokio::join!(i, s, l, c);
-            (Some(ir), Some(sr), Some(lr), Some(cr))
-        }
-        (Some(i), Some(s), Some(l), None) => {
-            let (ir, sr, lr) = tokio::join!(i, s, l);
-            (Some(ir), Some(sr), Some(lr), None)
-        }
-        (Some(i), Some(s), None, Some(c)) => {
-            let (ir, sr, cr) = tokio::join!(i, s, c);
-            (Some(ir), Some(sr), None, Some(cr))
-        }
-        (Some(i), Some(s), None, None) => {
-            let (ir, sr) = tokio::join!(i, s);
-            (Some(ir), Some(sr), None, None)
-        }
-        (Some(i), None, Some(l), Some(c)) => {
-            let (ir, lr, cr) = tokio::join!(i, l, c);
-            (Some(ir), None, Some(lr), Some(cr))
-        }
-        (Some(i), None, Some(l), None) => {
-            let (ir, lr) = tokio::join!(i, l);
-            (Some(ir), None, Some(lr), None)
-        }
-        (Some(i), None, None, Some(c)) => {
-            let (ir, cr) = tokio::join!(i, c);
-            (Some(ir), None, None, Some(cr))
-        }
-        (Some(i), None, None, None) => {
-            let ir = i.await;
-            (Some(ir), None, None, None)
-        }
-        (None, Some(s), Some(l), Some(c)) => {
-            let (sr, lr, cr) = tokio::join!(s, l, c);
-            (None, Some(sr), Some(lr), Some(cr))
-        }
-        (None, Some(s), Some(l), None) => {
-            let (sr, lr) = tokio::join!(s, l);
-            (None, Some(sr), Some(lr), None)
-        }
-        (None, Some(s), None, Some(c)) => {
-            let (sr, cr) = tokio::join!(s, c);
-            (None, Some(sr), None, Some(cr))
-        }
-        (None, Some(s), None, None) => {
-            let sr = s.await;
-            (None, Some(sr), None, None)
-        }
-        (None, None, Some(l), Some(c)) => {
-            let (lr, cr) = tokio::join!(l, c);
-            (None, None, Some(lr), Some(cr))
-        }
-        (None, None, Some(l), None) => {
-            let lr = l.await;
-            (None, None, Some(lr), None)
-        }
-        (None, None, None, Some(c)) => {
-            let cr = c.await;
-            (None, None, None, Some(cr))
-        }
-        (None, None, None, None) => (None, None, None, None),
-    };
+    // Execute all spawned tasks in true parallel using Vec-of-futures + join_all
+    // Box the futures to get a common type
+    type PhaseResult = Result<
+        (
+            Vec<VulnerabilityFinding>,
+            Vec<String>,
+            Vec<crate::scanner::phases::llm_phases::RejectedFinding>,
+        ),
+        String,
+    >;
+    let mut tasks: Vec<(ScanPhase, futures::future::LocalBoxFuture<'_, PhaseResult>)> = Vec::new();
+
+    if let Some(fut) = indexing_handle {
+        tasks.push((ScanPhase::Indexing, Box::pin(fut)));
+    }
+    if let Some(fut) = semgrep_handle {
+        tasks.push((ScanPhase::Semgrep, Box::pin(fut)));
+    }
+    if let Some(fut) = llm_static_handle {
+        tasks.push((ScanPhase::LlmStaticAnalysis, Box::pin(fut)));
+    }
+    if let Some(fut) = cpg_slice_handle {
+        tasks.push((ScanPhase::CpgSlice, Box::pin(fut)));
+    }
+
+    // Run all tasks in parallel and collect results with their phase tags
+    let results = join_all(
+        tasks
+            .into_iter()
+            .map(|(phase, fut)| async move { (phase, fut.await) }),
+    )
+    .await;
+
+    // Extract results per-phase for backward compatibility with existing logic
+    // Results are already awaited by join_all, so we just extract and clone them
+    let indexing_result = results
+        .iter()
+        .find(|(p, _)| *p == ScanPhase::Indexing)
+        .map(|(_, r)| r.clone());
+
+    let semgrep_result = results
+        .iter()
+        .find(|(p, _)| *p == ScanPhase::Semgrep)
+        .map(|(_, r)| r.clone());
+
+    let llm_static_result = results
+        .iter()
+        .find(|(p, _)| *p == ScanPhase::LlmStaticAnalysis)
+        .map(|(_, r)| r.clone());
+
+    let cpg_slice_result = results
+        .iter()
+        .find(|(p, _)| *p == ScanPhase::CpgSlice)
+        .map(|(_, r)| r.clone());
 
     let parallel_duration = start_time.elapsed();
     tracing::info!("Parallel phases completed in {:?}", parallel_duration);

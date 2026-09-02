@@ -273,3 +273,64 @@ fn test_default_equals_new() {
         assert_eq!(default_phase, new_phase);
     }
 }
+
+#[test]
+fn test_display_name_format_indexing() {
+    let graph = PhaseGraph::new();
+    let display = graph.display_name(&ScanPhase::Indexing);
+    assert_eq!(display, "1/24 Indexing");
+}
+
+#[test]
+fn test_display_name_format_cpg_slice() {
+    let graph = PhaseGraph::new();
+    let display = graph.display_name(&ScanPhase::CpgSlice);
+    assert_eq!(display, "3/24 CPG Slice");
+}
+
+#[test]
+fn test_display_name_format_llm_static() {
+    let graph = PhaseGraph::new();
+    let display = graph.display_name(&ScanPhase::LlmStaticAnalysis);
+    assert_eq!(display, "4/24 LLM Static Analysis");
+}
+
+#[test]
+fn test_display_name_format_reporting() {
+    let graph = PhaseGraph::new();
+    let display = graph.display_name(&ScanPhase::Reporting);
+    assert_eq!(display, "24/24 Reporting");
+}
+
+#[test]
+fn test_display_name_total_count_matches_graph() {
+    let graph = PhaseGraph::new();
+    for phase in graph.phases() {
+        let display = graph.display_name(phase);
+        let expected_total = graph.total_phases() as u8;
+        // Extract total from display string "NN/24 Name"
+        if let Some(slash_pos) = display.find('/') {
+            if let Some(space_pos) = display[slash_pos..].find(' ') {
+                let total_str = &display[slash_pos + 1..slash_pos + space_pos];
+                if let Ok(total) = total_str.parse::<u8>() {
+                    assert_eq!(total, expected_total, "Total mismatch for {:?}", phase);
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn test_phase_index_derived_from_graph() {
+    let graph = PhaseGraph::new();
+    // Verify that phase_index matches the index in display_name
+    for (i, phase) in graph.phases().iter().enumerate() {
+        let expected_index = i + 1;
+        let actual_index = graph.phase_index(phase);
+        assert_eq!(
+            actual_index, expected_index,
+            "Index mismatch for {:?}",
+            phase
+        );
+    }
+}

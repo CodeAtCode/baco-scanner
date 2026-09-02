@@ -531,3 +531,125 @@ enabled = false
 normalization_tier = "None"
 project_baseline_path = null
 ```
+
+## Presets
+
+Presets are bundled TOML overlays that pre-configure BACO for a target project
+type. They set language lists, exclude paths, semgrep rulesets, triage, budget,
+and per-CWE false-positive patterns in one step.
+
+**Loading order:** built-in defaults → preset file → user `config.toml` → CLI flags.
+The user config and CLI flags override the preset.
+
+### Built-in Presets
+
+| Preset             | Target                                          | Languages             |
+|--------------------|-------------------------------------------------|-----------------------|
+| `wordpress-core`   | WordPress core audit                            | php, javascript       |
+| `wordpress-plugin` | WordPress plugin audit                          | php                   |
+| `litellm`          | LiteLLM proxy codebase                          | python                |
+| `oss-python`       | Generic OSS Python project                      | python                |
+| `oss-monorepo`     | Polyglot OSS monorepo                           | python, rust          |
+
+### Usage
+
+```bash
+# Apply a preset via CLI
+baco scan --config my.toml --preset wordpress-core
+
+# List available presets (built-in + ~/.config/baco/presets/*.toml)
+baco presets
+```
+
+### Preset TOML Structure
+
+A preset file is a partial `ScannerConfig`. Every section is optional; unset
+sections fall through to defaults or the user config.
+
+```toml
+# presets/wordpress-core.toml
+[project]
+name = "wordpress-core"
+path = "./wordpress"
+languages = ["php", "javascript"]
+
+[scanner]
+max_file_size_kb = 256
+exclude_paths = ["wp-content/*", "tests/*", "*.min.js"]
+
+[scanner.semgrep]
+config = ["p/wordpress", "p/php", "p/security"]
+
+[scanner.performance]
+enable_incremental_scan = true
+enable_root_cause_dedup = true
+enable_variant_search = true
+
+[llm]
+timeout_secs = 90
+max_concurrent = 6
+temperature = 0.2
+
+[llm.phases.discovery]
+models = ["mistral-small"]
+
+[llm.phases.verification]
+model = "mistral-medium"
+
+[triage]
+enabled = true
+model = "mistral-small"
+batch_size = 8
+suspicion_threshold = 0.35
+
+[priority]
+entry_point_patterns = ["wp-admin/admin-post.php", "xmlrpc.php"]
+sink_patterns = ["$wpdb->query", "unserialize(", "eval("]
+churn_weight = 0.3
+
+[budget]
+enabled = true
+max_llm_calls = 600
+
+[knowledge.fp_patterns]
+"CWE-79"  = ["esc_html(", "esc_attr(", "wp_kses_post("]
+"CWE-89"  = ["$wpdb->prepare("]
+"CWE-352" = ["check_admin_referer(", "wp_verify_nonce("]
+"CWE-862" = ["current_user_can(", "is_admin()"]
+
+[agent_flow]
+enabled = false
+
+[agent]
+enabled = false
+trusted_paths = []
+```
+
+### Custom Presets
+
+Drop a `*.toml` file in `~/.config/baco/presets/` and it appears in
+`baco presets` and is loadable via `--preset <name>`:
+
+```bash
+mkdir -p ~/.config/baco/presets
+cp presets/wordpress-core.toml ~/.config/baco/presets/my-project.toml
+# Edit ~/.config/baco/presets/my-project.toml, then:
+baco scan --config my.toml --preset my-project
+```
+
+### Fields a Preset Can Override
+
+| Section      | Key fields                                                                 |
+|--------------|---------------------------------------------------------------------------|
+| `project`    | `name`, `path`, `languages`                                               |
+| `scanner`    | `max_file_size_kb`, `exclude_paths`, `semgrep.rulesets`, `performance.*`  |
+| `llm`        | `timeout_secs`, `max_concurrent`, `temperature`, `phases.*`               |
+| `triage`     | `enabled`, `model`, `batch_size`, `suspicion_threshold`                   |
+| `priority`   | `enabled`, `git_recent_boost`, `entry_point_boost`, `small_file_boost`    |
+| `budget`     | `enabled`, `max_llm_calls`, `reserve_percent_for_high_risk`               |
+| `agent_flow` | `enabled`, `max_iterations`, `requires_instrumented_target`                |
+| `agent`      | `enabled`, `max_turns`, `tool_timeout_secs`, `trusted_paths`               |
+| `knowledge`  | `fp_patterns` (map of CWE → list of false-positive indicator strings)     |
+
+Unset fields keep the base `ScannerConfig` default; the user `config.toml` and
+CLI flags still override the preset.

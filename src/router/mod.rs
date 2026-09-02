@@ -3,51 +3,58 @@
 //! Implements the MoEVD pattern: route findings to specialized prompts based on
 //! CWE ID or language, falling back to a default prompt.
 
-// Re-export types from config to avoid duplication
-pub use crate::config::{PromptSpec, RouterConfig};
-
 use std::collections::HashMap;
 
-/// Registry of CWE and language overrides
-#[derive(Debug, Clone, Default, PartialEq)]
+use serde::{Deserialize, Serialize};
+
+use crate::config::RouterConfig;
+use crate::prompt::templates::cwe_to_hunt_domain;
+
+/// Route result for a CWE ID
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Route {
+    /// Hunt domain (xss, injection, auth, etc.)
+    pub domain: Option<String>,
+    /// Optional model override for this route
+    pub model_override: Option<String>,
+}
+
+/// Registry of domain-based routing configuration
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct RouterRegistry {
-    /// CWE ID -> PromptSpec mapping
-    cwe_overrides: HashMap<String, PromptSpec>,
-    /// Language -> PromptSpec mapping
-    language_overrides: HashMap<String, PromptSpec>,
+    /// Domain -> model_override mapping
+    #[serde(default)]
+    pub domains: HashMap<String, DomainConfig>,
+}
+
+/// Domain configuration
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+pub struct DomainConfig {
+    /// Optional model override for this domain
+    #[serde(default)]
+    pub model_override: Option<String>,
 }
 
 impl RouterRegistry {
     /// Create a new empty registry
     pub fn new() -> Self {
         Self {
-            cwe_overrides: HashMap::new(),
-            language_overrides: HashMap::new(),
+            domains: HashMap::new(),
         }
     }
 
-    /// Add a CWE override
-    pub fn add_cwe_override(&mut self, cwe_id: String, spec: PromptSpec) {
-        self.cwe_overrides.insert(cwe_id, spec);
+    /// Add a domain configuration
+    pub fn add_domain(&mut self, domain: String, config: DomainConfig) {
+        self.domains.insert(domain, config);
     }
 
-    /// Add a language override
-    pub fn add_language_override(&mut self, language: String, spec: PromptSpec) {
-        self.language_overrides.insert(language, spec);
-    }
-
-    /// Get a CWE override
-    pub fn get_cwe(&self, cwe_id: &str) -> Option<&PromptSpec> {
-        self.cwe_overrides.get(cwe_id)
-    }
-
-    /// Get a language override
-    pub fn get_language(&self, language: &str) -> Option<&PromptSpec> {
-        self.language_overrides.get(language)
+    /// Get domain configuration
+    pub fn get_domain(&self, domain: &str) -> Option<&DomainConfig> {
+        self.domains.get(domain)
     }
 }
 
-/// Router that dispatches findings to specialized prompts
+/// Router that routes CWE IDs to hunt domains
 #[derive(Debug, Clone)]
 pub struct CweRouter {
     registry: RouterRegistry,
@@ -64,56 +71,76 @@ impl Default for CweRouter {
 }
 
 impl CweRouter {
-    /// Create a router from config
+    /// Create a router from config, seeded with the shipped domain registry
+    /// and overlaid with the config's CWE overrides (config wins)
     pub fn from_config(config: &RouterConfig) -> Self {
+        let mut registry = Self::default_registry();
+        for (domain, dc) in config.to_registry().domains {
+            registry.add_domain(domain, dc);
+        }
         Self {
-            registry: config.to_registry(),
+            registry,
             default_prompt: config.default_prompt.clone(),
         }
     }
 
     /// Create a router from the scanner config's RouterConfig
     pub fn from_scanner_config(config: &crate::config::RouterConfig) -> Self {
-        Self {
-            registry: config.to_registry(),
-            default_prompt: config.default_prompt.clone(),
-        }
+        Self::from_config(config)
     }
 
-    /// Route a finding to the appropriate prompt spec
-    ///
-    /// Priority: CWE ID > Language > Default
-    pub fn route(&self, cwe_id: &Option<String>, language: &str) -> PromptSpec {
-        // Try CWE match first
-        if let Some(ref cwe) = cwe_id {
-            // Normalize CWE ID (handle both "79" and "CWE-79" formats)
-            let normalized = normalize_cwe_id(cwe);
-            if let Some(spec) = self.registry.get_cwe(&normalized) {
-                return spec.clone();
+    /// Domains shipped in registry.toml, embedded at compile time
+    fn default_registry() -> RouterRegistry {
+        static DEFAULT: std::sync::OnceLock<RouterRegistry> = std::sync::OnceLock::new();
+        DEFAULT
+            .get_or_init(|| {
+                #[derive(Deserialize)]
+                struct RegistryFile {
+                    router: RegistryRouter,
+                }
+                #[derive(Deserialize)]
+                struct RegistryRouter {
+                    #[serde(default)]
+                    domains: HashMap<String, DomainConfig>,
+                }
+                let parsed: RegistryFile = toml::from_str(include_str!("registry.toml"))
+                    .unwrap_or_else(|e| {
+                        tracing::warn!("Invalid registry.toml, using empty registry: {}", e);
+                        RegistryFile {
+                            router: RegistryRouter {
+                                domains: HashMap::new(),
+                            },
+                        }
+                    });
+                RouterRegistry {
+                    domains: parsed.router.domains,
+                }
+            })
+            .clone()
+    }
+
+    /// Route a CWE ID to a domain and model override
+    pub fn route_cwe(&self, cwe_id: &str) -> Route {
+        // Map CWE to hunt domain using the shared mapping
+        if let Some(domain) = cwe_to_hunt_domain(cwe_id) {
+            // Look up the domain config
+            if let Some(domain_config) = self.registry.get_domain(domain) {
+                return Route {
+                    domain: Some(domain.to_string()),
+                    model_override: domain_config.model_override.clone(),
+                };
             }
+            // Domain exists in mapping but not in registry - return domain without override
+            return Route {
+                domain: Some(domain.to_string()),
+                model_override: None,
+            };
         }
-
-        // Try language match
-        if let Some(spec) = self.registry.get_language(language) {
-            return spec.clone();
-        }
-
-        // Fall back to default
-        PromptSpec {
-            prompt_template: self.default_prompt.clone(),
+        // Unknown CWE - return uncategorized
+        Route {
+            domain: None,
             model_override: None,
         }
-    }
-
-    /// Route by CWE ID only
-    pub fn route_by_cwe(&self, cwe_id: &str) -> Option<PromptSpec> {
-        let normalized = normalize_cwe_id(cwe_id);
-        self.registry.get_cwe(&normalized).cloned()
-    }
-
-    /// Route by language only
-    pub fn route_by_language(&self, language: &str) -> Option<PromptSpec> {
-        self.registry.get_language(language).cloned()
     }
 
     /// Get the default prompt template name
@@ -122,87 +149,40 @@ impl CweRouter {
     }
 }
 
-/// Normalize a CWE ID to just the number part
-fn normalize_cwe_id(cwe: &str) -> String {
-    cwe.trim_start_matches("CWE-")
-        .trim_start_matches("cwe-")
-        .to_uppercase()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_normalize_cwe_id() {
-        assert_eq!(normalize_cwe_id("79"), "79");
-        assert_eq!(normalize_cwe_id("CWE-79"), "79");
-        assert_eq!(normalize_cwe_id("cwe-79"), "79");
-        assert_eq!(normalize_cwe_id("CWE-89"), "89");
-    }
-
-    #[test]
-    fn test_router_config_default() {
-        let config = RouterConfig::default();
-        assert!(!config.enabled);
-        assert_eq!(config.default_prompt, "llm_static_analysis");
-        assert!(config.cwe_overrides.is_empty());
-        assert!(config.language_overrides.is_empty());
-    }
-
-    #[test]
-    fn test_router_registry() {
-        let mut registry = RouterRegistry::new();
-
-        let spec = PromptSpec {
-            prompt_template: "xss_specialized".to_string(),
-            model_override: None,
-        };
-        registry.add_cwe_override("79".to_string(), spec.clone());
-
-        assert_eq!(registry.get_cwe("79"), Some(&spec));
-        assert_eq!(registry.get_cwe("89"), None);
-    }
-
-    #[test]
-    fn test_cwe_router_default() {
+    fn test_route_cwe_known() {
         let router = CweRouter::default();
-        assert_eq!(router.default_prompt(), "llm_static_analysis");
+        let route = router.route_cwe("CWE-79");
+        assert_eq!(route.domain, Some("xss".to_string()));
+        assert_eq!(route.model_override, None);
     }
 
     #[test]
-    fn test_cwe_router_from_config() {
-        let mut cwe_overrides = HashMap::new();
-        cwe_overrides.insert(
-            "79".to_string(),
-            PromptSpec {
-                prompt_template: "xss_specialized".to_string(),
-                model_override: None,
-            },
-        );
-
-        let config = RouterConfig {
-            enabled: true,
-            default_prompt: "custom_default".to_string(),
-            cwe_overrides,
-            language_overrides: HashMap::new(),
-        };
-
-        let router = CweRouter::from_config(&config);
-        assert_eq!(router.default_prompt(), "custom_default");
-    }
-
-    #[test]
-    fn test_router_construction() {
+    fn test_route_cwe_unknown() {
         let router = CweRouter::default();
-        assert!(router.registry.cwe_overrides.is_empty());
-        assert!(router.registry.language_overrides.is_empty());
+        let route = router.route_cwe("CWE-999999");
+        assert_eq!(route.domain, None);
+        assert_eq!(route.model_override, None);
     }
+}
 
-    #[test]
-    fn test_router_fallback_unknown_cwe() {
-        let router = CweRouter::default();
-        // Unknown CWE should return None
-        assert!(router.route_by_cwe("CWE-999").is_none());
+/// Public helper that returns (domain, prompt_content) for a CWE ID
+/// Dead-code-safe: marked pub for external consumption
+/// Returns None if CWE has no mapping or prompt content is empty
+pub fn cwe_specialist_context(cwe_id: &str) -> Option<(String, String)> {
+    use crate::prompt::engine::PromptEngine;
+
+    let engine = PromptEngine::new();
+    let domain = cwe_to_hunt_domain(cwe_id)?;
+    let content = engine.get_hunt_prompt(domain)?;
+
+    if content.is_empty() {
+        None
+    } else {
+        Some((domain.to_string(), content))
     }
 }

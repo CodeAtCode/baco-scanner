@@ -4,6 +4,7 @@ use crate::checkpoint::ScanPhase;
 use crate::error::ScanResult;
 use crate::findings::VerificationStatus;
 use crate::findings::VulnerabilityFinding;
+use crate::indexer::ExcludeMatcher;
 use crate::scanner::phases::PhaseConfig;
 use std::sync::Arc;
 
@@ -94,6 +95,11 @@ pub async fn run_security_agent_verification(
             let mut call_graph_builder =
                 crate::agent_scaffold::call_graph_paths::CallGraphBuilder::new();
 
+            // Build exclusion matcher from config patterns
+            let exclude_matcher = ExcludeMatcher::new(exclude_paths).unwrap_or_else(|_| {
+                ExcludeMatcher::new(&[]).expect("Empty patterns should always work")
+            });
+
             let build_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 // Walk directory and add source files
                 for entry in walkdir::WalkDir::new(target_path)
@@ -105,8 +111,9 @@ pub async fn run_security_agent_verification(
                         continue;
                     }
 
-                    let path_str = path.to_string_lossy();
-                    if exclude_paths.iter().any(|p| path_str.contains(p)) {
+                    // Use glob-based exclusion matching
+                    let relative_path = path.strip_prefix(target_path).ok();
+                    if exclude_matcher.is_excluded(path, relative_path) {
                         continue;
                     }
 

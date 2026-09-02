@@ -1,4 +1,5 @@
 use crate::agent::ToolCall;
+use crate::error::ScanError;
 pub use crate::llm_cache;
 pub use crate::llm_metrics::LlmMetricsTracker;
 use crate::rate_limiter::RateLimiter;
@@ -113,9 +114,29 @@ pub struct FunctionToolDefinition {
     pub parameters: serde_json::Value,
 }
 
+/// JSON schema for structured outputs (response_format)
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct JsonSchema {
+    pub name: String,
+    #[serde(default)]
+    pub strict: bool,
+    #[serde(default)]
+    pub schema: serde_json::Value,
+}
+
+/// Response format configuration for structured JSON outputs
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ResponseFormat {
+    #[serde(default, rename = "type")]
+    pub type_: String, // "json_schema"
+    #[serde(default)]
+    pub json_schema: JsonSchema,
+}
+
 /// Complete tool schema with OpenAI format
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ToolSchema {
+    #[serde(rename = "type")]
     pub type_: String,
     pub function: FunctionToolDefinition,
 }
@@ -261,7 +282,7 @@ impl LlmClient {
         base_url: &str,
         payload: serde_json::Value,
         messages_for_metrics: usize,
-    ) -> Result<ChatResponseWithModel, String> {
+    ) -> Result<ChatResponseWithModel, ScanError> {
         let url = chat_endpoint(base_url);
         let model = self.get_current_model();
         let start_time = std::time::Instant::now();
@@ -296,10 +317,7 @@ impl LlmClient {
 
             match response {
                 Ok(resp) if resp.status().is_success() => {
-                    let result: serde_json::Value = resp
-                        .json()
-                        .await
-                        .map_err(|e| format!("Failed to parse response: {}", e))?;
+                    let result: serde_json::Value = resp.json().await?;
 
                     let content = result
                         .get("choices")
@@ -355,15 +373,20 @@ impl LlmClient {
 
                     // Fail fast on 400/401/403
                     if status == 400 {
-                        return Err(format!(
-                            "Malformed LLM request (400): {}",
-                            error.chars().take(200).collect::<String>()
-                        ));
+                        return Err(ScanError::Parse {
+                            message: format!(
+                                "Malformed LLM request (400): {}",
+                                error.chars().take(200).collect::<String>()
+                            ),
+                            source: None,
+                        });
                     }
                     if status == 401 || status == 403 {
-                        return Err(
-                            "LLM authentication failed (401/403) — check the API key".to_string()
-                        );
+                        return Err(ScanError::Auth {
+                            message: "LLM authentication failed (401/403) — check the API key"
+                                .to_string(),
+                            source: None,
+                        });
                     }
 
                     if !should_retry || retries + 1 >= max_attempts {
@@ -374,14 +397,17 @@ impl LlmClient {
                         )
                         .await;
 
-                        return Err(format!(
-                            "LLM API request failed after {} retries to URL {}\nStatus: {}\nResponse: {}\nModel: {}",
-                            max_attempts.saturating_sub(1),
-                            url,
-                            status,
-                            error,
-                            model
-                        ));
+                        return Err(ScanError::Server {
+                            message: format!(
+                                "LLM API request failed after {} retries to URL {}\nStatus: {}\nResponse: {}\nModel: {}",
+                                max_attempts.saturating_sub(1),
+                                url,
+                                status,
+                                error,
+                                model
+                            ),
+                            source: None,
+                        });
                     }
 
                     // Honor Retry-After on 429
@@ -410,15 +436,18 @@ impl LlmClient {
                         )
                         .await;
 
-                        return Err(format!(
-                            "LLM HTTP request failed after {} retries\nError: {:?}\nStatus: {}\nType: {}\nURL: {}\nModel: {}",
-                            max_attempts.saturating_sub(1),
-                            e,
-                            status,
-                            kind,
-                            url_e,
-                            model
-                        ));
+                        return Err(ScanError::Network {
+                            message: format!(
+                                "LLM HTTP request failed after {} retries\nError: {:?}\nStatus: {}\nType: {}\nURL: {}\nModel: {}",
+                                max_attempts.saturating_sub(1),
+                                e,
+                                status,
+                                kind,
+                                url_e,
+                                model
+                            ),
+                            source: Some(Box::new(e) as _),
+                        });
                     }
 
                     retries += 1;
@@ -434,7 +463,7 @@ impl LlmClient {
         &self,
         base_url: &str,
         payload: serde_json::Value,
-    ) -> Result<ChatResponse, String> {
+    ) -> Result<ChatResponse, ScanError> {
         let url = chat_endpoint(base_url);
         let model = self.get_current_model();
         let start_time = std::time::Instant::now();
@@ -469,10 +498,7 @@ impl LlmClient {
 
             match response {
                 Ok(resp) if resp.status().is_success() => {
-                    let result: serde_json::Value = resp
-                        .json()
-                        .await
-                        .map_err(|e| format!("Failed to parse response: {}", e))?;
+                    let result: serde_json::Value = resp.json().await?;
 
                     let choice = result
                         .get("choices")
@@ -568,26 +594,34 @@ impl LlmClient {
 
                     // Fail fast on 400/401/403
                     if status == 400 {
-                        return Err(format!(
-                            "Malformed LLM request (400): {}",
-                            error.chars().take(200).collect::<String>()
-                        ));
+                        return Err(ScanError::Parse {
+                            message: format!(
+                                "Malformed LLM request (400): {}",
+                                error.chars().take(200).collect::<String>()
+                            ),
+                            source: None,
+                        });
                     }
                     if status == 401 || status == 403 {
-                        return Err(
-                            "LLM authentication failed (401/403) — check the API key".to_string()
-                        );
+                        return Err(ScanError::Auth {
+                            message: "LLM authentication failed (401/403) — check the API key"
+                                .to_string(),
+                            source: None,
+                        });
                     }
 
                     if !should_retry || retries + 1 >= max_attempts {
-                        return Err(format!(
-                            "LLM API request failed after {} retries to URL {}\nStatus: {}\nResponse: {}\nModel: {}",
-                            max_attempts.saturating_sub(1),
-                            url,
-                            status,
-                            error,
-                            model
-                        ));
+                        return Err(ScanError::Server {
+                            message: format!(
+                                "LLM API request failed after {} retries to URL {}\nStatus: {}\nResponse: {}\nModel: {}",
+                                max_attempts.saturating_sub(1),
+                                url,
+                                status,
+                                error,
+                                model
+                            ),
+                            source: None,
+                        });
                     }
 
                     // Honor Retry-After on 429
@@ -609,16 +643,19 @@ impl LlmClient {
                     );
 
                     if !is_timeout && retries + 1 >= max_attempts {
-                        return Err(format!(
-                            "LLM HTTP request failed after {} retries\nError: {:?}\nStatus: {}\nType: {}\nURL: {}\nEndpoint: {}chat/completions\nModel: {}",
-                            max_attempts.saturating_sub(1),
-                            e,
-                            status,
-                            kind,
-                            url_e,
-                            base_url,
-                            model
-                        ));
+                        return Err(ScanError::Network {
+                            message: format!(
+                                "LLM HTTP request failed after {} retries\nError: {:?}\nStatus: {}\nType: {}\nURL: {}\nEndpoint: {}chat/completions\nModel: {}",
+                                max_attempts.saturating_sub(1),
+                                e,
+                                status,
+                                kind,
+                                url_e,
+                                base_url,
+                                model
+                            ),
+                            source: Some(Box::new(e) as _),
+                        });
                     }
 
                     retries += 1;
@@ -629,8 +666,13 @@ impl LlmClient {
         }
     }
 
-    pub async fn chat(&self, messages: &[ChatMessage]) -> Result<ChatResponseWithModel, String> {
-        let model = self.get_current_model();
+    /// Build chat payload with optional structured output support
+    fn build_chat_payload(
+        &self,
+        model: &str,
+        messages: &[ChatMessage],
+        response_format: Option<&ResponseFormat>,
+    ) -> serde_json::Value {
         let mut payload = serde_json::json!({
             "model": model,
             "messages": messages,
@@ -640,6 +682,22 @@ impl LlmClient {
         if let Some(max_tokens) = self.config.max_reasoning_tokens {
             payload["max_tokens"] = serde_json::json!(max_tokens);
         }
+
+        // Add response_format for structured JSON outputs
+        if let Some(format) = response_format {
+            payload["response_format"] = serde_json::to_value(format).unwrap_or_default();
+            // Lower temperature for structured outputs if not explicitly set
+            if self.config.temperature == default_runtime_temperature() {
+                payload["temperature"] = serde_json::json!(0.2);
+            }
+        }
+
+        payload
+    }
+
+    pub async fn chat(&self, messages: &[ChatMessage]) -> Result<ChatResponseWithModel, ScanError> {
+        let model = self.get_current_model();
+        let payload = Self::build_chat_payload(self, &model, messages, None);
 
         let tokens_prompt: usize = messages.iter().map(|m| m.content.len() / 4).sum();
 
@@ -727,7 +785,52 @@ impl LlmClient {
             }
             Err(e) => {
                 tracing::warn!("LLM API {} failed: {}", chat_url, e);
-                Err("LLM API request failed".to_string())
+                Err(ScanError::Network {
+                    message: "LLM API request failed".to_string(),
+                    source: None,
+                })
+            }
+        }
+    }
+
+    /// Chat with structured JSON output using JSON schema
+    /// When schema is provided, sets response_format with json_schema type and strict mode
+    /// Also lowers temperature to 0.2 if using default temperature
+    pub async fn chat_with_json_schema(
+        &self,
+        messages: &[ChatMessage],
+        schema_name: &str,
+        json_schema: serde_json::Value,
+    ) -> Result<ChatResponseWithModel, ScanError> {
+        let model = self.get_current_model();
+
+        let response_format = ResponseFormat {
+            type_: "json_schema".to_string(),
+            json_schema: JsonSchema {
+                name: schema_name.to_string(),
+                strict: true,
+                schema: json_schema,
+            },
+        };
+
+        let payload = Self::build_chat_payload(self, &model, messages, Some(&response_format));
+
+        let tokens_prompt: usize = messages.iter().map(|m| m.content.len() / 4).sum();
+
+        let chat_url = chat_endpoint(&self.config.base_url);
+        tracing::info!("Trying LLM API with JSON schema at: {}", chat_url);
+
+        match self
+            .try_chat_request(&self.config.base_url, payload, tokens_prompt)
+            .await
+        {
+            Ok(response) => Ok(response),
+            Err(e) => {
+                tracing::warn!("LLM API with JSON schema {} failed: {}", chat_url, e);
+                Err(ScanError::Network {
+                    message: "LLM API request with JSON schema failed".to_string(),
+                    source: None,
+                })
             }
         }
     }
@@ -737,22 +840,16 @@ impl LlmClient {
         &self,
         messages: &[ChatMessage],
         tools: &[ToolSchema],
-    ) -> Result<ChatResponse, String> {
+    ) -> Result<ChatResponse, ScanError> {
         let model = self.get_current_model();
-        let mut payload = if tools.is_empty() {
-            serde_json::json!({
-                "model": model,
-                "messages": messages,
-                "temperature": self.config.temperature
-            })
+        let payload = Self::build_chat_payload(self, &model, messages, None);
+        let mut payload = if !tools.is_empty() {
+            let mut p = payload;
+            p["tools"] = serde_json::to_value(tools).unwrap_or_default();
+            p["tool_choice"] = serde_json::json!("auto");
+            p
         } else {
-            serde_json::json!({
-                "model": model,
-                "messages": messages,
-                "tools": tools,
-                "tool_choice": "auto",
-                "temperature": self.config.temperature
-            })
+            payload
         };
 
         if let Some(max_tokens) = self.config.max_reasoning_tokens {
@@ -848,7 +945,10 @@ impl LlmClient {
             }
             Err(e) => {
                 tracing::warn!("LLM API (with tools) {} failed: {}", chat_url, e);
-                Err("LLM API request failed".to_string())
+                Err(ScanError::Network {
+                    message: "LLM API request failed".to_string(),
+                    source: None,
+                })
             }
         }
     }
@@ -883,8 +983,22 @@ impl ChatMessage {
     }
 }
 
+/// Async trait for LLM chat clients - enables testing with mock implementations
+#[allow(async_fn_in_trait)]
+#[cfg_attr(test, mockall::automock)]
+pub trait LlmChatClient: Send + Sync {
+    async fn chat(&self, messages: &[ChatMessage]) -> Result<ChatResponseWithModel, ScanError>;
+}
+
+/// Implement LlmChatClient for LlmClient
+impl LlmChatClient for LlmClient {
+    async fn chat(&self, messages: &[ChatMessage]) -> Result<ChatResponseWithModel, ScanError> {
+        self.chat(messages).await
+    }
+}
+
 pub trait LlmProvider {
-    fn chat(&self, messages: &[ChatMessage]) -> Result<String, String>;
+    fn chat(&self, messages: &[ChatMessage]) -> Result<String, ScanError>;
 }
 
 #[cfg(test)]
@@ -897,7 +1011,7 @@ mod tests {
         pub LlmProvider {}
 
         impl LlmProvider for LlmProvider {
-            fn chat(&self, messages: &[ChatMessage]) -> Result<String, String>;
+            fn chat(&self, messages: &[ChatMessage]) -> Result<String, ScanError>;
         }
     }
 
@@ -962,12 +1076,13 @@ mod tests {
         mock_provider
             .expect_chat()
             .times(1)
-            .returning(|_| Err("API Error".to_string()));
+            .returning(|_| Err(ScanError::LlmClientBuildError("API Error".to_string())));
 
         let messages = vec![ChatMessage::user("Test message")];
         let result = mock_provider.chat(&messages);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "API Error");
+        let err = result.unwrap_err();
+        assert!(matches!(err, ScanError::LlmClientBuildError(_)));
     }
 
     #[tokio::test]
@@ -1070,22 +1185,8 @@ pub fn create_llm_client_with_metrics(
             );
     }
 
-    let api_key = api_key?;
-
-    let llm_config = LlmConfig {
-        base_url: phase_config.base_url.clone(),
-        api_key: api_key.clone(),
-        model: phase_config.model.clone(),
-        models: phase_config.get_models(),
-        timeout: scanner.config.llm.timeout_secs,
-        max_retries: scanner.config.llm.max_retries as u32,
-        retry_backoff_ms: scanner.config.llm.retry_backoff_ms,
-        temperature: 0.5,
-        max_reasoning_tokens: scanner.config.llm.max_reasoning_tokens,
-        enable_llm_cache: false,
-        cache_dir: None,
-        max_concurrent: 3,
-    };
+    // Use the new unified helper for consistency
+    let llm_config = phase_llm_config(&scanner.config, phase_name, None);
 
     Some(LlmClient::with_metrics(
         llm_config,
@@ -1106,4 +1207,98 @@ async fn record_failure_metrics(client: &LlmClient, model: String, latency_ms: u
             success: false,
         })
         .await;
+}
+
+// ============================================================================
+// Unified LLM Config Construction (T26)
+// ============================================================================
+
+use crate::config::ScannerConfig;
+
+/// Build LlmConfig for a specific phase from ScannerConfig
+/// Reads base_url/api_key/timeout/temperature/max_concurrent/max_reasoning_tokens from global config,
+/// applies [llm.phases.<phase>] overrides if present, NEVER hardcodes temperature.
+pub fn phase_llm_config(
+    scanner_config: &ScannerConfig,
+    phase: &str,
+    model_override: Option<&str>,
+) -> LlmConfig {
+    // Get global LLM settings
+    let global_llm = &scanner_config.llm;
+
+    // Get phase-specific config if available
+    let phase_config = get_phase_config(&global_llm.phases, phase);
+
+    // Build base_url: phase override > global
+    let base_url = if !phase_config.base_url.is_empty() {
+        phase_config.base_url.clone()
+    } else {
+        // Default OpenAI endpoint
+        "https://api.openai.com/v1".to_string()
+    };
+
+    // Build api_key: phase override > env var > empty
+    let api_key = phase_config
+        .api_key
+        .clone()
+        .or_else(|| std::env::var("LLM_API_KEY").ok())
+        .unwrap_or_default();
+
+    // Build model: override param > phase models > phase model > global
+    let model = if let Some(override_model) = model_override {
+        override_model.to_string()
+    } else if !phase_config.get_models().is_empty() {
+        phase_config.get_models()[0].clone()
+    } else if !phase_config.model.is_empty() {
+        phase_config.model.clone()
+    } else {
+        "gpt-4".to_string()
+    };
+
+    // Build timeout: phase override > global
+    let timeout = phase_config.timeout_secs.unwrap_or(global_llm.timeout_secs);
+
+    // Temperature: phase override > global - NEVER hardcode
+    let temperature = phase_config.temperature.unwrap_or(global_llm.temperature);
+
+    LlmConfig {
+        base_url,
+        api_key,
+        model,
+        models: vec![],
+        timeout,
+        max_retries: global_llm.max_retries as u32,
+        retry_backoff_ms: global_llm.retry_backoff_ms,
+        temperature,
+        max_reasoning_tokens: global_llm.max_reasoning_tokens,
+        enable_llm_cache: global_llm.enable_llm_cache,
+        cache_dir: global_llm.cache_dir.clone(),
+        max_concurrent: global_llm.max_concurrent,
+    }
+}
+
+/// Get phase config by name from LlmPhasesConfig
+fn get_phase_config(
+    phases: &crate::config::LlmPhasesConfig,
+    phase: &str,
+) -> crate::config::LlmPhaseConfig {
+    // Match phase name to config field
+    match phase {
+        "discovery" => phases.discovery.clone(),
+        "verification" => phases.verification.clone(),
+        "aggregation" => phases.aggregation.clone(),
+        "semgrep" => phases.semgrep.clone(),
+        "ticket_crossref" => phases.ticket_crossref.clone(),
+        "git_analysis" => phases.git_analysis.clone(),
+        "cross_file_analysis" => phases.cross_file_analysis.clone(),
+        "confidence_scoring" => phases.confidence_scoring.clone(),
+        "ai_aggregation" => phases.ai_aggregation.clone(),
+        "reporting" => phases.reporting.clone(),
+        "indexing" => phases.indexing.clone(),
+        "static_analysis" => {
+            // static_analysis uses discovery config as fallback
+            phases.discovery.clone()
+        }
+        _ => crate::config::LlmPhaseConfig::default(),
+    }
 }

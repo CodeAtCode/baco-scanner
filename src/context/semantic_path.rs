@@ -5,7 +5,7 @@
 use std::fmt;
 
 /// Error types for semantic path operations
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum ContextError {
     LlmError(String),
     EmptySource,
@@ -52,7 +52,10 @@ pub async fn summarize(
         crate::llm::ChatMessage::user(truncated),
     ];
 
-    let response = llm.chat(&messages).await.map_err(ContextError::LlmError)?;
+    let response = llm
+        .chat(&messages)
+        .await
+        .map_err(|e| ContextError::LlmError(e.to_string()))?;
 
     Ok(SemanticPath {
         summary: response.content,

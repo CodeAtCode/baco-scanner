@@ -246,6 +246,19 @@ impl PhaseGraph {
     pub fn phase_index(&self, phase: &ScanPhase) -> usize {
         self.phases.iter().position(|p| p == phase).unwrap_or(0) + 1
     }
+
+    /// Get the display name for a phase in "NN/24 Name" format.
+    pub fn display_name(&self, phase: &ScanPhase) -> String {
+        if let Some(metadata) = self.metadata.get(phase) {
+            format!(
+                "{}/{} {}",
+                metadata.phase_number, metadata.total_phases, metadata.display_name
+            )
+        } else {
+            // Fallback for phases not in the graph
+            "?/? Unknown".to_string()
+        }
+    }
 }
 
 /// Standalone helper: total phases in the default pipeline.

@@ -1,7 +1,7 @@
 mod agent_verification;
-mod discovery;
+pub mod discovery;
 mod helpers;
-mod static_analysis;
+pub mod static_analysis;
 pub mod verification;
 
 pub use agent_verification::run_security_agent_verification;

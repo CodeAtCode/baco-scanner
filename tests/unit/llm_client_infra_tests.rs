@@ -1,6 +1,6 @@
 //! Tests for LLM client infrastructure: cache, rate limiting, and retry policy
 
-use baco::llm::{chat_endpoint, ChatMessage, ChatResponseWithModel, LlmClient, LlmConfig};
+use baco::llm::{chat_endpoint, ChatMessage, LlmClient, LlmConfig};
 use baco::llm_cache;
 use baco::llm_metrics::LlmMetricsTracker;
 use baco::rate_limiter::RateLimiter;
@@ -51,7 +51,7 @@ async fn test_cache_hit_without_http() {
     llm_cache::write_cached_response(&cache_dir, &cache_key, &cached_response).unwrap();
 
     // Call chat - should hit cache and NOT attempt HTTP
-    let result: Result<ChatResponseWithModel, String> = client.chat(&messages).await;
+    let result = client.chat(&messages).await;
 
     // Should succeed with cached content
     assert!(result.is_ok(), "Cache hit should succeed: {:?}", result);

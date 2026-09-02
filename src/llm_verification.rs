@@ -200,7 +200,7 @@ pub trait AsyncLlmClient: Send + Sync {
     async fn chat(
         &self,
         messages: &[crate::llm::ChatMessage],
-    ) -> Result<crate::llm::ChatResponseWithModel, String>;
+    ) -> Result<crate::llm::ChatResponseWithModel, crate::error::ScanError>;
 }
 
 #[async_trait::async_trait]
@@ -208,7 +208,7 @@ impl AsyncLlmClient for crate::llm::LlmClient {
     async fn chat(
         &self,
         messages: &[crate::llm::ChatMessage],
-    ) -> Result<crate::llm::ChatResponseWithModel, String> {
+    ) -> Result<crate::llm::ChatResponseWithModel, crate::error::ScanError> {
         crate::llm::LlmClient::chat(self, messages).await
     }
 }

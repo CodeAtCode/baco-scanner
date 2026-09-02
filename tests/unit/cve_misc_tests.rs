@@ -755,7 +755,7 @@ fn test_index_project_excludes_subdirectory() {
         temp_dir.path().to_str().unwrap(),
         &["rust".to_string()],
         1024 * 1024,
-        &["tests/".to_string()],
+        &["**/tests/**".to_string()],
         false,
     )
     .unwrap();

@@ -23,8 +23,14 @@ impl SemgrepRunner {
                 .arg("--quiet")
                 .arg(&target_path_clone);
 
-            if let Some(config) = &self_clone.config_path {
-                cmd.arg("--config").arg(config);
+            // Add multiple --config args if rulesets are specified
+            // If empty, semgrep uses its default/bundled ruleset
+            if self_clone.rulesets.is_empty() {
+                // No explicit config - let semgrep use default behavior
+            } else {
+                for ruleset in &self_clone.rulesets {
+                    cmd.arg("--config").arg(ruleset);
+                }
             }
 
             let output = cmd

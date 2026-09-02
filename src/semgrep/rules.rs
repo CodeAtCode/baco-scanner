@@ -2,14 +2,14 @@ use crate::findings::Severity;
 
 #[derive(Clone)]
 pub struct SemgrepRunner {
-    pub config_path: Option<String>,
+    pub rulesets: Vec<String>,
     pub exclude_rules: Vec<String>,
 }
 
 impl SemgrepRunner {
-    pub fn new(config_path: Option<String>, exclude_rules: Vec<String>) -> Self {
+    pub fn new(rulesets: Vec<String>, exclude_rules: Vec<String>) -> Self {
         Self {
-            config_path,
+            rulesets,
             exclude_rules,
         }
     }

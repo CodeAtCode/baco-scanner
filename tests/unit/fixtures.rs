@@ -229,6 +229,7 @@ pub fn create_test_config() -> ScannerConfig {
                     api_key: None,
                     model: "llama3.1".to_string(),
                     models: vec![],
+                    temperature: None,
                     timeout_secs: Some(30),
                 },
                 verification: LlmPhaseConfig {
@@ -236,6 +237,7 @@ pub fn create_test_config() -> ScannerConfig {
                     api_key: None,
                     model: "llama3.1".to_string(),
                     models: vec![],
+                    temperature: None,
                     timeout_secs: Some(30),
                 },
                 aggregation: LlmPhaseConfig {
@@ -243,6 +245,7 @@ pub fn create_test_config() -> ScannerConfig {
                     api_key: None,
                     model: "llama3.1".to_string(),
                     models: vec![],
+                    temperature: None,
                     timeout_secs: Some(30),
                 },
                 semgrep: Default::default(),
@@ -279,6 +282,9 @@ pub fn create_test_config() -> ScannerConfig {
         agent_flow: Default::default(),
         vuln_spec: Default::default(),
         citation_verification: Default::default(),
+        triage: Default::default(),
+        priority: Default::default(),
+        budget: Default::default(),
         prior_runs: Default::default(),
         org_context: Default::default(),
     }
@@ -333,6 +339,9 @@ pub fn create_minimal_config() -> ScannerConfig {
         agent_flow: Default::default(),
         vuln_spec: Default::default(),
         citation_verification: Default::default(),
+        triage: Default::default(),
+        priority: Default::default(),
+        budget: Default::default(),
         prior_runs: Default::default(),
         org_context: Default::default(),
     }

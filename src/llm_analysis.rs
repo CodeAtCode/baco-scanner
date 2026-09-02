@@ -7,6 +7,111 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
+/// Sink call tokens for RAG query building (T22)
+const SINK_TOKENS: &[&str] = &[
+    "eval",
+    "exec",
+    "system",
+    "popen",
+    "query",
+    "execute",
+    "innerHTML",
+    "dangerouslySetInnerHTML",
+    "unserialize",
+    "strcpy",
+    "memcpy",
+    "sprintf",
+    "gets",
+    "$wpdb->",
+    "Runtime.exec",
+    "child_process",
+    "subprocess",
+    "shell_exec",
+    "passthru",
+    "proc_open",
+    "popen",
+    "curl_exec",
+    "file_get_contents",
+    "include",
+    "require",
+    "eval(",
+    "exec(",
+    "system(",
+];
+
+/// Extract sink calls from code content (T22)
+pub fn extract_sink_calls(code: &str) -> Vec<String> {
+    let mut sinks = Vec::new();
+    let code_lower = code.to_lowercase();
+
+    for sink in SINK_TOKENS {
+        if code_lower.contains(&sink.to_lowercase()) {
+            sinks.push(sink.to_string());
+        }
+    }
+
+    sinks
+}
+
+/// Extract import/requires from code (T22)
+pub fn extract_imports(code: &str) -> Vec<String> {
+    let mut imports = Vec::new();
+
+    for line in code.lines().take(50) {
+        let trimmed = line.trim();
+        if trimmed.starts_with("import ")
+            || trimmed.starts_with("require ")
+            || trimmed.starts_with("const ") && trimmed.contains(" = require(")
+            || trimmed.starts_with("use ")  // Rust
+            || trimmed.starts_with("#include")
+        // C/C++
+        {
+            imports.push(trimmed.to_string());
+        }
+    }
+
+    imports
+}
+
+/// Build a smart RAG query from code content (T22)
+/// Returns: sink calls + imports + CWE hints (if available)
+pub fn build_rag_query(
+    file_path: &str,
+    code_content: &str,
+    cwe_hints: Option<&[String]>,
+) -> String {
+    let mut query_parts = Vec::new();
+
+    // Always include file path
+    query_parts.push(file_path.to_string());
+
+    // Extract and include sink calls
+    let sinks = extract_sink_calls(code_content);
+    if !sinks.is_empty() {
+        query_parts.push(format!("sinks: {}", sinks.join(", ")));
+    }
+
+    // Extract and include imports
+    let imports = extract_imports(code_content);
+    if !imports.is_empty() {
+        query_parts.push(format!("imports: {}", imports.join("; ")));
+    }
+
+    // Include CWE hints if available
+    if let Some(cwes) = cwe_hints {
+        if !cwes.is_empty() {
+            query_parts.push(format!("suspected CWEs: {}", cwes.join(", ")));
+        }
+    }
+
+    // Fallback: if nothing extracted, use first 20 lines
+    if query_parts.len() == 1 {
+        query_parts.push(code_content.lines().take(20).collect::<Vec<_>>().join(" "));
+    }
+
+    query_parts.join(" ")
+}
+
 /// Format CWE specifications into a human-readable string
 pub fn format_cwe_specs(results: &[&CweDocument]) -> String {
     if results.is_empty() {
@@ -221,6 +326,8 @@ pub struct LlmAnalyzer {
     /// Optional context prefix prepended to the user prompt for RAG-augmented analysis
     /// (VulTriage triple-path + PacVD primitive-API abstraction).
     context_prefix: Option<String>,
+    /// Enable structured JSON output using response_format with JSON schema
+    enable_structured_output: bool,
 }
 
 impl LlmAnalyzer {
@@ -263,6 +370,7 @@ impl LlmAnalyzer {
             prompt_template,
             cwe_kb,
             context_prefix: None,
+            enable_structured_output: false,
         }
     }
 
@@ -280,17 +388,22 @@ impl LlmAnalyzer {
         map.insert("rust".to_string(), vec!["rs"]);
         map.insert("go".to_string(), vec!["go"]);
         map.insert("java".to_string(), vec!["java"]);
+        map.insert("php".to_string(), vec!["php", "phtml"]);
         map
     }
 
     /// Check if file should be analyzed based on extension
     pub fn should_analyze(&self, path: &Path) -> bool {
-        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+        let ext = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_lowercase();
         let extensions = self.get_extensions();
 
         for lang in &self.languages {
             if let Some(lang_exts) = extensions.get(lang.to_lowercase().as_str()) {
-                if lang_exts.contains(&ext) {
+                if lang_exts.contains(&ext.as_str()) {
                     return true;
                 }
             }
@@ -320,6 +433,12 @@ impl LlmAnalyzer {
     /// to inject RAG context before the code-under-analysis.
     pub fn with_context_prefix(mut self, prefix: impl Into<String>) -> Self {
         self.context_prefix = Some(prefix.into());
+        self
+    }
+
+    /// Enable structured JSON output using response_format with JSON schema
+    pub fn with_structured_output(mut self, enabled: bool) -> Self {
+        self.enable_structured_output = enabled;
         self
     }
 
@@ -367,14 +486,56 @@ impl LlmAnalyzer {
             crate::llm::ChatMessage::user(&user_prompt)
         ];
 
-        let response = self.client.chat(&messages).await;
+        // Use structured output if enabled, otherwise fall back to regular chat
+        let response = if self.enable_structured_output {
+            // Define the JSON schema for structured findings
+            let schema = serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "findings": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "title": {"type": "string"},
+                                "cwe_id": {"type": "string"},
+                                "severity": {"type": "string"},
+                                "file": {"type": "string"},
+                                "line": {"type": "integer"},
+                                "description": {"type": "string"},
+                                "recommendation": {"type": "string"}
+                            },
+                            "required": ["title", "cwe_id", "severity", "file", "line", "description", "recommendation"]
+                        }
+                    }
+                },
+                "required": ["findings"]
+            });
+
+            self.client
+                .chat_with_json_schema(&messages, "vulnerability_findings", schema)
+                .await
+        } else {
+            self.client.chat(&messages).await
+        };
 
         match response {
-            Ok(response_with_model) => self.parse_llm_response(
-                &response_with_model.content,
-                &file_path,
-                &response_with_model.model_used,
-            ),
+            Ok(response_with_model) => {
+                // If structured output was used, unwrap the findings array from the response
+                if self.enable_structured_output {
+                    self.parse_structured_llm_response(
+                        &response_with_model.content,
+                        &file_path,
+                        &response_with_model.model_used,
+                    )
+                } else {
+                    self.parse_llm_response(
+                        &response_with_model.content,
+                        &file_path,
+                        &response_with_model.model_used,
+                    )
+                }
+            }
             Err(e) => {
                 tracing::error!(
                     "LLM analysis failed for {}: Error: {}\n  Model: {}",
@@ -394,12 +555,8 @@ impl LlmAnalyzer {
             None => return String::new(),
         };
 
-        // Build query from file path and first 20 lines of code
-        let query_parts: Vec<String> = vec![
-            file_path.to_string(),
-            code_content.lines().take(20).collect::<Vec<_>>().join(" "),
-        ];
-        let query = query_parts.join(" ");
+        // Build smart RAG query (T22)
+        let query = build_rag_query(file_path, code_content, None);
 
         // Search for top-3 relevant CWE specifications
         let results = kb.search(&query, 3);
@@ -439,6 +596,278 @@ impl LlmAnalyzer {
             }
             boundary = prev_char_boundary(code, boundary - 1);
         }
+    }
+
+    /// Chunk code using tree-sitter AST parsing (T19)
+    /// Extracts whole functions/classes, groups them under max_bytes cap.
+    /// Falls back to truncate_code when parsing unavailable.
+    pub fn chunk_code_tree_sitter(
+        &self,
+        content: &str,
+        language: &str,
+        max_bytes: usize,
+    ) -> Vec<String> {
+        // Try to parse with tree-sitter
+        let chunks = self.parse_and_chunk(content, language, max_bytes);
+
+        // Fallback to line-based truncation if parsing fails
+        if chunks.is_empty() {
+            vec![self.truncate_code(content)]
+        } else {
+            chunks
+        }
+    }
+
+    /// Parse content and extract function/class chunks
+    fn parse_and_chunk(&self, content: &str, language: &str, max_bytes: usize) -> Vec<String> {
+        // Map language to tree-sitter parser
+        let lang = match language.to_lowercase().as_str() {
+            "rust" => Some(tree_sitter_rust::LANGUAGE.into()),
+            "c" | "c++" | "cpp" => Some(tree_sitter_c::LANGUAGE.into()),
+            "python" => Some(tree_sitter_python::LANGUAGE.into()),
+            "javascript" | "typescript" | "tsx" => Some(tree_sitter_javascript::LANGUAGE.into()),
+            "php" => Some(tree_sitter_php::LANGUAGE_PHP.into()),
+            _ => None,
+        };
+
+        let lang = match lang {
+            Some(l) => l,
+            None => return vec![],
+        };
+
+        let mut parser = tree_sitter::Parser::new();
+        if parser.set_language(&lang).is_err() {
+            return vec![];
+        }
+
+        let tree = match parser.parse(content, None) {
+            Some(t) => t,
+            None => return vec![],
+        };
+
+        // Extract top-level function/class nodes
+        let mut function_ranges = Vec::new();
+        let root = tree.root_node();
+
+        Self::extract_function_ranges(root, content, &mut function_ranges);
+
+        if function_ranges.is_empty() {
+            return vec![];
+        }
+
+        // Group functions into chunks under max_bytes
+        let mut chunks = Vec::new();
+        let mut current_chunk = String::new();
+
+        // Find preamble (imports/includes before first function)
+        let first_func_start = function_ranges.iter().map(|(s, _)| *s).min().unwrap_or(0);
+        let preamble = if first_func_start > 0 {
+            &content[..first_func_start]
+        } else {
+            ""
+        };
+
+        for (func_start, func_end) in function_ranges {
+            let func_content = &content[func_start..func_end];
+            let func_bytes = func_content.len();
+
+            // Check if function alone exceeds cap - hard split with marker
+            if func_bytes > max_bytes {
+                // Push current chunk if any
+                if !current_chunk.is_empty() {
+                    chunks.push(std::mem::take(&mut current_chunk));
+                }
+
+                // Hard split large function
+                let marker = "\n// [chunk continues - function too large for single chunk]\n";
+                let mut remaining = &content[func_start..func_end];
+                let mut chunk_num = 1;
+
+                while !remaining.is_empty() {
+                    let take = max_bytes.saturating_sub(marker.len());
+                    let end = std::cmp::min(take, remaining.len());
+
+                    let chunk_text = if chunk_num == 1 {
+                        format!("{}{}{}", preamble, marker, &remaining[..end])
+                    } else {
+                        format!("{}{}", marker, &remaining[..end])
+                    };
+
+                    chunks.push(chunk_text);
+                    remaining = &remaining[end..];
+                    chunk_num += 1;
+                }
+                current_chunk = String::new();
+            } else if current_chunk.len() + func_bytes <= max_bytes {
+                // Add to current chunk
+                if current_chunk.is_empty() && !preamble.is_empty() {
+                    current_chunk.push_str(preamble);
+                }
+                current_chunk.push_str(func_content);
+                current_chunk.push('\n');
+            } else {
+                // Push current chunk and start new one
+                if !current_chunk.is_empty() {
+                    chunks.push(current_chunk);
+                }
+                current_chunk = format!("{}{}", preamble, func_content);
+                current_chunk.push('\n');
+            }
+        }
+
+        // Push final chunk
+        if !current_chunk.is_empty() {
+            chunks.push(current_chunk);
+        }
+
+        chunks
+    }
+
+    /// Recursively extract function/class node ranges from tree-sitter AST
+    fn extract_function_ranges(
+        node: tree_sitter::Node,
+        _content: &str,
+        ranges: &mut Vec<(usize, usize)>,
+    ) {
+        // Check for common function/class node types
+        let node_type = node.kind();
+        let is_function = matches!(
+            node_type,
+            "function_definition"
+                | "method_definition"
+                | "class_definition"
+                | "function_item"
+                | "impl_item"
+                | "declaration_list"
+                | "compound_statement"
+        );
+
+        if is_function {
+            ranges.push((node.start_byte(), node.end_byte()));
+        }
+
+        // Recurse into children
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            Self::extract_function_ranges(child, _content, ranges);
+        }
+    }
+
+    /// Parse structured LLM response with JSON schema into findings
+    fn parse_structured_llm_response(
+        &self,
+        text: &str,
+        file_path: &str,
+        model_name: &str,
+    ) -> Result<Vec<VulnerabilityFinding>, String> {
+        // Remove markdown code fences
+        let cleaned = text
+            .trim()
+            .trim_start_matches("```json")
+            .trim_start_matches("```")
+            .trim_end_matches("```")
+            .trim_end_matches("~~~")
+            .trim();
+
+        // Parse the outer wrapper object
+        let parsed: serde_json::Value =
+            serde_json::from_str(cleaned).map_err(|e| format!("Failed to parse JSON: {}", e))?;
+
+        // Extract the findings array
+        let findings_array = parsed
+            .get("findings")
+            .and_then(|v| v.as_array())
+            .ok_or("Missing or invalid 'findings' array in response")?;
+
+        tracing::debug!(
+            "Parsed {} findings from structured JSON",
+            findings_array.len()
+        );
+
+        // Process each finding
+        let mut findings = Vec::new();
+        for item in findings_array.iter() {
+            let severity_str = item.get("severity").and_then(|v| v.as_str());
+            let title = item.get("title").and_then(|v| v.as_str());
+            let description = item.get("description").and_then(|v| v.as_str());
+            let line = item.get("line").and_then(|v| v.as_i64());
+
+            if let (Some(severity_str), Some(title), Some(line)) = (severity_str, title, line) {
+                let description = description.map(|s| s.to_string()).unwrap_or_default();
+
+                let severity = match severity_str.to_lowercase().as_str() {
+                    "critical" => Severity::Critical,
+                    "high" => Severity::High,
+                    "medium" => Severity::Medium,
+                    _ => Severity::Low,
+                };
+
+                let recommendation = item
+                    .get("recommendation")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string())
+                    .unwrap_or_default();
+
+                let cwe_id = item
+                    .get("cwe_id")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+
+                let cwe_id_for_hash = cwe_id.as_deref().unwrap_or("CWE-000");
+
+                findings.push(VulnerabilityFinding {
+                    id: VulnerabilityFinding::generate_id(
+                        file_path,
+                        Some(line as u32),
+                        cwe_id_for_hash,
+                    ),
+                    title: title.to_string(),
+                    description,
+                    severity,
+                    confidence_score: 0.7,
+                    cwe_id,
+                    file_path: file_path.to_string(),
+                    line_number: Some(line as u32),
+                    code_snippet: None,
+                    diff_hunk: None,
+                    recommendation: Some(recommendation),
+                    code_location: Some(format!("{}:{}", file_path, line)),
+                    already_reported: false,
+                    sources: vec!["llm_analysis".to_string()],
+                    commit_reference: None,
+                    ticket_reference: None,
+                    priority_score: None,
+                    cross_file_references: None,
+                    verification_status: None,
+                    verification_notes: None,
+                    verification_error: None,
+                    agent_evidence_path: None,
+                    security_issue: None,
+                    poc_code: None,
+                    mitigation_code: None,
+                    poc_format: None,
+                    llm_model: if model_name == "fallback" || model_name.is_empty() {
+                        None
+                    } else {
+                        Some(model_name.to_string())
+                    },
+                    agent_mode: false,
+                    statement_range: None,
+                    triage_verdict: None,
+                    evidence: vec![crate::evidence::Evidence {
+                        source: crate::evidence::EvidenceSource::LlmAnalysis(
+                            model_name.to_string(),
+                        ),
+                        weight: 0.6,
+                        detail: "LLM static analysis finding (structured output)".to_string(),
+                        timestamp: chrono::Utc::now(),
+                    }],
+                    verification_tier: None,
+                });
+            }
+        }
+
+        Ok(findings)
     }
 
     /// Parse LLM response into findings

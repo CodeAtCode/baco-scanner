@@ -1,4 +1,5 @@
 use baco::config;
+use baco::preset;
 use baco::validation;
 use clap::{Parser, Subcommand};
 use std::path::{Path, PathBuf};
@@ -7,6 +8,7 @@ use tracing::info;
 #[derive(Parser)]
 #[command(name = "baco")]
 #[command(about = "BACO - CLI Security Vulnerability Scanner")]
+#[command(version = env!("CARGO_PKG_VERSION"))]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -29,6 +31,10 @@ enum Commands {
         force: bool,
         #[arg(long, help = "Only independently reproduced findings reach reports")]
         evidence_gate: bool,
+        #[arg(long, help = "Print estimate and exit before LLM/semgrep phases")]
+        dry_run: bool,
+        #[arg(long, help = "Preset name (not yet available)")]
+        preset: Option<String>,
     },
     Resume {
         #[arg(short, long)]
@@ -43,6 +49,24 @@ enum Commands {
     Verify {
         #[arg(short, long)]
         input: PathBuf,
+        #[arg(short, long, help = "Config file path")]
+        config: Option<PathBuf>,
+    },
+    Preset {
+        #[command(subcommand)]
+        action: PresetCommands,
+    },
+}
+
+#[derive(Subcommand)]
+enum PresetCommands {
+    List {
+        #[arg(long, help = "Show full TOML for each preset")]
+        verbose: bool,
+    },
+    Show {
+        #[arg(help = "Preset name to display")]
+        name: String,
     },
 }
 
@@ -85,14 +109,38 @@ async fn main() {
             target,
             force,
             evidence_gate,
+            dry_run,
+            preset,
         } => {
             info!("Starting scan with config: {:?}", config);
-            run_scan(&config, target, force, evidence_gate, cli.quiet)
-                .await
-                .unwrap_or_else(|e| {
-                    tracing::error!("Scan failed: {}", e);
-                    std::process::exit(1);
-                });
+
+            // Load preset if specified
+            let preset_overlay = if let Some(preset_name) = &preset {
+                match preset::load_preset(preset_name) {
+                    Ok(overlay) => Some(overlay),
+                    Err(e) => {
+                        tracing::error!("{}", e);
+                        std::process::exit(2);
+                    }
+                }
+            } else {
+                None
+            };
+
+            run_scan(
+                &config,
+                target,
+                force,
+                evidence_gate,
+                dry_run,
+                preset_overlay,
+                cli.quiet,
+            )
+            .await
+            .unwrap_or_else(|e| {
+                tracing::error!("Scan failed: {}", e);
+                std::process::exit(1);
+            });
         }
         Commands::Resume { checkpoint } => {
             info!("Resuming from checkpoint: {:?}", checkpoint);
@@ -110,13 +158,16 @@ async fn main() {
                 std::process::exit(1);
             });
         }
-        Commands::Verify { input } => {
+        Commands::Verify { input, config } => {
             info!("Verifying findings from: {:?}", input);
-            run_verify(&input, cli.quiet).await.unwrap_or_else(|e| {
-                tracing::error!("Verification failed: {}", e);
-                std::process::exit(1);
-            });
+            run_verify(&input, config, cli.quiet)
+                .await
+                .unwrap_or_else(|e| {
+                    tracing::error!("Verification failed: {}", e);
+                    std::process::exit(1);
+                });
         }
+        Commands::Preset { action } => run_preset_command(action, cli.quiet),
     }
 }
 
@@ -125,6 +176,8 @@ async fn run_scan(
     target: Option<PathBuf>,
     force: bool,
     evidence_gate: bool,
+    dry_run: bool,
+    preset_overlay: Option<baco::preset::PresetOverlay>,
     quiet: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     match validation::validate_config(config_path) {
@@ -136,6 +189,11 @@ async fn run_scan(
     }
     let mut config =
         config::ScannerConfig::from_file(config_path.to_str().ok_or("Invalid config path")?)?;
+
+    // Apply preset overlay before user config
+    if let Some(preset) = preset_overlay {
+        preset.merge_into(&mut config);
+    }
 
     // Apply CLI flag override
     if evidence_gate {
@@ -149,6 +207,11 @@ async fn run_scan(
     std::fs::create_dir_all(&output_dir)?;
 
     let target_path = target.unwrap_or_else(|| PathBuf::from(&config.project.path));
+
+    // Dry-run mode: perform indexing + prioritization, print estimate, exit
+    if dry_run {
+        return run_dry_run(&config, &target_path, quiet);
+    }
 
     if !quiet {
         tracing::info!("Starting BACO security scan on: {}", target_path.display());
@@ -191,89 +254,22 @@ async fn run_scan(
         eprintln!("Initializing scanner...");
     }
 
+    let project_name = config.project.name.clone();
     let scanner = baco::scanner::Scanner::new(config, target_path, force);
     let findings = scanner.run().await?;
 
-    // Print summary
-    if !quiet {
-        tracing::info!("═══════════════════════════════════════");
-        tracing::info!("Scan complete: {} findings", findings.len());
-
-        // Count by severity
-        let mut severity_counts = std::collections::HashMap::new();
-        for finding in &findings {
-            *severity_counts
-                .entry(finding.severity.to_string())
-                .or_insert(0) += 1;
-        }
-        if !severity_counts.is_empty() {
-            let mut parts = Vec::new();
-            for (severity, count) in severity_counts.iter() {
-                parts.push(format!("{} {}", count, severity));
-            }
-            tracing::info!("Severity breakdown: {}", parts.join(", "));
-        }
-
-        // Evidence tier summary when gating is active
-        if evidence_gate_enabled {
-            let mut tier_counts = (0, 0, 0); // (verified, supported, unverified)
-            for finding in &findings {
-                let tier =
-                    baco::evidence::classify_finding(&finding.evidence, finding.confidence_score);
-                match tier {
-                    baco::evidence::VerificationTier::Verified => tier_counts.0 += 1,
-                    baco::evidence::VerificationTier::Supported => tier_counts.1 += 1,
-                    baco::evidence::VerificationTier::Unverified => tier_counts.2 += 1,
-                }
-            }
-            println!(
-                "Evidence gate: {} verified, {} supported, {} unverified (excluded from reports)",
-                tier_counts.0, tier_counts.1, tier_counts.2
-            );
-        }
-
-        // Save findings to output directory
-        let findings_path = output_dir.join("findings.json");
-        let json = serde_json::to_string_pretty(&findings)?;
-        std::fs::write(&findings_path, json)?;
-
-        tracing::info!("Results saved to:");
-        tracing::info!("  - Findings: {}", findings_path.display());
-        tracing::info!("  - HTML report: {}/report.html", output_dir.display());
-        tracing::info!("═══════════════════════════════════════");
-    } else {
-        // Quiet mode: only show summary line when complete
-        tracing::info!("Scan complete: {} findings", findings.len());
-
-        // Evidence tier summary when gating is active
-        if evidence_gate_enabled {
-            let mut tier_counts = (0, 0, 0); // (verified, supported, unverified)
-            for finding in &findings {
-                let tier =
-                    baco::evidence::classify_finding(&finding.evidence, finding.confidence_score);
-                match tier {
-                    baco::evidence::VerificationTier::Verified => tier_counts.0 += 1,
-                    baco::evidence::VerificationTier::Supported => tier_counts.1 += 1,
-                    baco::evidence::VerificationTier::Unverified => tier_counts.2 += 1,
-                }
-            }
-            println!(
-                "Evidence gate: {} verified, {} supported, {} unverified (excluded from reports)",
-                tier_counts.0, tier_counts.1, tier_counts.2
-            );
-        }
-
-        // Save findings to output directory
-        let findings_path = output_dir.join("findings.json");
-        let json = serde_json::to_string_pretty(&findings)?;
-        std::fs::write(&findings_path, json)?;
-
-        // HTML report path
-        let _report_path = format!("{}/report.html", output_dir.display());
-    }
+    // Print summary and save reports
+    print_scan_summary(
+        &findings,
+        &output_dir,
+        &project_name,
+        evidence_gate_enabled,
+        quiet,
+    )?;
 
     Ok(())
 }
+
 async fn run_resume(checkpoint_path: &Path, quiet: bool) -> Result<(), Box<dyn std::error::Error>> {
     let checkpoint = validation::validate_checkpoint(checkpoint_path)?;
     if checkpoint.current_phase == baco::checkpoint::ScanPhase::Complete {
@@ -425,37 +421,246 @@ async fn run_resume(checkpoint_path: &Path, quiet: bool) -> Result<(), Box<dyn s
 }
 
 fn format_phase(phase: &baco::checkpoint::ScanPhase) -> String {
-    let (phase_str, _phase_index) = match phase {
-        baco::checkpoint::ScanPhase::Indexing => ("Indexing ⚙️", 0),
-        baco::checkpoint::ScanPhase::Semgrep => ("Semgrep 🔍", 1),
-        baco::checkpoint::ScanPhase::CweRouting => ("MoE CWE Routing 🎯", 2),
-        baco::checkpoint::ScanPhase::LlmStaticAnalysis => ("LLM Static Analysis 🧠", 3),
-        baco::checkpoint::ScanPhase::LlmDiscovery => ("LLM Discovery 🔎", 3),
-        baco::checkpoint::ScanPhase::LlmVerification => ("LLM Verification ✅", 4),
-        baco::checkpoint::ScanPhase::TicketCrossRef => ("Ticket Cross-Ref 🎫", 5),
-        baco::checkpoint::ScanPhase::GitAnalysis => ("Git Analysis 📊", 6),
-        baco::checkpoint::ScanPhase::CrossFileAnalysis => ("Cross-File Analysis 🔗", 7),
-        baco::checkpoint::ScanPhase::CpgSlice => ("CPG Slicing ✂️", 7),
-        baco::checkpoint::ScanPhase::ConfidenceScoring => ("Confidence Scoring ⚖️", 8),
-        baco::checkpoint::ScanPhase::AiAggregation => ("AI Aggregation 🤖", 9),
-        baco::checkpoint::ScanPhase::Reporting => ("Reporting 📝", 10),
-        baco::checkpoint::ScanPhase::ThreatModeling => ("Threat Modeling 🛡️", 11),
-        baco::checkpoint::ScanPhase::RootCauseDedup => ("Root Cause Dedup 🔍", 12),
-        baco::checkpoint::ScanPhase::MultiVerifier => ("Multi-Verifier 🗳️", 13),
-        baco::checkpoint::ScanPhase::AutoPatching => ("Auto-Patching 🔧", 14),
-        baco::checkpoint::ScanPhase::CveBootstrap => ("CVE Bootstrap 📋", 17),
-        baco::checkpoint::ScanPhase::PocCompiler => ("PoC Compiler 🛠️", 18),
-        baco::checkpoint::ScanPhase::VariantSearch => ("Variant Search 🔎", 19),
-        baco::checkpoint::ScanPhase::SecurityAgentVerification => {
-            ("SecurityAgent Verification 🤖", 20)
+    // Delegate to PhaseGraph for data-driven display names
+    // This keeps phase numbering in sync with PhaseGraph (single source of truth)
+    let phase_graph = baco::scanner::PhaseGraph::new();
+    phase_graph.display_name(phase)
+}
+
+/// Print scan summary and save reports (shared by quiet and normal branches)
+fn print_scan_summary(
+    findings: &[baco::findings::VulnerabilityFinding],
+    output_dir: &std::path::Path,
+    project_name: &str,
+    evidence_gate_enabled: bool,
+    quiet: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    if !quiet {
+        tracing::info!("═══════════════════════════════════════");
+        tracing::info!("Scan complete: {} findings", findings.len());
+
+        // Count by severity
+        let mut severity_counts = std::collections::HashMap::new();
+        for finding in findings {
+            *severity_counts
+                .entry(finding.severity.to_string())
+                .or_insert(0) += 1;
         }
-        baco::checkpoint::ScanPhase::RuleSynthesis => ("Rule Synthesis ⚗️", 21),
-        baco::checkpoint::ScanPhase::Validate => ("Validate 🛡️", 22),
-        baco::checkpoint::ScanPhase::ExploitSynth => ("Exploit Synthesis 💉", 25),
-        baco::checkpoint::ScanPhase::Complete => ("Complete ✨", 15),
-        baco::checkpoint::ScanPhase::Error => ("Error ❌", 16),
+        if !severity_counts.is_empty() {
+            let mut parts = Vec::new();
+            for (severity, count) in severity_counts.iter() {
+                parts.push(format!("{} {}", count, severity));
+            }
+            tracing::info!("Severity breakdown: {}", parts.join(", "));
+        }
+
+        // Evidence tier summary when gating is active
+        if evidence_gate_enabled {
+            let mut tier_counts = (0, 0, 0); // (verified, supported, unverified)
+            for finding in findings {
+                let tier =
+                    baco::evidence::classify_finding(&finding.evidence, finding.confidence_score);
+                match tier {
+                    baco::evidence::VerificationTier::Verified => tier_counts.0 += 1,
+                    baco::evidence::VerificationTier::Supported => tier_counts.1 += 1,
+                    baco::evidence::VerificationTier::Unverified => tier_counts.2 += 1,
+                }
+            }
+            println!(
+                "Evidence gate: {} verified, {} supported, {} unverified (excluded from reports)",
+                tier_counts.0, tier_counts.1, tier_counts.2
+            );
+        }
+
+        // Save findings to output directory
+        let findings_path = output_dir.join("findings.json");
+        let json = serde_json::to_string_pretty(&findings)?;
+        std::fs::write(&findings_path, json)?;
+
+        // Write markdown report alongside JSON
+        let markdown_path = output_dir.join("findings.md");
+        let md_content = baco::report::markdown::generate_markdown_report(findings, project_name);
+        std::fs::write(&markdown_path, md_content)?;
+
+        tracing::info!("Results saved to:");
+        tracing::info!("  - Findings: {}", findings_path.display());
+        tracing::info!("  - Markdown report: {}", markdown_path.display());
+        tracing::info!("  - HTML report: {}/report.html", output_dir.display());
+        tracing::info!("═══════════════════════════════════════");
+    } else {
+        // Quiet mode: only show summary line when complete
+        tracing::info!("Scan complete: {} findings", findings.len());
+
+        // Evidence tier summary when gating is active
+        if evidence_gate_enabled {
+            let mut tier_counts = (0, 0, 0); // (verified, supported, unverified)
+            for finding in findings {
+                let tier =
+                    baco::evidence::classify_finding(&finding.evidence, finding.confidence_score);
+                match tier {
+                    baco::evidence::VerificationTier::Verified => tier_counts.0 += 1,
+                    baco::evidence::VerificationTier::Supported => tier_counts.1 += 1,
+                    baco::evidence::VerificationTier::Unverified => tier_counts.2 += 1,
+                }
+            }
+            println!(
+                "Evidence gate: {} verified, {} supported, {} unverified (excluded from reports)",
+                tier_counts.0, tier_counts.1, tier_counts.2
+            );
+        }
+
+        // Save findings to output directory
+        let findings_path = output_dir.join("findings.json");
+        let json = serde_json::to_string_pretty(&findings)?;
+        std::fs::write(&findings_path, json)?;
+
+        // Write markdown report alongside JSON
+        let markdown_path = output_dir.join("findings.md");
+        let md_content = baco::report::markdown::generate_markdown_report(findings, project_name);
+        std::fs::write(&markdown_path, md_content)?;
+
+        // HTML report path
+        let _report_path = format!("{}/report.html", output_dir.display());
+    }
+
+    Ok(())
+}
+
+/// Run dry-run mode: index + prioritize + estimate, then exit
+fn run_dry_run(
+    config: &baco::config::ScannerConfig,
+    target_path: &std::path::Path,
+    quiet: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use baco::indexer::FileIndex;
+    use baco::scanner::phases::llm_phases::static_analysis::compute_file_priority_score;
+
+    if !quiet {
+        tracing::info!("[Dry Run] Indexing project...");
+    }
+
+    // Index project
+    let index = FileIndex::index_project(
+        target_path.to_str().unwrap_or("."),
+        &config.project.languages,
+        config.scanner.max_file_size_kb * 1024,
+        &config.scanner.exclude_paths,
+        config.scanner.performance.enable_file_filtering,
+    )
+    .unwrap_or(FileIndex {
+        files: Vec::new(),
+        total_size: 0,
+        hash_store: None,
+    });
+
+    let files = index.get_files();
+
+    // Compute priority scores and count files per language
+    let mut files_by_lang: std::collections::HashMap<String, Vec<&baco::indexer::FileInfo>> =
+        std::collections::HashMap::new();
+    let mut total_priority: f32 = 0.0;
+
+    for file in files {
+        let lang = file.language.clone();
+        let score = compute_file_priority_score(
+            file,
+            config.priority.git_recent_boost,
+            config.priority.entry_point_boost,
+            config.priority.small_file_boost,
+        );
+        total_priority += score;
+        files_by_lang.entry(lang).or_default().push(file);
+    }
+
+    // Estimate LLM calls respecting budget and triage
+    let max_calls = if config.budget.enabled {
+        config.budget.max_llm_calls
+    } else {
+        usize::MAX
     };
-    phase_str.to_string()
+
+    let reserve_percent = if config.budget.enabled {
+        config.budget.reserve_percent_for_high_risk as f32 / 100.0
+    } else {
+        0.0
+    };
+    let normal_cap = max_calls.saturating_sub((max_calls as f32 * reserve_percent) as usize);
+
+    // Count high-risk files (entry-points)
+    let mut high_risk_count = 0;
+    let mut normal_count = 0;
+    for file in files {
+        let file_name = file
+            .path
+            .file_name()
+            .map(|n: &std::ffi::OsStr| n.to_string_lossy().to_string())
+            .unwrap_or_default();
+        let is_high_risk = ["main.", "index.", "app.", "server.", "__init__."]
+            .iter()
+            .any(|p| file_name.contains(p));
+        if is_high_risk {
+            high_risk_count += 1;
+        } else {
+            normal_count += 1;
+        }
+    }
+
+    // Estimate planned LLM calls (triage would skip low-suspicion files)
+    let planned_calls = if config.triage.enabled {
+        // Assume triage filters ~50% of non-high-risk files
+        let triaged_normal = normal_count / 2;
+        std::cmp::min(normal_cap, triaged_normal)
+            + std::cmp::min(max_calls.saturating_sub(normal_cap), high_risk_count)
+    } else {
+        std::cmp::min(max_calls, files.len())
+    };
+
+    // Estimate tokens (~4 chars/token)
+    let total_bytes: usize = files.iter().map(|f| f.size as usize).sum();
+    let estimated_tokens = total_bytes / 4;
+
+    // Print estimate
+    if !quiet {
+        println!("\n[Dry Run] Project Estimate");
+        println!("═══════════════════════════════════════");
+        println!("Target: {}", target_path.display());
+        println!("\nFiles by language:");
+        for (lang, lang_files) in &files_by_lang {
+            println!("  {}: {} files", lang, lang_files.len());
+        }
+        println!("\nTotal files: {}", files.len());
+        println!("Total size: {} bytes", total_bytes);
+        println!("Estimated tokens (~4 chars/token): {}", estimated_tokens);
+        println!("\nPlanned LLM calls: {}", planned_calls);
+        if config.budget.enabled {
+            println!(
+                "  (budget max: {}, normal cap: {}, high-risk: {})",
+                max_calls,
+                normal_cap,
+                max_calls.saturating_sub(normal_cap)
+            );
+        }
+        println!(
+            "\nAverage priority score: {:.2}",
+            if files.is_empty() {
+                0.0
+            } else {
+                total_priority / files.len() as f32
+            }
+        );
+        println!("\n[Dry Run] No phases executed, no findings produced.");
+    } else {
+        // Quiet mode: minimal output
+        println!(
+            "[Dry Run] {} files, {} tokens, {} planned LLM calls",
+            files.len(),
+            estimated_tokens,
+            planned_calls
+        );
+        println!("[Dry Run] No phases executed, no findings produced.");
+    }
+
+    Ok(())
 }
 
 fn run_report(input: &Path, format: &str, quiet: bool) -> Result<(), Box<dyn std::error::Error>> {
@@ -498,7 +703,16 @@ fn run_report(input: &Path, format: &str, quiet: bool) -> Result<(), Box<dyn std
                 info!("Generated SARIF report to {:?}", sarif_path);
             }
         }
-        "markdown" => return Err("Markdown report not yet implemented".into()),
+        "markdown" => {
+            use baco::report::markdown::generate_markdown_report;
+            let md_path = output_path.clone();
+            let md_content = generate_markdown_report(&findings, "unknown");
+            std::fs::write(&md_path, md_content)
+                .map_err(|e| format!("Failed to write markdown report: {}", e))?;
+            if !quiet {
+                info!("Generated markdown report to {:?}", md_path);
+            }
+        }
         _ => return Err(format!("Unsupported report format: {}", format).into()),
     }
 
@@ -508,7 +722,11 @@ fn run_report(input: &Path, format: &str, quiet: bool) -> Result<(), Box<dyn std
     Ok(())
 }
 
-async fn run_verify(input: &Path, quiet: bool) -> Result<(), Box<dyn std::error::Error>> {
+async fn run_verify(
+    input: &Path,
+    config_path: Option<PathBuf>,
+    quiet: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut findings = validation::validate_findings(input)?;
     if findings.is_empty() {
         if !quiet {
@@ -521,7 +739,8 @@ async fn run_verify(input: &Path, quiet: bool) -> Result<(), Box<dyn std::error:
         tracing::info!("Loaded {} findings to verify", findings.len());
     }
 
-    let config_path = std::env::var("LLM_CONFIG_PATH").map(PathBuf::from).ok();
+    let config_path =
+        config_path.or_else(|| std::env::var("LLM_CONFIG_PATH").map(PathBuf::from).ok());
     let mut config = match &config_path {
         Some(path) => {
             if !path.exists() {
@@ -587,7 +806,7 @@ async fn run_verify(input: &Path, quiet: bool) -> Result<(), Box<dyn std::error:
             Err(e) => {
                 tracing::error!("LLM verification failed for {}: {}", finding.id, e);
                 finding.verification_status = Some(baco::findings::VerificationStatus::Failed);
-                finding.verification_error = Some(e);
+                finding.verification_error = Some(e.to_string());
             }
         }
     }
@@ -612,4 +831,87 @@ async fn run_verify(input: &Path, quiet: bool) -> Result<(), Box<dyn std::error:
         );
     }
     Ok(())
+}
+
+fn run_preset_command(action: PresetCommands, quiet: bool) {
+    match action {
+        PresetCommands::List { verbose } => {
+            let presets = preset::list_available_presets();
+            if presets.is_empty() {
+                if !quiet {
+                    println!("No presets available.");
+                }
+                return;
+            }
+
+            if verbose {
+                for name in &presets {
+                    // Extract preset name (strip " (user)" suffix if present)
+                    let preset_name = name.split(" (").next().unwrap_or(name.as_str());
+                    println!("\n=== {} ===", name);
+                    match preset::load_preset(preset_name) {
+                        Ok(_) => {
+                            // For verbose mode, we'd need to read the raw TOML
+                            // For now, just show the name
+                            println!("Preset: {}", preset_name);
+                        }
+                        Err(e) => {
+                            println!("Error loading preset: {}", e);
+                        }
+                    }
+                }
+            } else {
+                println!("Available presets:");
+                for name in presets {
+                    println!("  - {}", name);
+                }
+            }
+        }
+        PresetCommands::Show { name } => {
+            // Load preset to verify it exists
+            match preset::load_preset(&name) {
+                Ok(_) => {
+                    // For show, we need to read the raw TOML content
+                    // Try bundled first
+                    if let Some(content) = preset_content(&name) {
+                        println!("{}", content);
+                    } else {
+                        // Try user directory
+                        let user_path = preset::home_dir()
+                            .join(".config")
+                            .join("baco")
+                            .join("presets")
+                            .join(format!("{}.toml", name));
+                        if user_path.exists() {
+                            match std::fs::read_to_string(&user_path) {
+                                Ok(content) => println!("{}", content),
+                                Err(e) => {
+                                    eprintln!("Failed to read preset: {}", e);
+                                    std::process::exit(1);
+                                }
+                            }
+                        } else {
+                            eprintln!("Preset '{}' not found", name);
+                            std::process::exit(1);
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("{}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+    }
+}
+
+fn preset_content(name: &str) -> Option<&'static str> {
+    match name {
+        "wordpress-core" => Some(include_str!("../presets/wordpress-core.toml")),
+        "wordpress-plugin" => Some(include_str!("../presets/wordpress-plugin.toml")),
+        "litellm" => Some(include_str!("../presets/litellm.toml")),
+        "oss-python" => Some(include_str!("../presets/oss-python.toml")),
+        "oss-monorepo" => Some(include_str!("../presets/oss-monorepo.toml")),
+        _ => None,
+    }
 }

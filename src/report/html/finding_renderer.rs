@@ -4,6 +4,10 @@ use html_escape::encode_text;
 use super::utilities::{detect_language, markdown_to_html};
 
 pub fn render_finding(finding: &VulnerabilityFinding, finding_id: usize) -> String {
+    render_finding_with_id(finding, &format!("finding-{}", finding_id))
+}
+
+pub fn render_finding_with_id(finding: &VulnerabilityFinding, finding_id: &str) -> String {
     let severity_class = match finding.severity {
         crate::findings::Severity::Critical => "critical",
         crate::findings::Severity::High => "high",
@@ -20,7 +24,7 @@ pub fn render_finding(finding: &VulnerabilityFinding, finding_id: usize) -> Stri
         "confidence-low"
     };
 
-    let finding_div_id = format!("finding-{}", finding_id);
+    let finding_div_id = finding_id.to_string();
 
     let line_info = finding
         .line_number

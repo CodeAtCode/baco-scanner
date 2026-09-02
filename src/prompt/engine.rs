@@ -8,7 +8,9 @@ use std::fs;
 
 use serde::{Deserialize, Serialize};
 
-use super::templates::{BacoPhase, DefaultPrompts, ProjectType, TemplateVariables};
+use super::templates::{
+    cwe_to_hunt_domain, BacoPhase, DefaultPrompts, ProjectType, TemplateVariables,
+};
 
 /// Configuration for prompt overrides
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -160,6 +162,15 @@ impl PromptEngine {
         let mut domains: Vec<String> = self.hunt_prompts.keys().cloned().collect();
         domains.sort();
         domains
+    }
+
+    /// Get hunt prompt content for a CWE ID
+    /// Maps CWE → hunt domain → returns the prompt module content
+    pub fn hunt_prompt_for_cwe(&self, cwe_id: &str) -> Option<String> {
+        // Use the existing CWE to domain mapping
+        let domain = cwe_to_hunt_domain(cwe_id)?;
+        // Load the hunt prompt for that domain
+        self.get_hunt_prompt(domain)
     }
 
     /// Select hunt domains based on programming languages

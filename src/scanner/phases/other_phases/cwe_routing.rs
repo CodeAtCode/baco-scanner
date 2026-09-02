@@ -31,12 +31,13 @@ pub async fn run_cwe_routing(
     let mut routed_count = 0usize;
 
     for finding in &mut findings {
-        let language = crate::report::html::utilities::detect_language(&finding.file_path);
-        let spec = router.route(&finding.cwe_id, language);
+        if let Some(cwe) = finding.cwe_id.as_deref() {
+            let route = router.route_cwe(cwe);
 
-        if let Some(ref model) = spec.model_override {
-            finding.llm_model = Some(model.clone());
-            routed_count += 1;
+            if let Some(model) = route.model_override {
+                finding.llm_model = Some(model);
+                routed_count += 1;
+            }
         }
     }
 

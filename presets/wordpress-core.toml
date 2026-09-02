@@ -1,0 +1,128 @@
+# BACO preset — WordPress core (requires T38 PHP support)
+# Usage: baco scan --config my.toml --preset wordpress-core
+
+[project]
+name = "wordpress-core"
+path = "./wordpress"
+languages = ["php", "javascript"]
+
+[scanner]
+max_file_size_kb = 256
+exclude_paths = [
+  "wp-content/*",
+  "wp-includes/js/*",
+  "wp-includes/ID3/*",
+  "wp-includes/Requests/*",
+  "wp-includes/SimplePie/*",
+  "wp-includes/Text/*",
+  "tests/*", "tools/*", "docs/*", "src/wp-includes/js/*",
+  "*.min.js",
+]
+
+[scanner.semgrep]
+config = ["p/wordpress", "p/php", "p/security"]
+
+[scanner.performance]
+enable_incremental_scan = true
+enable_llm_cache = true
+enable_root_cause_dedup = true
+enable_multi_verifier = false
+enable_variant_search = true
+enable_cve_bootstrap = true
+enable_threat_modeling = false
+
+[llm]
+timeout_secs = 90
+max_concurrent = 6
+temperature = 0.2
+
+[llm.phases.discovery]
+models = ["mistral-small"]
+
+[llm.phases.verification]
+model = "mistral-medium"
+
+[llm.phases.aggregation]
+model = "mistral-medium"
+
+[triage]
+enabled = true
+model = "mistral-small"
+batch_size = 8
+suspicion_threshold = 0.35
+include_code_in_summary = false
+
+[priority]
+entry_point_patterns = [
+  "wp-admin/admin-post.php",
+  "wp-admin/admin-ajax.php",
+  "wp-admin/includes/*",
+  "wp-admin/options.php",
+  "wp-includes/rest-api/*",
+  "wp-includes/class-wp-xmlrpc-server.php",
+  "xmlrpc.php",
+  "wp-admin/includes/file.php",
+  "wp-admin/includes/image.php",
+  "wp-includes/pluggable.php",
+  "wp-includes/user.php",
+  "wp-includes/formatting.php",
+  "wp-includes/kses.php",
+]
+sink_patterns = [
+  "$wpdb->query",
+  "$wpdb->get_results",
+  "$wpdb->prepare",
+  "unserialize(",
+  "maybe_unserialize(",
+  "eval(",
+  "create_function(",
+  "preg_replace(.*e'",
+  "$_GET",
+  "$_POST",
+  "$_REQUEST",
+  "$_FILES",
+  "$_COOKIE",
+  "wp_handle_upload",
+  "move_uploaded_file",
+  "system(",
+  "exec(",
+  "shell_exec(",
+  "passthru(",
+  "proc_open(",
+  "include(",
+  "require(",
+  "include_once",
+  "require_once",
+  "wp_redirect",
+  "wp_kses(",
+]
+churn_weight = 0.3
+
+[budget]
+enabled = true
+max_llm_calls = 600
+
+[knowledge.fp_patterns]
+"CWE-79" = [
+  "esc_html(",
+  "esc_attr(",
+  "esc_url(",
+  "wp_kses_post(",
+  "esc_textarea(",
+  "esc_js(",
+]
+"CWE-89" = ["$wpdb->prepare("]
+"CWE-352" = [
+  "check_admin_referer(",
+  "wp_verify_nonce(",
+  "check_ajax_referer(",
+]
+"CWE-862" = ["current_user_can(", "user_can(", "is_admin()"]
+
+[agent_flow]
+enabled = false
+requires_instrumented_target = false
+
+[agent]
+enabled = false
+trusted_paths = []

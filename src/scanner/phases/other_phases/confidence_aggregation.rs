@@ -4,6 +4,9 @@ use crate::error::ScanResult;
 use crate::findings::VulnerabilityFinding;
 use crate::scanner::phases::PhaseConfig;
 
+/// Project baseline file name.
+const PROJECT_BASELINE_FILE: &str = "project-baseline.json";
+
 /// Run confidence scoring phase (phase 14 of 24).
 pub async fn run_confidence_scoring(
     _scanner: &crate::scanner::Scanner,
@@ -29,8 +32,17 @@ pub async fn run_confidence_scoring(
 
     tracing::info!("Running confidence refinement phase...");
 
-    // Load analysis context
+    // Load project baseline if present
     let output_path = PathBuf::from(&config.output.dir);
+    let baseline_path = output_path.join(PROJECT_BASELINE_FILE);
+    let mut baseline = crate::confidence_refinement::ProjectBaseline::load(&baseline_path);
+    tracing::info!(
+        "Loaded project baseline: {} findings, {:.1}% FP rate",
+        baseline.total_findings,
+        baseline.false_positive_rate() * 100.0
+    );
+
+    // Load analysis context
     let context = if output_path.exists() {
         match crate::analysis_context::AnalysisContext::load(&output_path) {
             Ok(ctx) => ctx,
@@ -66,6 +78,23 @@ pub async fn run_confidence_scoring(
             ));
             updated_findings.push(updated);
         }
+    }
+
+    // Update baseline with this run's findings (simplified: treat all as potential TP)
+    // In a full implementation, this would use triage outcomes
+    for finding in &updated_findings {
+        // For now, just count findings - real FP tracking requires triage feedback
+        baseline.update(finding.confidence_score, true);
+    }
+
+    // Save updated baseline
+    if let Err(e) = baseline.save(&baseline_path) {
+        tracing::warn!("Failed to save project baseline: {}", e);
+    } else {
+        tracing::info!(
+            "Saved updated project baseline: {} findings total",
+            baseline.total_findings
+        );
     }
 
     pb.set_position(pb.position() + 100);

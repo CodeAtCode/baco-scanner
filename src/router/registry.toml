@@ -2,11 +2,15 @@
 enabled = false
 default_prompt = "llm_static_analysis"
 
-[router.cwe_overrides]
-"79" = { prompt_template = "xss_specialized", model_override = null }
-"89" = { prompt_template = "sqli_specialized", model_override = null }
-"120" = { prompt_template = "buffer_overflow_specialized", model_override = null }
-
-[router.language_overrides]
-"c" = { prompt_template = "c_specialized", model_override = null }
-"rust" = { prompt_template = "rust_specialized", model_override = null }
+# Domain-based routing: each hunt domain maps to model_override (optional)
+# Router uses cwe_to_hunt_domain() to map CWE IDs to these domains
+[router.domains]
+"injection" = {}
+"xss" = {}
+"auth" = {}
+"authz_absence" = {}
+"path_traversal" = {}
+"crypto" = {}
+"resource" = {}
+"deserialization" = {}
+"memory_safety" = {}

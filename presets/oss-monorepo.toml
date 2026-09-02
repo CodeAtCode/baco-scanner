@@ -1,0 +1,108 @@
+# BACO preset — Generic large OSS / monorepo
+[project]
+name = "oss-monorepo"
+languages = ["c", "cpp", "python", "javascript", "rust"]
+
+[scanner]
+max_file_size_kb = 512
+exclude_paths = [
+  "node_modules/*",
+  "vendor/*",
+  "third_party/*",
+  "thirdparty/*",
+  "external/*",
+  "deps/*",
+  "submodules/*",
+  "tests/*",
+  "test/*",
+  "testing/*",
+  "spec/*",
+  "e2e/*",
+  "fixtures/*",
+  "docs/*",
+  "examples/*",
+  "samples/*",
+  "demo/*",
+  "benchmarks/*",
+  "dist/*",
+  "build/*",
+  "out/*",
+  "target/*",
+  ".venv/*",
+  "site-packages/*",
+  "*.min.js",
+  "*.bundle.js",
+  "*.map",
+  "*_pb2.py",
+  "*.pb.cc",
+  "*.pb.h",
+]
+
+[scanner.performance]
+enable_incremental_scan = true
+enable_llm_cache = true
+enable_multi_verifier = false
+
+[llm.phases.discovery]
+models = ["mistral-small"]
+
+[llm.phases.verification]
+model = "mistral-medium"
+
+[triage]
+enabled = true
+batch_size = 10
+suspicion_threshold = 0.40
+
+[priority]
+entry_point_patterns = [
+  "main.c",
+  "main.rs",
+  "main.py",
+  "index.js",
+  "app.py",
+  "server.py",
+  "cli/",
+  "api/",
+  "routes/",
+  "controllers/",
+  "handlers/",
+  "endpoints/",
+  "servlet",
+  "cmd/",
+]
+sink_patterns = [
+  "strcpy",
+  "strcat",
+  "sprintf",
+  "memcpy",
+  "gets(",
+  "system(",
+  "exec",
+  "popen",
+  "shell=True",
+  "eval(",
+  "unserialize",
+  "SELECT",
+  "query(",
+  "execute(",
+  "innerHTML",
+  "dangerouslySetInnerHTML",
+  "document.write",
+  "os.system",
+  "subprocess",
+  "open(",
+]
+churn_weight = 0.4
+
+[budget]
+enabled = true
+max_llm_calls = 1000
+
+[agent_flow]
+enabled = false
+requires_instrumented_target = false
+
+[agent]
+enabled = false
+trusted_paths = []

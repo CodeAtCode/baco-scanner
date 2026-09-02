@@ -28,6 +28,7 @@ pub type Result<T> = std::result::Result<T, CveBootstrapError>;
 pub struct CveBootstrapper {
     project_root: String,
     client: CveClient,
+    cpe_hint: Option<String>,
 }
 
 impl CveBootstrapper {
@@ -35,6 +36,16 @@ impl CveBootstrapper {
         Self {
             project_root,
             client: CveClient::new(),
+            cpe_hint: None,
+        }
+    }
+
+    /// Create a new bootstrapper with an optional CPE hint for CVE filtering
+    pub fn with_cpe_hint(project_root: String, cpe_hint: Option<String>) -> Self {
+        Self {
+            project_root,
+            client: CveClient::new(),
+            cpe_hint,
         }
     }
 
@@ -269,6 +280,24 @@ impl CveBootstrapper {
     pub async fn fetch_relevant_cves(&self, stack: &ProjectStack) -> Result<Vec<CveEntry>> {
         let mut all_cves = Vec::new();
 
+        // If CPE hint is set, use it for CVE matching
+        if let Some(cpe) = &self.cpe_hint {
+            // Parse CPE format: cpe:2.3:a:vendor:product:version:*:*:*:*:*:*:*
+            let parts: Vec<&str> = cpe.split(':').collect();
+            if parts.len() >= 5 {
+                let vendor = parts[3];
+                let product = parts[4];
+
+                match self.client.fetch_nvd_cves(vendor, product).await {
+                    Ok(cves) => all_cves.extend(cves),
+                    Err(e) => {
+                        warn!("Failed to fetch CVEs for CPE {}: {}", cpe, e);
+                    }
+                }
+            }
+        }
+
+        // Also fetch CVEs based on dependency name matching
         for dep in &stack.dependencies {
             let parts: Vec<&str> = dep.name.split('/').collect();
             let (vendor, product) = if parts.len() >= 2 {

@@ -33,7 +33,7 @@ fn test_missing_check_id_field() {
         ]
     });
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner
         .parse_json_output(mock_json.to_string().as_bytes())
         .unwrap();
@@ -62,7 +62,7 @@ fn test_missing_extra_block() {
         ]
     });
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner
         .parse_json_output(mock_json.to_string().as_bytes())
         .unwrap();
@@ -85,7 +85,7 @@ fn test_empty_results_array() {
         "results": []
     });
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner
         .parse_json_output(mock_json.to_string().as_bytes())
         .unwrap();
@@ -112,7 +112,7 @@ fn test_malformed_start_missing_line() {
         ]
     });
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner
         .parse_json_output(mock_json.to_string().as_bytes())
         .unwrap();
@@ -136,7 +136,7 @@ fn test_malformed_start_empty_object() {
         ]
     });
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner
         .parse_json_output(mock_json.to_string().as_bytes())
         .unwrap();
@@ -160,7 +160,7 @@ fn test_malformed_start_null_value() {
         ]
     });
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner
         .parse_json_output(mock_json.to_string().as_bytes())
         .unwrap();
@@ -188,7 +188,7 @@ fn test_invalid_line_number_zero() {
         ]
     });
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner
         .parse_json_output(mock_json.to_string().as_bytes())
         .unwrap();
@@ -211,7 +211,7 @@ fn test_invalid_line_number_negative() {
         ]
     }"#;
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     // Negative line number won't parse as u64, so result should be skipped
     let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
 
@@ -233,7 +233,7 @@ fn test_invalid_line_number_non_integer() {
         ]
     }"#;
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     // String line number won't parse as u64, so result should be skipped
     let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
 
@@ -255,7 +255,7 @@ fn test_invalid_line_number_float() {
         ]
     }"#;
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     // Float line number won't parse as u64, so result should be skipped
     let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
 
@@ -282,7 +282,7 @@ fn test_nested_missing_metadata() {
         ]
     });
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner
         .parse_json_output(mock_json.to_string().as_bytes())
         .unwrap();
@@ -312,7 +312,7 @@ fn test_nested_missing_cwe_array() {
         ]
     });
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner
         .parse_json_output(mock_json.to_string().as_bytes())
         .unwrap();
@@ -340,7 +340,7 @@ fn test_nested_empty_cwe_array() {
         ]
     });
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner
         .parse_json_output(mock_json.to_string().as_bytes())
         .unwrap();
@@ -368,7 +368,7 @@ fn test_nested_null_metadata() {
         ]
     });
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner
         .parse_json_output(mock_json.to_string().as_bytes())
         .unwrap();
@@ -400,7 +400,7 @@ fn test_very_long_check_id() {
         ]
     });
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner
         .parse_json_output(mock_json.to_string().as_bytes())
         .unwrap();
@@ -429,7 +429,7 @@ fn test_very_long_message() {
         ]
     });
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner
         .parse_json_output(mock_json.to_string().as_bytes())
         .unwrap();
@@ -459,7 +459,7 @@ fn test_very_long_file_path() {
         ]
     });
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner
         .parse_json_output(mock_json.to_string().as_bytes())
         .unwrap();
@@ -493,7 +493,7 @@ fn test_unicode_in_file_path() {
         ]
     });
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner
         .parse_json_output(mock_json.to_string().as_bytes())
         .unwrap();
@@ -524,7 +524,7 @@ fn test_unicode_in_check_id() {
         ]
     });
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner
         .parse_json_output(mock_json.to_string().as_bytes())
         .unwrap();
@@ -548,7 +548,7 @@ fn test_unicode_in_message() {
         ]
     });
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner
         .parse_json_output(mock_json.to_string().as_bytes())
         .unwrap();
@@ -576,7 +576,7 @@ fn test_unicode_cwe_metadata() {
         ]
     });
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner
         .parse_json_output(mock_json.to_string().as_bytes())
         .unwrap();
@@ -603,7 +603,7 @@ fn test_mixed_unicode_and_ascii() {
         ]
     });
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner
         .parse_json_output(mock_json.to_string().as_bytes())
         .unwrap();

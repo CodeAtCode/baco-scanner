@@ -15,6 +15,11 @@ use crate::llm_analysis::LlmAnalyzer;
 use crate::retrieval::CweKnowledgeBase;
 use std::collections::HashSet;
 
+/// Triage decision: files at or above the suspicion threshold go to deep analysis
+pub fn should_analyze_file(suspicion: f32, threshold: f32) -> bool {
+    suspicion >= threshold
+}
+
 /// Run policy sampling for a single file (VulnLLM-R P2.2)
 /// Returns a set of CWE IDs collected from multiple high-temperature samples
 async fn run_policy_sampling(
@@ -132,26 +137,14 @@ pub async fn run_llm_static_analysis(
         phase_config.api_key
     );
 
-    if let Some(api_key) = &phase_config.api_key {
-        let discovery_timeout = phase_config.timeout_secs.unwrap_or(config.llm.timeout_secs);
+    if let Some(_api_key) = &phase_config.api_key {
+        let _discovery_timeout = phase_config.timeout_secs.unwrap_or(config.llm.timeout_secs);
 
         // Enable steady tick for progress bar timer
         pb.enable_steady_tick(std::time::Duration::from_millis(100));
 
-        let llm_config = llm::LlmConfig {
-            base_url: phase_config.base_url.clone(),
-            api_key: api_key.clone(),
-            model: phase_config.model.clone(),
-            models: phase_config.get_models(),
-            timeout: discovery_timeout,
-            max_retries: config.llm.max_retries as u32,
-            retry_backoff_ms: config.llm.retry_backoff_ms,
-            temperature: 0.5,
-            max_reasoning_tokens: config.llm.max_reasoning_tokens,
-            enable_llm_cache: false,
-            cache_dir: None,
-            max_concurrent: 3,
-        };
+        // Use unified LLM config construction helper (T26)
+        let llm_config = llm::phase_llm_config(config, "static_analysis", None);
 
         let client =
             crate::llm::LlmClient::with_metrics(llm_config.clone(), Some(metrics_tracker.clone()));
@@ -176,7 +169,70 @@ pub async fn run_llm_static_analysis(
         // Get max_context_tokens for PacVD auto-level selection
         let max_context_tokens = config.llm.max_reasoning_tokens.unwrap_or(32768);
 
-        for (i, file_info) in files.iter().enumerate() {
+        // Triage cascade (T17): filter files before deep analysis
+        let (files_to_analyze, skipped_files) = if config.triage.enabled {
+            run_triage_cascade(
+                &client,
+                &config.triage.model,
+                files,
+                analyzed_files,
+                config.triage.batch_size,
+                config.triage.suspicion_threshold,
+            )
+            .await
+        } else {
+            (files.iter().collect(), Vec::new())
+        };
+
+        if !skipped_files.is_empty() {
+            tracing::info!(
+                "[Triage] Skipped {} files (suspicion < {} threshold)",
+                skipped_files.len(),
+                config.triage.suspicion_threshold
+            );
+            for f in &skipped_files {
+                tracing::debug!("[Triage] Skipped: {}", f);
+            }
+        }
+
+        // Priority scoring (T18): sort files by priority score
+        let prioritized_files: Vec<_> = if config.priority.enabled {
+            let mut scored: Vec<_> = files_to_analyze
+                .iter()
+                .map(|f| {
+                    let score = compute_file_priority_score(
+                        f,
+                        config.priority.git_recent_boost,
+                        config.priority.entry_point_boost,
+                        config.priority.small_file_boost,
+                    );
+                    (f, score)
+                })
+                .collect();
+            scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            scored.into_iter().map(|(f, _)| *f).collect::<Vec<_>>()
+        } else {
+            files_to_analyze.to_vec()
+        };
+
+        // Budget enforcement (T18): track LLM calls and enforce limits
+        let mut llm_call_count = 0;
+        let max_calls = if config.budget.enabled {
+            config.budget.max_llm_calls
+        } else {
+            usize::MAX
+        };
+        let reserve_percent = if config.budget.enabled {
+            config.budget.reserve_percent_for_high_risk as f32 / 100.0
+        } else {
+            0.0
+        };
+        // Reserve capacity that only high-risk (entry-point) files may consume
+        let normal_cap = max_calls.saturating_sub((max_calls as f32 * reserve_percent) as usize);
+        let mut high_risk_count = 0;
+        let mut skipped_by_budget = Vec::new();
+
+        for (i, file_info) in prioritized_files.iter().enumerate() {
             let file_path_str = file_info.path.to_string_lossy().to_string();
             if analyzed_files.contains(&file_path_str) {
                 let progress_pct = ((i as f64 / file_count as f64) * 100.0) as u64;
@@ -316,6 +372,31 @@ pub async fn run_llm_static_analysis(
                 analyzer = analyzer.with_context_prefix(ctx);
             }
 
+            // Budget enforcement (T18): normal files stop at normal_cap;
+            // the reserve is only available to high-risk (entry-point) files
+            let file_name = file_info
+                .path
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_default();
+            let is_high_risk = ["main.", "index.", "app.", "server.", "__init__."]
+                .iter()
+                .any(|p| file_name.contains(p));
+            let file_cap = if is_high_risk { max_calls } else { normal_cap };
+            if llm_call_count >= file_cap {
+                skipped_by_budget.push(file_path_str.clone());
+                tracing::debug!(
+                    "[Budget] Skipping {} (cap={}, max_llm_calls={})",
+                    file_path_str,
+                    file_cap,
+                    max_calls
+                );
+                continue;
+            }
+            if is_high_risk && llm_call_count >= normal_cap {
+                high_risk_count += 1;
+            }
+
             match analyzer.analyze_file(&file_info.path).await {
                 Ok(file_findings) => {
                     // Wire vuln_spec retriever if enabled
@@ -353,6 +434,7 @@ pub async fn run_llm_static_analysis(
                     };
                     llm_findings.extend(file_findings);
                     new_analyzed_files.push(file_path_str);
+                    llm_call_count += 1;
                     let msg = format!(
                         "Phase {}/{}: LLM analyzing [{}/{}] ({:.0}%): {} - {} findings total",
                         phase_num,
@@ -403,9 +485,248 @@ pub async fn run_llm_static_analysis(
             total,
             llm_findings.len()
         ));
+
+        // Log budget summary
+        log_budget_summary(
+            llm_call_count,
+            max_calls,
+            &skipped_by_budget,
+            high_risk_count,
+        );
     } else {
         tracing::debug!("No API key for LLM analysis, skipping static analysis");
     }
 
     Ok((findings, analyzed_files.to_vec()))
+}
+
+/// Triage finding structure for structured output (T17)
+#[derive(Debug, serde::Deserialize)]
+struct TriageFinding {
+    file: String,
+    summary_one_line: String,
+    suspicion: f32,
+    reason: String,
+}
+
+/// Triage response wrapper
+#[derive(Debug, serde::Deserialize)]
+struct TriageResponse {
+    findings: Vec<TriageFinding>,
+}
+
+/// Run triage cascade to filter files before deep analysis (T17)
+async fn run_triage_cascade<'a>(
+    client: &crate::llm::LlmClient,
+    _triage_model: &str,
+    files: &'a [crate::indexer::FileInfo],
+    analyzed_files: &[String],
+    batch_size: u8,
+    suspicion_threshold: f32,
+) -> (Vec<&'a crate::indexer::FileInfo>, Vec<String>) {
+    use serde::Serialize;
+
+    #[derive(Serialize)]
+    struct TriageRequest {
+        files: Vec<TriageFile>,
+    }
+
+    #[derive(Serialize, Clone)]
+    struct TriageFile {
+        path: String,
+        content_snippet: String,
+    }
+
+    let mut files_to_analyze = Vec::new();
+    let mut skipped_files = Vec::new();
+
+    // Process files in batches
+    let mut batch_start = 0;
+    while batch_start < files.len() {
+        let batch_end = std::cmp::min(batch_start + batch_size as usize, files.len());
+        let batch = &files[batch_start..batch_end];
+
+        // Build batch request
+        let batch_files: Vec<TriageFile> = batch
+            .iter()
+            .filter(|f| !analyzed_files.contains(&f.path.to_string_lossy().to_string()))
+            .map(|f| {
+                let content = std::fs::read_to_string(&f.path).unwrap_or_default();
+                let snippet = content.lines().take(30).collect::<Vec<_>>().join(" ");
+                TriageFile {
+                    path: f.path.to_string_lossy().to_string(),
+                    content_snippet: snippet,
+                }
+            })
+            .collect();
+
+        if batch_files.is_empty() {
+            batch_start = batch_end;
+            continue;
+        }
+
+        // Build triage prompt
+        let request = TriageRequest {
+            files: batch_files.clone(),
+        };
+
+        let prompt = format!(
+            r#"Analyze these files for security-relevant patterns. For each file, provide:
+- file: the file path
+- summary_one_line: one-line summary of what the file does
+- suspicion: float 0.0-1.0 indicating likelihood of security issues
+- reason: brief explanation of the suspicion score
+
+Respond with JSON in this exact format:
+{{"findings": [{{"file": "path", "summary_one_line": "...", "suspicion": 0.5, "reason": "..."}}]}}
+
+Files to analyze:
+{}"#,
+            serde_json::to_string_pretty(&request).unwrap_or_default()
+        );
+
+        let messages = vec![
+            crate::llm::ChatMessage::system("You are a security triage assistant. Be conservative - only flag files with clear security relevance."),
+            crate::llm::ChatMessage::user(&prompt),
+        ];
+
+        match client.chat(&messages).await {
+            Ok(response) => {
+                // Parse structured response
+                let cleaned = response
+                    .content
+                    .trim()
+                    .trim_start_matches("```json")
+                    .trim_start_matches("```")
+                    .trim_end_matches("```")
+                    .trim_end_matches("~~~")
+                    .trim();
+
+                match serde_json::from_str::<TriageResponse>(cleaned) {
+                    Ok(triage_response) => {
+                        for finding in triage_response.findings {
+                            if should_analyze_file(finding.suspicion, suspicion_threshold) {
+                                // Find the original file info
+                                if let Some(file_info) = batch
+                                    .iter()
+                                    .find(|f| f.path.to_string_lossy() == finding.file)
+                                {
+                                    files_to_analyze.push(file_info);
+                                    tracing::debug!(
+                                        "[Triage] File {} passed (suspicion: {}) — {}",
+                                        finding.file,
+                                        finding.suspicion,
+                                        finding.summary_one_line
+                                    );
+                                }
+                            } else {
+                                let file_path = finding.file.clone();
+                                skipped_files.push(file_path.clone());
+                                tracing::debug!(
+                                    "[Triage] File {} skipped (suspicion: {} < threshold: {}) — {}",
+                                    file_path,
+                                    finding.suspicion,
+                                    suspicion_threshold,
+                                    finding.reason
+                                );
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to parse triage response: {}", e);
+                        // Fallback: analyze all files in batch
+                        for f in batch {
+                            if !analyzed_files.contains(&f.path.to_string_lossy().to_string()) {
+                                files_to_analyze.push(f);
+                            }
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                tracing::warn!("Triage request failed: {}", e);
+                // Fallback: analyze all files in batch
+                for f in batch {
+                    if !analyzed_files.contains(&f.path.to_string_lossy().to_string()) {
+                        files_to_analyze.push(f);
+                    }
+                }
+            }
+        }
+
+        batch_start = batch_end;
+    }
+
+    (files_to_analyze, skipped_files)
+}
+
+/// Compute priority score for a file (T18)
+/// Returns a score based on: entry-point status, recent modification, and file size
+pub fn compute_file_priority_score(
+    file_info: &crate::indexer::FileInfo,
+    git_recent_boost: f32,
+    entry_point_boost: f32,
+    small_file_boost: f32,
+) -> f32 {
+    let mut score = 1.0;
+    let _path_str = file_info.path.to_string_lossy().to_string();
+    let filename = file_info
+        .path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
+
+    // Entry-point boost: main.*, index.*, app.*, server.*, __init__.*
+    let entry_point_patterns = [
+        "main.",
+        "index.",
+        "app.",
+        "server.",
+        "__init__.",
+        "__main__.",
+    ];
+    if entry_point_patterns.iter().any(|p| filename.starts_with(p)) {
+        score *= entry_point_boost;
+    }
+
+    // Recent modification boost (mtime < 7 days)
+    if let Ok(metadata) = std::fs::metadata(&file_info.path) {
+        if let Ok(modified) = metadata.modified() {
+            let now = std::time::SystemTime::now();
+            if let Ok(elapsed) = now.duration_since(modified) {
+                if elapsed.as_secs() < 7 * 24 * 60 * 60 {
+                    // 7 days
+                    score *= git_recent_boost;
+                }
+            }
+        }
+    }
+
+    // Small file boost (< 10KB)
+    if file_info.size < 10 * 1024 {
+        score *= small_file_boost;
+    }
+
+    score
+}
+
+/// Log budget summary (T18)
+fn log_budget_summary(
+    llm_call_count: usize,
+    max_calls: usize,
+    skipped_by_budget: &[String],
+    high_risk_protected: usize,
+) {
+    if !skipped_by_budget.is_empty() || llm_call_count > 0 {
+        tracing::info!(
+            "[Budget] LLM calls: {}/{} ({} skipped by budget, {} high-risk protected by reserve)",
+            llm_call_count,
+            max_calls,
+            skipped_by_budget.len(),
+            high_risk_protected
+        );
+        for f in skipped_by_budget {
+            tracing::debug!("[Budget] Skipped: {}", f);
+        }
+    }
 }

@@ -7,7 +7,56 @@ use crate::llm;
 use crate::org_context;
 use crate::prompt::engine::PromptEngine;
 use crate::scanner::phases::PhaseConfig;
+use std::collections::HashMap;
 use std::sync::Arc;
+
+/// Build stable prefix for discovery prompt (byte-stable across findings in same phase)
+/// Returns the prefix that should be cached by LLM providers.
+pub fn build_stable_discovery_prefix(
+    _findings: &[VulnerabilityFinding],
+    hunt_prompts: &HashMap<String, String>,
+) -> String {
+    let mut prefix = String::from(
+        "You are a security vulnerability analyzer. Output valid JSON only.\n\n\
+         Enrich the following security findings with descriptions and recommendations.\n\
+         Return JSON with format:\n\
+         {\n\
+           \"description\": \"Detailed explanation of the vulnerability\",\n\
+           \"fix_code\": \"The secure version of the code or fix suggestion\"\n\
+         }\n\n",
+    );
+
+    // Add hunt domain guidance (stable within phase)
+    for (domain, hunt_prompt) in hunt_prompts {
+        if !hunt_prompt.is_empty() {
+            prefix.push_str(&format!(
+                "=== HUNT MODULE: {} ===\n{}\n=== END HUNT MODULE ===\n\n",
+                domain, hunt_prompt
+            ));
+        }
+    }
+
+    prefix
+}
+
+/// Build volatile tail for discovery prompt (finding-specific content)
+pub fn build_volatile_discovery_tail(finding: &VulnerabilityFinding) -> String {
+    format!(
+        r#"Vulnerability: {}
+Location: {}:{}
+Current description: {}
+
+Respond with ONLY JSON:
+{{
+  "description": "Enriched description",
+  "fix_code": "The secure version of the code"
+}}"#,
+        finding.title,
+        finding.file_path,
+        finding.line_number.unwrap_or(0),
+        finding.description
+    )
+}
 
 /// Run LLM discovery phase (phase 7 of 24).
 pub async fn run_llm_discovery(
@@ -121,8 +170,25 @@ pub async fn run_llm_discovery(
     // Note: This requires access to scanner state, caller should handle this
 
     // Step 2: Continue with LLM discovery/enrichment
-    if let Some(_api_key) = &config.llm.phases.discovery.api_key {
+    // Partition findings: already-described (LlmAnalysis evidence) vs needing discovery
+    let needs_discovery: Vec<_> = findings
+        .drain(..)
+        .filter(|f| {
+            !f.evidence
+                .iter()
+                .any(|e| matches!(e.source, crate::evidence::EvidenceSource::LlmAnalysis(_)))
+        })
+        .collect();
+    let already_described_count = findings.len();
+
+    let enriched_findings = if let Some(_api_key) = &config.llm.phases.discovery.api_key {
         tracing::debug!("API key configured, running discovery");
+
+        tracing::info!(
+            "Skipping {} findings as already-described; {} findings need discovery",
+            already_described_count,
+            needs_discovery.len()
+        );
 
         // Enable steady tick for progress bar timer
         pb.enable_steady_tick(std::time::Duration::from_millis(100));
@@ -185,11 +251,12 @@ pub async fn run_llm_discovery(
             None
         };
 
-        // Enrich each finding's description
-        let total_findings = findings.len();
+        // Enrich findings that need discovery
+        let total_findings = needs_discovery.len();
         let use_agent_mode = config.agent.enabled;
 
-        for (i, finding) in findings.iter_mut().enumerate() {
+        let mut enriched_findings = Vec::with_capacity(total_findings);
+        for (i, mut finding) in needs_discovery.into_iter().enumerate() {
             let progress_pct = if total_findings > 0 {
                 ((i as f64 / total_findings as f64) * 100.0) as u64
             } else {
@@ -247,34 +314,28 @@ pub async fn run_llm_discovery(
                     }
                 }
             } else {
-                // Simple mode: also request fix_code in JSON format
-                let mut user_prompt = format!(
-                    r#"Vulnerability: {}
-Location: {}:{}
-Current description: {}
+                // Build stable prefix + volatile tail for prompt caching
+                // Convert hunt_context to HashMap for the stable prefix helper
+                let hunt_prompts: HashMap<String, String> = if let Some(ref hunt_ctx) = hunt_context
+                {
+                    // Simple conversion: use "discovery" as the domain key
+                    HashMap::from([("discovery".to_string(), hunt_ctx.clone())])
+                } else {
+                    HashMap::new()
+                };
 
-Respond with ONLY JSON:
-{{
-  "description": "Enriched description",
-  "fix_code": "The secure version of the code"
-}}"#,
-                    finding.title,
-                    finding.file_path,
-                    finding.line_number.unwrap_or(0),
-                    finding.description
-                );
+                let stable_prefix =
+                    build_stable_discovery_prefix(std::slice::from_ref(&finding), &hunt_prompts);
+                let volatile_tail = build_volatile_discovery_tail(&finding);
 
-                // Prepend prior runs skip list if available
+                let mut user_prompt = format!("{}{}", stable_prefix, volatile_tail);
+
+                // Prepend prior runs skip list if available (semi-stable: stable within scan)
                 if let Some(ref skip_list) = prior_skip_list {
                     user_prompt = format!("{}\n\n{}", skip_list, user_prompt);
                 }
 
-                // Append hunt context if available
-                if let Some(ref hunt_ctx) = hunt_context {
-                    user_prompt.push_str(hunt_ctx);
-                }
-
-                // Append org-context block if available
+                // Append org-context block if available (semi-stable: stable per scan)
                 if let Some(ref org_ctx) = org_context::render(&config.org_context) {
                     user_prompt.push_str("\n\n");
                     user_prompt.push_str(org_ctx);
@@ -304,19 +365,30 @@ Respond with ONLY JSON:
                     }
                 }
             }
+            enriched_findings.push(finding);
         }
         pb.set_position(base + 100);
         pb.set_message(format!(
             "Phase {}/{}: Discovery complete - enriched {} findings",
-            phase_num, total, total_findings
+            phase_num,
+            total,
+            enriched_findings.len()
         ));
+        enriched_findings
     } else {
         tracing::debug!("No API key for discovery, skipping LLM enrichment");
+        tracing::info!(
+            "Skipping {} findings as already-described; {} findings would need discovery (no API key)",
+            already_described_count,
+            needs_discovery.len()
+        );
         pb.set_message(format!(
             "Phase {}/{}: No API key configured - skipping discovery",
             phase_num, total
         ));
         pb.set_position(base + 100);
-    }
-    Ok((findings, analyzed_files.to_vec()))
+        needs_discovery
+    };
+
+    Ok((enriched_findings, analyzed_files.to_vec()))
 }

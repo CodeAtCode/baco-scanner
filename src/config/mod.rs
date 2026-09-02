@@ -50,6 +50,12 @@ pub struct ScannerConfig {
     #[serde(default)]
     pub vultriage: VultriageConfig,
     #[serde(default)]
+    pub triage: TriageConfig,
+    #[serde(default)]
+    pub priority: PriorityConfig,
+    #[serde(default)]
+    pub budget: BudgetConfig,
+    #[serde(default)]
     pub policy_sampling: PolicySamplingConfig,
     #[serde(default)]
     pub agent_scaffold: AgentScaffoldConfig,
@@ -209,7 +215,9 @@ impl ScannerConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ProjectConfig {
+    #[serde(default)]
     pub name: String,
+    #[serde(default)]
     pub path: String,
     #[serde(default)]
     pub languages: Vec<String>,
@@ -217,6 +225,7 @@ pub struct ProjectConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct OutputConfig {
+    #[serde(default)]
     pub dir: String,
     #[serde(default)]
     pub evidence_gate: bool,
@@ -304,4 +313,36 @@ pub struct OrgContextConfig {
 
 pub fn default_llm_static_analysis() -> String {
     "llm_static_analysis".to_string()
+}
+
+pub fn default_triage_model() -> String {
+    "mistral-small".to_string()
+}
+
+pub fn default_triage_batch_size() -> u8 {
+    8
+}
+
+pub fn default_triage_threshold() -> f32 {
+    0.35
+}
+
+pub fn default_priority_git_recent_boost() -> f32 {
+    2.0
+}
+
+pub fn default_priority_entry_point_boost() -> f32 {
+    1.5
+}
+
+pub fn default_priority_small_file_boost() -> f32 {
+    1.2
+}
+
+pub fn default_budget_max_llm_calls() -> usize {
+    200
+}
+
+pub fn default_budget_reserve_percent() -> u8 {
+    20
 }

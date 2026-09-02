@@ -34,6 +34,13 @@ max_file_size_kb = 512
 exclude_paths = ["tests/", "docs/", "target/"]
 
 [scanner.semgrep]
+# Rulesets can be a single string or an array of strings
+# Each ruleset will be passed as a separate --config argument to semgrep
+# Empty array preserves default behavior (uses bundled/default ruleset)
+rulesets = [
+    # "p/python",  # Example: Python security rules
+    # "p/javascript",  # Example: JavaScript security rules
+]
 exclude_rules = ["html.security.plaintext-http-link", "html.security.plaintext-http-link.plaintext-http-link"]
 
 [scanner.performance]
@@ -74,6 +81,11 @@ enable_confidence_refinement = true
 # CVE bootstrap (enriches findings with CVE data from external sources)
 # Default: true
 enable_cve_bootstrap = true
+# Optional CPE hint for CVE filtering (e.g., "cpe:2.3:a:vendor:product")
+# When set, CVE queries will include this CPE as an additional match source
+# A CVE whose CPE references the hinted vendor/product is considered relevant
+# regardless of package-name matching
+# cpe_hint = "cpe:2.3:a:microsoft:internet_explorer:11.0:*:*:*:*:*:*:*"
 # Variant search (searches for variant instances of the same vulnerability pattern)
 # Default: true
 enable_variant_search = true

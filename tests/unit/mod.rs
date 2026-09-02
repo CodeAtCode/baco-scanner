@@ -4,9 +4,18 @@
 
 pub mod common;
 
+// Error taxonomy tests (T27)
+mod error_taxonomy_tests;
+
 // Include centralized fixtures
 mod fixtures;
 pub use fixtures::*;
+
+// Glob-based exclusion matcher tests
+mod glob_exclude_tests;
+mod prompt_prefix_stability_tests;
+mod router_hunt_wiring_tests;
+mod triage_rag_tests;
 
 // Include git_analysis module tests
 mod git_analysis;
@@ -116,10 +125,17 @@ mod retrieval_tests;
 mod scanner_types_tests;
 
 // Additional coverage: scanner phases, pipeline, report/html
+mod dry_run_tests;
+mod eval_tests;
+mod html_report_assets_tests;
+mod llm_request_count_tests;
+mod php_support_tests;
 mod pipeline_tests;
 mod rejected_findings_tests;
 mod report_html_tests;
 mod root_cause_dedup_phase_tests;
+mod scan_diff_tests;
+mod semgrep_ruleset_cpe_tests;
 
 // Exploit test helpers
 mod exploit_test_helpers;
@@ -218,6 +234,9 @@ mod context_triple_path_tests;
 mod html_finding_renderer_tests;
 mod html_renderer_tests;
 
+// Markdown report unit tests
+mod markdown_report_tests;
+
 // Coverage gap closure: indexer, file_hash, incremental_scan, rate_limiter, phases
 mod confidence_aggregation_tests;
 mod file_hash_tests;
@@ -256,6 +275,9 @@ mod truncate_code_tests;
 // LLM client infrastructure tests (cache, retry policy)
 mod llm_client_infra_tests;
 
+// Structured output and unified config tests (T16, T26)
+mod llm_structured_output_tests;
+
 // Structural dedup tests
 mod structural_dedup_tests;
 
@@ -273,3 +295,13 @@ mod org_context_tests;
 
 // Hunt-module scope/skeptical-gate prompt structure tests
 mod prompt_scope_tests;
+
+// Batch LLM processing tests (T14)
+mod batch_llm_phases_tests;
+mod discovery_skip_baseline_tests;
+
+// Priority, budget, and chunking tests (T18, T19)
+mod budget_chunk_tests;
+
+// Preset system tests (T39-T42)
+mod preset_tests;

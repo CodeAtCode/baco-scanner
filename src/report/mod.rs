@@ -6,6 +6,7 @@ pub mod aggregation;
 pub mod ai_aggregation;
 pub mod html;
 pub mod json;
+pub mod markdown;
 pub mod sarif;
 
 /// Apply evidence gate filter to findings.

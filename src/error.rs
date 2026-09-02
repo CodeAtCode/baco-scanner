@@ -1,8 +1,87 @@
 use thiserror::Error;
 
+/// Retryability classification for pipeline errors
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Retryable {
+    /// Retryable error (Network/Timeout/RateLimit)
+    Yes,
+    /// Non-retryable error (Auth/Config/Parse)
+    No,
+}
+
 /// Top-level error type for BACO scanner operations
+///
+/// Provides typed error taxonomy with retryability classification and phase context.
+/// Use `is_retryable()` to check if an error should be retried, and `with_phase()`
+/// to attach phase context to errors.
 #[derive(Error, Debug)]
 pub enum ScanError {
+    /// Authentication failure (401/403) - non-retryable
+    #[error("Authentication failed: {message}")]
+    Auth {
+        message: String,
+        #[source]
+        source: Option<Box<dyn std::error::Error + Send + Sync + 'static>>,
+    },
+
+    /// Configuration error - non-retryable
+    #[error("Configuration error: {message}")]
+    Config {
+        message: String,
+        #[source]
+        source: Option<Box<dyn std::error::Error + Send + Sync + 'static>>,
+    },
+
+    /// Parse/serialization error - non-retryable
+    #[error("Parse error: {message}")]
+    Parse {
+        message: String,
+        #[source]
+        source: Option<Box<dyn std::error::Error + Send + Sync + 'static>>,
+    },
+
+    /// Network error - retryable
+    #[error("Network error: {message}")]
+    Network {
+        message: String,
+        #[source]
+        source: Option<Box<dyn std::error::Error + Send + Sync + 'static>>,
+    },
+
+    /// Timeout error - retryable
+    #[error("Timeout error: {message}")]
+    Timeout {
+        message: String,
+        #[source]
+        source: Option<Box<dyn std::error::Error + Send + Sync + 'static>>,
+    },
+
+    /// Rate limit error (429) - retryable
+    #[error("Rate limit exceeded: {message}")]
+    RateLimit {
+        message: String,
+        #[source]
+        source: Option<Box<dyn std::error::Error + Send + Sync + 'static>>,
+    },
+
+    /// Server error (5xx) - retryable
+    #[error("Server error: {message}")]
+    Server {
+        message: String,
+        #[source]
+        source: Option<Box<dyn std::error::Error + Send + Sync + 'static>>,
+    },
+
+    /// Phase-specific error context
+    #[error("Phase '{phase}' failed: {message}")]
+    Phase {
+        message: String,
+        phase: String,
+        #[source]
+        source: Option<Box<dyn std::error::Error + Send + Sync + 'static>>,
+    },
+
+    /// Legacy variants for backward compatibility
     #[error("Missing required environment variable: {0}")]
     MissingEnvVar(String),
 
@@ -12,19 +91,9 @@ pub enum ScanError {
     #[error("LLM client error: {0}")]
     LlmClientBuildError(String),
 
-    #[error("Rate limit exceeded: {0}")]
-    RateLimitExceeded(String),
-
-    #[error("Configuration error: {0}")]
-    ConfigError(String),
-
     #[error("I/O error: {0}")]
     IoError(#[from] std::io::Error),
 
-    #[error("Parse error: {0}")]
-    ParseError(String),
-
-    // Existing variants preserved
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
 
@@ -45,6 +114,149 @@ pub enum ScanError {
 
     #[error("Unknown error: {0}")]
     Unknown(String),
+}
+
+impl ScanError {
+    /// Check if this error is retryable.
+    ///
+    /// Retryable errors: Network, Timeout, RateLimit, Server
+    /// Non-retryable errors: Auth, Config, Parse
+    pub fn is_retryable(&self) -> bool {
+        matches!(
+            self,
+            ScanError::Network { .. }
+                | ScanError::Timeout { .. }
+                | ScanError::RateLimit { .. }
+                | ScanError::Server { .. }
+        )
+    }
+
+    /// Attach phase context to this error.
+    ///
+    /// Wraps the error in a Phase variant if it doesn't already have phase context.
+    pub fn with_phase(self, phase: &str) -> Self {
+        // If already a Phase error, just append to the message
+        if let ScanError::Phase {
+            message,
+            source,
+            phase: existing_phase,
+        } = self
+        {
+            return ScanError::Phase {
+                message: format!("{} (phase: {})", message, phase),
+                phase: existing_phase,
+                source,
+            };
+        }
+
+        // Otherwise wrap in Phase
+        let message = self.to_string();
+        let source = match self {
+            ScanError::Auth { source, .. } => source,
+            ScanError::Config { source, .. } => source,
+            ScanError::Parse { source, .. } => source,
+            ScanError::Network { source, .. } => source,
+            ScanError::Timeout { source, .. } => source,
+            ScanError::RateLimit { source, .. } => source,
+            ScanError::Server { source, .. } => source,
+            ScanError::Phase { source, .. } => source, // Already handled above
+            ScanError::MissingEnvVar(e) => {
+                Some(Box::new(std::io::Error::other(e)) as Box<dyn std::error::Error + Send + Sync>)
+            }
+            ScanError::GitOperationFailed(e) => Some(Box::new(e) as _),
+            ScanError::LlmClientBuildError(e) => Some(Box::new(std::io::Error::other(e)) as _),
+            ScanError::IoError(e) => Some(Box::new(e) as _),
+            ScanError::Json(e) => Some(Box::new(e) as _),
+            ScanError::Toml(e) => Some(Box::new(e) as _),
+            ScanError::Git(e) => Some(Box::new(std::io::Error::other(e)) as _),
+            ScanError::Http(e) => Some(Box::new(e) as _),
+            ScanError::Validation(e) => Some(Box::new(std::io::Error::other(e)) as _),
+            ScanError::Checkpoint(e) => Some(Box::new(std::io::Error::other(e)) as _),
+            ScanError::Unknown(e) => Some(Box::new(std::io::Error::other(e)) as _),
+        };
+
+        ScanError::Phase {
+            message,
+            phase: phase.to_string(),
+            source,
+        }
+    }
+
+    /// Extract the phase name if this error has phase context.
+    pub fn phase(&self) -> Option<&str> {
+        match self {
+            ScanError::Phase { phase, .. } => Some(phase),
+            _ => None,
+        }
+    }
+
+    /// Classify a reqwest error into a typed ScanError variant.
+    ///
+    /// Maps HTTP status codes and error kinds to appropriate variants:
+    /// - 401/403 → Auth (non-retryable)
+    /// - 429 → RateLimit (retryable)
+    /// - 5xx → Server (retryable)
+    /// - Timeout/Network → Network/Timeout (retryable)
+    /// - Other → Parse (non-retryable)
+    pub fn from_reqwest(err: reqwest::Error) -> Self {
+        if err.is_timeout() {
+            return ScanError::Timeout {
+                message: "Request timeout".to_string(),
+                source: Some(Box::new(err) as _),
+            };
+        }
+
+        if err.is_connect() || err.is_request() || err.is_body() || err.is_decode() {
+            return ScanError::Network {
+                message: "Network operation failed".to_string(),
+                source: Some(Box::new(err) as _),
+            };
+        }
+
+        // Check status code if available
+        if let Some(status) = err.status() {
+            let code = status.as_u16();
+            match code {
+                401 | 403 => ScanError::Auth {
+                    message: format!("HTTP {} authentication error", code),
+                    source: Some(Box::new(err) as _),
+                },
+                429 => ScanError::RateLimit {
+                    message: "Rate limit exceeded (HTTP 429)".to_string(),
+                    source: Some(Box::new(err) as _),
+                },
+                500..=599 => ScanError::Server {
+                    message: format!("HTTP {} server error", code),
+                    source: Some(Box::new(err) as _),
+                },
+                _ => ScanError::Network {
+                    message: format!("HTTP {} error", code),
+                    source: Some(Box::new(err) as _),
+                },
+            }
+        } else {
+            ScanError::Network {
+                message: "HTTP error (no status)".to_string(),
+                source: Some(Box::new(err) as _),
+            }
+        }
+    }
+
+    /// Classify a serde_json error into a Parse variant.
+    pub fn from_json_error(err: serde_json::Error) -> Self {
+        ScanError::Parse {
+            message: "JSON parse error".to_string(),
+            source: Some(Box::new(err) as _),
+        }
+    }
+
+    /// Classify a toml error into a Parse variant.
+    pub fn from_toml_error(err: toml::de::Error) -> Self {
+        ScanError::Parse {
+            message: "TOML parse error".to_string(),
+            source: Some(Box::new(err) as _),
+        }
+    }
 }
 
 // Convenience impls for common conversions
@@ -77,7 +289,10 @@ mod tests {
 
     #[test]
     fn test_scan_error_config_error() {
-        let err = ScanError::ConfigError("invalid config".to_string());
+        let err = ScanError::Config {
+            message: "invalid config".to_string(),
+            source: None,
+        };
         let display = format!("{}", err);
         assert!(display.contains("Configuration error"));
         assert!(display.contains("invalid config"));

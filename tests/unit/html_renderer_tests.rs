@@ -297,7 +297,8 @@ fn test_generate_html_report_contains_finding_details() {
     let content = fs::read_to_string(output_path).unwrap();
     assert!(content.contains("SQL Injection"));
     assert!(content.contains("CWE-89"));
-    assert!(content.contains("finding-0"));
+    // New behavior: finding IDs are file-grouped (e.g., "src-vuln.rs-0")
+    assert!(content.contains("src-vuln.rs-0"));
     assert!(content.contains("src/vuln.rs"));
 
     let _ = fs::remove_file(output_path);
@@ -319,9 +320,10 @@ fn test_generate_html_report_multiple_findings_unique_ids() {
     assert!(result.is_ok());
 
     let content = fs::read_to_string(output_path).unwrap();
-    assert!(content.contains("id=\"finding-0\""));
-    assert!(content.contains("id=\"finding-1\""));
-    assert!(content.contains("id=\"finding-2\""));
+    // New behavior: finding IDs are file-grouped
+    assert!(content.contains("id=\"src-a.rs-0\""));
+    assert!(content.contains("id=\"src-b.rs-0\""));
+    assert!(content.contains("id=\"src-c.rs-0\""));
 
     let _ = fs::remove_file(output_path);
 }
@@ -395,7 +397,8 @@ fn test_generate_html_report_python_file_loads_python_prism() {
     assert!(result.is_ok());
 
     let content = fs::read_to_string(output_path).unwrap();
-    assert!(content.contains("prism-python"));
+    // Embedded Prism grammar appears as "languages.python="
+    assert!(content.contains("languages.python"));
 
     let _ = fs::remove_file(output_path);
 }
@@ -414,7 +417,8 @@ fn test_generate_html_report_rust_file_loads_rust_prism() {
     assert!(result.is_ok());
 
     let content = fs::read_to_string(output_path).unwrap();
-    assert!(content.contains("prism-rust"));
+    // Embedded Prism grammar appears as "languages.rust="
+    assert!(content.contains("languages.rust"));
 
     let _ = fs::remove_file(output_path);
 }
@@ -433,7 +437,8 @@ fn test_generate_html_report_diff_hunk_loads_diff_prism() {
     assert!(result.is_ok());
 
     let content = fs::read_to_string(output_path).unwrap();
-    assert!(content.contains("prism-diff"));
+    // Prism.js is embedded via include_str!; language grammars appear as "languages.diff="
+    assert!(content.contains("languages.diff"));
 
     let _ = fs::remove_file(output_path);
 }
@@ -461,8 +466,9 @@ fn test_generate_html_report_multiple_languages_multiple_scripts() {
     assert!(result.is_ok());
 
     let content = fs::read_to_string(output_path).unwrap();
-    assert!(content.contains("prism-python"));
-    assert!(content.contains("prism-rust"));
+    // Embedded Prism: language grammars appear as "languages.python=" and "languages.rust="
+    assert!(content.contains("languages.python"));
+    assert!(content.contains("languages.rust"));
 
     let _ = fs::remove_file(output_path);
 }
@@ -553,7 +559,8 @@ fn test_generate_html_report_empty_file_path() {
     assert!(result.is_ok());
 
     let content = fs::read_to_string(output_path).unwrap();
-    assert!(content.contains("finding-0"));
+    // New behavior: finding IDs are file-grouped (empty file path becomes "-0")
+    assert!(content.contains("-0"));
 
     let _ = fs::remove_file(output_path);
 }

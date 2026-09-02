@@ -17,7 +17,7 @@ pub trait AgentLlmClient: Send + Sync {
         &self,
         messages: &[crate::llm::ChatMessage],
         tools: &[ToolSchema],
-    ) -> Result<ChatResponse, String>;
+    ) -> Result<ChatResponse, crate::error::ScanError>;
     fn model_name(&self) -> String;
 }
 
@@ -28,7 +28,7 @@ impl AgentLlmClient for LlmClient {
         &self,
         messages: &[crate::llm::ChatMessage],
         tools: &[ToolSchema],
-    ) -> Result<ChatResponse, String> {
+    ) -> Result<ChatResponse, crate::error::ScanError> {
         LlmClient::chat_with_tools(self, messages, tools).await
     }
     fn model_name(&self) -> String {

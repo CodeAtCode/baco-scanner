@@ -73,6 +73,9 @@ fn create_test_config() -> config::ScannerConfig {
         vuln_spec: Default::default(),
         citation_verification: Default::default(),
         prior_runs: Default::default(),
+        triage: Default::default(),
+        priority: Default::default(),
+        budget: Default::default(),
         org_context: Default::default(),
     }
 }

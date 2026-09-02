@@ -26,7 +26,7 @@ mod tests {
             ]
         }"#;
 
-        let runner = SemgrepRunner::new(None, vec![]);
+        let runner = SemgrepRunner::new(vec![], vec![]);
         let findings =
             parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules).unwrap();
 
@@ -39,7 +39,7 @@ mod tests {
     #[test]
     fn test_parse_semgrep_output_empty_results() {
         let mock_json = r#"{"results": []}"#;
-        let runner = SemgrepRunner::new(None, vec![]);
+        let runner = SemgrepRunner::new(vec![], vec![]);
         let findings =
             parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules).unwrap();
         assert_eq!(findings.len(), 0);
@@ -48,7 +48,7 @@ mod tests {
     #[test]
     fn test_parse_semgrep_output_empty_array() {
         let mock_json = r#"[]"#;
-        let runner = SemgrepRunner::new(None, vec![]);
+        let runner = SemgrepRunner::new(vec![], vec![]);
         let result = parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules);
         assert!(result.is_ok());
     }
@@ -56,7 +56,7 @@ mod tests {
     #[test]
     fn test_parse_semgrep_output_no_results_key() {
         let mock_json = r#"{"data": []}"#;
-        let runner = SemgrepRunner::new(None, vec![]);
+        let runner = SemgrepRunner::new(vec![], vec![]);
         let findings =
             parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules).unwrap();
         assert_eq!(findings.len(), 0);
@@ -70,7 +70,7 @@ mod tests {
                 {"check_id": "cve.2024.2", "path": "file2.py", "start": {"line": 2}, "extra": {"message": "Issue 2", "metadata": {"cwe": ["CWE-2"]}}}
             ]
         }"#;
-        let runner = SemgrepRunner::new(None, vec![]);
+        let runner = SemgrepRunner::new(vec![], vec![]);
         let findings =
             parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules).unwrap();
         assert_eq!(findings.len(), 2);
@@ -83,7 +83,7 @@ mod tests {
                 {"check_id": "critical.issue", "path": "test.py", "start": {"line": 1}, "extra": {"message": "Critical", "metadata": {"cwe": ["CWE-1"]}}}
             ]
         }"#;
-        let runner = SemgrepRunner::new(None, vec![]);
+        let runner = SemgrepRunner::new(vec![], vec![]);
         let findings =
             parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules).unwrap();
         assert_eq!(findings[0].severity, Severity::Critical);
@@ -96,7 +96,7 @@ mod tests {
                 {"check_id": "medium.issue", "path": "test.py", "start": {"line": 1}, "extra": {"message": "Medium", "metadata": {"cwe": ["CWE-1"]}}}
             ]
         }"#;
-        let runner = SemgrepRunner::new(None, vec![]);
+        let runner = SemgrepRunner::new(vec![], vec![]);
         let findings =
             parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules).unwrap();
         assert_eq!(findings[0].severity, Severity::Medium);
@@ -109,7 +109,7 @@ mod tests {
                 {"check_id": "test.issue", "path": "test.py", "start": {"line": 1}, "extra": {"message": "No CWE"}}
             ]
         }"#;
-        let runner = SemgrepRunner::new(None, vec![]);
+        let runner = SemgrepRunner::new(vec![], vec![]);
         let findings =
             parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules).unwrap();
         assert_eq!(findings[0].cwe_id, None);
@@ -122,7 +122,7 @@ mod tests {
                 {"check_id": "test.issue", "path": "test.py", "start": {"line": 1}}
             ]
         }"#;
-        let runner = SemgrepRunner::new(None, vec![]);
+        let runner = SemgrepRunner::new(vec![], vec![]);
         let findings =
             parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules).unwrap();
         assert!(findings[0].code_snippet.is_some());
@@ -131,7 +131,7 @@ mod tests {
     #[test]
     fn test_parse_semgrep_output_json_parse_error() {
         let mock_json = r#"{"invalid json}"#;
-        let runner = SemgrepRunner::new(None, vec![]);
+        let runner = SemgrepRunner::new(vec![], vec![]);
         let result = parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules);
         assert!(result.unwrap_err().contains("Failed to parse"));
     }
@@ -143,7 +143,7 @@ mod tests {
                 {"check_id": "test.issue", "path": "test.py"}
             ]
         }"#;
-        let runner = SemgrepRunner::new(None, vec![]);
+        let runner = SemgrepRunner::new(vec![], vec![]);
         let result = parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules);
         let findings = result.unwrap();
         assert!(findings.is_empty());
@@ -156,7 +156,7 @@ mod tests {
                 {"check_id": "test.issue", "start": {"line": 1}}
             ]
         }"#;
-        let runner = SemgrepRunner::new(None, vec![]);
+        let runner = SemgrepRunner::new(vec![], vec![]);
         let result = parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules);
         assert!(result.is_ok());
         let findings = result.unwrap();
@@ -165,27 +165,27 @@ mod tests {
 
     #[test]
     fn test_run_stubbed() {
-        let runner = SemgrepRunner::new(None, vec![]);
-        assert!(runner.config_path.is_none());
+        let runner = SemgrepRunner::new(vec![], vec![]);
+        assert!(runner.rulesets.is_empty());
     }
 
     #[test]
     fn test_run_with_config() {
-        let runner = SemgrepRunner::new(Some("/path/to/config.yml".to_string()), vec![]);
-        assert_eq!(runner.config_path, Some("/path/to/config.yml".to_string()));
+        let runner = SemgrepRunner::new(vec!["/path/to/config.yml".to_string()], vec![]);
+        assert_eq!(runner.rulesets, vec!["/path/to/config.yml".to_string()]);
     }
 
     #[test]
     fn test_run_invalid_json() {
         let mock_json = b"not valid json";
-        let runner = SemgrepRunner::new(None, vec![]);
+        let runner = SemgrepRunner::new(vec![], vec![]);
         let result = parser::parse_json_output(mock_json, &runner.exclude_rules);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_should_exclude_rule_exact_match() {
-        let runner = SemgrepRunner::new(None, vec!["python.lang.security".to_string()]);
+        let runner = SemgrepRunner::new(vec![], vec!["python.lang.security".to_string()]);
         assert!(runner.should_exclude_rule("python.lang.security"));
         // Prefix match: "python.lang.security" matches "python.lang.security.audit"
         assert!(runner.should_exclude_rule("python.lang.security.audit"));
@@ -193,7 +193,7 @@ mod tests {
 
     #[test]
     fn test_should_exclude_rule_prefix_match() {
-        let runner = SemgrepRunner::new(None, vec!["python.lang.security".to_string()]);
+        let runner = SemgrepRunner::new(vec![], vec!["python.lang.security".to_string()]);
         // Prefix match should exclude all sub-rules
         assert!(runner.should_exclude_rule("python.lang.security.audit"));
         assert!(runner.should_exclude_rule("python.lang.security.injection"));
@@ -202,7 +202,7 @@ mod tests {
 
     #[test]
     fn test_should_exclude_rule_no_match() {
-        let runner = SemgrepRunner::new(None, vec!["python.lang.security".to_string()]);
+        let runner = SemgrepRunner::new(vec![], vec!["python.lang.security".to_string()]);
         assert!(!runner.should_exclude_rule("javascript.security"));
         assert!(!runner.should_exclude_rule("python.lang.ast"));
         assert!(!runner.should_exclude_rule("rust.security"));
@@ -211,7 +211,7 @@ mod tests {
     #[test]
     fn test_should_exclude_rule_multiple_patterns() {
         let runner = SemgrepRunner::new(
-            None,
+            vec![],
             vec!["python.lang".to_string(), "javascript.security".to_string()],
         );
         assert!(runner.should_exclude_rule("python.lang.security"));
@@ -221,7 +221,7 @@ mod tests {
 
     #[test]
     fn test_should_exclude_rule_empty_patterns() {
-        let runner = SemgrepRunner::new(None, vec![]);
+        let runner = SemgrepRunner::new(vec![], vec![]);
         assert!(!runner.should_exclude_rule("any.rule"));
         assert!(!runner.should_exclude_rule("python.lang.security"));
     }
@@ -295,7 +295,7 @@ mod tests {
                 {"check_id": "low.issue", "path": "test.py", "start": {"line": 1}, "extra": {"message": "Low", "metadata": {"cwe": ["CWE-1"]}}}
             ]
         }"#;
-        let runner = SemgrepRunner::new(None, vec![]);
+        let runner = SemgrepRunner::new(vec![], vec![]);
         let findings =
             parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules).unwrap();
         assert_eq!(findings[0].severity, Severity::Low);
@@ -308,7 +308,7 @@ mod tests {
                 {"check_id": "info.issue", "path": "test.py", "start": {"line": 1}, "extra": {"message": "Info", "metadata": {"cwe": ["CWE-1"]}}}
             ]
         }"#;
-        let runner = SemgrepRunner::new(None, vec![]);
+        let runner = SemgrepRunner::new(vec![], vec![]);
         let findings =
             parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules).unwrap();
         assert_eq!(findings[0].severity, Severity::Info);
@@ -321,7 +321,7 @@ mod tests {
                 {"check_id": "test.issue", "path": "test.py", "start": {"line": 1}, "extra": {"metadata": {"cwe": ["CWE-1"]}}}
             ]
         }"#;
-        let runner = SemgrepRunner::new(None, vec![]);
+        let runner = SemgrepRunner::new(vec![], vec![]);
         let findings =
             parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules).unwrap();
         // Should use fallback description
@@ -337,7 +337,7 @@ mod tests {
                 {"check_id": "multi.issue", "path": "file3.py", "start": {"line": 3}, "extra": {"message": "Issue", "metadata": {"cwe": ["CWE-1"]}}}
             ]
         }"#;
-        let runner = SemgrepRunner::new(None, vec![]);
+        let runner = SemgrepRunner::new(vec![], vec![]);
         let findings =
             parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules).unwrap();
         // Multiple findings with same check_id should be aggregated
@@ -358,7 +358,7 @@ mod tests {
                 {"check_id": "single.issue", "path": "file1.py", "start": {"line": 1}, "extra": {"message": "Single issue", "metadata": {"cwe": ["CWE-1"]}}}
             ]
         }"#;
-        let runner = SemgrepRunner::new(None, vec![]);
+        let runner = SemgrepRunner::new(vec![], vec![]);
         let findings =
             parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules).unwrap();
         assert_eq!(findings.len(), 1);
@@ -373,7 +373,7 @@ mod tests {
                 {"check_id": "test.issue", "path": "test.py", "start": {"line": 1}}
             ]
         }"#;
-        let runner = SemgrepRunner::new(None, vec![]);
+        let runner = SemgrepRunner::new(vec![], vec![]);
         parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules).unwrap()
     }
 
@@ -392,7 +392,7 @@ mod tests {
                 {"check_id": "", "path": "test.py", "start": {"line": 1}, "extra": {"message": "Test"}}
             ]
         }"#;
-        let runner = SemgrepRunner::new(None, vec![]);
+        let runner = SemgrepRunner::new(vec![], vec![]);
         let findings =
             parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules).unwrap();
         assert_eq!(findings.len(), 1);
@@ -402,10 +402,10 @@ mod tests {
     #[test]
     fn test_semgrep_runner_new_with_exclude_rules() {
         let runner = SemgrepRunner::new(
-            Some("/path/to/config.yml".to_string()),
+            vec!["/path/to/config.yml".to_string()],
             vec!["rule1".to_string(), "rule2".to_string()],
         );
-        assert_eq!(runner.config_path, Some("/path/to/config.yml".to_string()));
+        assert_eq!(runner.rulesets, vec!["/path/to/config.yml".to_string()]);
         assert_eq!(runner.exclude_rules.len(), 2);
         assert!(runner.exclude_rules.contains(&"rule1".to_string()));
         assert!(runner.exclude_rules.contains(&"rule2".to_string()));
@@ -446,7 +446,7 @@ mod tests {
                 {"check_id": "empty.msg.issue", "path": "file2.py", "start": {"line": 2}, "extra": {"message": "", "metadata": {"cwe": ["CWE-1"]}}}
             ]
         }"#;
-        let runner = SemgrepRunner::new(None, vec![]);
+        let runner = SemgrepRunner::new(vec![], vec![]);
         let findings =
             parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules).unwrap();
         assert_eq!(findings.len(), 1);
@@ -461,7 +461,7 @@ mod tests {
                 {"check_id": "single.empty.msg", "path": "file1.py", "start": {"line": 1}, "extra": {"message": "", "metadata": {"cwe": ["CWE-1"]}}}
             ]
         }"#;
-        let runner = SemgrepRunner::new(None, vec![]);
+        let runner = SemgrepRunner::new(vec![], vec![]);
         let findings =
             parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules).unwrap();
         assert_eq!(findings.len(), 1);
@@ -476,7 +476,7 @@ mod tests {
                 {"check_id": "test.issue", "path": "test.py", "start": {"line": 1}, "extra": {"message": "Test message"}}
             ]
         }"#;
-        let runner = SemgrepRunner::new(None, vec![]);
+        let runner = SemgrepRunner::new(vec![], vec![]);
         let findings =
             parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules).unwrap();
         assert_eq!(findings.len(), 1);
@@ -498,7 +498,7 @@ mod tests {
                 {"check_id": "no.msg.test", "path": "test.py", "start": {"line": 1}, "extra": {"metadata": {"cwe": ["CWE-89"]}}}
             ]
         }"#;
-        let runner = SemgrepRunner::new(None, vec![]);
+        let runner = SemgrepRunner::new(vec![], vec![]);
         let findings =
             parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules).unwrap();
         assert_eq!(findings.len(), 1);
@@ -514,7 +514,7 @@ mod tests {
                 {"check_id": "valid.rule", "path": "test2.py", "start": {"line": 2}, "extra": {"message": "Valid"}}
             ]
         }"#;
-        let runner = SemgrepRunner::new(None, vec![]);
+        let runner = SemgrepRunner::new(vec![], vec![]);
         let findings =
             parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules).unwrap();
         // Entry without check_id should be skipped
@@ -530,7 +530,7 @@ mod tests {
                 {"check_id": "other.rule", "path": "test2.py", "start": {"line": 2}, "extra": {"message": "Should be included"}}
             ]
         }"#;
-        let runner = SemgrepRunner::new(None, vec!["python.lang.security".to_string()]);
+        let runner = SemgrepRunner::new(vec![], vec!["python.lang.security".to_string()]);
         let findings =
             parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules).unwrap();
         // python.lang.security.* should be excluded
@@ -547,7 +547,7 @@ mod tests {
                 {"check_id": "multi.with.msg", "path": "file3.py", "start": {"line": 3}, "extra": {"message": "Base issue found", "metadata": {"cwe": ["CWE-1"]}}}
             ]
         }"#;
-        let runner = SemgrepRunner::new(None, vec![]);
+        let runner = SemgrepRunner::new(vec![], vec![]);
         let findings =
             parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules).unwrap();
         assert_eq!(findings.len(), 1);
@@ -564,7 +564,7 @@ mod tests {
                 {"check_id": "multi.two.msg", "path": "file2.py", "start": {"line": 2}, "extra": {"message": "Found issue", "metadata": {"cwe": ["CWE-1"]}}}
             ]
         }"#;
-        let runner = SemgrepRunner::new(None, vec![]);
+        let runner = SemgrepRunner::new(vec![], vec![]);
         let findings =
             parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules).unwrap();
         assert_eq!(findings.len(), 1);
@@ -582,7 +582,7 @@ mod tests {
                 {"check_id": "empty.single", "path": "file1.py", "start": {"line": 1}, "extra": {"message": "", "metadata": {"cwe": ["CWE-1"]}}}
             ]
         }"#;
-        let runner = SemgrepRunner::new(None, vec![]);
+        let runner = SemgrepRunner::new(vec![], vec![]);
         let findings =
             parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules).unwrap();
         assert_eq!(findings.len(), 1);
@@ -628,34 +628,35 @@ mod tests {
 
     #[test]
     fn test_semgrep_runner_clone() {
-        let runner = SemgrepRunner::new(Some("config.yml".into()), vec!["rule1".into()]);
+        let runner = SemgrepRunner::new(vec!["config.yml".into()], vec!["rule1".into()]);
         let cloned = runner.clone();
-        assert_eq!(runner.config_path, cloned.config_path);
+        assert_eq!(runner.rulesets, cloned.rulesets);
         assert_eq!(runner.exclude_rules, cloned.exclude_rules);
     }
 
     #[test]
     fn test_semgrep_runner_new_empty() {
-        let runner = SemgrepRunner::new(None, vec![]);
-        assert!(runner.config_path.is_none());
+        let runner = SemgrepRunner::new(vec![], vec![]);
+        assert!(runner.rulesets.is_empty());
         assert!(runner.exclude_rules.is_empty());
     }
 
     #[test]
     fn test_semgrep_runner_new_with_config() {
-        let runner = SemgrepRunner::new(Some("/path/config.yml".into()), vec![]);
-        assert_eq!(runner.config_path, Some("/path/config.yml".into()));
+        let runner = SemgrepRunner::new(vec!["/path/config.yml".into()], vec![]);
+        assert_eq!(runner.rulesets, vec!["/path/config.yml".to_string()]);
     }
 
     #[test]
     fn test_semgrep_runner_new_with_multiple_exclude_rules() {
-        let runner = SemgrepRunner::new(None, vec!["rule1".into(), "rule2".into(), "rule3".into()]);
+        let runner =
+            SemgrepRunner::new(vec![], vec!["rule1".into(), "rule2".into(), "rule3".into()]);
         assert_eq!(runner.exclude_rules.len(), 3);
     }
 
     #[test]
     fn test_should_exclude_rule_exact_and_prefix() {
-        let runner = SemgrepRunner::new(None, vec!["python".into()]);
+        let runner = SemgrepRunner::new(vec![], vec!["python".into()]);
         assert!(runner.should_exclude_rule("python"));
         assert!(runner.should_exclude_rule("python.lang"));
         assert!(runner.should_exclude_rule("python.lang.security"));
@@ -665,7 +666,7 @@ mod tests {
     #[test]
     fn test_should_exclude_rule_multiple_patterns_additional() {
         let runner = SemgrepRunner::new(
-            None,
+            vec![],
             vec!["python".into(), "javascript".into(), "rust".into()],
         );
         assert!(runner.should_exclude_rule("python.lang"));
@@ -676,13 +677,13 @@ mod tests {
 
     #[test]
     fn test_should_exclude_rule_empty_list() {
-        let runner = SemgrepRunner::new(None, vec![]);
+        let runner = SemgrepRunner::new(vec![], vec![]);
         assert!(!runner.should_exclude_rule("any.rule"));
     }
 
     #[test]
     fn test_should_exclude_rule_no_match_additional() {
-        let runner = SemgrepRunner::new(None, vec!["python".into()]);
+        let runner = SemgrepRunner::new(vec![], vec!["python".into()]);
         assert!(!runner.should_exclude_rule("javascript.security"));
         assert!(!runner.should_exclude_rule("rust.lang"));
     }
@@ -820,7 +821,7 @@ mod tests {
 
     #[test]
     fn test_parse_json_output_with_missing_optional_fields() {
-        let runner = SemgrepRunner::new(None, vec![]);
+        let runner = SemgrepRunner::new(vec![], vec![]);
 
         // Missing extra.metadata
         let json = r#"{"results": [{"check_id": "test", "path": "f.py", "start": {"line": 1}, "extra": {"message": "m"}}]}"#;
@@ -831,7 +832,7 @@ mod tests {
 
     #[test]
     fn test_parse_json_output_aggregation_logic() {
-        let runner = SemgrepRunner::new(None, vec![]);
+        let runner = SemgrepRunner::new(vec![], vec![]);
 
         // Single finding - no aggregation
         let json_single = r#"{"results": [{"check_id": "single", "path": "f1.py", "start": {"line": 1}, "extra": {"message": "m"}}]}"#;

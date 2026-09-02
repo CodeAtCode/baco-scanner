@@ -150,6 +150,7 @@ pub fn detect_language(file_path: &str) -> &'static str {
             "c" => "c",
             "cpp" | "cc" | "cxx" => "cpp",
             "h" | "hpp" => "cpp",
+            "php" | "phtml" => "php",
             "sql" => "sql",
             "yml" | "yaml" => "yaml",
             "json" => "json",

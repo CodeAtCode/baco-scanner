@@ -1,0 +1,131 @@
+# BACO preset — WordPress plugin
+[project]
+name = "wordpress-plugin"
+languages = ["php", "javascript"]
+
+[scanner]
+max_file_size_kb = 512
+exclude_paths = [
+  "node_modules/*",
+  "vendor/*",
+  "dist/*",
+  "build/*",
+  "assets/*",
+  "*.min.js",
+  "*.min.css",
+  "tests/*",
+  "test/*",
+  "spec/*",
+  "cypress/*",
+  "playwright/*",
+  "*.map",
+]
+
+[scanner.semgrep]
+config = ["p/wordpress", "p/php", "p/security"]
+
+[scanner.performance]
+enable_incremental_scan = true
+enable_llm_cache = true
+enable_multi_verifier = false
+enable_variant_search = true
+enable_cve_bootstrap = true
+
+[llm]
+temperature = 0.2
+max_concurrent = 4
+
+[llm.phases.discovery]
+models = ["mistral-small"]
+
+[llm.phases.verification]
+model = "mistral-medium"
+
+[triage]
+enabled = true
+model = "mistral-small"
+batch_size = 8
+suspicion_threshold = 0.30
+
+[priority]
+entry_point_patterns = [
+  "add_action(",
+  "add_filter(",
+  "register_rest_route(",
+  "register_activation_hook(",
+  "register_admin_menu_page(",
+  "admin_post_",
+  "wp_ajax_",
+  "init.php",
+  "admin.php",
+  "uninstall.php",
+  "xmlrpc",
+]
+sink_patterns = [
+  "$wpdb->query",
+  "$wpdb->get_results",
+  "$wpdb->prepare",
+  "unserialize(",
+  "maybe_unserialize(",
+  "eval(",
+  "assert(",
+  "preg_replace(",
+  "$_GET",
+  "$_POST",
+  "$_REQUEST",
+  "$_FILES",
+  "move_uploaded_file(",
+  "file_get_contents(",
+  "fopen(",
+  "include",
+  "require",
+  "wp_enqueue_script",
+  "wp_localize_script",
+  "wp_add_inline_script",
+  "header('Location:",
+  "wp_redirect(",
+  "wp_safe_redirect(",
+  "curl_init(",
+  "wp_remote_get(",
+  "wp_remote_post(",
+  "base64_decode(",
+  "str_rot13(",
+  "gzinflate(",
+  "shell_exec",
+  "system(",
+  "exec(",
+  "passthru(",
+]
+
+[budget]
+enabled = true
+max_llm_calls = 250
+
+[knowledge.fp_patterns]
+"CWE-79" = [
+  "esc_html(",
+  "esc_attr(",
+  "esc_url(",
+  "wp_kses",
+  "sanitize_text_field(",
+]
+"CWE-89" = [
+  "$wpdb->prepare(",
+  "$wpdb->insert(",
+  "$wpdb->update(",
+  "$wpdb->delete(",
+]
+"CWE-352" = [
+  "wp_verify_nonce(",
+  "check_admin_referer(",
+  "check_ajax_referer(",
+]
+"CWE-862" = ["current_user_can(", "is_admin()", "manage_options"]
+
+[agent_flow]
+enabled = false
+requires_instrumented_target = false
+
+[agent]
+enabled = false
+trusted_paths = []

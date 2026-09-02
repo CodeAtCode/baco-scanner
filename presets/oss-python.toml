@@ -1,0 +1,101 @@
+# BACO preset — Large Python OSS project
+[project]
+name = "oss-python"
+languages = ["python"]
+
+[scanner]
+max_file_size_kb = 512
+exclude_paths = [
+  "node_modules/*",
+  "vendor/*",
+  "third_party/*",
+  "thirdparty/*",
+  "external/*",
+  "deps/*",
+  "submodules/*",
+  "tests/*",
+  "test/*",
+  "testing/*",
+  "spec/*",
+  "e2e/*",
+  "fixtures/*",
+  "docs/*",
+  "examples/*",
+  "samples/*",
+  "demo/*",
+  "benchmarks/*",
+  "dist/*",
+  "build/*",
+  "out/*",
+  "target/*",
+  ".venv/*",
+  "site-packages/*",
+  "*.min.js",
+  "*.bundle.js",
+  "*.map",
+  "*_pb2.py",
+  "*.pb.cc",
+  "*.pb.h",
+]
+
+[scanner.semgrep]
+config = ["p/python", "p/bandit", "p/security"]
+
+[scanner.performance]
+enable_incremental_scan = true
+enable_llm_cache = true
+enable_multi_verifier = false
+
+[llm.phases.discovery]
+models = ["mistral-small"]
+
+[llm.phases.verification]
+model = "mistral-medium"
+
+[triage]
+enabled = true
+batch_size = 10
+suspicion_threshold = 0.40
+
+[priority]
+entry_point_patterns = [
+  "main.py",
+  "app.py",
+  "server.py",
+  "cli/",
+  "api/",
+  "routes/",
+  "controllers/",
+  "handlers/",
+  "endpoints/",
+  "cmd/",
+]
+sink_patterns = [
+  "system(",
+  "exec",
+  "popen",
+  "shell=True",
+  "eval(",
+  "unserialize",
+  "SELECT",
+  "query(",
+  "execute(",
+  "os.system",
+  "subprocess",
+  "open(",
+  "pickle.",
+  "yaml.load",
+]
+churn_weight = 0.4
+
+[budget]
+enabled = true
+max_llm_calls = 1000
+
+[agent_flow]
+enabled = false
+requires_instrumented_target = false
+
+[agent]
+enabled = false
+trusted_paths = []

@@ -30,6 +30,7 @@ pub mod confidence;
 pub mod confidence_refinement;
 pub mod config;
 pub mod context; // Context extraction module
+pub mod cost_estimate;
 pub mod cpg; // CPG-guided slicing (T3.1)
 pub mod crossfile;
 pub mod cve_bootstrap;
@@ -54,6 +55,7 @@ pub mod org_context;
 pub mod phase;
 pub mod poc_compiler;
 pub mod poc_generation;
+pub mod preset;
 pub mod project_type;
 pub mod prompt;
 pub mod rate_limiter;
@@ -63,6 +65,7 @@ pub mod root_cause_dedup;
 pub mod router;
 pub mod rulesynth;
 pub mod run_store;
+pub mod scan_diff;
 pub mod scanner;
 pub mod scanner_types;
 pub mod semgrep;

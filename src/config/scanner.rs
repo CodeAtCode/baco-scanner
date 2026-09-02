@@ -6,6 +6,7 @@ use crate::config::{default_four, default_true};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ScannerSettings {
+    #[serde(default)]
     pub max_file_size_kb: u64,
     #[serde(default)]
     pub exclude_paths: Vec<String>,
@@ -17,6 +18,9 @@ pub struct ScannerSettings {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SemgrepSettings {
+    #[serde(default)]
+    pub rulesets: Vec<String>,
+    #[serde(default)]
     pub exclude_rules: Vec<String>,
 }
 
@@ -126,14 +130,19 @@ impl Default for PromptSpec {
 }
 
 impl RouterConfig {
-    /// Create a RouterRegistry from this config
+    /// Create a RouterRegistry from this config, translating CWE overrides
+    /// into the domain-keyed registry via the shared CWE-to-domain mapping
     pub fn to_registry(&self) -> crate::router::RouterRegistry {
         let mut registry = crate::router::RouterRegistry::new();
         for (cwe_id, spec) in &self.cwe_overrides {
-            registry.add_cwe_override(cwe_id.clone(), spec.clone());
-        }
-        for (language, spec) in &self.language_overrides {
-            registry.add_language_override(language.clone(), spec.clone());
+            if let Some(domain) = crate::prompt::templates::cwe_to_hunt_domain(cwe_id) {
+                registry.add_domain(
+                    domain.to_string(),
+                    crate::router::DomainConfig {
+                        model_override: spec.model_override.clone(),
+                    },
+                );
+            }
         }
         registry
     }

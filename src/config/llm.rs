@@ -3,8 +3,11 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct LlmConfig {
+    #[serde(default)]
     pub timeout_secs: u64,
+    #[serde(default)]
     pub max_retries: u8,
+    #[serde(default)]
     pub retry_backoff_ms: u64,
     #[serde(default = "crate::config::default_max_concurrent")]
     pub max_concurrent: usize,
@@ -56,6 +59,7 @@ impl LlmPhasesConfig {}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct LlmPhaseConfig {
+    #[serde(default)]
     pub base_url: String,
     #[serde(default)]
     pub api_key: Option<String>,
@@ -65,6 +69,8 @@ pub struct LlmPhaseConfig {
     pub models: Vec<String>, // New: list of models (takes precedence over model)
     #[serde(default)]
     pub timeout_secs: Option<u64>, // Optional per-phase timeout override
+    #[serde(default)]
+    pub temperature: Option<f32>, // Optional per-phase temperature override
 }
 
 impl LlmPhaseConfig {

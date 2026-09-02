@@ -1,176 +1,89 @@
-//! Integration tests for the MoE per-CWE router pipeline
-//!
-//! Tests that verify the router works correctly in an end-to-end scenario.
+//! Integration tests for the MoE CWE router pipeline (domain-based routing).
 
-use baco::router::{CweRouter, PromptSpec, RouterConfig};
+use baco::config::{PromptSpec, RouterConfig};
+use baco::router::CweRouter;
 use std::collections::HashMap;
 
-/// Test that the router correctly routes CWE-79 findings to the specialized prompt
-#[test]
-fn test_moe_pipeline_cwe_79_routing() {
-    // Build a router with CWE-79 override
+fn config_with_override(cwe: &str, model: Option<&str>) -> RouterConfig {
     let mut cwe_overrides = HashMap::new();
     cwe_overrides.insert(
-        "79".to_string(),
+        cwe.to_string(),
         PromptSpec {
-            prompt_template: "xss_specialized".to_string(),
-            model_override: None,
+            prompt_template: "llm_static_analysis".to_string(),
+            model_override: model.map(|m| m.to_string()),
         },
     );
-
-    let config = RouterConfig {
+    RouterConfig {
         enabled: true,
         default_prompt: "llm_static_analysis".to_string(),
         cwe_overrides,
         language_overrides: HashMap::new(),
-    };
-
-    let router = CweRouter::from_config(&config);
-
-    // Route a finding with CWE-79
-    let spec = router.route(&Some("79".to_string()), "javascript");
-
-    // Assert: returned PromptSpec has the specialized template
-    assert_eq!(spec.prompt_template, "xss_specialized");
+    }
 }
 
-/// Test that unknown CWEs fall back to the default prompt
-#[test]
-fn test_moe_pipeline_unknown_cwe_fallback() {
-    let mut cwe_overrides = HashMap::new();
-    cwe_overrides.insert(
-        "79".to_string(),
-        PromptSpec {
-            prompt_template: "xss_specialized".to_string(),
-            model_override: None,
-        },
-    );
-
-    let config = RouterConfig {
-        enabled: true,
-        default_prompt: "llm_static_analysis".to_string(),
-        cwe_overrides,
-        language_overrides: HashMap::new(),
-    };
-
-    let router = CweRouter::from_config(&config);
-
-    // Route a finding with unknown CWE
-    let spec = router.route(&Some("999".to_string()), "javascript");
-
-    // Assert: falls back to default_prompt
-    assert_eq!(spec.prompt_template, "llm_static_analysis");
-}
-
-/// Test language-based routing when no CWE match exists
-#[test]
-fn test_moe_pipeline_language_routing() {
-    let mut language_overrides = HashMap::new();
-    language_overrides.insert(
-        "rust".to_string(),
-        PromptSpec {
-            prompt_template: "rust_specialized".to_string(),
-            model_override: Some("gpt-4".to_string()),
-        },
-    );
-
-    let config = RouterConfig {
-        enabled: true,
+fn empty_config() -> RouterConfig {
+    RouterConfig {
+        enabled: false,
         default_prompt: "llm_static_analysis".to_string(),
         cwe_overrides: HashMap::new(),
-        language_overrides,
-    };
-
-    let router = CweRouter::from_config(&config);
-
-    // Route a finding with no CWE but Rust language
-    let spec = router.route(&None, "rust");
-
-    assert_eq!(spec.prompt_template, "rust_specialized");
-    assert_eq!(spec.model_override, Some("gpt-4".to_string()));
-}
-
-/// Test that CWE routing takes priority over language routing
-#[test]
-fn test_moe_pipeline_cwe_priority() {
-    let mut cwe_overrides = HashMap::new();
-    cwe_overrides.insert(
-        "89".to_string(),
-        PromptSpec {
-            prompt_template: "sqli_specialized".to_string(),
-            model_override: None,
-        },
-    );
-
-    let mut language_overrides = HashMap::new();
-    language_overrides.insert(
-        "rust".to_string(),
-        PromptSpec {
-            prompt_template: "rust_specialized".to_string(),
-            model_override: None,
-        },
-    );
-
-    let config = RouterConfig {
-        enabled: true,
-        default_prompt: "llm_static_analysis".to_string(),
-        cwe_overrides,
-        language_overrides,
-    };
-
-    let router = CweRouter::from_config(&config);
-
-    // CWE-89 should match even for Rust language
-    let spec = router.route(&Some("89".to_string()), "rust");
-    assert_eq!(spec.prompt_template, "sqli_specialized");
-}
-
-/// Test full pipeline with multiple CWEs
-#[test]
-fn test_moe_pipeline_multiple_cwes() {
-    let mut cwe_overrides = HashMap::new();
-    cwe_overrides.insert(
-        "79".to_string(),
-        PromptSpec {
-            prompt_template: "xss_specialized".to_string(),
-            model_override: None,
-        },
-    );
-    cwe_overrides.insert(
-        "89".to_string(),
-        PromptSpec {
-            prompt_template: "sqli_specialized".to_string(),
-            model_override: None,
-        },
-    );
-    cwe_overrides.insert(
-        "120".to_string(),
-        PromptSpec {
-            prompt_template: "buffer_overflow_specialized".to_string(),
-            model_override: None,
-        },
-    );
-
-    let config = RouterConfig {
-        enabled: true,
-        default_prompt: "llm_static_analysis".to_string(),
-        cwe_overrides,
         language_overrides: HashMap::new(),
-    };
+    }
+}
 
-    let router = CweRouter::from_config(&config);
+/// CWE-79 routes to the xss hunt domain
+#[test]
+fn test_moe_cwe_79_routes_to_xss_domain() {
+    let router = CweRouter::from_config(&config_with_override("CWE-79", None));
+    let route = router.route_cwe("CWE-79");
+    assert_eq!(route.domain.as_deref(), Some("xss"));
+}
 
-    // Test each CWE routes correctly
-    let spec_79 = router.route(&Some("79".to_string()), "c");
-    assert_eq!(spec_79.prompt_template, "xss_specialized");
+/// Unknown CWEs fall back to no domain and no override
+#[test]
+fn test_moe_unknown_cwe_has_no_domain() {
+    let router = CweRouter::from_config(&config_with_override("CWE-79", None));
+    let route = router.route_cwe("CWE-999999");
+    assert_eq!(route.domain, None);
+    assert_eq!(route.model_override, None);
+}
 
-    let spec_89 = router.route(&Some("89".to_string()), "rust");
-    assert_eq!(spec_89.prompt_template, "sqli_specialized");
+/// A CWE override configured by model propagates through its domain
+#[test]
+fn test_moe_model_override_propagates_through_domain() {
+    let router = CweRouter::from_config(&config_with_override("CWE-89", Some("mistral-large")));
+    let route = router.route_cwe("CWE-89");
+    assert_eq!(route.domain.as_deref(), Some("injection"));
+    assert_eq!(route.model_override.as_deref(), Some("mistral-large"));
+}
 
-    let spec_120 = router.route(&Some("120".to_string()), "c");
-    assert_eq!(spec_120.prompt_template, "buffer_overflow_specialized");
+/// Multiple CWE families map to their hunt domains
+#[test]
+fn test_moe_multiple_domains() {
+    let router = CweRouter::from_config(&config_with_override("CWE-79", None));
+    assert_eq!(
+        router.route_cwe("CWE-89").domain.as_deref(),
+        Some("injection")
+    );
+    assert_eq!(
+        router.route_cwe("CWE-22").domain.as_deref(),
+        Some("path_traversal")
+    );
+    assert_eq!(
+        router.route_cwe("CWE-327").domain.as_deref(),
+        Some("crypto")
+    );
+    assert_eq!(
+        router.route_cwe("CWE-502").domain.as_deref(),
+        Some("deserialization")
+    );
+    assert_eq!(router.route_cwe("CWE-287").domain.as_deref(), Some("auth"));
+}
 
-    // Unknown CWE falls back to default
-    let spec_unknown = router.route(&Some("555".to_string()), "python");
-    assert_eq!(spec_unknown.prompt_template, "llm_static_analysis");
+/// The shipped registry.toml seeds domain knowledge even without config overrides
+#[test]
+fn test_moe_default_registry_seeds_domains() {
+    let router = CweRouter::from_config(&empty_config());
+    let route = router.route_cwe("CWE-79");
+    assert_eq!(route.domain.as_deref(), Some("xss"));
+    assert_eq!(route.model_override, None);
 }

@@ -83,8 +83,9 @@ fn test_generate_html_report_creates_nested_directories() {
         content.contains("BACO Security Report"),
         "HTML should contain report title"
     );
+    // New behavior: finding IDs are file-grouped (e.g., "src-vulnerable.rs-0")
     assert!(
-        content.contains("finding-0"),
+        content.contains("src-vulnerable.rs-0"),
         "HTML should contain rendered finding"
     );
     assert!(content.contains("CWE-79"), "HTML should contain CWE ID");

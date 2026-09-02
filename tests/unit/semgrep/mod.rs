@@ -20,18 +20,18 @@ mod parsing_edge_cases_tests;
 
 #[test]
 fn test_semgrep_runner_default_construction() {
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
 
-    assert!(runner.config_path.is_none());
+    assert!(runner.rulesets.is_empty());
     assert!(runner.exclude_rules.is_empty());
 }
 
 #[test]
 fn test_semgrep_runner_with_config_path() {
     let config_path = "/path/to/.semgrep.yml".to_string();
-    let runner = SemgrepRunner::new(Some(config_path.clone()), vec![]);
+    let runner = SemgrepRunner::new(vec![config_path.clone()], vec![]);
 
-    assert_eq!(runner.config_path, Some(config_path));
+    assert_eq!(runner.rulesets, vec![config_path]);
     assert!(runner.exclude_rules.is_empty());
 }
 
@@ -41,9 +41,9 @@ fn test_semgrep_runner_with_exclude_rules() {
         "python.lang.security".to_string(),
         "javascript.security.xss".to_string(),
     ];
-    let runner = SemgrepRunner::new(None, exclude_rules.clone());
+    let runner = SemgrepRunner::new(vec![], exclude_rules.clone());
 
-    assert!(runner.config_path.is_none());
+    assert!(runner.rulesets.is_empty());
     assert_eq!(runner.exclude_rules.len(), 2);
     assert!(runner
         .exclude_rules
@@ -57,9 +57,9 @@ fn test_semgrep_runner_with_exclude_rules() {
 fn test_semgrep_runner_with_both_config_and_excludes() {
     let config_path = "/custom/config.yml".to_string();
     let exclude_rules = vec!["rust.security".to_string()];
-    let runner = SemgrepRunner::new(Some(config_path.clone()), exclude_rules.clone());
+    let runner = SemgrepRunner::new(vec![config_path.clone()], exclude_rules.clone());
 
-    assert_eq!(runner.config_path, Some(config_path));
+    assert_eq!(runner.rulesets, vec![config_path]);
     assert_eq!(runner.exclude_rules.len(), 1);
 }
 
@@ -69,7 +69,7 @@ fn test_semgrep_runner_with_both_config_and_excludes() {
 
 #[test]
 fn test_should_exclude_single_exact_match() {
-    let runner = SemgrepRunner::new(None, vec!["exact.rule".to_string()]);
+    let runner = SemgrepRunner::new(vec![], vec!["exact.rule".to_string()]);
 
     assert!(runner.should_exclude_rule("exact.rule"));
     assert!(runner.should_exclude_rule("exact.rule.sub")); // Prefix match
@@ -78,7 +78,7 @@ fn test_should_exclude_single_exact_match() {
 
 #[test]
 fn test_should_exclude_prefix_matches_all_subrules() {
-    let runner = SemgrepRunner::new(None, vec!["python.lang".to_string()]);
+    let runner = SemgrepRunner::new(vec![], vec!["python.lang".to_string()]);
 
     // Prefix should match all sub-rules
     assert!(runner.should_exclude_rule("python.lang.security"));
@@ -89,7 +89,7 @@ fn test_should_exclude_prefix_matches_all_subrules() {
 
 #[test]
 fn test_should_exclude_case_sensitive() {
-    let runner = SemgrepRunner::new(None, vec!["Python.Security".to_string()]);
+    let runner = SemgrepRunner::new(vec![], vec!["Python.Security".to_string()]);
 
     // Should be case-sensitive - exact match only
     assert!(runner.should_exclude_rule("Python.Security"));
@@ -100,7 +100,7 @@ fn test_should_exclude_case_sensitive() {
 #[test]
 fn test_should_exclude_with_multiple_overlapping_patterns() {
     let runner = SemgrepRunner::new(
-        None,
+        vec![],
         vec![
             "python".to_string(),
             "javascript.security".to_string(),
@@ -117,7 +117,7 @@ fn test_should_exclude_with_multiple_overlapping_patterns() {
 
 #[test]
 fn test_should_exclude_empty_pattern_list() {
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
 
     // No patterns means nothing excluded
     assert!(!runner.should_exclude_rule("any.rule"));
@@ -126,7 +126,7 @@ fn test_should_exclude_empty_pattern_list() {
 
 #[test]
 fn test_should_exclude_empty_rule_id() {
-    let runner = SemgrepRunner::new(None, vec!["".to_string()]);
+    let runner = SemgrepRunner::new(vec![], vec!["".to_string()]);
 
     // Empty pattern should match empty rule_id
     assert!(runner.should_exclude_rule(""));
@@ -135,7 +135,7 @@ fn test_should_exclude_empty_rule_id() {
 
 #[test]
 fn test_should_exclude_partial_prefix_no_match() {
-    let runner = SemgrepRunner::new(None, vec!["python.lang".to_string()]);
+    let runner = SemgrepRunner::new(vec![], vec!["python.lang".to_string()]);
 
     // Should not match similar but different prefixes
     assert!(!runner.should_exclude_rule("python-language"));
@@ -164,7 +164,7 @@ fn test_parse_json_valid_single_finding() {
         ]
     }"#;
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
 
     assert_eq!(findings.len(), 1);
@@ -179,7 +179,7 @@ fn test_parse_json_valid_single_finding() {
 fn test_parse_json_empty_results_array() {
     let mock_json = r#"{"results": []}"#;
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
 
     assert!(findings.is_empty());
@@ -189,7 +189,7 @@ fn test_parse_json_empty_results_array() {
 fn test_parse_json_missing_results_key() {
     let mock_json = r#"{"data": [], "metadata": {}}"#;
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
 
     // Missing results key should return empty, not error
@@ -200,7 +200,7 @@ fn test_parse_json_missing_results_key() {
 fn test_parse_json_invalid_json_format() {
     let invalid_json = r#"not valid json {"broken": "#;
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let result = runner.parse_json_output(invalid_json.as_bytes());
 
     assert!(result.is_err());
@@ -212,7 +212,7 @@ fn test_parse_json_invalid_json_format() {
 fn test_parse_json_not_array_root() {
     let not_array = r#""just a string""#;
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let result = runner.parse_json_output(not_array.as_bytes());
 
     assert!(result.is_ok());
@@ -235,7 +235,7 @@ fn test_parse_json_missing_start_line_skips_result() {
         ]
     }"#;
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
 
     // Missing start.line should skip the result
@@ -254,7 +254,7 @@ fn test_parse_json_missing_extra_field_uses_defaults() {
         ]
     }"#;
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
 
     assert_eq!(findings.len(), 1);
@@ -276,7 +276,7 @@ fn test_parse_json_null_fields_handled_gracefully() {
         ]
     }"#;
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
 
     // Null fields should be skipped
@@ -295,7 +295,7 @@ fn test_severity_mapping_critical() {
         ]
     }"#;
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
 
     assert_eq!(findings[0].severity, Severity::Critical);
@@ -309,7 +309,7 @@ fn test_severity_mapping_high() {
         ]
     }"#;
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
 
     assert_eq!(findings[0].severity, Severity::High);
@@ -323,7 +323,7 @@ fn test_severity_mapping_medium() {
         ]
     }"#;
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
 
     assert_eq!(findings[0].severity, Severity::Medium);
@@ -337,7 +337,7 @@ fn test_severity_mapping_low() {
         ]
     }"#;
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
 
     assert_eq!(findings[0].severity, Severity::Low);
@@ -351,7 +351,7 @@ fn test_severity_mapping_unknown_defaults_to_info() {
         ]
     }"#;
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
 
     assert_eq!(findings[0].severity, Severity::Info);
@@ -368,7 +368,7 @@ fn test_severity_mapping_case_insensitive() {
         ]
     }"#;
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
 
     // Sort by file path for deterministic ordering
@@ -395,7 +395,7 @@ fn test_parse_json_excludes_matched_rules() {
         ]
     }"#;
 
-    let runner = SemgrepRunner::new(None, vec!["python.lang".to_string()]);
+    let runner = SemgrepRunner::new(vec![], vec!["python.lang".to_string()]);
     let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
 
     // python.lang.ast should be excluded (prefix match)
@@ -412,7 +412,7 @@ fn test_parse_json_all_results_excluded() {
         ]
     }"#;
 
-    let runner = SemgrepRunner::new(None, vec!["python".to_string()]);
+    let runner = SemgrepRunner::new(vec![], vec!["python".to_string()]);
     let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
 
     // All results should be excluded
@@ -431,7 +431,7 @@ fn test_aggregation_single_location_preserves_details() {
         ]
     }"#;
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
 
     assert_eq!(findings.len(), 1);
@@ -451,7 +451,7 @@ fn test_aggregation_multiple_same_rule_creates_single_finding() {
         ]
     }"#;
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
 
     // Multiple same check_id should aggregate to single finding
@@ -475,7 +475,7 @@ fn test_aggregation_different_rules_separate_findings() {
         ]
     }"#;
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
 
     // Different check_ids should create separate findings
@@ -504,7 +504,7 @@ fn test_findings_include_code_snippet_for_single_location() {
         test_file.to_string_lossy()
     );
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
 
     assert_eq!(findings.len(), 1);
@@ -527,7 +527,7 @@ fn test_findings_code_snippet_for_nonexistent_file() {
         ]
     }"#;
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
 
     assert_eq!(findings.len(), 1);
@@ -547,7 +547,7 @@ fn test_aggregated_findings_have_location_list_snippet() {
         ]
     }"#;
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
 
     assert_eq!(findings.len(), 1);
@@ -594,7 +594,7 @@ fn test_full_parse_workflow_with_realistic_json() {
         ]
     }"#;
 
-    let runner = SemgrepRunner::new(None, vec![]);
+    let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
 
     assert_eq!(findings.len(), 2);
@@ -627,7 +627,7 @@ fn test_parse_with_excluded_rules_in_realistic_scenario() {
     }"#;
 
     // Exclude python.lang rules
-    let runner = SemgrepRunner::new(None, vec!["python.lang".to_string()]);
+    let runner = SemgrepRunner::new(vec![], vec!["python.lang".to_string()]);
     let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
 
     // python.lang.* should be excluded, only javascript should remain
@@ -639,12 +639,12 @@ fn test_parse_with_excluded_rules_in_realistic_scenario() {
 fn test_semgrep_runner_clone_for_async() {
     // Verify SemgrepRunner implements Clone (needed for async spawn_blocking)
     let runner = SemgrepRunner::new(
-        Some("/config.yml".to_string()),
+        vec!["/config.yml".to_string()],
         vec!["rule1".to_string(), "rule2".to_string()],
     );
 
     let runner_clone = runner.clone();
 
-    assert_eq!(runner.config_path, runner_clone.config_path);
+    assert_eq!(runner.rulesets, runner_clone.rulesets);
     assert_eq!(runner.exclude_rules, runner_clone.exclude_rules);
 }
