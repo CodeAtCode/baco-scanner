@@ -5,10 +5,12 @@
 
 use baco::checkpoint::ScanPhase;
 use baco::config::{
-    LlmConfig, LlmPhasesConfig, OutputConfig, PerformanceSettings, ScannerSettings,
+    LlmConfig, LlmPhasesConfig, OutputConfig, PerformanceSettings, ProjectConfig, ScannerConfig,
+    ScannerSettings, SemgrepSettings,
 };
 use baco::findings::{Severity, VulnerabilityFinding};
 use baco::scanner::Scanner;
+use indicatif::{MultiProgress, ProgressBar};
 use std::fs;
 use std::path::PathBuf;
 use tempfile::TempDir;
@@ -891,4 +893,332 @@ async fn test_scanner_run_nonexistent_target() {
 
     // Run the scanner - just verify it doesn't panic
     let _ = scanner.run().await;
+}
+
+// ============================================================================
+// Tests migrated from src/scanner/core.rs inline #[cfg(test)] block
+// ============================================================================
+
+fn create_test_config_core_migrated() -> ScannerConfig {
+    ScannerConfig {
+        project: ProjectConfig {
+            name: "test-project".to_string(),
+            path: "/tmp/test-project".to_string(),
+            languages: vec![],
+        },
+        output: OutputConfig {
+            dir: "/tmp/test-output".to_string(),
+            evidence_gate: false,
+            include_rejected: false,
+        },
+        scanner: ScannerSettings {
+            max_file_size_kb: 1024,
+            exclude_paths: vec![],
+            semgrep: SemgrepSettings::default(),
+            performance: PerformanceSettings::default(),
+        },
+        llm: LlmConfig {
+            timeout_secs: 30,
+            max_retries: 3,
+            retry_backoff_ms: 1000,
+            max_concurrent: 4,
+            phases: LlmPhasesConfig::default(),
+            temperature: 0.5,
+            max_reasoning_tokens: None,
+            enable_llm_cache: false,
+            cache_dir: None,
+        },
+        tickets: Default::default(),
+        agent: Default::default(),
+        router: Default::default(),
+        aggregation: Default::default(),
+        rulesynth: Default::default(),
+        normalization: Default::default(),
+        cpg: Default::default(),
+        exploit: Default::default(),
+        validate: Default::default(),
+        vultriage: Default::default(),
+        policy_sampling: Default::default(),
+        agent_scaffold: Default::default(),
+        pacvd: Default::default(),
+        agent_flow: Default::default(),
+        vuln_spec: Default::default(),
+        citation_verification: Default::default(),
+        triage: Default::default(),
+        priority: Default::default(),
+        budget: Default::default(),
+        prior_runs: Default::default(),
+        org_context: Default::default(),
+        knowledge: Default::default(),
+    }
+}
+
+fn create_test_finding_core_migrated(id: &str) -> VulnerabilityFinding {
+    VulnerabilityFinding {
+        id: id.to_string(),
+        title: "Test".to_string(),
+        description: "Test desc".to_string(),
+        severity: Severity::Medium,
+        confidence_score: 0.5,
+        cwe_id: None,
+        file_path: "test.rs".to_string(),
+        line_number: None,
+        code_snippet: None,
+        diff_hunk: None,
+        recommendation: None,
+        code_location: None,
+        already_reported: false,
+        sources: vec![],
+        commit_reference: None,
+        ticket_reference: None,
+        priority_score: None,
+        cross_file_references: None,
+        verification_status: None,
+        verification_notes: None,
+        verification_error: None,
+        agent_evidence_path: None,
+        security_issue: None,
+        poc_code: None,
+        mitigation_code: None,
+        poc_format: None,
+        llm_model: None,
+        agent_mode: false,
+        statement_range: None,
+        triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
+    }
+}
+
+#[test]
+fn test_scanner_new_creates_initial_state_inline_migrated() {
+    let config = create_test_config_core_migrated();
+    let target_path = PathBuf::from("/tmp/test-target");
+    let scanner = baco::scanner::Scanner::new(config.clone(), target_path.clone(), false);
+
+    assert_eq!(scanner.config.project.name, "test-project");
+    assert_eq!(scanner.target_path, target_path);
+    assert_eq!(scanner.state.borrow().findings.len(), 0);
+    assert_eq!(scanner.state.borrow().current_phase, ScanPhase::Indexing);
+    assert_eq!(scanner.state.borrow().files_scanned, 0);
+    assert_eq!(scanner.state.borrow().errors.len(), 0);
+}
+
+#[test]
+fn test_scanner_with_initial_findings_inline_migrated() {
+    let config = create_test_config_core_migrated();
+    let target_path = PathBuf::from("/tmp/test-target");
+    let initial_findings = vec![VulnerabilityFinding {
+        id: "test-1".to_string(),
+        title: "Test Finding".to_string(),
+        description: "Test description".to_string(),
+        severity: Severity::High,
+        confidence_score: 0.8,
+        cwe_id: Some("CWE-79".to_string()),
+        file_path: "test.c".to_string(),
+        line_number: Some(42),
+        code_snippet: None,
+        diff_hunk: None,
+        recommendation: None,
+        code_location: None,
+        already_reported: false,
+        sources: vec![],
+        commit_reference: None,
+        ticket_reference: None,
+        priority_score: None,
+        cross_file_references: None,
+        verification_status: None,
+        verification_notes: None,
+        verification_error: None,
+        agent_evidence_path: None,
+        security_issue: None,
+        poc_code: None,
+        mitigation_code: None,
+        poc_format: None,
+        llm_model: None,
+        agent_mode: false,
+        statement_range: None,
+        triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
+    }];
+
+    let scanner = baco::scanner::Scanner::with_initial_findings(
+        config,
+        target_path,
+        initial_findings.clone(),
+        false,
+    );
+
+    assert_eq!(scanner.state.borrow().findings.len(), 1);
+    assert_eq!(scanner.state.borrow().findings[0].id, "test-1");
+}
+
+#[test]
+fn test_scanner_force_flag_inline_migrated() {
+    let config = create_test_config_core_migrated();
+    let target_path = PathBuf::from("/tmp/test-target");
+    let scanner = baco::scanner::Scanner::new(config, target_path, true);
+
+    assert!(scanner.force);
+}
+
+#[test]
+fn test_scanner_findings_method_inline_migrated() {
+    let config = create_test_config_core_migrated();
+    let target_path = PathBuf::from("/tmp/test-target");
+    let scanner = baco::scanner::Scanner::new(config, target_path, false);
+
+    assert!(scanner.findings().is_empty());
+
+    scanner.add_finding(create_test_finding_core_migrated("test-1"));
+
+    assert_eq!(scanner.findings().len(), 1);
+}
+
+#[test]
+fn test_scanner_findings_mut_method_inline_migrated() {
+    let config = create_test_config_core_migrated();
+    let target_path = PathBuf::from("/tmp/test-target");
+    let scanner = baco::scanner::Scanner::new(config, target_path, false);
+
+    scanner.add_finding(create_test_finding_core_migrated("test-1"));
+    assert_eq!(scanner.findings().len(), 1);
+
+    let new_findings = vec![create_test_finding_core_migrated("test-2")];
+    scanner.update_findings(new_findings.clone());
+    assert_eq!(scanner.findings().len(), 1);
+    assert_eq!(scanner.findings()[0].id, "test-2");
+}
+
+#[test]
+fn test_scanner_target_path_inline_migrated() {
+    let config = create_test_config_core_migrated();
+    let target_path = PathBuf::from("/custom/path/to/project");
+    let scanner = baco::scanner::Scanner::new(config, target_path.clone(), false);
+
+    assert_eq!(scanner.target_path(), &target_path);
+}
+
+#[test]
+fn test_scanner_checkpoint_path_computed_from_config_inline_migrated() {
+    let mut config = create_test_config_core_migrated();
+    config.output.dir = "/tmp/custom-output".to_string();
+    let target_path = PathBuf::from("/tmp/target");
+    let scanner = baco::scanner::Scanner::new(config, target_path, false);
+
+    assert_eq!(
+        scanner.checkpoint_path,
+        PathBuf::from("/tmp/custom-output/checkpoint.json")
+    );
+}
+
+#[test]
+fn test_scanner_state_initial_values_inline_migrated() {
+    let config = create_test_config_core_migrated();
+    let target_path = PathBuf::from("/tmp/test-target");
+    let scanner = baco::scanner::Scanner::new(config, target_path, false);
+
+    let state = scanner.state.borrow();
+    assert!(state.findings.is_empty());
+    assert_eq!(state.current_phase, ScanPhase::Indexing);
+    assert_eq!(state.files_scanned, 0);
+    assert!(state.errors.is_empty());
+    assert!(state.cve_entries.is_empty());
+    assert!(state.project_stack.is_none());
+}
+
+#[test]
+fn test_scanner_metrics_tracker_initialization_inline_migrated() {
+    let config = create_test_config_core_migrated();
+    let target_path = PathBuf::from("/tmp/test-target");
+    let _scanner = baco::scanner::Scanner::new(config, target_path, false);
+}
+
+#[test]
+fn test_scanner_with_different_force_values_inline_migrated() {
+    let config = create_test_config_core_migrated();
+    let target_path = PathBuf::from("/tmp/test-target");
+
+    let scanner_force = baco::scanner::Scanner::new(config.clone(), target_path.clone(), true);
+    let scanner_no_force = baco::scanner::Scanner::new(config, target_path, false);
+
+    assert!(scanner_force.force);
+    assert!(!scanner_no_force.force);
+}
+
+#[test]
+fn test_scanner_checkpoint_path_with_nested_output_dir_inline_migrated() {
+    let mut config = create_test_config_core_migrated();
+    config.output.dir = "/tmp/output/nested/path".to_string();
+    let target_path = PathBuf::from("/tmp/target");
+    let scanner = baco::scanner::Scanner::new(config, target_path, false);
+
+    assert_eq!(
+        scanner.checkpoint_path,
+        PathBuf::from("/tmp/output/nested/path/checkpoint.json")
+    );
+}
+
+#[tokio::test]
+async fn test_check_early_termination_below_threshold_inline_migrated() {
+    let config = create_test_config_core_migrated();
+    let target_path = PathBuf::from("/tmp/test-target");
+    let scanner = baco::scanner::Scanner::new(config, target_path, false);
+
+    let findings = vec![create_test_finding_core_migrated("test-1")];
+
+    let multi_progress = MultiProgress::new();
+    let pb = multi_progress.add(ProgressBar::new(100));
+
+    let result = scanner
+        .check_early_termination(&findings, &[], &ScanPhase::Indexing, &pb)
+        .await;
+
+    assert!(result.is_ok());
+    assert!(!result.unwrap());
+}
+
+#[tokio::test]
+async fn test_check_early_termination_above_threshold_inline_migrated() {
+    let mut config = create_test_config_core_migrated();
+    config.scanner.performance.early_termination_threshold = 2.0;
+    let target_path = PathBuf::from("/tmp/test-target");
+    let scanner = baco::scanner::Scanner::new(config, target_path, false);
+
+    let findings: Vec<VulnerabilityFinding> = (0..5)
+        .map(|i| create_test_finding_core_migrated(&format!("test-{}", i)))
+        .collect();
+
+    let multi_progress = MultiProgress::new();
+    let pb = multi_progress.add(ProgressBar::new(100));
+
+    let result = scanner
+        .check_early_termination(&findings, &[], &ScanPhase::Indexing, &pb)
+        .await;
+
+    assert!(result.is_ok());
+    assert!(result.unwrap());
+}
+
+#[tokio::test]
+async fn test_check_early_termination_disabled_inline_migrated() {
+    let mut config = create_test_config_core_migrated();
+    config.scanner.performance.early_termination_threshold = 0.0;
+    let target_path = PathBuf::from("/tmp/test-target");
+    let scanner = baco::scanner::Scanner::new(config, target_path, false);
+
+    let findings: Vec<VulnerabilityFinding> = (0..10000)
+        .map(|i| create_test_finding_core_migrated(&format!("test-{}", i)))
+        .collect();
+
+    let multi_progress = MultiProgress::new();
+    let pb = multi_progress.add(ProgressBar::new(100));
+
+    let result = scanner
+        .check_early_termination(&findings, &[], &ScanPhase::Indexing, &pb)
+        .await;
+
+    assert!(result.is_ok());
+    assert!(!result.unwrap());
 }

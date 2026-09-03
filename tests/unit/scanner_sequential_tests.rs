@@ -426,3 +426,100 @@ fn test_finding_with_all_phases() {
         };
     }
 }
+
+// ============================================================================
+// Tests migrated from src/scanner/sequential.rs inline #[cfg(test)] block
+// ============================================================================
+
+use baco::scanner::sequential::{get_phase_message, SEQUENTIAL_PHASES};
+
+#[test]
+fn test_get_phase_message_llm_discovery_inline_migrated() {
+    let msg = get_phase_message(&ScanPhase::LlmDiscovery, 1, 16);
+    assert!(msg.contains("Phase 1/16"));
+    assert!(msg.contains("LLM discovery"));
+    assert!(msg.contains("enriching findings"));
+}
+
+#[test]
+fn test_get_phase_message_llm_verification_inline_migrated() {
+    let msg = get_phase_message(&ScanPhase::LlmVerification, 2, 16);
+    assert!(msg.contains("Phase 2/16"));
+    assert!(msg.contains("LLM verification"));
+    assert!(msg.contains("validating findings"));
+}
+
+#[test]
+fn test_get_phase_message_security_agent_verification_inline_migrated() {
+    let msg = get_phase_message(&ScanPhase::SecurityAgentVerification, 3, 16);
+    assert!(msg.contains("Phase 3/16"));
+    assert!(msg.contains("SecurityAgent verification"));
+    assert!(msg.contains("tool-based validation"));
+}
+
+#[test]
+fn test_get_phase_message_git_analysis_inline_migrated() {
+    let msg = get_phase_message(&ScanPhase::GitAnalysis, 5, 16);
+    assert!(msg.contains("Phase 5/16"));
+    assert!(msg.contains("Analyzing Git history"));
+    assert!(msg.contains("related commits"));
+}
+
+#[test]
+fn test_get_phase_message_threat_modeling_inline_migrated() {
+    let msg = get_phase_message(&ScanPhase::ThreatModeling, 10, 16);
+    assert!(msg.contains("Phase 10/16"));
+    assert!(msg.contains("Threat modeling"));
+    assert!(msg.contains("STRIDE analysis"));
+}
+
+#[test]
+fn test_get_phase_message_auto_patching_inline_migrated() {
+    let msg = get_phase_message(&ScanPhase::AutoPatching, 14, 16);
+    assert!(msg.contains("Phase 14/16"));
+    assert!(msg.contains("Auto-patching"));
+    assert!(msg.contains("staging validation"));
+}
+
+#[test]
+fn test_get_phase_message_unknown_phase_inline_migrated() {
+    let msg = get_phase_message(&ScanPhase::Indexing, 0, 16);
+    assert!(msg.contains("Phase 0/16"));
+    assert!(msg.contains("Indexing"));
+}
+
+#[test]
+fn test_sequential_phases_count_inline_migrated() {
+    assert_eq!(SEQUENTIAL_PHASES.len(), 16);
+}
+
+#[test]
+fn test_sequential_phases_order_inline_migrated() {
+    assert_eq!(SEQUENTIAL_PHASES[0], ScanPhase::LlmDiscovery);
+    assert_eq!(SEQUENTIAL_PHASES[1], ScanPhase::LlmVerification);
+    assert_eq!(SEQUENTIAL_PHASES[8], ScanPhase::Reporting);
+}
+
+#[test]
+fn test_sequential_phases_contains_all_v3_features_inline_migrated() {
+    let phases = SEQUENTIAL_PHASES;
+    assert!(phases.contains(&ScanPhase::ThreatModeling));
+    assert!(phases.contains(&ScanPhase::RootCauseDedup));
+    assert!(phases.contains(&ScanPhase::MultiVerifier));
+    assert!(phases.contains(&ScanPhase::AutoPatching));
+    assert!(phases.contains(&ScanPhase::CveBootstrap));
+    assert!(phases.contains(&ScanPhase::PocCompiler));
+    assert!(phases.contains(&ScanPhase::VariantSearch));
+}
+
+#[test]
+fn test_sequential_phases_no_duplicates_inline_migrated() {
+    let mut unique_phases: std::collections::HashSet<_> = std::collections::HashSet::new();
+    for phase in SEQUENTIAL_PHASES.iter() {
+        assert!(
+            unique_phases.insert(phase.clone()),
+            "Duplicate phase found: {:?}",
+            phase
+        );
+    }
+}

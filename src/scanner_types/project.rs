@@ -60,29 +60,3 @@ impl MajorityVerdict {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_majority_verdict() {
-        let verdicts = vec![
-            VerifierVerdict::Confirmed,
-            VerifierVerdict::Rejected,
-            VerifierVerdict::Confirmed,
-        ];
-
-        let majority = MajorityVerdict::new(VerifierVerdict::Confirmed, 0.67, verdicts.clone());
-
-        assert_eq!(majority.final_verdict, VerifierVerdict::Confirmed);
-        assert_eq!(
-            majority
-                .vote_count
-                .get(&VerifierVerdict::Confirmed)
-                .unwrap(),
-            &2
-        );
-        assert_eq!(majority.confidence, 0.67);
-    }
-}

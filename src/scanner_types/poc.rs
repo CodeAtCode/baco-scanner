@@ -36,20 +36,3 @@ impl PoCCompileResult {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_poc_compile_result() {
-        let success = PoCCompileResult::success("rust");
-        assert!(success.compiles);
-        assert!(success.errors.is_empty());
-
-        let failure =
-            PoCCompileResult::failure("python", vec!["SyntaxError: invalid syntax".to_string()]);
-        assert!(!failure.compiles);
-        assert_eq!(failure.errors.len(), 1);
-    }
-}

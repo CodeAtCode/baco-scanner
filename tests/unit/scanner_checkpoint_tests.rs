@@ -562,3 +562,346 @@ fn test_checkpoint_multiple_save_load_cycles() {
 
     let _ = fs::remove_file(&temp_path);
 }
+
+// ============================================================================
+// Tests migrated from src/scanner/checkpoint.rs inline #[cfg(test)] block
+// ============================================================================
+
+use chrono::Utc;
+
+#[test]
+fn test_save_load_roundtrip_inline_migrated() {
+    let checkpoint = Checkpoint::new("test-scan-123", "/tmp/test-project", Utc::now());
+
+    let temp_path = "/tmp/test_checkpoint.json";
+    checkpoint.save(temp_path).unwrap();
+
+    let loaded = Checkpoint::load(temp_path).unwrap();
+    assert_eq!(checkpoint.scan_id, loaded.scan_id);
+    assert_eq!(checkpoint.project_path, loaded.project_path);
+    assert_eq!(checkpoint.current_phase, loaded.current_phase);
+
+    let _ = fs::remove_file(temp_path);
+}
+
+#[test]
+fn test_validate_corrupted_inline_migrated() {
+    let corrupted = r#"{"scan_id":"","project_path":"test","started_at":"2024-01-01T00:00:00Z","current_phase":"Indexing","completed_phases":[],"findings_so_far":[],"file_count":0}"#;
+
+    let temp_path = "/tmp/test_corrupted.json";
+    fs::write(temp_path, corrupted).unwrap();
+
+    let result = Checkpoint::load(temp_path);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("empty"));
+
+    let _ = fs::remove_file(temp_path);
+}
+
+#[test]
+fn test_resume_from_returns_correct_phase_inline_migrated() {
+    let checkpoint = Checkpoint::new("test", "/tmp", Utc::now());
+    let temp_path = "/tmp/test_resume.json";
+    checkpoint.save(temp_path).unwrap();
+
+    let next_phase = Checkpoint::resume_from(temp_path).unwrap();
+    assert_eq!(next_phase, ScanPhase::Semgrep);
+
+    let _ = fs::remove_file(temp_path);
+}
+
+#[test]
+fn test_resume_from_all_phases_inline_migrated() {
+    let all_phases = vec![
+        ScanPhase::Indexing,
+        ScanPhase::Semgrep,
+        ScanPhase::LlmDiscovery,
+        ScanPhase::LlmVerification,
+        ScanPhase::TicketCrossRef,
+        ScanPhase::GitAnalysis,
+        ScanPhase::CrossFileAnalysis,
+        ScanPhase::ConfidenceScoring,
+        ScanPhase::AiAggregation,
+        ScanPhase::Reporting,
+        ScanPhase::Complete,
+        ScanPhase::Error,
+    ];
+    for phase in all_phases {
+        let checkpoint = Checkpoint::new("test", "/tmp", Utc::now());
+        let temp_path = format!("/tmp/test_resume_{:?}.json", phase);
+        checkpoint.save(&temp_path).unwrap();
+
+        let _next_phase = Checkpoint::resume_from(&temp_path).unwrap();
+
+        let _ = fs::remove_file(&temp_path);
+    }
+}
+
+#[test]
+fn test_validate_missing_scan_id_inline_migrated() {
+    let corrupted = r#"{"scan_id":"","project_path":"test","started_at":"2024-01-01T00:00:00Z","current_phase":"Indexing","completed_phases":[],"findings_so_far":[],"file_count":0}"#;
+    let temp_path = "/tmp/test_scan_id.json";
+    fs::write(temp_path, corrupted).unwrap();
+
+    let result = Checkpoint::load(temp_path);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("scan_id"));
+
+    let _ = fs::remove_file(temp_path);
+}
+
+#[test]
+fn test_validate_missing_project_path_inline_migrated() {
+    let corrupted = r#"{"scan_id":"test123","project_path":"","started_at":"2024-01-01T00:00:00Z","current_phase":"Indexing","completed_phases":[],"findings_so_far":[],"file_count":0}"#;
+    let temp_path = "/tmp/test_project_path.json";
+    fs::write(temp_path, corrupted).unwrap();
+
+    let result = Checkpoint::load(temp_path);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("project_path"));
+
+    let _ = fs::remove_file(temp_path);
+}
+
+#[test]
+fn test_resume_from_invalid_file_inline_migrated() {
+    let temp_path = "/tmp/test_invalid_12345.json";
+    fs::write(temp_path, "not json at all").unwrap();
+
+    let result = Checkpoint::resume_from(temp_path);
+    assert!(result.is_err());
+    let _ = fs::remove_file(temp_path);
+}
+
+#[test]
+fn test_load_malformed_json_inline_migrated() {
+    let temp_path = "/tmp/test_malformed.json";
+    fs::write(temp_path, "{ invalid json }").unwrap();
+
+    let result = Checkpoint::load(temp_path);
+    assert!(result.is_err());
+
+    let _ = fs::remove_file(temp_path);
+}
+
+#[test]
+fn test_load_empty_file_inline_migrated() {
+    let temp_path = "/tmp/test_empty.json";
+    fs::write(temp_path, "").unwrap();
+
+    let result = Checkpoint::load(temp_path);
+    assert!(result.is_err());
+
+    let _ = fs::remove_file(temp_path);
+}
+
+#[test]
+fn test_validate_directly_inline_migrated() {
+    let valid_json = r#"{"scan_id":"test123","project_path":"/tmp/test","started_at":"2024-01-01T00:00:00Z","current_phase":"Indexing","completed_phases":[],"findings_so_far":[],"file_count":0}"#;
+    let temp_path = "/tmp/test_validate.json";
+    fs::write(temp_path, valid_json).unwrap();
+
+    let checkpoint = Checkpoint::load(temp_path).unwrap();
+    let result = checkpoint.validate();
+    assert!(result.is_ok());
+
+    let _ = fs::remove_file(temp_path);
+}
+
+#[test]
+fn test_checkpoint_new_initializes_correctly_inline_migrated() {
+    let scan_id = "test-scan-456";
+    let project_path = "/tmp/my-project";
+    let now = Utc::now();
+
+    let checkpoint = Checkpoint::new(scan_id, project_path, now);
+
+    assert_eq!(checkpoint.scan_id, scan_id);
+    assert_eq!(checkpoint.project_path, project_path);
+    assert_eq!(checkpoint.current_phase, ScanPhase::Indexing);
+    assert!(checkpoint.completed_phases.is_empty());
+    assert!(checkpoint.findings_so_far.is_empty());
+    assert_eq!(checkpoint.file_count, 0);
+}
+
+#[test]
+fn test_checkpoint_clone_inline_migrated() {
+    let checkpoint = Checkpoint::new("test", "/tmp", Utc::now());
+    let cloned = checkpoint.clone();
+
+    assert_eq!(checkpoint.scan_id, cloned.scan_id);
+    assert_eq!(checkpoint.project_path, cloned.project_path);
+    assert_eq!(checkpoint.current_phase, cloned.current_phase);
+}
+
+#[test]
+fn test_checkpoint_serialization_roundtrip_inline_migrated() {
+    let mut checkpoint = Checkpoint::new("test", "/tmp", Utc::now());
+    checkpoint.file_count = 100;
+
+    let temp_path = "/tmp/test_serialization.json";
+    checkpoint.save(temp_path).unwrap();
+
+    let loaded = Checkpoint::load(temp_path).unwrap();
+    assert_eq!(checkpoint.file_count, loaded.file_count);
+
+    let _ = fs::remove_file(temp_path);
+}
+
+#[test]
+fn test_checkpoint_with_findings_inline_migrated() {
+    let mut checkpoint = Checkpoint::new("test", "/tmp", Utc::now());
+    let finding = baco::findings::VulnerabilityFinding {
+        id: "test-1".to_string(),
+        title: "Test".to_string(),
+        description: "Test desc".to_string(),
+        severity: baco::findings::Severity::Medium,
+        confidence_score: 0.5,
+        cwe_id: None,
+        file_path: "test.rs".to_string(),
+        line_number: None,
+        code_snippet: None,
+        diff_hunk: None,
+        recommendation: None,
+        code_location: None,
+        already_reported: false,
+        sources: vec![],
+        commit_reference: None,
+        ticket_reference: None,
+        priority_score: None,
+        cross_file_references: None,
+        verification_status: None,
+        verification_notes: None,
+        verification_error: None,
+        agent_evidence_path: None,
+        security_issue: None,
+        poc_code: None,
+        mitigation_code: None,
+        poc_format: None,
+        llm_model: None,
+        agent_mode: false,
+        statement_range: None,
+        triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
+    };
+    checkpoint.findings_so_far.push(finding);
+
+    let temp_path = "/tmp/test_findings.json";
+    checkpoint.save(temp_path).unwrap();
+
+    let loaded = Checkpoint::load(temp_path).unwrap();
+    assert_eq!(
+        checkpoint.findings_so_far.len(),
+        loaded.findings_so_far.len()
+    );
+
+    let _ = fs::remove_file(temp_path);
+}
+
+#[test]
+fn test_checkpoint_with_analyzed_files_inline_migrated() {
+    let mut checkpoint = Checkpoint::new("test", "/tmp", Utc::now());
+    checkpoint.file_count = 150;
+
+    let temp_path = "/tmp/test_analyzed.json";
+    checkpoint.save(temp_path).unwrap();
+
+    let loaded = Checkpoint::load(temp_path).unwrap();
+    assert_eq!(checkpoint.file_count, loaded.file_count);
+
+    let _ = fs::remove_file(temp_path);
+}
+
+#[test]
+fn test_checkpoint_with_completed_phases_inline_migrated() {
+    let mut checkpoint = Checkpoint::new("test", "/tmp", Utc::now());
+    checkpoint.completed_phases = vec![ScanPhase::Indexing, ScanPhase::Semgrep];
+
+    let temp_path = "/tmp/test_phases.json";
+    checkpoint.save(temp_path).unwrap();
+
+    let loaded = Checkpoint::load(temp_path).unwrap();
+    assert_eq!(
+        checkpoint.completed_phases.len(),
+        loaded.completed_phases.len()
+    );
+
+    let _ = fs::remove_file(temp_path);
+}
+
+#[test]
+fn test_checkpoint_with_file_count_inline_migrated() {
+    let mut checkpoint = Checkpoint::new("test", "/tmp", Utc::now());
+    checkpoint.file_count = 150;
+
+    let temp_path = "/tmp/test_count.json";
+    checkpoint.save(temp_path).unwrap();
+
+    let loaded = Checkpoint::load(temp_path).unwrap();
+    assert_eq!(checkpoint.file_count, loaded.file_count);
+
+    let _ = fs::remove_file(temp_path);
+}
+
+#[test]
+fn test_scan_phase_equality_inline_migrated() {
+    assert_eq!(ScanPhase::Indexing, ScanPhase::Indexing);
+    assert_ne!(ScanPhase::Indexing, ScanPhase::Semgrep);
+}
+
+#[test]
+fn test_resume_from_complete_phase_inline_migrated() {
+    let mut checkpoint = Checkpoint::new("test", "/tmp", Utc::now());
+    checkpoint.current_phase = ScanPhase::Complete;
+
+    let temp_path = "/tmp/test_complete.json";
+    checkpoint.save(temp_path).unwrap();
+
+    let result = Checkpoint::resume_from(temp_path);
+    assert!(result.is_ok());
+
+    let _ = fs::remove_file(temp_path);
+}
+
+#[test]
+fn test_resume_from_error_phase_inline_migrated() {
+    let mut checkpoint = Checkpoint::new("test", "/tmp", Utc::now());
+    checkpoint.current_phase = ScanPhase::Error;
+
+    let temp_path = "/tmp/test_error.json";
+    checkpoint.save(temp_path).unwrap();
+
+    let result = Checkpoint::resume_from(temp_path);
+    assert!(result.is_ok());
+
+    let _ = fs::remove_file(temp_path);
+}
+
+#[test]
+fn test_resume_from_all_phase_transitions_inline_migrated() {
+    let transitions = vec![
+        (ScanPhase::Indexing, ScanPhase::Semgrep),
+        (ScanPhase::Semgrep, ScanPhase::CpgSlice),
+    ];
+
+    for (from, expected_next) in transitions {
+        let mut checkpoint = Checkpoint::new("test", "/tmp", Utc::now());
+        checkpoint.current_phase = from.clone();
+
+        let temp_path = format!("/tmp/test_transition_{:?}.json", from);
+        checkpoint.save(&temp_path).unwrap();
+
+        let next_phase = Checkpoint::resume_from(&temp_path).unwrap();
+        assert_eq!(next_phase, expected_next);
+
+        let _ = fs::remove_file(&temp_path);
+    }
+}
+
+#[test]
+fn test_checkpoint_nonexistent_file_inline_migrated() {
+    let result = Checkpoint::load("/nonexistent/path/checkpoint.json");
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("read"));
+}

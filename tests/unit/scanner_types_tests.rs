@@ -749,3 +749,89 @@ fn test_rubric_score_serialization_roundtrip() {
 
     assert_eq!(score, deserialized);
 }
+
+// ============================================================================
+// Tests migrated from src/scanner_types/ inline #[cfg(test)] blocks
+// ============================================================================
+
+#[test]
+fn test_poc_compile_result_inline_migrated() {
+    let success = PoCCompileResult::success("rust");
+    assert!(success.compiles);
+    assert!(success.errors.is_empty());
+
+    let failure =
+        PoCCompileResult::failure("python", vec!["SyntaxError: invalid syntax".to_string()]);
+    assert!(!failure.compiles);
+    assert_eq!(failure.errors.len(), 1);
+}
+
+#[test]
+fn test_patch_validation_result_inline_migrated() {
+    let success = PatchValidationResult::success();
+    assert!(success.compiles);
+    assert!(success.tests_pass);
+    assert!(success.error_message.is_none());
+
+    let failure = PatchValidationResult::failure("Syntax error");
+    assert!(!failure.compiles);
+    assert!(!failure.tests_pass);
+    assert_eq!(failure.error_message, Some("Syntax error".to_string()));
+}
+
+#[test]
+fn test_cve_entry_creation_inline_migrated() {
+    let cve = CveEntry::new(
+        "CVE-2024-1234",
+        "Test vulnerability",
+        V3Severity::High,
+        CveSource::KEV,
+    );
+
+    assert_eq!(cve.cve_id, "CVE-2024-1234");
+    assert_eq!(cve.severity, V3Severity::High);
+    assert_eq!(cve.source, CveSource::KEV);
+}
+
+#[test]
+fn test_root_cause_group_inline_migrated() {
+    let mut group = RootCauseGroup::new("abc123", "Missing authentication", V3Severity::Critical);
+
+    group.add_finding("f1", "src/auth.rs", 42);
+    group.add_finding("f2", "src/api.rs", 108);
+
+    assert_eq!(group.findings.len(), 2);
+    assert_eq!(group.all_locations.len(), 2);
+    assert_eq!(group.all_locations[0], ("src/auth.rs".to_string(), 42));
+}
+
+#[test]
+fn test_majority_verdict_inline_migrated() {
+    let verdicts = vec![
+        VerifierVerdict::Confirmed,
+        VerifierVerdict::Rejected,
+        VerifierVerdict::Confirmed,
+    ];
+
+    let majority = MajorityVerdict::new(VerifierVerdict::Confirmed, 0.67, verdicts.clone());
+
+    assert_eq!(majority.final_verdict, VerifierVerdict::Confirmed);
+    assert_eq!(
+        majority
+            .vote_count
+            .get(&VerifierVerdict::Confirmed)
+            .unwrap(),
+        &2
+    );
+    assert_eq!(majority.confidence, 0.67);
+}
+
+#[test]
+fn test_serialization_roundtrip_inline_migrated() {
+    let rubric = SeverityRubric::new(0.8, 0.9, 0.7, true, AccessType::Both, BlastRadius::Critical);
+
+    let serialized = serde_json::to_string(&rubric).unwrap();
+    let deserialized: SeverityRubric = serde_json::from_str(&serialized).unwrap();
+
+    assert_eq!(rubric, deserialized);
+}

@@ -15,7 +15,7 @@ pub static EMBEDDING_INDEX: Lazy<RwLock<SpecEmbeddingIndex>> =
     Lazy::new(|| RwLock::new(SpecEmbeddingIndex::new()));
 
 /// Maximum number of dimensions for embeddings
-const EMBEDDING_DIM: usize = 768;
+pub const EMBEDDING_DIM: usize = 768;
 
 /// Specification embedding index with vector and BM25 support
 #[derive(Default)]
@@ -81,7 +81,7 @@ impl SpecEmbeddingIndex {
 
 /// Simplified BM25 index implementation
 #[derive(Default)]
-struct Bm25Index {
+pub struct Bm25Index {
     /// Document frequencies for each term
     doc_freq: HashMap<String, usize>,
     /// Document terms (inverted index)
@@ -95,7 +95,7 @@ struct Bm25Index {
 }
 
 impl Bm25Index {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             doc_freq: HashMap::new(),
             doc_terms: HashMap::new(),
@@ -105,7 +105,7 @@ impl Bm25Index {
         }
     }
 
-    fn index(&mut self, doc_id: usize, text: &str) {
+    pub fn index(&mut self, doc_id: usize, text: &str) {
         let terms = self.tokenize(text);
         let _term_count = terms.len() as f64;
 
@@ -143,7 +143,7 @@ impl Bm25Index {
             .collect()
     }
 
-    fn search(&self, query: &str, top_k: usize) -> Vec<(usize, f32)> {
+    pub fn search(&self, query: &str, top_k: usize) -> Vec<(usize, f32)> {
         let query_terms = self.tokenize(query);
         let mut scores: HashMap<usize, f32> = HashMap::new();
 
@@ -202,7 +202,7 @@ pub fn build_embedding_index(specs: &[SecuritySpecification]) -> Result<(), Stri
 }
 
 /// Generate a simple embedding (placeholder for actual embedding model)
-fn generate_embedding(text: &str) -> Vec<f32> {
+pub fn generate_embedding(text: &str) -> Vec<f32> {
     // This is a simple hash-based embedding for demonstration
     // In production, this would use a proper embedding model like sentence-transformers
     let mut embedding = vec![0.0f32; EMBEDDING_DIM];
@@ -225,7 +225,7 @@ fn generate_embedding(text: &str) -> Vec<f32> {
 }
 
 /// Cosine similarity between two vectors
-fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
+pub fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
     let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
     let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
@@ -241,7 +241,7 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
 ///
 /// Formula: RRF(d) = Σ 1/(k + rank_i(d))
 /// where k=60 (standard) and rank_i(d) is the rank of document d in result list i
-fn reciprocal_rank_fusion(
+pub fn reciprocal_rank_fusion(
     bm25_results: Vec<(usize, f32)>,
     vector_results: Vec<(usize, f32)>,
     k: usize,
@@ -282,7 +282,7 @@ fn reciprocal_rank_fusion(
 }
 
 /// Hybrid search combining BM25 and vector similarity using Reciprocal Rank Fusion
-fn hybrid_search(query: &str, top_k: usize) -> Vec<(usize, f32)> {
+pub fn hybrid_search(query: &str, top_k: usize) -> Vec<(usize, f32)> {
     let index = EMBEDDING_INDEX.read().expect("Failed to acquire read lock");
 
     // BM25 search
@@ -396,245 +396,4 @@ pub fn get_index_stats() -> IndexStats {
 pub struct IndexStats {
     pub num_documents: usize,
     pub num_embeddings: usize,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::sync::Mutex;
-
-    static INDEX_LOCK: Mutex<()> = Mutex::new(());
-
-    // Test helper to get spec count
-    fn get_spec_count() -> usize {
-        let index = EMBEDDING_INDEX.read().expect("Failed to acquire read lock");
-        index.specs_by_doc.len()
-    }
-
-    #[test]
-    fn test_build_embedding_index() {
-        let _guard = INDEX_LOCK.lock().unwrap();
-        let specs = vec![
-            SecuritySpecification {
-                id: "spec-1".to_string(),
-                vuln_type: "CWE-79".to_string(),
-                description: "Cross-site scripting vulnerability".to_string(),
-                safe_behavior_pattern: "Sanitize user input before rendering".to_string(),
-                project_domain: "web-server".to_string(),
-                source_patch_hash: "abc123".to_string(),
-                category: DomainCategory::General,
-            },
-            SecuritySpecification {
-                id: "spec-2".to_string(),
-                vuln_type: "CWE-89".to_string(),
-                description: "SQL injection vulnerability".to_string(),
-                safe_behavior_pattern: "Use parameterized queries".to_string(),
-                project_domain: "database".to_string(),
-                source_patch_hash: "def456".to_string(),
-                category: DomainCategory::DomainSpecific("database".to_string()),
-            },
-        ];
-
-        clear_index();
-        build_embedding_index(&specs).expect("Should build index");
-
-        let stats = get_index_stats();
-        assert!(stats.num_documents >= 2);
-        assert!(stats.num_embeddings >= 2);
-        assert_eq!(get_spec_count(), 2);
-    }
-
-    #[test]
-    fn test_cosine_similarity() {
-        let a = vec![1.0, 0.0, 0.0];
-        let b = vec![1.0, 0.0, 0.0];
-        let c = vec![0.0, 1.0, 0.0];
-
-        assert!((cosine_similarity(&a, &b) - 1.0).abs() < 0.0001);
-        assert!((cosine_similarity(&a, &c) - 0.0).abs() < 0.0001);
-    }
-
-    #[test]
-    fn test_generate_embedding() {
-        let embedding1 = generate_embedding("test");
-        let embedding2 = generate_embedding("test");
-        let embedding3 = generate_embedding("different");
-
-        assert_eq!(embedding1.len(), EMBEDDING_DIM);
-        assert_eq!(
-            embedding1, embedding2,
-            "Same text should produce same embedding"
-        );
-        assert_ne!(
-            embedding1, embedding3,
-            "Different text should produce different embedding"
-        );
-    }
-
-    #[test]
-    fn test_bm25_indexing_and_search() {
-        let mut bm25 = Bm25Index::new();
-
-        bm25.index(
-            0,
-            "SQL injection vulnerability can be prevented with parameterized queries",
-        );
-        bm25.index(
-            1,
-            "Cross-site scripting requires input sanitization and escaping",
-        );
-        bm25.index(
-            2,
-            "Buffer overflow occurs when writing beyond allocated memory",
-        );
-
-        let results = bm25.search("SQL parameterized", 2);
-        assert!(!results.is_empty());
-        assert!(results[0].0 == 0); // Should find SQL document first
-
-        let results2 = bm25.search("sanitization escaping", 2);
-        assert!(!results2.is_empty());
-        assert!(results2[0].0 == 1); // Should find XSS document first
-    }
-
-    #[test]
-    fn test_hybrid_search() {
-        let _guard = INDEX_LOCK.lock().unwrap();
-        // Clear index first
-        clear_index();
-
-        let specs = vec![SecuritySpecification {
-            id: "spec-1".to_string(),
-            vuln_type: "CWE-79".to_string(),
-            description: "XSS vulnerability in web applications".to_string(),
-            safe_behavior_pattern: "Sanitize and escape all user input".to_string(),
-            project_domain: "web-server".to_string(),
-            source_patch_hash: "abc123".to_string(),
-            category: DomainCategory::General,
-        }];
-
-        build_embedding_index(&specs).unwrap();
-
-        let results = hybrid_search("XSS sanitization", 5);
-        assert!(!results.is_empty());
-    }
-
-    #[test]
-    fn test_clear_index() {
-        let _guard = INDEX_LOCK.lock().unwrap();
-        let specs = vec![SecuritySpecification {
-            id: "spec-1".to_string(),
-            vuln_type: "CWE-79".to_string(),
-            description: "Test".to_string(),
-            safe_behavior_pattern: "Test pattern".to_string(),
-            project_domain: "test".to_string(),
-            source_patch_hash: "test".to_string(),
-            category: DomainCategory::General,
-        }];
-
-        build_embedding_index(&specs).unwrap();
-        // Index may already have documents from other tests
-        assert!(get_index_stats().num_documents >= 1);
-
-        clear_index();
-        assert_eq!(get_index_stats().num_documents, 0);
-    }
-
-    #[test]
-    fn test_extract_keywords_integration() {
-        let code = "SELECT * FROM users WHERE id = user_input";
-        let keywords = extract_keywords(code);
-
-        assert!(keywords.contains("select"));
-        assert!(keywords.contains("users"));
-        // Note: 'where' may or may not be filtered depending on implementation
-        // Just verify we got some keywords
-        assert!(!keywords.is_empty());
-    }
-
-    #[test]
-    fn test_reciprocal_rank_fusion_empty_inputs() {
-        // Both empty
-        let result = reciprocal_rank_fusion(vec![], vec![], 60, 10);
-        assert!(result.is_empty());
-    }
-
-    #[test]
-    fn test_reciprocal_rank_fusion_one_empty() {
-        // BM25 empty, vector non-empty
-        let vector_results = vec![(1, 0.9), (2, 0.8), (3, 0.7)];
-        let result = reciprocal_rank_fusion(vec![], vector_results.clone(), 60, 10);
-        assert_eq!(result.len(), 3);
-        assert_eq!(result[0].0, 1); // Highest ranked
-        assert_eq!(result[1].0, 2);
-        assert_eq!(result[2].0, 3);
-
-        // Vector empty, BM25 non-empty
-        let bm25_results = vec![(4, 0.9), (5, 0.8)];
-        let result = reciprocal_rank_fusion(bm25_results.clone(), vec![], 60, 10);
-        assert_eq!(result.len(), 2);
-        assert_eq!(result[0].0, 4);
-        assert_eq!(result[1].0, 5);
-    }
-
-    #[test]
-    fn test_reciprocal_rank_fusion_overlapping_results() {
-        // Same doc in both lists - should have higher RRF score
-        let bm25_results = vec![(1, 0.9), (2, 0.8), (3, 0.7)];
-        let vector_results = vec![(2, 0.85), (4, 0.75), (5, 0.65)];
-
-        let result = reciprocal_rank_fusion(bm25_results, vector_results, 60, 10);
-
-        // Doc 2 appears in both lists, should have highest RRF score
-        assert_eq!(result[0].0, 2);
-
-        // All unique docs should be present
-        let doc_ids: Vec<usize> = result.iter().map(|(id, _)| *id).collect();
-        assert!(doc_ids.contains(&1));
-        assert!(doc_ids.contains(&2));
-        assert!(doc_ids.contains(&3));
-        assert!(doc_ids.contains(&4));
-        assert!(doc_ids.contains(&5));
-    }
-
-    #[test]
-    fn test_reciprocal_rank_fusion_tie_breaking() {
-        // Create scenario where two docs have same RRF score (same rank in both lists)
-        let bm25_results = vec![(5, 0.9), (3, 0.8)];
-        let vector_results = vec![(3, 0.9), (5, 0.8)];
-
-        let result = reciprocal_rank_fusion(bm25_results, vector_results, 60, 10);
-
-        // Both docs have same RRF score (rank 1 in one list, rank 2 in other)
-        // Tie-break by doc_idx ascending, so doc 3 should come before doc 5
-        assert_eq!(result[0].0, 3);
-        assert_eq!(result[1].0, 5);
-    }
-
-    #[test]
-    fn test_reciprocal_rank_fusion_top_k_capping() {
-        let bm25_results = vec![(1, 0.9), (2, 0.8), (3, 0.7), (4, 0.6)];
-        let vector_results = vec![(5, 0.9), (6, 0.8), (7, 0.7), (8, 0.6)];
-
-        // Request only top 3
-        let result = reciprocal_rank_fusion(bm25_results, vector_results, 60, 3);
-
-        assert_eq!(result.len(), 3);
-        // All should be unique
-        let doc_ids: Vec<usize> = result.iter().map(|(id, _)| *id).collect();
-        assert_eq!(doc_ids.len(), 3);
-    }
-
-    #[test]
-    fn test_reciprocal_rank_fusion_rank_calculation() {
-        // Verify RRF formula: 1/(k + rank)
-        let bm25_results = vec![(1, 1.0)]; // rank 1
-        let vector_results = vec![];
-
-        let result = reciprocal_rank_fusion(bm25_results, vector_results, 60, 10);
-
-        // RRF score should be 1/(60 + 1) = 1/61
-        let expected_score = 1.0 / 61.0;
-        assert!((result[0].1 - expected_score).abs() < 1e-10);
-    }
 }

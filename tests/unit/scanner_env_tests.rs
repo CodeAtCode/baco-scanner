@@ -249,3 +249,105 @@ fn test_get_git_remote_url_remote_without_git_suffix() {
     assert!(result.is_some());
     assert_eq!(result.unwrap(), "https://github.com/owner/repo");
 }
+
+// ============================================================================
+// Tests migrated from src/scanner/env.rs inline #[cfg(test)] block
+// ============================================================================
+
+use baco::scanner::extract_owner_repo_from_url;
+
+#[test]
+fn test_extract_owner_repo_from_url_https_inline_migrated() {
+    let url = "https://github.com/owner/repo-name";
+    let result = extract_owner_repo_from_url(url);
+    assert_eq!(result, Some(("owner".to_string(), "repo-name".to_string())));
+}
+
+#[test]
+fn test_extract_owner_repo_from_url_https_no_git_suffix_inline_migrated() {
+    let url = "https://github.com/vercel/next.js";
+    let result = extract_owner_repo_from_url(url);
+    assert_eq!(result, Some(("vercel".to_string(), "next.js".to_string())));
+}
+
+#[test]
+fn test_extract_owner_repo_from_url_ssh_inline_migrated() {
+    let url = "git@github.com:owner/repo-name";
+    let result = extract_owner_repo_from_url(url);
+    assert_eq!(result, Some(("owner".to_string(), "repo-name".to_string())));
+}
+
+#[test]
+fn test_extract_owner_repo_from_url_ssh_with_git_suffix_inline_migrated() {
+    let url = "git@github.com:owner/repo-name.git";
+    let result = extract_owner_repo_from_url(url);
+    assert_eq!(result, Some(("owner".to_string(), "repo-name".to_string())));
+}
+
+#[test]
+fn test_extract_owner_repo_from_url_invalid_inline_migrated() {
+    let url = "invalid-url";
+    let result = extract_owner_repo_from_url(url);
+    assert_eq!(result, None);
+}
+
+#[test]
+fn test_extract_owner_repo_from_url_empty_inline_migrated() {
+    let url = "";
+    let result = extract_owner_repo_from_url(url);
+    assert_eq!(result, None);
+}
+
+#[test]
+fn test_extract_owner_repo_from_url_with_port_inline_migrated() {
+    let url = "https://gitlab.example.com:8080/owner/repo";
+    let result = extract_owner_repo_from_url(url);
+    assert_eq!(result, Some(("owner".to_string(), "repo".to_string())));
+}
+
+#[test]
+fn test_extract_owner_repo_from_url_http_inline_migrated() {
+    let url = "http://bitbucket.org/owner/repo";
+    let result = extract_owner_repo_from_url(url);
+    assert_eq!(result, Some(("owner".to_string(), "repo".to_string())));
+}
+
+#[test]
+fn test_extract_owner_repo_from_url_trailing_whitespace_inline_migrated() {
+    let url = "  https://github.com/owner/repo  ";
+    let result = extract_owner_repo_from_url(url);
+    assert_eq!(result, Some(("owner".to_string(), "repo".to_string())));
+}
+
+#[test]
+fn test_extract_owner_repo_from_various_git_hosts_inline_migrated() {
+    assert_eq!(
+        extract_owner_repo_from_url("https://github.com/rust-lang/rust"),
+        Some(("rust-lang".to_string(), "rust".to_string()))
+    );
+
+    assert_eq!(
+        extract_owner_repo_from_url("https://gitlab.com/gitlab-org/gitlab"),
+        Some(("gitlab-org".to_string(), "gitlab".to_string()))
+    );
+
+    assert_eq!(
+        extract_owner_repo_from_url("git@bitbucket.org:team/project.git"),
+        Some(("team".to_string(), "project".to_string()))
+    );
+}
+
+#[test]
+fn test_extract_owner_repo_from_url_with_subpath_inline_migrated() {
+    assert_eq!(
+        extract_owner_repo_from_url("https://github.com/vercel/next.js"),
+        Some(("vercel".to_string(), "next.js".to_string()))
+    );
+}
+
+#[test]
+fn test_extract_owner_repo_from_url_https_with_git_suffix_inline_migrated() {
+    let url = "https://github.com/owner/repo-name.git";
+    let result = extract_owner_repo_from_url(url);
+    assert_eq!(result, Some(("owner".to_string(), "repo-name".to_string())));
+}

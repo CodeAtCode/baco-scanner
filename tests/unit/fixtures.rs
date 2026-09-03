@@ -635,10 +635,18 @@ pub fn make_semgrep_result(title: &str, file: &str) -> (Vec<VulnerabilityFinding
 }
 
 /// Create LLM static result for parallel scanner tests.
-pub fn make_llm_static_result(title: &str, file: &str) -> (Vec<VulnerabilityFinding>, Vec<String>) {
+pub fn make_llm_static_result(
+    title: &str,
+    file: &str,
+) -> (
+    Vec<VulnerabilityFinding>,
+    Vec<String>,
+    Vec<(VulnerabilityFinding, String)>,
+) {
     (
         vec![create_test_finding_simple(title, Severity::Critical)],
         vec![format!("{}.rs", file)],
+        Vec::new(),
     )
 }
 

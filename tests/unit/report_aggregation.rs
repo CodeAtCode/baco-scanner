@@ -8,10 +8,11 @@
 //! - Full aggregation workflow
 
 use baco::analysis_context::AnalysisContext;
-use baco::findings::{IssueCategory, SecurityIssue, Severity, VerificationStatus, VulnerabilityFinding};
+use baco::findings::{
+    IssueCategory, SecurityIssue, Severity, VerificationStatus, VulnerabilityFinding,
+};
 use baco::report::aggregation::{
-    AggregateStatistics, AggregationResult, ExecutiveSummary, PrioritizedFinding,
-    ReportAggregationPhase,
+    AggregateStatistics, AggregationResult, ExecutiveSummary, ReportAggregationPhase,
 };
 
 use crate::fixtures::make_finding_report_agg;
@@ -60,7 +61,6 @@ fn create_finding_with_category(
         verification_error: None,
         agent_evidence_path: None,
         agent_mode: false,
-        llm_model: None,
         security_issue: Some(SecurityIssue {
             category,
             cwe_id: None,
@@ -71,6 +71,11 @@ fn create_finding_with_category(
         poc_code: None,
         mitigation_code: None,
         poc_format: None,
+        llm_model: None,
+        statement_range: None,
+        triage_verdict: None,
+        evidence: Vec::new(),
+        verification_tier: None,
     }
 }
 
@@ -84,12 +89,33 @@ fn test_deduplicate_same_location_same_cwe() {
 
     // Same file, line, and CWE - should deduplicate to 1
     let findings = vec![
-        create_finding("f1", "Finding 1", "src/test.rs", Some(10), Some("CWE-79"), Severity::High),
-        create_finding("f2", "Finding 2", "src/test.rs", Some(10), Some("CWE-79"), Severity::High),
-        create_finding("f3", "Finding 3", "src/test.rs", Some(10), Some("CWE-79"), Severity::Critical),
+        create_finding(
+            "f1",
+            "Finding 1",
+            "src/test.rs",
+            Some(10),
+            Some("CWE-79"),
+            Severity::High,
+        ),
+        create_finding(
+            "f2",
+            "Finding 2",
+            "src/test.rs",
+            Some(10),
+            Some("CWE-79"),
+            Severity::High,
+        ),
+        create_finding(
+            "f3",
+            "Finding 3",
+            "src/test.rs",
+            Some(10),
+            Some("CWE-79"),
+            Severity::Critical,
+        ),
     ];
 
-    let unique = phase.deduplicate_findings(findings);
+    let unique = phase.deduplicate_findings(findings, None);
     assert_eq!(unique.len(), 1);
 }
 
@@ -99,12 +125,33 @@ fn test_deduplicate_different_locations() {
 
     // Same CWE but different locations - should keep all
     let findings = vec![
-        create_finding("f1", "Finding 1", "src/test.rs", Some(10), Some("CWE-79"), Severity::High),
-        create_finding("f2", "Finding 2", "src/test.rs", Some(20), Some("CWE-79"), Severity::High),
-        create_finding("f3", "Finding 3", "src/other.rs", Some(10), Some("CWE-79"), Severity::High),
+        create_finding(
+            "f1",
+            "Finding 1",
+            "src/test.rs",
+            Some(10),
+            Some("CWE-79"),
+            Severity::High,
+        ),
+        create_finding(
+            "f2",
+            "Finding 2",
+            "src/test.rs",
+            Some(20),
+            Some("CWE-79"),
+            Severity::High,
+        ),
+        create_finding(
+            "f3",
+            "Finding 3",
+            "src/other.rs",
+            Some(10),
+            Some("CWE-79"),
+            Severity::High,
+        ),
     ];
 
-    let unique = phase.deduplicate_findings(findings);
+    let unique = phase.deduplicate_findings(findings, None);
     assert_eq!(unique.len(), 3);
 }
 
@@ -114,12 +161,33 @@ fn test_deduplicate_different_cwe_same_location() {
 
     // Same location but different CWE - should keep all
     let findings = vec![
-        create_finding("f1", "Finding 1", "src/test.rs", Some(10), Some("CWE-79"), Severity::High),
-        create_finding("f2", "Finding 2", "src/test.rs", Some(10), Some("CWE-89"), Severity::High),
-        create_finding("f3", "Finding 3", "src/test.rs", Some(10), Some("CWE-200"), Severity::High),
+        create_finding(
+            "f1",
+            "Finding 1",
+            "src/test.rs",
+            Some(10),
+            Some("CWE-79"),
+            Severity::High,
+        ),
+        create_finding(
+            "f2",
+            "Finding 2",
+            "src/test.rs",
+            Some(10),
+            Some("CWE-89"),
+            Severity::High,
+        ),
+        create_finding(
+            "f3",
+            "Finding 3",
+            "src/test.rs",
+            Some(10),
+            Some("CWE-200"),
+            Severity::High,
+        ),
     ];
 
-    let unique = phase.deduplicate_findings(findings);
+    let unique = phase.deduplicate_findings(findings, None);
     assert_eq!(unique.len(), 3);
 }
 
@@ -127,7 +195,7 @@ fn test_deduplicate_different_cwe_same_location() {
 fn test_deduplicate_empty_input() {
     let phase = ReportAggregationPhase::new();
     let findings: Vec<VulnerabilityFinding> = Vec::new();
-    let unique = phase.deduplicate_findings(findings);
+    let unique = phase.deduplicate_findings(findings, None);
     assert_eq!(unique.len(), 0);
 }
 
@@ -136,11 +204,25 @@ fn test_deduplicate_preserves_first_occurrence() {
     let phase = ReportAggregationPhase::new();
 
     let findings = vec![
-        create_finding("f1", "First Finding", "src/test.rs", Some(10), Some("CWE-79"), Severity::Low),
-        create_finding("f2", "Second Finding", "src/test.rs", Some(10), Some("CWE-79"), Severity::Critical),
+        create_finding(
+            "f1",
+            "First Finding",
+            "src/test.rs",
+            Some(10),
+            Some("CWE-79"),
+            Severity::Low,
+        ),
+        create_finding(
+            "f2",
+            "Second Finding",
+            "src/test.rs",
+            Some(10),
+            Some("CWE-79"),
+            Severity::Critical,
+        ),
     ];
 
-    let unique = phase.deduplicate_findings(findings);
+    let unique = phase.deduplicate_findings(findings, None);
     assert_eq!(unique.len(), 1);
     assert_eq!(unique[0].title, "First Finding");
     assert_eq!(unique[0].severity, Severity::Low);
@@ -171,7 +253,14 @@ fn test_calculate_statistics_severity_counts() {
     let phase = ReportAggregationPhase::new();
 
     let findings = vec![
-        create_finding("f1", "Critical", "src/a.rs", Some(1), None, Severity::Critical),
+        create_finding(
+            "f1",
+            "Critical",
+            "src/a.rs",
+            Some(1),
+            None,
+            Severity::Critical,
+        ),
         create_finding("f2", "High", "src/b.rs", Some(2), None, Severity::High),
         create_finding("f3", "Medium", "src/c.rs", Some(3), None, Severity::Medium),
         create_finding("f4", "Low", "src/d.rs", Some(4), None, Severity::Low),
@@ -195,10 +284,24 @@ fn test_calculate_statistics_verification_status() {
     let mut finding1 = create_finding("f1", "Confirmed", "src/a.rs", Some(1), None, Severity::High);
     finding1.verification_status = Some(VerificationStatus::Confirmed);
 
-    let mut finding2 = create_finding("f2", "False Positive", "src/b.rs", Some(2), None, Severity::High);
+    let mut finding2 = create_finding(
+        "f2",
+        "False Positive",
+        "src/b.rs",
+        Some(2),
+        None,
+        Severity::High,
+    );
     finding2.verification_status = Some(VerificationStatus::FalsePositive);
 
-    let mut finding3 = create_finding("f3", "Needs Review", "src/c.rs", Some(3), None, Severity::High);
+    let mut finding3 = create_finding(
+        "f3",
+        "Needs Review",
+        "src/c.rs",
+        Some(3),
+        None,
+        Severity::High,
+    );
     finding3.verification_status = Some(VerificationStatus::NeedsReview);
 
     let findings = vec![finding1, finding2, finding3];
@@ -260,15 +363,33 @@ fn test_calculate_statistics_categories() {
     let phase = ReportAggregationPhase::new();
 
     let findings = vec![
-        create_finding_with_category("f1", "Injection 1", "src/a.rs", IssueCategory::Injection, Severity::High),
-        create_finding_with_category("f2", "Injection 2", "src/b.rs", IssueCategory::Injection, Severity::High),
-        create_finding_with_category("f3", "Memory 1", "src/c.rs", IssueCategory::MemoryCorruption, Severity::Critical),
+        create_finding_with_category(
+            "f1",
+            "Injection 1",
+            "src/a.rs",
+            IssueCategory::Injection,
+            Severity::High,
+        ),
+        create_finding_with_category(
+            "f2",
+            "Injection 2",
+            "src/b.rs",
+            IssueCategory::Injection,
+            Severity::High,
+        ),
+        create_finding_with_category(
+            "f3",
+            "Memory 1",
+            "src/c.rs",
+            IssueCategory::MemoryCorruption,
+            Severity::Critical,
+        ),
     ];
 
     let stats = phase.calculate_statistics(&findings);
 
-    assert_eq!(stats.findings_by_category.get("injection"), Some(&2));
-    assert_eq!(stats.findings_by_category.get("memory_corruption"), Some(&1));
+    assert_eq!(stats.findings_by_category.get("Injection"), Some(&2));
+    assert_eq!(stats.findings_by_category.get("MemoryCorruption"), Some(&1));
 }
 
 // ============================================================================
@@ -414,7 +535,10 @@ fn test_executive_summary_recommendations_for_cross_file() {
 
     let summary = phase.generate_executive_summary(&stats, &[], &AnalysisContext::default());
 
-    assert!(summary.recommendations.iter().any(|r| r.contains("cross-file")));
+    assert!(summary
+        .recommendations
+        .iter()
+        .any(|r| r.contains("cross-file")));
 }
 
 #[test]
@@ -423,7 +547,14 @@ fn test_executive_summary_priority_files() {
     let stats = AggregateStatistics::default();
 
     let findings = vec![
-        create_finding("f1", "Critical", "src/critical.rs", Some(1), None, Severity::Critical),
+        create_finding(
+            "f1",
+            "Critical",
+            "src/critical.rs",
+            Some(1),
+            None,
+            Severity::Critical,
+        ),
         create_finding("f2", "High", "src/high.rs", Some(2), None, Severity::High),
         create_finding("f3", "Low", "src/low.rs", Some(3), None, Severity::Low),
     ];
@@ -432,7 +563,10 @@ fn test_executive_summary_priority_files() {
 
     // Priority files should include the files with critical/high findings
     assert!(!summary.priority_files.is_empty());
-    assert!(summary.priority_files.iter().any(|f| f.contains("critical.rs")));
+    assert!(summary
+        .priority_files
+        .iter()
+        .any(|f| f.contains("critical.rs")));
 }
 
 // ============================================================================
@@ -445,7 +579,14 @@ fn test_prioritize_findings_severity_order() {
 
     let findings = vec![
         create_finding("f1", "Low", "src/a.rs", Some(1), None, Severity::Low),
-        create_finding("f2", "Critical", "src/b.rs", Some(2), None, Severity::Critical),
+        create_finding(
+            "f2",
+            "Critical",
+            "src/b.rs",
+            Some(2),
+            None,
+            Severity::Critical,
+        ),
         create_finding("f3", "Medium", "src/c.rs", Some(3), None, Severity::Medium),
         create_finding("f4", "High", "src/d.rs", Some(4), None, Severity::High),
         create_finding("f5", "Info", "src/e.rs", Some(5), None, Severity::Info),
@@ -466,8 +607,22 @@ fn test_prioritize_findings_ranks_are_sequential() {
 
     let findings = vec![
         create_finding("f1", "Finding 1", "src/a.rs", Some(1), None, Severity::High),
-        create_finding("f2", "Finding 2", "src/b.rs", Some(2), None, Severity::Critical),
-        create_finding("f3", "Finding 3", "src/c.rs", Some(3), None, Severity::Medium),
+        create_finding(
+            "f2",
+            "Finding 2",
+            "src/b.rs",
+            Some(2),
+            None,
+            Severity::Critical,
+        ),
+        create_finding(
+            "f3",
+            "Finding 3",
+            "src/c.rs",
+            Some(3),
+            None,
+            Severity::Medium,
+        ),
     ];
 
     let prioritized = phase.prioritize_findings(&findings);
@@ -481,10 +636,24 @@ fn test_prioritize_findings_ranks_are_sequential() {
 fn test_prioritize_findings_cross_file_boost() {
     let phase = ReportAggregationPhase::new();
 
-    let mut finding1 = create_finding("f1", "With Cross-File", "src/a.rs", Some(1), None, Severity::High);
+    let mut finding1 = create_finding(
+        "f1",
+        "With Cross-File",
+        "src/a.rs",
+        Some(1),
+        None,
+        Severity::High,
+    );
     finding1.cross_file_references = Some(vec!["src/b.rs".to_string()]);
 
-    let finding2 = create_finding("f2", "Without Cross-File", "src/c.rs", Some(2), None, Severity::High);
+    let finding2 = create_finding(
+        "f2",
+        "Without Cross-File",
+        "src/c.rs",
+        Some(2),
+        None,
+        Severity::High,
+    );
 
     let findings = vec![finding1, finding2];
     let prioritized = phase.prioritize_findings(&findings);
@@ -497,7 +666,14 @@ fn test_prioritize_findings_cross_file_boost() {
 fn test_prioritize_findings_already_reported_reduction() {
     let phase = ReportAggregationPhase::new();
 
-    let mut finding1 = create_finding("f1", "Known Issue", "src/a.rs", Some(1), None, Severity::High);
+    let mut finding1 = create_finding(
+        "f1",
+        "Known Issue",
+        "src/a.rs",
+        Some(1),
+        None,
+        Severity::High,
+    );
     finding1.already_reported = true;
 
     let finding2 = create_finding("f2", "New Issue", "src/b.rs", Some(2), None, Severity::High);
@@ -522,7 +698,14 @@ fn test_prioritize_findings_priority_scores_in_range() {
     let phase = ReportAggregationPhase::new();
 
     let findings = vec![
-        create_finding("f1", "Finding 1", "src/a.rs", Some(1), None, Severity::Critical),
+        create_finding(
+            "f1",
+            "Finding 1",
+            "src/a.rs",
+            Some(1),
+            None,
+            Severity::Critical,
+        ),
         create_finding("f2", "Finding 2", "src/b.rs", Some(2), None, Severity::Info),
     ];
 
@@ -543,12 +726,33 @@ fn test_run_aggregation_full_workflow() {
     let context = AnalysisContext::default();
 
     let findings = vec![
-        create_finding("f1", "Critical Finding", "src/a.rs", Some(1), Some("CWE-79"), Severity::Critical),
-        create_finding("f2", "High Finding", "src/b.rs", Some(2), Some("CWE-89"), Severity::High),
-        create_finding("f3", "Medium Finding", "src/c.rs", Some(3), Some("CWE-200"), Severity::Medium),
+        create_finding(
+            "f1",
+            "Critical Finding",
+            "src/a.rs",
+            Some(1),
+            Some("CWE-79"),
+            Severity::Critical,
+        ),
+        create_finding(
+            "f2",
+            "High Finding",
+            "src/b.rs",
+            Some(2),
+            Some("CWE-89"),
+            Severity::High,
+        ),
+        create_finding(
+            "f3",
+            "Medium Finding",
+            "src/c.rs",
+            Some(3),
+            Some("CWE-200"),
+            Severity::Medium,
+        ),
     ];
 
-    let result = phase.run(findings, &context);
+    let result = phase.run(findings, &context, None);
 
     assert_eq!(result.statistics.total_findings, 3);
     assert_eq!(result.statistics.critical_count, 1);
@@ -556,7 +760,10 @@ fn test_run_aggregation_full_workflow() {
     assert_eq!(result.statistics.medium_count, 1);
     assert_eq!(result.summary.risk_level, "CRITICAL");
     assert_eq!(result.prioritized_findings.len(), 3);
-    assert_eq!(result.prioritized_findings[0].finding.severity, Severity::Critical);
+    assert_eq!(
+        result.prioritized_findings[0].finding.severity,
+        Severity::Critical
+    );
 }
 
 #[test]
@@ -566,12 +773,33 @@ fn test_run_aggregation_with_deduplication() {
 
     // These should be deduplicated to 1
     let findings = vec![
-        create_finding("f1", "Finding 1", "src/a.rs", Some(1), Some("CWE-79"), Severity::Critical),
-        create_finding("f2", "Finding 2", "src/a.rs", Some(1), Some("CWE-79"), Severity::High),
-        create_finding("f3", "Finding 3", "src/a.rs", Some(1), Some("CWE-79"), Severity::Medium),
+        create_finding(
+            "f1",
+            "Finding 1",
+            "src/a.rs",
+            Some(1),
+            Some("CWE-79"),
+            Severity::Critical,
+        ),
+        create_finding(
+            "f2",
+            "Finding 2",
+            "src/a.rs",
+            Some(1),
+            Some("CWE-79"),
+            Severity::High,
+        ),
+        create_finding(
+            "f3",
+            "Finding 3",
+            "src/a.rs",
+            Some(1),
+            Some("CWE-79"),
+            Severity::Medium,
+        ),
     ];
 
-    let result = phase.run(findings, &context);
+    let result = phase.run(findings, &context, None);
 
     assert_eq!(result.statistics.total_findings, 1);
     assert_eq!(result.unique_findings.len(), 1);
@@ -584,11 +812,25 @@ fn test_run_aggregation_updates_context() {
     let mut context = AnalysisContext::default();
 
     let findings = vec![
-        create_finding("f1", "Critical", "src/a.rs", Some(1), Some("CWE-79"), Severity::Critical),
-        create_finding("f2", "High", "src/b.rs", Some(2), Some("CWE-89"), Severity::High),
+        create_finding(
+            "f1",
+            "Critical",
+            "src/a.rs",
+            Some(1),
+            Some("CWE-79"),
+            Severity::Critical,
+        ),
+        create_finding(
+            "f2",
+            "High",
+            "src/b.rs",
+            Some(2),
+            Some("CWE-89"),
+            Severity::High,
+        ),
     ];
 
-    let result = phase.run(findings, &context);
+    let result = phase.run(findings, &context, None);
     phase.update_context(&result, &mut context);
 
     assert_eq!(context.findings_so_far.len(), 2);
@@ -604,14 +846,24 @@ fn test_aggregation_with_no_cwe_ids() {
 
     let findings = vec![
         create_finding("f1", "Finding 1", "src/a.rs", Some(1), None, Severity::High),
-        create_finding("f2", "Finding 2", "src/b.rs", Some(2), None, Severity::Medium),
+        create_finding(
+            "f2",
+            "Finding 2",
+            "src/b.rs",
+            Some(2),
+            None,
+            Severity::Medium,
+        ),
     ];
 
-    let result = phase.run(findings, &AnalysisContext::default());
+    let result = phase.run(findings, &AnalysisContext::default(), None);
 
     assert_eq!(result.statistics.total_findings, 2);
     // Should categorize as "unknown" when no CWE and no security_issue
-    assert!(result.statistics.findings_by_category.contains_key("unknown"));
+    assert!(result
+        .statistics
+        .findings_by_category
+        .contains_key("unknown"));
 }
 
 #[test]
@@ -619,15 +871,34 @@ fn test_aggregation_mixed_cwe_and_security_issue() {
     let phase = ReportAggregationPhase::new();
 
     let findings = vec![
-        create_finding("f1", "With CWE", "src/a.rs", Some(1), Some("CWE-79"), Severity::High),
-        create_finding_with_category("f2", "With Category", "src/b.rs", IssueCategory::Injection, Severity::High),
+        create_finding(
+            "f1",
+            "With CWE",
+            "src/a.rs",
+            Some(1),
+            Some("CWE-79"),
+            Severity::High,
+        ),
+        create_finding_with_category(
+            "f2",
+            "With Category",
+            "src/b.rs",
+            IssueCategory::Injection,
+            Severity::High,
+        ),
     ];
 
-    let result = phase.run(findings, &AnalysisContext::default());
+    let result = phase.run(findings, &AnalysisContext::default(), None);
 
     assert_eq!(result.statistics.total_findings, 2);
-    assert!(result.statistics.findings_by_category.contains_key("CWE-79"));
-    assert!(result.statistics.findings_by_category.contains_key("injection"));
+    assert!(result
+        .statistics
+        .findings_by_category
+        .contains_key("CWE-79"));
+    assert!(result
+        .statistics
+        .findings_by_category
+        .contains_key("Injection"));
 }
 
 #[test]
@@ -636,7 +907,7 @@ fn test_empty_aggregation_result() {
     let context = AnalysisContext::default();
     let findings: Vec<VulnerabilityFinding> = Vec::new();
 
-    let result = phase.run(findings, &context);
+    let result = phase.run(findings, &context, None);
 
     assert_eq!(result.statistics.total_findings, 0);
     assert_eq!(result.summary.risk_level, "MINIMAL");
@@ -646,8 +917,8 @@ fn test_empty_aggregation_result() {
 
 #[test]
 fn test_default_creation() {
-    let phase = ReportAggregationPhase::default();
-    assert!(true); // Just test that it compiles and creates
+    // Test that default creates valid instance
+    let _phase = ReportAggregationPhase;
 }
 
 #[test]
@@ -681,7 +952,10 @@ fn test_serialization_of_executive_summary() {
     let summary = ExecutiveSummary {
         risk_level: "HIGH".to_string(),
         findings_summary: "Test summary".to_string(),
-        recommendations: vec!["Recommendation 1".to_string(), "Recommendation 2".to_string()],
+        recommendations: vec![
+            "Recommendation 1".to_string(),
+            "Recommendation 2".to_string(),
+        ],
         priority_files: vec!["src/main.rs".to_string()],
         total_findings: 5,
     };
@@ -691,4 +965,219 @@ fn test_serialization_of_executive_summary() {
 
     assert_eq!(summary.risk_level, deserialized.risk_level);
     assert_eq!(summary.recommendations, deserialized.recommendations);
+}
+
+// ============================================================================
+// Migrated inline tests from src/report/aggregation.rs
+// ============================================================================
+
+fn create_finding_with_params_inline_migrated(
+    id: &str,
+    title: &str,
+    severity: Severity,
+) -> VulnerabilityFinding {
+    VulnerabilityFinding {
+        id: id.to_string(),
+        title: title.to_string(),
+        description: "Test finding".to_string(),
+        severity,
+        confidence_score: 0.8,
+        cwe_id: Some("CWE-79".to_string()),
+        file_path: "src/test.rs".to_string(),
+        line_number: Some(10),
+        code_snippet: Some("test code".to_string()),
+        diff_hunk: None,
+        recommendation: Some("Fix this".to_string()),
+        code_location: None,
+        already_reported: false,
+        sources: Vec::new(),
+        commit_reference: None,
+        ticket_reference: None,
+        priority_score: None,
+        cross_file_references: None,
+        verification_status: Some(VerificationStatus::NeedsReview),
+        verification_notes: None,
+        verification_error: None,
+        agent_evidence_path: None,
+        agent_mode: false,
+        llm_model: None,
+        security_issue: None,
+        poc_code: None,
+        mitigation_code: None,
+        poc_format: None,
+        statement_range: None,
+        triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
+    }
+}
+
+#[test]
+fn test_deduplicate_findings_inline_migrated() {
+    let phase = ReportAggregationPhase::new();
+
+    let finding1 = create_finding_with_params_inline_migrated("f1", "Test finding", Severity::High);
+    let finding2 = create_finding_with_params_inline_migrated("f2", "Test finding", Severity::High);
+    let finding3 =
+        create_finding_with_params_inline_migrated("f3", "Test finding", Severity::Critical);
+
+    let findings = vec![finding1, finding2, finding3];
+    let unique = phase.deduplicate_findings(findings, None);
+
+    // All findings have same file, line, and CWE, so they should all be deduplicated to 1
+    assert_eq!(unique.len(), 1);
+}
+
+#[test]
+fn test_calculate_statistics_inline_migrated() {
+    let phase = ReportAggregationPhase::new();
+
+    let findings = vec![
+        create_finding_with_params_inline_migrated("f1", "Test finding", Severity::Critical),
+        create_finding_with_params_inline_migrated("f2", "Test finding", Severity::High),
+        create_finding_with_params_inline_migrated("f3", "Test finding", Severity::Medium),
+    ];
+
+    let stats = phase.calculate_statistics(&findings);
+
+    assert_eq!(stats.total_findings, 3);
+    assert_eq!(stats.critical_count, 1);
+    assert_eq!(stats.high_count, 1);
+    assert_eq!(stats.medium_count, 1);
+    // All findings are in the same file (src/test.rs)
+    assert_eq!(stats.unique_files_affected, 1);
+    assert!((stats.average_confidence - 0.8).abs() < 0.01);
+}
+
+#[test]
+fn test_prioritize_findings_inline_migrated() {
+    let phase = ReportAggregationPhase::new();
+
+    let findings = vec![
+        create_finding_with_params_inline_migrated("f1", "Test finding", Severity::Low),
+        create_finding_with_params_inline_migrated("f2", "Test finding", Severity::Critical),
+        create_finding_with_params_inline_migrated("f3", "Test finding", Severity::High),
+    ];
+
+    let prioritized = phase.prioritize_findings(&findings);
+
+    assert_eq!(prioritized.len(), 3);
+    assert_eq!(prioritized[0].rank, 1);
+    // Critical should be first
+    assert_eq!(prioritized[0].finding.severity, Severity::Critical);
+}
+
+#[test]
+fn test_run_aggregation_inline_migrated() {
+    let phase = ReportAggregationPhase::new();
+    let context = AnalysisContext::default();
+
+    let findings = vec![
+        create_finding_with_params_inline_migrated("f1", "Test finding", Severity::Critical),
+        create_finding_with_params_inline_migrated("f2", "Test finding", Severity::High),
+    ];
+
+    let result = phase.run(findings, &context, None);
+
+    // Both findings have same file/line/CWE, so deduplicated to 1
+    assert_eq!(result.statistics.total_findings, 1);
+    assert_eq!(result.statistics.critical_count, 1);
+    assert_eq!(result.statistics.high_count, 0); // High was deduplicated
+    assert_eq!(result.summary.risk_level, "CRITICAL");
+    assert_eq!(result.prioritized_findings.len(), 1);
+    assert_eq!(result.prioritized_findings[0].rank, 1);
+}
+
+#[test]
+fn test_executive_summary_generation_inline_migrated() {
+    let phase = ReportAggregationPhase::new();
+
+    let stats = AggregateStatistics {
+        total_findings: 5,
+        critical_count: 1,
+        high_count: 2,
+        medium_count: 1,
+        low_count: 1,
+        info_count: 0,
+        average_confidence: 0.75,
+        verified_count: 2,
+        false_positive_count: 1,
+        needs_review_count: 2,
+        unique_files_affected: 3,
+        cross_file_findings: 1,
+        findings_by_category: std::collections::HashMap::new(),
+    };
+
+    let findings = vec![create_finding_with_params_inline_migrated(
+        "f1",
+        "Test finding",
+        Severity::Critical,
+    )];
+
+    let context = AnalysisContext::default();
+    let summary = phase.generate_executive_summary(&stats, &findings, &context);
+
+    assert_eq!(summary.risk_level, "CRITICAL");
+    assert!(!summary.recommendations.is_empty());
+    assert!(summary.total_findings > 0);
+}
+
+#[test]
+fn test_update_context_inline_migrated() {
+    let phase = ReportAggregationPhase::new();
+    let mut context = AnalysisContext::default();
+
+    let finding =
+        create_finding_with_params_inline_migrated("f1", "Test finding", Severity::Critical);
+    let result = AggregationResult {
+        statistics: AggregateStatistics {
+            total_findings: 1,
+            ..Default::default()
+        },
+        summary: ExecutiveSummary {
+            risk_level: "CRITICAL".to_string(),
+            findings_summary: "Test".to_string(),
+            recommendations: vec![],
+            priority_files: vec![],
+            total_findings: 1,
+        },
+        prioritized_findings: vec![],
+        unique_findings: vec![finding],
+    };
+
+    phase.update_context(&result, &mut context);
+
+    assert!(!context.findings_so_far.is_empty());
+}
+
+#[test]
+fn test_risk_level_classification_inline_migrated() {
+    let phase = ReportAggregationPhase::new();
+
+    // Critical risk
+    let stats = AggregateStatistics {
+        critical_count: 1,
+        ..Default::default()
+    };
+    let summary = phase.generate_executive_summary(&stats, &[], &AnalysisContext::default());
+    assert_eq!(summary.risk_level, "CRITICAL");
+
+    // High risk (no critical)
+    let stats = AggregateStatistics {
+        critical_count: 0,
+        high_count: 1,
+        ..Default::default()
+    };
+    let summary = phase.generate_executive_summary(&stats, &[], &AnalysisContext::default());
+    assert_eq!(summary.risk_level, "HIGH");
+
+    // Moderate risk (no critical/high)
+    let stats = AggregateStatistics {
+        critical_count: 0,
+        high_count: 0,
+        medium_count: 1,
+        ..Default::default()
+    };
+    let summary = phase.generate_executive_summary(&stats, &[], &AnalysisContext::default());
+    assert_eq!(summary.risk_level, "MODERATE");
 }

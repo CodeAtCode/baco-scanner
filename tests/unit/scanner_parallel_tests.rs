@@ -10,56 +10,18 @@ use crate::fixtures::{
 use baco::checkpoint::ScanPhase;
 use baco::findings::{Severity, VulnerabilityFinding};
 use baco::phase::helpers::create_test_finding_simple;
-use baco::scanner::{combine_parallel_results, ParallelPhaseConfig, ParallelPhaseResult, Scanner};
+use baco::scanner::{combine_parallel_results, ParallelPhaseConfig, ParallelPhaseResult};
 use indicatif::ProgressBar;
-use std::path::PathBuf;
+
 use std::time::Duration;
 
 // ============================================================================
 // Test Fixtures
 // ============================================================================
 
+#[expect(dead_code)]
 fn create_test_config() -> baco::config::ScannerConfig {
-    use baco::config::{AgentConfig, LlmPhasesConfig, PerformanceSettings, ScannerSettings};
-
-    baco::config::ScannerConfig {
-        project: baco::config::ProjectConfig {
-            languages: vec!["rust".to_string()],
-            ..Default::default()
-        },
-        scanner: ScannerSettings {
-            max_file_size_kb: 1024,
-            exclude_paths: vec![],
-            semgrep: baco::config::SemgrepSettings::default(),
-            performance: PerformanceSettings::default(),
-            ..Default::default()
-        },
-        llm: baco::config::LlmConfig {
-            phases: LlmPhasesConfig::default(),
-            timeout_secs: 30,
-            max_retries: 3,
-            retry_backoff_ms: 1000,
-            ..Default::default()
-        },
-        output: baco::config::OutputConfig {
-            dir: "/tmp/test_output".to_string(),
-            ..Default::default()
-        },
-        agent: AgentConfig::default(),
-        tickets: baco::config::TicketConfig { systems: vec![] },
-        router: baco::config::RouterConfig::default(),
-        aggregation: baco::config::AggregationConfig::default(),
-        rulesynth: baco::config::RuleSynthConfig::default(),
-        normalization: baco::config::NormalizationConfig::default(),
-        cpg: baco::config::CpgConfig::default(),
-        exploit: baco::config::ExploitConfig::default(),
-        validate: Default::default(),
-        vultriage: Default::default(),
-        policy_sampling: Default::default(),
-        agent_scaffold: Default::default(),
-        pacvd: Default::default(),
-        agent_flow: Default::default(),
-    }
+    baco::config::ScannerConfig::default()
 }
 
 // ============================================================================
@@ -315,6 +277,7 @@ fn test_combine_parallel_results_partial_success_llm_only() {
     let llm_static_result = Ok((
         vec![create_test_finding_simple("LLM", Severity::Critical)],
         vec!["file3.rs".to_string()],
+        Vec::<(VulnerabilityFinding, String)>::new(),
     ));
 
     let (combined_findings, analyzed_files) = combine_parallel_results(
@@ -373,6 +336,7 @@ fn test_combine_parallel_results_empty_initial_findings() {
     let llm_static_result = Ok((
         vec![create_test_finding_simple("LLM", Severity::Critical)],
         vec!["file3.rs".to_string()],
+        Vec::<(VulnerabilityFinding, String)>::new(),
     ));
 
     let (combined_findings, analyzed_files) = combine_parallel_results(
@@ -392,7 +356,11 @@ fn test_combine_parallel_results_empty_phase_findings() {
 
     let indexing_result = Ok((vec![], vec!["file1.rs".to_string()]));
     let semgrep_result = Ok((vec![], vec!["file2.rs".to_string()]));
-    let llm_static_result = Ok((vec![], vec!["file3.rs".to_string()]));
+    let llm_static_result = Ok((
+        vec![],
+        vec!["file3.rs".to_string()],
+        Vec::<(VulnerabilityFinding, String)>::new(),
+    ));
 
     let (combined_findings, analyzed_files) = combine_parallel_results(
         initial_findings,
@@ -421,6 +389,7 @@ fn test_combine_parallel_results_only_initial_and_llm() {
             create_test_finding_simple("LLM2", Severity::Critical),
         ],
         vec!["file3.rs".to_string(), "file4.rs".to_string()],
+        Vec::<(VulnerabilityFinding, String)>::new(),
     ));
 
     let (combined_findings, analyzed_files) = combine_parallel_results(
@@ -478,6 +447,7 @@ fn test_combine_results_with_many_findings() {
     let llm_static_result = Ok((
         vec![create_test_finding_simple("LLM", Severity::Critical)],
         vec!["file3.rs".to_string()],
+        Vec::<(VulnerabilityFinding, String)>::new(),
     ));
 
     let (combined_findings, analyzed_files) = combine_parallel_results(
@@ -518,7 +488,7 @@ fn test_combine_parallel_results_preserves_initial_findings_order() {
     ));
 
     let semgrep_result = Ok((vec![], vec![]));
-    let llm_static_result = Ok((vec![], vec![]));
+    let llm_static_result = Ok((vec![], vec![], Vec::<(VulnerabilityFinding, String)>::new()));
 
     let (combined_findings, _) = combine_parallel_results(
         initial_findings,
@@ -530,4 +500,137 @@ fn test_combine_parallel_results_preserves_initial_findings_order() {
     assert_eq!(combined_findings[0].title, "First");
     assert_eq!(combined_findings[1].title, "Second");
     assert_eq!(combined_findings[2].title, "Indexing");
+}
+
+// ============================================================================
+// Tests migrated from src/scanner/parallel.rs inline #[cfg(test)] block
+// ============================================================================
+
+#[tokio::test]
+async fn test_combine_parallel_results_with_all_success_inline_migrated() {
+    let findings = vec![create_test_finding_simple("Initial", Severity::Low)];
+
+    let indexing_result = Ok((
+        vec![create_test_finding_simple("Indexing", Severity::Medium)],
+        vec!["file1.rs".to_string()],
+    ));
+
+    let semgrep_result = Ok((
+        vec![create_test_finding_simple("Semgrep", Severity::High)],
+        vec!["file2.rs".to_string()],
+    ));
+
+    let llm_static_result = Ok((
+        vec![create_test_finding_simple("LLM", Severity::Critical)],
+        vec!["file3.rs".to_string()],
+        Vec::new(),
+    ));
+
+    let (combined_findings, analyzed_files) = combine_parallel_results(
+        findings,
+        Some(indexing_result),
+        Some(semgrep_result),
+        Some(llm_static_result),
+    );
+
+    assert_eq!(combined_findings.len(), 4);
+    assert_eq!(analyzed_files.len(), 1);
+    assert_eq!(analyzed_files[0], "file3.rs");
+}
+
+#[tokio::test]
+async fn test_combine_parallel_results_with_none_results_inline_migrated() {
+    let findings = vec![create_test_finding_simple("Initial", Severity::Low)];
+
+    let (combined_findings, analyzed_files) = combine_parallel_results(findings, None, None, None);
+
+    assert_eq!(combined_findings.len(), 1);
+    assert_eq!(combined_findings[0].title, "Initial");
+    assert!(analyzed_files.is_empty());
+}
+
+#[tokio::test]
+async fn test_combine_parallel_results_with_error_results_inline_migrated() {
+    let findings = vec![create_test_finding_simple("Initial", Severity::Low)];
+
+    let indexing_result = Err("Indexing failed".to_string());
+    let semgrep_result = Err("Semgrep failed".to_string());
+    let llm_static_result = Err("LLM failed".to_string());
+
+    let (combined_findings, analyzed_files) = combine_parallel_results(
+        findings,
+        Some(indexing_result),
+        Some(semgrep_result),
+        Some(llm_static_result),
+    );
+
+    assert_eq!(combined_findings.len(), 1);
+    assert!(analyzed_files.is_empty());
+}
+
+#[tokio::test]
+async fn test_combine_parallel_results_partial_success_inline_migrated() {
+    let findings = vec![create_test_finding_simple("Initial", Severity::Low)];
+
+    let indexing_result = Ok((
+        vec![create_test_finding_simple("Indexing", Severity::Medium)],
+        vec!["file1.rs".to_string()],
+    ));
+
+    let semgrep_result = Err("Semgrep failed".to_string());
+    let llm_static_result = Ok((
+        vec![create_test_finding_simple("LLM", Severity::Critical)],
+        vec!["file3.rs".to_string()],
+        Vec::new(),
+    ));
+
+    let (combined_findings, analyzed_files) = combine_parallel_results(
+        findings,
+        Some(indexing_result),
+        Some(semgrep_result),
+        Some(llm_static_result),
+    );
+
+    assert_eq!(combined_findings.len(), 3);
+    assert_eq!(analyzed_files.len(), 1);
+    assert_eq!(analyzed_files[0], "file3.rs");
+}
+
+#[tokio::test]
+async fn test_parallel_phase_config_creation_inline_migrated() {
+    let pb = ProgressBar::hidden();
+    let completed_phases: [ScanPhase; 2] = [ScanPhase::Indexing, ScanPhase::Semgrep];
+
+    let config = ParallelPhaseConfig {
+        indexing_enabled: true,
+        semgrep_enabled: true,
+        llm_static_enabled: false,
+        completed_phases: &completed_phases,
+        progress_bar: &pb,
+    };
+
+    assert!(config.indexing_enabled);
+    assert!(config.semgrep_enabled);
+    assert!(!config.llm_static_enabled);
+    assert_eq!(config.completed_phases.len(), 2);
+}
+
+#[tokio::test]
+async fn test_parallel_phase_result_creation_inline_migrated() {
+    let findings = vec![create_test_finding_simple("Test", Severity::High)];
+    let duration = Duration::from_secs(42);
+
+    let result = ParallelPhaseResult {
+        indexing_findings: findings.clone(),
+        semgrep_findings: findings.clone(),
+        llm_static_findings: findings,
+        analyzed_files: vec!["test.rs".to_string()],
+        duration,
+    };
+
+    assert_eq!(result.indexing_findings.len(), 1);
+    assert_eq!(result.semgrep_findings.len(), 1);
+    assert_eq!(result.llm_static_findings.len(), 1);
+    assert_eq!(result.analyzed_files.len(), 1);
+    assert_eq!(result.duration.as_secs(), 42);
 }

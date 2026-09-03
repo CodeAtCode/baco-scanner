@@ -183,19 +183,3 @@ impl RubricScore {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_serialization_roundtrip() {
-        let rubric =
-            SeverityRubric::new(0.8, 0.9, 0.7, true, AccessType::Both, BlastRadius::Critical);
-
-        let serialized = serde_json::to_string(&rubric).unwrap();
-        let deserialized: SeverityRubric = serde_json::from_str(&serialized).unwrap();
-
-        assert_eq!(rubric, deserialized);
-    }
-}

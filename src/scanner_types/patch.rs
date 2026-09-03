@@ -50,21 +50,3 @@ impl PatchValidationResult {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_patch_validation_result() {
-        let success = PatchValidationResult::success();
-        assert!(success.compiles);
-        assert!(success.tests_pass);
-        assert!(success.error_message.is_none());
-
-        let failure = PatchValidationResult::failure("Syntax error");
-        assert!(!failure.compiles);
-        assert!(!failure.tests_pass);
-        assert_eq!(failure.error_message, Some("Syntax error".to_string()));
-    }
-}

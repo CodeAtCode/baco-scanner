@@ -174,7 +174,7 @@ fn extract_code_from_lines(lines: &[&str]) -> String {
 }
 
 /// Identify vulnerability type from code patterns
-fn identify_vulnerability_type(removed: &str, added: &str) -> String {
+pub fn identify_vulnerability_type(removed: &str, added: &str) -> String {
     let removed_lower = removed.to_lowercase();
     let added_lower = added.to_lowercase();
 
@@ -217,7 +217,7 @@ fn identify_vulnerability_type(removed: &str, added: &str) -> String {
 }
 
 /// Generate safe behavior pattern from the fix
-fn generate_safe_pattern(added: &str, removed: &str) -> String {
+pub fn generate_safe_pattern(added: &str, removed: &str) -> String {
     let mut patterns = Vec::new();
 
     // Analyze what changed
@@ -316,98 +316,5 @@ fn truncate_text(text: &str, max_len: usize) -> String {
     } else {
         let trunc_len = (max_len.saturating_sub(3)).min(text.chars().count());
         format!("{}...", text.chars().take(trunc_len).collect::<String>())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_extract_from_sql_injection_patch() {
-        let patch = r#"
---- a/src/db.rs
-+++ b/src/db.rs
-@@ -10,4 +10,5 @@
--    let query = format!("SELECT * FROM users WHERE id = {}", user_id);
--    conn.execute(&query);
-+    let query = "SELECT * FROM users WHERE id = ?";
-+    let stmt = conn.prepare(query);
-+    stmt.execute(&[user_id]);
-"#;
-
-        let specs = extract_from_patch(patch);
-        assert!(!specs.is_empty(), "Should extract specification");
-
-        let spec = &specs[0];
-        assert_eq!(spec.vuln_type, "CWE-89");
-        assert!(
-            spec.safe_behavior_pattern.contains("prepare")
-                || spec.safe_behavior_pattern.contains("Parameterized")
-        );
-        // Check domain extraction
-        assert_eq!(spec.project_domain, "database");
-    }
-
-    #[test]
-    fn test_extract_from_xss_patch() {
-        let patch = r#"
---- a/src/web/handler.js
-+++ b/src/web/handler.js
-@@ -15,3 +15,4 @@
--    element.innerHTML = userInput;
-+    element.textContent = escapeHtml(userInput);
-+    // Sanitize input before rendering
-"#;
-
-        let specs = extract_from_patch(patch);
-        assert!(!specs.is_empty(), "Should extract specification");
-
-        let spec = &specs[0];
-        assert_eq!(spec.vuln_type, "CWE-79");
-        // Domain correctly extracted as 'web-server' from path
-        assert_eq!(spec.project_domain, "web-server");
-    }
-
-    #[test]
-    fn test_extract_keywords_from_patch() {
-        let patch = r#"
---- a/src/main.rs
-+++ b/src/main.rs
-@@ -1,3 +1,4 @@
-+    let sanitized = sanitize_input(user_input);
--    process(user_input);
-"#;
-
-        let specs = extract_from_patch(patch);
-        assert!(!specs.is_empty());
-        // Check that we got a safe behavior pattern (may vary based on implementation)
-        assert!(!specs[0].safe_behavior_pattern.is_empty());
-    }
-
-    #[test]
-    fn test_safe_pattern_generation() {
-        let added = "sanitize_input(data)";
-        let removed = "process(data)";
-
-        let pattern = generate_safe_pattern(added, removed);
-        assert!(pattern.contains("sanitization"));
-    }
-
-    #[test]
-    fn test_vulnerability_type_identification() {
-        // SQL injection
-        let vuln_type = identify_vulnerability_type(
-            "execute(format!(\"SELECT {}\", id))",
-            "prepare(\"SELECT ?\").execute(&[id])",
-        );
-        assert_eq!(vuln_type, "CWE-89");
-
-        // XSS
-        let vuln_type = identify_vulnerability_type(
-            "element.innerHTML = input",
-            "element.textContent = escape(input)",
-        );
-        assert_eq!(vuln_type, "CWE-79");
     }
 }

@@ -88,37 +88,3 @@ fn default_false() -> bool {
 fn default_db_path() -> String {
     "baco-output/vuln_spec_db.json".to_string()
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_create_specification() {
-        let spec = SecuritySpecification {
-            id: "spec-001".to_string(),
-            vuln_type: "CWE-79".to_string(),
-            description: "Cross-site scripting vulnerability".to_string(),
-            safe_behavior_pattern: "Sanitize all user input before rendering".to_string(),
-            project_domain: "web-server".to_string(),
-            source_patch_hash: "abc123".to_string(),
-            category: DomainCategory::General,
-        };
-
-        assert_eq!(spec.id, "spec-001");
-        assert_eq!(spec.vuln_type, "CWE-79");
-        assert!(matches!(spec.category, DomainCategory::General));
-    }
-
-    #[test]
-    fn test_domain_category_serialization() {
-        let general = DomainCategory::General;
-        let domain = DomainCategory::DomainSpecific("rust".to_string());
-
-        let general_json = serde_json::to_string(&general).unwrap();
-        let domain_json = serde_json::to_string(&domain).unwrap();
-
-        assert_eq!(general_json, "\"General\"");
-        assert!(domain_json.contains("rust"));
-    }
-}

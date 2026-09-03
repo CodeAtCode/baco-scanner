@@ -72,35 +72,3 @@ pub struct CveCluster {
     pub example_cves: Vec<String>,
     pub affected_dependencies: Vec<String>,
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_cve_entry_creation() {
-        let cve = CveEntry::new(
-            "CVE-2024-1234",
-            "Test vulnerability",
-            V3Severity::High,
-            CveSource::KEV,
-        );
-
-        assert_eq!(cve.cve_id, "CVE-2024-1234");
-        assert_eq!(cve.severity, V3Severity::High);
-        assert_eq!(cve.source, CveSource::KEV);
-    }
-
-    #[test]
-    fn test_root_cause_group() {
-        let mut group =
-            RootCauseGroup::new("abc123", "Missing authentication", V3Severity::Critical);
-
-        group.add_finding("f1", "src/auth.rs", 42);
-        group.add_finding("f2", "src/api.rs", 108);
-
-        assert_eq!(group.findings.len(), 2);
-        assert_eq!(group.all_locations.len(), 2);
-        assert_eq!(group.all_locations[0], ("src/auth.rs".to_string(), 42));
-    }
-}

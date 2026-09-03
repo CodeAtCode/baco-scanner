@@ -9,6 +9,7 @@ pub mod joern;
 pub use joern::JoernEngine;
 pub mod queries;
 pub mod slicer;
+pub use slicer::CpgSlicer;
 
 use std::path::PathBuf;
 

@@ -81,35 +81,3 @@ pub fn get_prompt(
         })
         .unwrap_or_else(|| default_prompt.to_string())
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_load_phase_prompts() {
-        let prompts = load_phase_prompts(None);
-        assert!(prompts.contains_key("llm_static_analysis"));
-        assert!(prompts.contains_key("llm_discovery"));
-        assert!(prompts.contains_key("llm_verification"));
-    }
-
-    #[test]
-    fn test_get_prompt_fallback() {
-        let mut loaded = HashMap::new();
-        loaded.insert("test".to_string(), "from file".to_string());
-
-        // Priority: config > file > default
-        assert_eq!(
-            get_prompt("test", &loaded, Some("from config"), "default"),
-            "from config"
-        );
-        assert_eq!(get_prompt("test", &loaded, None, "default"), "from file");
-
-        let empty = HashMap::new();
-        assert_eq!(
-            get_prompt("nonexistent", &empty, None, "default"),
-            "default"
-        );
-    }
-}

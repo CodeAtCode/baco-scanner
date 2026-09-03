@@ -68,6 +68,9 @@ mod scanner_env_tests;
 // Threat modeling tests
 mod threat_model;
 mod threat_model_file;
+mod threat_model_fs_tests;
+mod threat_model_generation_tests;
+mod threat_model_tests;
 
 // Phase tests
 mod phase;
@@ -306,8 +309,25 @@ mod prompt_scope_tests;
 mod batch_llm_phases_tests;
 mod discovery_skip_baseline_tests;
 
-// Priority, budget, and chunking tests (T18, T19)
 mod budget_chunk_tests;
 
-// Preset system tests (T39-T42)
 mod preset_tests;
+
+// Wave 2 migrated modules: report rendering, prompts, CPG, retrieval, scanner
+mod cpg_joern_tests;
+mod cpg_queries_tests;
+mod cpg_slicer_tests;
+mod prompt_engine_tests;
+mod prompt_loader_tests;
+mod prompt_sanitize_tests;
+mod report_aggregation;
+mod report_html_finding_renderer_tests;
+mod report_html_renderer_tests;
+mod report_html_utilities_tests;
+mod report_json_tests;
+mod report_sarif_tests;
+mod retrieval_bm25_tests;
+mod retrieval_mod_tests;
+mod scanner_helpers_tests;
+mod scanner_mod_tests;
+mod scanner_parallel_tests;
