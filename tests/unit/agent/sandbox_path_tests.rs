@@ -6,7 +6,6 @@
 use std::path::PathBuf;
 
 use baco::agent::sandbox::ToolSandbox;
-use baco::agent::tool_schema::SandboxLike;
 
 /// Helper to create a sandbox with a temporary directory
 fn setup_sandbox() -> (ToolSandbox, tempfile::TempDir) {

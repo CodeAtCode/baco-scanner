@@ -68,7 +68,7 @@ pub async fn propose_rewrite(
     parse_rewrite_proposal(&response.content)
 }
 
-fn build_harness_summary(harness: &AgentFlowHarness) -> String {
+pub fn build_harness_summary(harness: &AgentFlowHarness) -> String {
     let mut agents = Vec::new();
     for node in &harness.nodes {
         if let super::dsl::NodeKind::Agent(a) = &node.kind {
@@ -118,7 +118,7 @@ fn build_harness_summary(harness: &AgentFlowHarness) -> String {
     )
 }
 
-fn parse_rewrite_proposal(response: &str) -> Result<RewriteProposal, String> {
+pub fn parse_rewrite_proposal(response: &str) -> Result<RewriteProposal, String> {
     let trimmed = response.trim();
 
     if trimmed.starts_with('{') {
@@ -148,7 +148,7 @@ struct ParsedProposal {
     edits: Vec<serde_json::Value>,
 }
 
-fn parse_single_edit(edit_json: &serde_json::Value) -> Option<HarnessEdit> {
+pub fn parse_single_edit(edit_json: &serde_json::Value) -> Option<HarnessEdit> {
     let edit_type = edit_json.get("type")?.as_str()?;
 
     match edit_type {
@@ -256,186 +256,4 @@ pub fn apply_rewrite(harness: &AgentFlowHarness, proposal: &RewriteProposal) -> 
     }
 
     new_harness
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::agent_flow::dsl::{Agent, AgentFlowHarness, EdgeKind};
-    use std::collections::BTreeSet;
-
-    fn agent(role: &str) -> Agent {
-        Agent {
-            role: role.to_string(),
-            prompt: format!("{{{{ {}.out }}}}", role),
-            model: "test".to_string(),
-            tools: BTreeSet::new(),
-        }
-    }
-
-    fn simple_harness() -> AgentFlowHarness {
-        let mut h = AgentFlowHarness::new();
-        let a = h.add_agent(agent("analyst"));
-        let b = h.add_agent(agent("validator"));
-        h.add_edge(a, b, EdgeKind::Data, "{{ analyst.out }}".to_string());
-        h
-    }
-
-    #[test]
-    fn test_apply_add_agent() {
-        let proposal = RewriteProposal {
-            edits: vec![HarnessEdit::AddAgent {
-                role: "reviewer".into(),
-                prompt: "review".into(),
-            }],
-            rationale: "add reviewer".into(),
-        };
-        let h = simple_harness();
-        let new_h = apply_rewrite(&h, &proposal);
-        assert_eq!(new_h.nodes.len(), 3);
-    }
-
-    #[test]
-    fn test_apply_remove_agent() {
-        let proposal = RewriteProposal {
-            edits: vec![HarnessEdit::RemoveAgent {
-                role: "validator".into(),
-            }],
-            rationale: "remove".into(),
-        };
-        let h = simple_harness();
-        let new_h = apply_rewrite(&h, &proposal);
-        assert_eq!(new_h.nodes.len(), 1);
-        assert!(new_h.edges.is_empty());
-    }
-
-    #[test]
-    fn test_apply_update_prompt() {
-        let proposal = RewriteProposal {
-            edits: vec![HarnessEdit::UpdatePrompt {
-                role: "analyst".into(),
-                new_prompt: "new prompt".into(),
-            }],
-            rationale: "update".into(),
-        };
-        let h = simple_harness();
-        let new_h = apply_rewrite(&h, &proposal);
-        for node in &new_h.nodes {
-            if let crate::agent_flow::dsl::NodeKind::Agent(a) = &node.kind {
-                if a.role == "analyst" {
-                    assert_eq!(a.prompt, "new prompt");
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_apply_add_edge() {
-        let proposal = RewriteProposal {
-            edits: vec![HarnessEdit::AddEdge {
-                from_role: "validator".into(),
-                to_role: "analyst".into(),
-                kind: "data".into(),
-                template: "{{ validator.out }}".into(),
-            }],
-            rationale: "add edge".into(),
-        };
-        let h = simple_harness();
-        let new_h = apply_rewrite(&h, &proposal);
-        assert_eq!(new_h.edges.len(), 2);
-    }
-
-    #[test]
-    fn test_build_harness_summary() {
-        let h = simple_harness();
-        let summary = build_harness_summary(&h);
-        assert!(summary.contains("analyst"));
-        assert!(summary.contains("validator"));
-        assert!(summary.contains("Edges:"));
-    }
-
-    #[test]
-    fn test_build_harness_summary_empty() {
-        let h = AgentFlowHarness::new();
-        let summary = build_harness_summary(&h);
-        assert!(summary.contains("Agents:"));
-        assert!(summary.contains("Edges:"));
-    }
-
-    #[test]
-    fn test_parse_rewrite_proposal_empty_response() {
-        let response = "";
-        let proposal = parse_rewrite_proposal(response).unwrap();
-        assert!(proposal.edits.is_empty());
-        assert!(!proposal.rationale.is_empty());
-    }
-
-    #[test]
-    fn test_parse_single_edit_add_agent() {
-        let edit_json = serde_json::json!({
-            "type": "AddAgent",
-            "role": "reviewer",
-            "prompt": "Review the findings"
-        });
-        let edit = parse_single_edit(&edit_json).unwrap();
-        match edit {
-            HarnessEdit::AddAgent { role, prompt } => {
-                assert_eq!(role, "reviewer");
-                assert_eq!(prompt, "Review the findings");
-            }
-            _ => panic!("Expected AddAgent edit"),
-        }
-    }
-
-    #[test]
-    fn test_parse_single_edit_remove_agent() {
-        let edit_json = serde_json::json!({
-            "type": "RemoveAgent",
-            "role": "validator"
-        });
-        let edit = parse_single_edit(&edit_json).unwrap();
-        match edit {
-            HarnessEdit::RemoveAgent { role } => {
-                assert_eq!(role, "validator");
-            }
-            _ => panic!("Expected RemoveAgent edit"),
-        }
-    }
-
-    #[test]
-    fn test_parse_single_edit_update_prompt() {
-        let edit_json = serde_json::json!({
-            "type": "UpdatePrompt",
-            "role": "analyst",
-            "new_prompt": "Updated prompt"
-        });
-        let edit = parse_single_edit(&edit_json).unwrap();
-        match edit {
-            HarnessEdit::UpdatePrompt { role, new_prompt } => {
-                assert_eq!(role, "analyst");
-                assert_eq!(new_prompt, "Updated prompt");
-            }
-            _ => panic!("Expected UpdatePrompt edit"),
-        }
-    }
-
-    #[test]
-    fn test_parse_single_edit_unknown_type() {
-        let edit_json = serde_json::json!({
-            "type": "UnknownType",
-            "role": "test"
-        });
-        let edit = parse_single_edit(&edit_json);
-        assert!(edit.is_none());
-    }
-
-    #[test]
-    fn test_parse_single_edit_missing_field() {
-        let edit_json = serde_json::json!({
-            "type": "AddAgent",
-            "role": "reviewer"
-        });
-        let edit = parse_single_edit(&edit_json);
-        assert!(edit.is_none());
-    }
 }

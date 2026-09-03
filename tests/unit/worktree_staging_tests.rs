@@ -956,3 +956,45 @@ fn test_worktree_manager_from_nested_path() {
         .remove_worktree(&format!("baco-staging-{}", unique_id))
         .ok();
 }
+
+// ============================================================================
+// Migrated inline tests from src/worktree_staging.rs
+// ============================================================================
+
+#[test]
+fn test_worktree_manager_creation_inline_migrated() {
+    use std::time::Instant;
+
+    let timestamp = Instant::now().elapsed().as_nanos();
+    let temp_dir = std::env::temp_dir().join(format!("baco-test-worktree-{}", timestamp));
+    let _manager = WorktreeManager::new(temp_dir.clone());
+
+    // Manager should be created successfully
+    let _ = _manager;
+}
+
+#[test]
+fn test_cleanup_nonexistent_directory_inline_migrated() {
+    use std::time::Instant;
+
+    let timestamp = Instant::now().elapsed().as_nanos();
+    let temp_dir = std::env::temp_dir().join(format!("baco-test-cleanup-{}", timestamp));
+    let manager = WorktreeManager::new(temp_dir.clone());
+
+    let cleaned = manager
+        .cleanup_stale_worktrees(Duration::from_secs(0))
+        .unwrap();
+    assert_eq!(cleaned, 0);
+}
+
+#[test]
+fn test_patch_validation_result_format_inline_migrated() {
+    let results = [
+        ("cargo build".to_string(), true),
+        ("cargo test".to_string(), false),
+    ];
+
+    assert_eq!(results.len(), 2);
+    assert!(results[0].1);
+    assert!(!results[1].1);
+}

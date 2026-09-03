@@ -215,6 +215,12 @@ mod agent_scaffold_fn_lookup_tests;
 mod agent_scaffold_tests;
 mod agent_scaffold_tree_sitter_parser_tests;
 mod context_pacvd_tests;
+mod rulesynth_emitter_tests;
+mod rulesynth_mod_tests;
+mod rulesynth_pattern_dsl_tests;
+mod rulesynth_prompt_tests;
+mod rulesynth_proposer_tests;
+mod rulesynth_symbolic_validator_tests;
 mod rulesynth_validator_tests;
 
 // Standalone unit test modules for core types

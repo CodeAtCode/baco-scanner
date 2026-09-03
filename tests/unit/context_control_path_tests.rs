@@ -439,3 +439,99 @@ fn test_context_error_display_tree_sitter_error() {
     assert!(displayed.contains("Tree-sitter error"));
     assert!(displayed.contains("test error"));
 }
+
+// ============================================================================
+// Migrated inline tests from src/context/control_path.rs (4 tests)
+// ============================================================================
+
+#[test]
+fn test_extract_c_function_with_branch_inline_migrated() {
+    use baco::context::control_path::extract;
+    use baco::context::Language;
+
+    let source = r#"
+void process(int x) {
+    int result = 0;
+    if (x > 10) {
+        result = x * 2;
+    } else {
+        result = x;
+    }
+}
+"#;
+
+    let control = extract(source, Language::C).expect("Should parse C code");
+
+    assert!(!control.ast_text.is_empty(), "AST should not be empty");
+    assert!(
+        control.ast_text.contains("function_definition"),
+        "AST should contain function_definition"
+    );
+    assert!(
+        control.cfg_text.contains("if"),
+        "CFG should contain if statement"
+    );
+    assert!(
+        control.cfg_text.contains("->"),
+        "CFG should contain flow arrows"
+    );
+}
+
+#[test]
+fn test_extract_python_with_assignment_inline_migrated() {
+    use baco::context::control_path::extract;
+    use baco::context::Language;
+
+    let source = r#"
+def calculate(x):
+    result = 0
+    for i in range(x):
+        result = result + i
+    return result
+"#;
+
+    let control = extract(source, Language::Python).expect("Should parse Python code");
+
+    assert!(
+        control.dfg_text.contains("<-"),
+        "DFG should contain assignment arrows"
+    );
+    assert!(
+        control.dfg_text.contains("result"),
+        "DFG should mention result variable"
+    );
+}
+
+#[test]
+fn test_malformed_source_returns_error_inline_migrated() {
+    use baco::context::control_path::extract;
+    use baco::context::Language;
+
+    // Tree-sitter is lenient, so malformed source may still parse
+    // This test verifies we don't panic on edge cases
+    let source = r#"
+void broken( {
+    int x = ;
+"#;
+
+    let result = extract(source, Language::C);
+    // Tree-sitter may still produce a parse tree for malformed code
+    // Just verify we get a result without panicking
+    assert!(
+        result.is_ok() || result.is_err(),
+        "Should handle malformed source gracefully"
+    );
+}
+
+#[test]
+fn test_empty_source_inline_migrated() {
+    use baco::context::control_path::extract;
+    use baco::context::Language;
+
+    let source = "";
+    let control = extract(source, Language::C).expect("Empty source should parse");
+    assert!(
+        !control.ast_text.is_empty(),
+        "AST should have minimal content"
+    );
+}

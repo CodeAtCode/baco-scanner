@@ -18,5 +18,8 @@ pub mod typecheck;
 pub use diagnoser::{diagnose, format_diagnostic, Diagnostic, FeedbackSignal};
 pub use dsl::{Agent, AgentFlowHarness, Edge, EdgeKind, FeedbackChannel, Node, NodeKind};
 pub use executor::{execute, AgentOutput, ExecutionResult};
-pub use proposer::{apply_rewrite, propose_rewrite, HarnessEdit, RewriteProposal};
+pub use proposer::{
+    apply_rewrite, build_harness_summary, parse_rewrite_proposal, parse_single_edit,
+    propose_rewrite, HarnessEdit, RewriteProposal,
+};
 pub use typecheck::{typecheck, TypeError, TypeResult};

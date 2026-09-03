@@ -13,6 +13,10 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 
+mod compiler_tests;
+mod core_tests;
+mod error_tests;
+
 // ============================================================================
 // Test Helpers
 // ============================================================================

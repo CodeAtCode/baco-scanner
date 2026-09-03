@@ -473,3 +473,69 @@ fn test_complex_nested_expression() {
         arg_count: 2
     }));
 }
+
+// ============================================================================
+// Migrated inline tests from src/context/callee_walker.rs (6 tests)
+// ============================================================================
+
+#[test]
+fn test_no_calls_inline_migrated() {
+    use baco::context::callee_walker::extract_call_sites;
+
+    let sites = extract_call_sites("let x = 42;");
+    assert!(sites.is_empty());
+}
+
+#[test]
+fn test_simple_call_inline_migrated() {
+    use baco::context::callee_walker::{extract_call_sites, CallSite};
+
+    let sites = extract_call_sites("foo(1, 2)");
+    assert!(sites.contains(&CallSite {
+        callee: "foo".into(),
+        arg_count: 2
+    }));
+}
+
+#[test]
+fn test_nested_call_inline_migrated() {
+    use baco::context::callee_walker::{extract_call_sites, CallSite};
+
+    let sites = extract_call_sites("outer(inner(1), 2)");
+    assert!(sites.contains(&CallSite {
+        callee: "outer".into(),
+        arg_count: 2
+    }));
+    assert!(sites.contains(&CallSite {
+        callee: "inner".into(),
+        arg_count: 1
+    }));
+}
+
+#[test]
+fn test_zero_args_inline_migrated() {
+    use baco::context::callee_walker::{extract_call_sites, CallSite};
+
+    let sites = extract_call_sites("getpid()");
+    assert!(sites.contains(&CallSite {
+        callee: "getpid".into(),
+        arg_count: 0
+    }));
+}
+
+#[test]
+fn test_method_call_colons_inline_migrated() {
+    use baco::context::callee_walker::extract_call_sites;
+
+    let sites = extract_call_sites("obj::method(a)");
+    let names: Vec<_> = sites.iter().map(|c| c.callee.as_str()).collect();
+    assert!(names.iter().any(|n| n.contains("method")));
+}
+
+#[test]
+fn test_dedup_same_callee_inline_migrated() {
+    use baco::context::callee_walker::extract_call_sites;
+
+    let sites = extract_call_sites("foo(1)\nfoo(2)\nfoo(3)");
+    assert_eq!(sites.iter().filter(|c| c.callee == "foo").count(), 1);
+}

@@ -410,3 +410,63 @@ fn test_retrieve_with_unicode() {
     let result = retrieve(code, &kb, 3);
     assert!(result.is_ok());
 }
+
+// ============================================================================
+// Migrated inline tests from src/context/knowledge_path.rs (4 tests)
+// ============================================================================
+
+#[test]
+fn test_retrieve_with_valid_code_inline_migrated() {
+    use baco::context::knowledge_path::retrieve;
+    use baco::retrieval::CweKnowledgeBase;
+
+    let code = "sql query user_input concatenation vulnerable";
+    let kb = CweKnowledgeBase::load_embedded().expect("Should load CWE data");
+
+    let result = retrieve(code, &kb, 3);
+    assert!(result.is_ok(), "Should retrieve rules for valid code");
+
+    let knowledge = result.unwrap();
+    assert!(
+        !knowledge.retrieved_rules.is_empty(),
+        "Should have retrieved rules"
+    );
+}
+
+#[test]
+fn test_retrieve_empty_code_inline_migrated() {
+    use baco::context::knowledge_path::retrieve;
+    use baco::retrieval::CweKnowledgeBase;
+
+    let code = "";
+    let kb = CweKnowledgeBase::load_embedded().unwrap();
+
+    let result = retrieve(code, &kb, 3);
+    assert!(result.is_err(), "Should error on empty code");
+}
+
+#[test]
+fn test_extract_keywords_inline_migrated() {
+    use baco::context::knowledge_path::extract_keywords;
+
+    let code = "int main() { return 0; }";
+    let keywords = extract_keywords(code);
+
+    assert!(keywords.contains("main"), "Should extract main keyword");
+    assert!(
+        !keywords.contains("int"),
+        "Should filter common terms like int"
+    );
+}
+
+#[test]
+fn test_truncate_text_inline_migrated() {
+    use baco::context::knowledge_path::truncate_text;
+
+    let short = "hello";
+    let long = "this is a very long text that should be truncated properly";
+
+    assert_eq!(truncate_text(short, 100), "hello");
+    assert!(truncate_text(long, 20).ends_with("..."));
+    assert!(truncate_text(long, 20).len() <= 23); // max 20 chars + 3 dots
+}

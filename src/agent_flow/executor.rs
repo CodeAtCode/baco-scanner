@@ -73,7 +73,7 @@ pub async fn execute(
     })
 }
 
-fn topological_sort(harness: &AgentFlowHarness) -> Option<Vec<usize>> {
+pub fn topological_sort(harness: &AgentFlowHarness) -> Option<Vec<usize>> {
     let n = harness.nodes.len();
     let mut in_degree = vec![0u32; n];
     let mut adj: Vec<Vec<usize>> = vec![Vec::new(); n];
@@ -105,7 +105,7 @@ fn topological_sort(harness: &AgentFlowHarness) -> Option<Vec<usize>> {
     }
 }
 
-fn resolve_template(template: &str, outputs: &BTreeMap<String, AgentOutput>) -> String {
+pub fn resolve_template(template: &str, outputs: &BTreeMap<String, AgentOutput>) -> String {
     let mut result = template.to_string();
     for (role, output) in outputs {
         let var = format!("{{{{ {}.out }}}}", role);
@@ -150,140 +150,4 @@ async fn run_agent(llm: &LlmClient, role: &str, prompt: &str) -> Result<String, 
         .map_err(|e| format!("LLM call failed for agent '{}': {}", role, e))?;
 
     Ok(response.content)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::agent_flow::dsl::{Agent, AgentFlowHarness, EdgeKind};
-    use std::collections::BTreeSet;
-
-    fn agent(role: &str) -> Agent {
-        Agent {
-            role: role.to_string(),
-            prompt: format!("Analyze: {{{{{}.out}}}}", role),
-            model: "test".to_string(),
-            tools: BTreeSet::new(),
-        }
-    }
-
-    #[test]
-    fn test_topological_sort_linear() {
-        let mut h = AgentFlowHarness::new();
-        let a = h.add_agent(agent("analyst"));
-        let b = h.add_agent(agent("validator"));
-        h.add_edge(a, b, EdgeKind::Data, "{{ analyst.out }}".to_string());
-
-        let order = topological_sort(&h);
-        assert!(order.is_some());
-        let order = order.unwrap();
-        assert_eq!(order.len(), 2);
-        assert_eq!(order[0], a);
-        assert_eq!(order[1], b);
-    }
-
-    #[test]
-    fn test_topological_sort_fails_on_cycle() {
-        let mut h = AgentFlowHarness::new();
-        let a = h.add_agent(agent("a"));
-        let b = h.add_agent(agent("b"));
-        h.add_edge(a, b, EdgeKind::Data, "{{ a.out }}".to_string());
-        h.add_edge(b, a, EdgeKind::Data, "{{ b.out }}".to_string());
-
-        let result = topological_sort(&h);
-        assert!(result.is_none());
-    }
-
-    #[test]
-    fn test_topological_sort_empty_harness() {
-        let h = AgentFlowHarness::new();
-        let order = topological_sort(&h);
-        assert!(order.is_some());
-        assert!(order.unwrap().is_empty());
-    }
-
-    #[test]
-    fn test_resolve_template() {
-        let mut outputs = BTreeMap::new();
-        outputs.insert(
-            "analyst".to_string(),
-            AgentOutput {
-                role: "analyst".into(),
-                content: "found bug".into(),
-                success: true,
-            },
-        );
-        let resolved = resolve_template("Result: {{ analyst.out }}", &outputs);
-        assert_eq!(resolved, "Result: found bug");
-    }
-
-    #[test]
-    fn test_resolve_template_multiple_vars() {
-        let mut outputs = BTreeMap::new();
-        outputs.insert(
-            "analyst".to_string(),
-            AgentOutput {
-                role: "analyst".into(),
-                content: "found bug".into(),
-                success: true,
-            },
-        );
-        outputs.insert(
-            "validator".to_string(),
-            AgentOutput {
-                role: "validator".into(),
-                content: "validated".into(),
-                success: true,
-            },
-        );
-        let resolved = resolve_template("{{ analyst.out }} then {{ validator.out }}", &outputs);
-        assert_eq!(resolved, "found bug then validated");
-    }
-
-    #[test]
-    fn test_resolve_template_no_vars() {
-        let outputs = BTreeMap::new();
-        let resolved = resolve_template("Static prompt", &outputs);
-        assert_eq!(resolved, "Static prompt");
-    }
-
-    #[test]
-    fn test_execution_result_is_success() {
-        let result = ExecutionResult {
-            outputs: vec![
-                AgentOutput {
-                    role: "analyst".into(),
-                    content: "ok".into(),
-                    success: true,
-                },
-                AgentOutput {
-                    role: "validator".into(),
-                    content: "validated".into(),
-                    success: true,
-                },
-            ],
-            rounds: 1,
-        };
-        assert!(result.is_success());
-    }
-
-    #[test]
-    fn test_execution_result_fails_on_one_failure() {
-        let result = ExecutionResult {
-            outputs: vec![
-                AgentOutput {
-                    role: "analyst".into(),
-                    content: "ok".into(),
-                    success: true,
-                },
-                AgentOutput {
-                    role: "validator".into(),
-                    content: "failed".into(),
-                    success: false,
-                },
-            ],
-            rounds: 1,
-        };
-        assert!(!result.is_success());
-    }
 }

@@ -14,7 +14,7 @@
 
 use baco::agent::mock_llm::MockLlmClient;
 use baco::agent::sandbox::ToolSandbox;
-use baco::agent::tool_schema::{default_tools, tool_definitions, SandboxLike, Tool, ToolRegistry};
+use baco::agent::tool_schema::{default_tools, tool_definitions, Tool, ToolRegistry};
 use baco::agent::tools::{
     FileReadTool, FileWriteTool, PatternSearchTool, TestCompileTool, TestRunTool,
 };

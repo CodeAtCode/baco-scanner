@@ -745,3 +745,106 @@ fn test_auto_level_selection_workflow() {
     assert_eq!(v3.level, AbstractionLevel::Grouped);
     assert_eq!(v4.level, AbstractionLevel::Semantic);
 }
+
+// ============================================================================
+// Migrated inline tests from src/context/pacvd_extractor.rs (11 tests)
+// ============================================================================
+
+fn site(name: &str, n: usize) -> CallSite {
+    CallSite {
+        callee: name.into(),
+        arg_count: n,
+    }
+}
+
+fn sample_sites() -> BTreeSet<CallSite> {
+    let mut s = BTreeSet::new();
+    s.insert(site("strcpy", 2));
+    s.insert(site("system", 1));
+    s.insert(site("malloc", 1));
+    s.insert(site("printf", 1));
+    s
+}
+
+#[test]
+fn test_extract_primitive_inline_migrated() {
+    let v = extract(&sample_sites(), AbstractionLevel::Primitive);
+    assert_eq!(v.level, AbstractionLevel::Primitive);
+    assert_eq!(v.primitive.len(), 4);
+    assert!(v.typed.is_empty());
+    assert!(v.grouped.is_empty());
+    assert!(v.semantic.is_empty());
+}
+
+#[test]
+fn test_extract_grouped_inline_migrated() {
+    let v = extract(&sample_sites(), AbstractionLevel::Grouped);
+    assert!(v.grouped.contains_key("memory"));
+    assert!(v.grouped.contains_key("control_flow"));
+    assert!(v.grouped.contains_key("I/O"));
+    assert!(v.semantic.is_empty());
+}
+
+#[test]
+fn test_extract_semantic_inline_migrated() {
+    let v = extract(&sample_sites(), AbstractionLevel::Semantic);
+    assert!(v
+        .semantic
+        .iter()
+        .any(|(k, _)| k.contains("buffer_overflow")));
+    assert!(v
+        .semantic
+        .iter()
+        .any(|(k, _)| k.contains("command_injection")));
+}
+
+#[test]
+fn test_auto_level_small_inline_migrated() {
+    assert_eq!(auto_level(2048), AbstractionLevel::Primitive);
+}
+
+#[test]
+fn test_auto_level_medium_inline_migrated() {
+    assert_eq!(auto_level(8192), AbstractionLevel::Typed);
+}
+
+#[test]
+fn test_auto_level_large_inline_migrated() {
+    assert_eq!(auto_level(32768), AbstractionLevel::Grouped);
+}
+
+#[test]
+fn test_auto_level_xl_inline_migrated() {
+    assert_eq!(auto_level(128000), AbstractionLevel::Semantic);
+}
+
+#[test]
+fn test_to_prompt_section_primitive_inline_migrated() {
+    let v = extract(&sample_sites(), AbstractionLevel::Primitive);
+    let s = v.to_prompt_section();
+    assert!(s.contains("%%PACVD_CONTEXT%%"));
+    assert!(s.contains("strcpy"));
+    assert!(!s.contains("### Functional grouping"));
+}
+
+#[test]
+fn test_to_prompt_section_semantic_inline_migrated() {
+    let v = extract(&sample_sites(), AbstractionLevel::Semantic);
+    let s = v.to_prompt_section();
+    assert!(s.contains("### CWE-relevant tags"));
+}
+
+#[test]
+fn test_categorize_known_inline_migrated() {
+    assert_eq!(categorize("strcpy"), "memory");
+    assert_eq!(categorize("system"), "control_flow");
+    assert_eq!(categorize("printf"), "I/O");
+    assert_eq!(categorize("unknown_fn"), "other");
+}
+
+#[test]
+fn test_tag_cwe_known_inline_migrated() {
+    assert_eq!(tag_cwe("strcpy").unwrap().1, "CWE-120");
+    assert_eq!(tag_cwe("system").unwrap().1, "CWE-78");
+    assert!(tag_cwe("printf").is_none());
+}
