@@ -7,11 +7,7 @@ use std::path::PathBuf;
 use super::rules::{parse_severity, RawFinding};
 
 /// Read a file and extract lines around the target line for code snippet
-pub(crate) fn extract_code_snippet(
-    file_path: &str,
-    target_line: u32,
-    context_lines: usize,
-) -> String {
+pub fn extract_code_snippet(file_path: &str, target_line: u32, context_lines: usize) -> String {
     let path = PathBuf::from(file_path);
     if !path.exists() {
         return format!("Line {}: [file not found]", target_line);

@@ -485,3 +485,149 @@ fn test_score_is_always_at_most_one() {
         assert!(score <= 1.0, "Score {} should not exceed 1.0", score);
     }
 }
+
+// ============================================================================
+// Migrated inline tests from src/severity_rubric.rs (8 tests)
+// ============================================================================
+
+#[test]
+fn test_high_risk_finding_critical_severity_inline_migrated() {
+    // High-risk finding: easily reachable, full attacker control, no auth needed
+    let rubric = SeverityRubric::new(
+        1.0,                   // High reachability
+        1.0,                   // Full attacker control
+        1.0,                   // No preconditions
+        false,                 // No auth required
+        AccessType::Both,      // Read + Write access
+        BlastRadius::Critical, // Critical blast radius
+    );
+
+    let result = SeverityRubricScorer::score(&rubric);
+
+    assert_eq!(result.severity(), V3Severity::Critical);
+    assert!(result.raw_score >= 0.8);
+}
+
+#[test]
+fn test_low_risk_finding_low_severity_inline_migrated() {
+    // Low-risk finding: hard to reach, limited control, auth required
+    let rubric = SeverityRubric::new(
+        0.1,              // Low reachability
+        0.2,              // Limited attacker control
+        0.3,              // Many preconditions
+        true,             // Auth required
+        AccessType::Read, // Read only
+        BlastRadius::Low, // Low blast radius
+    );
+
+    let result = SeverityRubricScorer::score(&rubric);
+
+    assert_eq!(result.severity(), V3Severity::Low);
+    assert!(result.raw_score < 0.2);
+}
+
+#[test]
+fn test_medium_risk_finding_inline_migrated() {
+    // Medium-risk: typical web vulnerability
+    let rubric = SeverityRubric::new(
+        0.9,               // High reachability
+        0.8,               // Good attacker control
+        0.7,               // Some preconditions
+        false,             // No auth required (common in web apps)
+        AccessType::Write, // Write access
+        BlastRadius::High, // High blast radius
+    );
+
+    let result = SeverityRubricScorer::score(&rubric);
+
+    assert_eq!(result.severity(), V3Severity::Medium);
+}
+
+#[test]
+fn test_auth_reduces_severity_inline_migrated() {
+    let rubric_no_auth = SeverityRubric::new(
+        0.8,
+        0.8,
+        0.8,
+        false, // No auth
+        AccessType::Both,
+        BlastRadius::High,
+    );
+
+    let rubric_with_auth = SeverityRubric::new(
+        0.8,
+        0.8,
+        0.8,
+        true, // Auth required
+        AccessType::Both,
+        BlastRadius::High,
+    );
+
+    let score_no_auth = SeverityRubricScorer::score(&rubric_no_auth);
+    let score_with_auth = SeverityRubricScorer::score(&rubric_with_auth);
+
+    // Auth should reduce the score
+    assert!(score_with_auth.raw_score < score_no_auth.raw_score);
+}
+
+#[test]
+fn test_explain_score_contains_details_inline_migrated() {
+    let rubric = SeverityRubric::new(0.5, 0.6, 0.7, false, AccessType::Write, BlastRadius::Medium);
+
+    let explanation = SeverityRubricScorer::explain_score(&rubric);
+
+    assert!(explanation.contains("reachability: 0.50"));
+    assert!(explanation.contains("raw_score:"));
+}
+
+#[test]
+fn test_default_rubric_scores_medium_inline_migrated() {
+    let score = SeverityRubricScorer::score(&DEFAULT_RUBRIC);
+
+    // Default rubric should produce Medium severity
+    assert_eq!(score.severity(), V3Severity::Medium);
+}
+
+#[test]
+fn test_severity_mapping_boundaries_inline_migrated() {
+    // Test exact boundary values
+    assert_eq!(SeverityRubricScorer::map_to_severity(0.0), V3Severity::Low);
+    assert_eq!(SeverityRubricScorer::map_to_severity(0.19), V3Severity::Low);
+    assert_eq!(
+        SeverityRubricScorer::map_to_severity(0.2),
+        V3Severity::Medium
+    );
+    assert_eq!(
+        SeverityRubricScorer::map_to_severity(0.49),
+        V3Severity::Medium
+    );
+    assert_eq!(SeverityRubricScorer::map_to_severity(0.5), V3Severity::High);
+    assert_eq!(
+        SeverityRubricScorer::map_to_severity(0.79),
+        V3Severity::High
+    );
+    assert_eq!(
+        SeverityRubricScorer::map_to_severity(0.8),
+        V3Severity::Critical
+    );
+    assert_eq!(
+        SeverityRubricScorer::map_to_severity(1.0),
+        V3Severity::Critical
+    );
+}
+
+#[test]
+fn test_rubric_values_clamped_inline_migrated() {
+    let rubric = SeverityRubric::new(
+        1.5,  // Should clamp to 1.0
+        -0.5, // Should clamp to 0.0
+        2.0,  // Should clamp to 1.0
+        false,
+        AccessType::Read,
+        BlastRadius::Low,
+    );
+
+    assert_eq!(rubric.reachability, 1.0);
+    assert_eq!(rubric.attacker_control, 0.0);
+    assert_eq!(rubric.preconditions_factor, 1.0);
+}

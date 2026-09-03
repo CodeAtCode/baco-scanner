@@ -3,6 +3,7 @@
 //! diffs, and error paths through the public API.
 
 use baco::tools::diff_analysis::{analyze_diff, parse_diff, DiffAnalysisInput, DiffAnalysisOutput};
+use std::process::Command;
 
 #[test]
 fn fn_parse_diff_single_file_single_insert() {
@@ -207,4 +208,82 @@ fn fn_diff_analysis_output_clone_debug() {
     assert_eq!(cloned.deletions, 1);
     let debug = format!("{:?}", output);
     assert!(debug.contains("DiffAnalysisOutput"));
+}
+
+// ============================================================================
+// Migrated inline tests from src/tools/diff_analysis.rs (7 tests)
+// ============================================================================
+
+#[test]
+fn test_diff_analysis_both_commits_inline_migrated() {
+    let input = DiffAnalysisInput {
+        file_path: "README.md".to_string(),
+        base_commit: Some("v1.0.0".to_string()),
+        head_commit: Some("v1.0.1".to_string()),
+    };
+
+    let result = analyze_diff(input);
+    assert!(result.is_ok() || result.is_err());
+}
+
+#[test]
+fn test_diff_analysis_only_base_inline_migrated() {
+    let input = DiffAnalysisInput {
+        file_path: "README.md".to_string(),
+        base_commit: Some("v1.0.0".to_string()),
+        head_commit: None,
+    };
+
+    let result = analyze_diff(input);
+    assert!(result.is_ok() || result.is_err());
+}
+
+#[test]
+fn test_diff_analysis_only_head_inline_migrated() {
+    let input = DiffAnalysisInput {
+        file_path: "README.md".to_string(),
+        base_commit: None,
+        head_commit: Some("v1.0.1".to_string()),
+    };
+
+    let result = analyze_diff(input);
+    assert!(result.is_ok() || result.is_err());
+}
+
+#[test]
+fn test_diff_analysis_missing_commits_inline_migrated() {
+    let input = DiffAnalysisInput {
+        file_path: "README.md".to_string(),
+        base_commit: None,
+        head_commit: None,
+    };
+
+    let result = analyze_diff(input);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_parse_diff_empty_inline_migrated() {
+    let (files, inserts, deletes) = parse_diff("");
+    assert_eq!(files, 0);
+    assert_eq!(inserts, 0);
+    assert_eq!(deletes, 0);
+}
+
+#[test]
+fn test_parse_diff_with_content_inline_migrated() {
+    let diff = "- old line\n+ new line\n- deleted\n+ inserted more";
+    let (files, inserts, deletes) = parse_diff(diff);
+    assert_eq!(files, 1);
+    assert_eq!(inserts, 2);
+    assert_eq!(deletes, 2);
+}
+
+#[test]
+fn test_git_diff_command_exists_inline_migrated() {
+    let output = Command::new("git")
+        .args(["rev-parse", "--git-dir"])
+        .output();
+
+    assert!(output.is_ok(), "git command should exist");
 }

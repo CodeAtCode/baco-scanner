@@ -308,3 +308,23 @@ fn test_cwe_routing_cwe_id_format_normalization() {
     simulate_cwe_routing(&mut findings, &router);
     assert!(findings[0].llm_model.is_none());
 }
+
+// ============================================================================
+// Additional router/mod.rs inline tests (migrated)
+// ============================================================================
+
+#[test]
+fn test_route_cwe_known() {
+    let router = CweRouter::default();
+    let route = router.route_cwe("CWE-79");
+    assert_eq!(route.domain, Some("xss".to_string()));
+    assert_eq!(route.model_override, None);
+}
+
+#[test]
+fn test_route_cwe_unknown() {
+    let router = CweRouter::default();
+    let route = router.route_cwe("CWE-999999");
+    assert_eq!(route.domain, None);
+    assert_eq!(route.model_override, None);
+}

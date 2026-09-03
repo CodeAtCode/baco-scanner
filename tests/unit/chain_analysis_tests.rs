@@ -625,3 +625,184 @@ fn test_batch_verify_filters_rejected() {
     // Should keep confirmed/inconclusive, filter out rejected
     assert!(result.len() <= findings.len());
 }
+// ============================================================================
+// Additional ChainAnalyzer Tests
+// ============================================================================
+
+fn create_finding_inline(id: &str, file_path: &str, cwe_id: Option<&str>) -> VulnerabilityFinding {
+    use baco::findings::{Severity, TriageVerdict};
+
+    VulnerabilityFinding {
+        id: id.to_string(),
+        title: "Test finding".to_string(),
+        description: "Test description".to_string(),
+        severity: Severity::High,
+        confidence_score: 0.8,
+        cwe_id: cwe_id.map(|s| s.to_string()),
+        file_path: file_path.to_string(),
+        line_number: Some(42),
+        code_snippet: None,
+        diff_hunk: None,
+        recommendation: None,
+        code_location: None,
+        already_reported: false,
+        sources: vec!["test".to_string()],
+        commit_reference: None,
+        ticket_reference: None,
+        priority_score: None,
+        cross_file_references: None,
+        verification_status: None,
+        verification_notes: None,
+        verification_error: None,
+        agent_evidence_path: None,
+        security_issue: None,
+        poc_code: None,
+        mitigation_code: None,
+        poc_format: None,
+        llm_model: None,
+        agent_mode: false,
+        statement_range: None,
+        triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
+    }
+}
+
+#[test]
+fn test_analyze_chains_empty_findings() {
+    let findings: Vec<VulnerabilityFinding> = Vec::new();
+    let chains = ChainAnalyzer::analyze_chains(&findings);
+    assert!(chains.is_empty());
+}
+
+#[test]
+fn test_analyze_chains_single_finding() {
+    let findings = vec![create_finding_inline("f1", "src/main.rs", Some("CWE-89"))];
+    let chains = ChainAnalyzer::analyze_chains(&findings);
+    assert!(chains.is_empty());
+}
+
+#[test]
+fn test_injection_to_execution_chain() {
+    let findings = vec![
+        create_finding_inline("f1", "src/db.rs", Some("CWE-89")), // SQLi
+        create_finding_inline("f2", "src/db.rs", Some("CWE-78")), // Command Injection
+    ];
+    let chains = ChainAnalyzer::analyze_chains(&findings);
+    assert_eq!(chains.len(), 1);
+    assert_eq!(chains[0].chain_type, ChainType::InjectionToExecution);
+    assert_eq!(chains[0].primary_finding_id, "f1");
+    assert_eq!(chains[0].partner_finding_ids, vec!["f2"]);
+}
+
+#[test]
+fn test_auth_bypass_to_privilege_escalation() {
+    let findings = vec![
+        create_finding_inline("f1", "src/auth.rs", Some("CWE-287")), // Auth Bypass
+        create_finding_inline("f2", "src/admin.rs", Some("CWE-269")), // Privilege Escalation
+    ];
+    let chains = ChainAnalyzer::analyze_chains(&findings);
+    assert_eq!(chains.len(), 1);
+    assert_eq!(chains[0].chain_type, ChainType::AuthBypassToPrivilegeEscal);
+}
+
+#[test]
+fn test_file_access_to_rce() {
+    let findings = vec![
+        create_finding_inline("f1", "src/upload.rs", Some("CWE-22")), // Path Traversal
+        create_finding_inline("f2", "src/include.rs", Some("CWE-98")), // File Include
+    ];
+    let chains = ChainAnalyzer::analyze_chains(&findings);
+    assert_eq!(chains.len(), 1);
+    assert_eq!(chains[0].chain_type, ChainType::FileAccessToRCE);
+}
+
+#[test]
+fn test_data_exfiltration_chain_inline() {
+    let findings = vec![
+        create_finding_inline("f1", "src/proxy.rs", Some("CWE-918")), // SSRF
+        create_finding_inline("f2", "src/api.rs", Some("CWE-200")),   // Info Exposure
+    ];
+    let chains = ChainAnalyzer::analyze_chains(&findings);
+    assert_eq!(chains.len(), 1);
+    assert_eq!(chains[0].chain_type, ChainType::DataExfilChain);
+}
+
+#[test]
+fn test_no_chain_different_directories() {
+    let findings = vec![
+        create_finding_inline("f1", "src/db.rs", Some("CWE-89")), // SQLi in src/
+        create_finding_inline("f2", "tests/test.rs", Some("CWE-78")), // Command Injection in tests/
+    ];
+    let chains = ChainAnalyzer::analyze_chains(&findings);
+    // Different directories, no chain detected
+    assert!(chains.is_empty());
+}
+
+#[test]
+fn test_apply_chain_verdicts() {
+    let mut findings = vec![
+        create_finding_inline("f1", "src/db.rs", Some("CWE-89")),
+        create_finding_inline("f2", "src/db.rs", Some("CWE-78")),
+        create_finding_inline("f3", "src/other.rs", Some("CWE-200")),
+    ];
+
+    let chains = vec![ChainResult {
+        primary_finding_id: "f1".to_string(),
+        partner_finding_ids: vec!["f2".to_string()],
+        chain_description: "Test chain".to_string(),
+        chain_type: ChainType::InjectionToExecution,
+    }];
+
+    apply_chain_verdicts(&mut findings, &chains);
+
+    // f1 and f2 should have ChainRequired verdict
+    assert!(matches!(
+        findings[0].triage_verdict,
+        Some(TriageVerdict::ChainRequired { .. })
+    ));
+    assert!(matches!(
+        findings[1].triage_verdict,
+        Some(TriageVerdict::ChainRequired { .. })
+    ));
+    // f3 should have no verdict
+    assert!(findings[2].triage_verdict.is_none());
+}
+
+#[test]
+fn test_extract_directory() {
+    assert_eq!(
+        ChainAnalyzer::extract_directory("src/db.rs"),
+        "src".to_string()
+    );
+    assert_eq!(
+        ChainAnalyzer::extract_directory("src/utils/db.rs"),
+        "src/utils".to_string()
+    );
+    assert_eq!(ChainAnalyzer::extract_directory("main.rs"), ".".to_string());
+}
+
+#[test]
+fn test_extract_cwe_number() {
+    assert_eq!(
+        ChainAnalyzer::extract_cwe_number(&Some("CWE-89".to_string())),
+        Some("89")
+    );
+    assert_eq!(
+        ChainAnalyzer::extract_cwe_number(&Some("CWE-1234".to_string())),
+        Some("1234")
+    );
+    assert_eq!(ChainAnalyzer::extract_cwe_number(&None), None);
+}
+
+#[test]
+fn test_chain_description_format() {
+    let findings = vec![
+        create_finding_inline("f1", "src/db.rs", Some("CWE-89")),
+        create_finding_inline("f2", "src/db.rs", Some("CWE-78")),
+    ];
+    let chains = ChainAnalyzer::analyze_chains(&findings);
+    assert!(chains[0].chain_description.contains("src/db.rs"));
+    assert!(chains[0].chain_description.contains("CWE-89"));
+    assert!(chains[0].chain_description.contains("CWE-78"));
+}

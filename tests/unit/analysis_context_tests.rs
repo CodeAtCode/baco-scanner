@@ -373,3 +373,37 @@ fn test_save_overwrites_existing_file() {
     assert_eq!(loaded.project_type, ProjectType::Web);
     assert_eq!(loaded.architecture_summary, "Second");
 }
+// ============================================================================
+// Additional AnalysisContext Tests
+// ============================================================================
+
+#[test]
+fn test_context_save_load() {
+    let tmp = tempfile::tempdir().unwrap();
+    let ctx = AnalysisContext {
+        project_type: ProjectType::CLI,
+        architecture_summary: "Test summary".to_string(),
+        threat_model: Some("Attacker: anonymous".to_string()),
+        invariants: vec!["No unauthenticated access".to_string()],
+        findings_so_far: vec!["CWE-79: XSS in header".to_string()],
+    };
+
+    ctx.save(tmp.path()).unwrap();
+
+    let loaded = AnalysisContext::load(tmp.path()).unwrap();
+    assert_eq!(loaded.project_type, ctx.project_type);
+    assert_eq!(loaded.architecture_summary, ctx.architecture_summary);
+    assert_eq!(loaded.threat_model, ctx.threat_model);
+    assert_eq!(loaded.invariants, ctx.invariants);
+    assert_eq!(loaded.findings_so_far, ctx.findings_so_far);
+}
+
+#[test]
+fn test_context_missing_file() {
+    let tmp = tempfile::tempdir().unwrap();
+    let ctx = AnalysisContext::load(tmp.path()).unwrap();
+    assert!(ctx.architecture_summary.is_empty());
+    assert!(ctx.invariants.is_empty());
+    assert!(ctx.findings_so_far.is_empty());
+    assert_eq!(ctx.threat_model, None);
+}

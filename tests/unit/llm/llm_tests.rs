@@ -9,10 +9,7 @@
 //! 6. Tool schema serialization
 //! 7. Edge cases: empty configs, None fields, defaults
 
-use baco::llm::{
-    ChatMessage, ChatResponse, ChatResponseWithModel, FunctionToolDefinition, LlmClient, LlmConfig,
-    ModelSelector, ToolSchema,
-};
+use baco::llm::{LlmProvider, ChatMessage, ChatResponse, ChatResponseWithModel, FunctionToolDefinition, LlmClient, LlmConfig, ModelSelector, ToolSchema};
 use serde_json::json;
 
 // ============================================================================
@@ -351,4 +348,146 @@ fn test_chat_endpoint_localhost_no_v1() {
         baco::llm::chat_endpoint("http://localhost:8080"),
         "http://localhost:8080/v1/chat/completions"
     );
+}
+// ============================================================================
+// Additional ChatMessage Tests
+// ============================================================================
+
+#[test]
+fn test_chat_message_long_content() {
+    let long_content = "A".repeat(1000);
+    let msg = ChatMessage::user(&long_content);
+    assert_eq!(msg.content.len(), 1000);
+}
+
+// ============================================================================
+// LlmConfig Validation Tests
+// ============================================================================
+
+#[test]
+fn test_llm_config_validation() {
+    use baco::llm::LlmConfig;
+
+    let config = LlmConfig {
+        base_url: "https://api.test.com/v1".to_string(),
+        api_key: "test-key".to_string(),
+        model: "test-model".to_string(),
+        models: vec![],
+        timeout: 30,
+        max_retries: 3,
+        retry_backoff_ms: 1000,
+        temperature: 0.5,
+        ..Default::default()
+    };
+    assert_eq!(config.base_url, "https://api.test.com/v1");
+    assert_eq!(config.model, "test-model");
+}
+
+// ============================================================================
+// LlmClient Tests
+// ============================================================================
+
+#[test]
+fn test_llm_client_new() {
+    use baco::llm::LlmConfig;
+
+    let config = LlmConfig {
+        base_url: "https://api.test.com/v1".to_string(),
+        api_key: "test-key".to_string(),
+        model: "test-model".to_string(),
+        models: vec![],
+        timeout: 30,
+        max_retries: 3,
+        retry_backoff_ms: 1000,
+        temperature: 0.5,
+        ..Default::default()
+    };
+    let client = LlmClient::new(config);
+    assert!(client.config.base_url.contains("api.test.com"));
+}
+
+// ============================================================================
+// MockLlmProvider Tests (async)
+// ============================================================================
+
+#[tokio::test]
+async fn test_mock_provider_chat_success() {
+    use mockall::mock;
+
+    mock! {
+        #[derive(Debug)]
+        pub LlmProvider {}
+
+        impl baco::llm::LlmProvider for LlmProvider {
+            fn chat(&self, messages: &[ChatMessage]) -> Result<String, baco::error::ScanError>;
+        }
+    }
+
+    let mut mock_provider = MockLlmProvider::new();
+    mock_provider
+        .expect_chat()
+        .times(1)
+        .returning(|_| Ok("Successfully analyzed".to_string()));
+
+    let messages = vec![ChatMessage::user("Test message")];
+    let result = mock_provider.chat(&messages);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "Successfully analyzed");
+}
+
+#[tokio::test]
+async fn test_mock_provider_chat_error() {
+    use mockall::mock;
+
+    mock! {
+        #[derive(Debug)]
+        pub LlmProvider {}
+
+        impl baco::llm::LlmProvider for LlmProvider {
+            fn chat(&self, messages: &[ChatMessage]) -> Result<String, baco::error::ScanError>;
+        }
+    }
+
+    let mut mock_provider = MockLlmProvider::new();
+    mock_provider.expect_chat().times(1).returning(|_| {
+        Err(baco::error::ScanError::LlmClientBuildError(
+            "API Error".to_string(),
+        ))
+    });
+
+    let messages = vec![ChatMessage::user("Test message")];
+    let result = mock_provider.chat(&messages);
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(matches!(
+        err,
+        baco::error::ScanError::LlmClientBuildError(_)
+    ));
+}
+
+#[tokio::test]
+async fn test_mock_provider_with_different_messages() {
+    use mockall::mock;
+
+    mock! {
+        #[derive(Debug)]
+        pub LlmProvider {}
+
+        impl baco::llm::LlmProvider for LlmProvider {
+            fn chat(&self, messages: &[ChatMessage]) -> Result<String, baco::error::ScanError>;
+        }
+    }
+
+    let mut mock_provider = MockLlmProvider::new();
+    mock_provider.expect_chat().times(1).returning(|messages| {
+        assert_eq!(messages.len(), 2);
+        Ok(format!("Responded to {} messages", messages.len()))
+    });
+
+    let messages = vec![
+        ChatMessage::system("You are helpful"),
+        ChatMessage::user("Hello"),
+    ];
+    let result = mock_provider.chat(&messages);
+    assert!(result.is_ok());
 }

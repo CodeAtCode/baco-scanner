@@ -149,27 +149,6 @@ impl CweRouter {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_route_cwe_known() {
-        let router = CweRouter::default();
-        let route = router.route_cwe("CWE-79");
-        assert_eq!(route.domain, Some("xss".to_string()));
-        assert_eq!(route.model_override, None);
-    }
-
-    #[test]
-    fn test_route_cwe_unknown() {
-        let router = CweRouter::default();
-        let route = router.route_cwe("CWE-999999");
-        assert_eq!(route.domain, None);
-        assert_eq!(route.model_override, None);
-    }
-}
-
 /// Public helper that returns (domain, prompt_content) for a CWE ID
 /// Dead-code-safe: marked pub for external consumption
 /// Returns None if CWE has no mapping or prompt content is empty

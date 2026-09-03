@@ -349,3 +349,132 @@ fn test_priority_score_always_positive() {
         assert!(finding.priority_score.unwrap() >= 0.0);
     }
 }
+
+// ============================================================================
+// Migrated inline tests from src/confidence.rs (3 tests)
+// ============================================================================
+
+#[test]
+fn test_composite_confidence_inline_migrated() {
+    let mut finding = VulnerabilityFinding {
+        id: "test".to_string(),
+        title: "Test".to_string(),
+        description: "Test".to_string(),
+        severity: Severity::High,
+        confidence_score: 0.7,
+        cwe_id: None,
+        file_path: "test.c".to_string(),
+        line_number: Some(42),
+        code_snippet: None,
+        diff_hunk: None,
+        recommendation: None,
+        code_location: None,
+        already_reported: false,
+        sources: vec!["semgrep".to_string()],
+        commit_reference: None,
+        ticket_reference: None,
+        priority_score: None,
+        cross_file_references: None,
+        verification_status: None,
+        verification_notes: None,
+        verification_error: None,
+        agent_evidence_path: None,
+        security_issue: None,
+        poc_code: None,
+        mitigation_code: None,
+        poc_format: None,
+        llm_model: None,
+        agent_mode: false,
+        statement_range: None,
+        triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
+    };
+
+    let score = ConfidenceCalculator::calculate_composite(&mut finding);
+    assert!(score >= 70.0);
+    assert!(score <= 100.0);
+}
+
+#[test]
+fn test_confidence_with_multiple_sources_inline_migrated() {
+    let mut finding = VulnerabilityFinding {
+        id: "test".to_string(),
+        title: "Test".to_string(),
+        description: "Test".to_string(),
+        severity: Severity::Critical,
+        confidence_score: 0.5,
+        cwe_id: None,
+        file_path: "test.c".to_string(),
+        line_number: Some(42),
+        code_snippet: None,
+        diff_hunk: None,
+        recommendation: None,
+        code_location: None,
+        already_reported: false,
+        sources: vec!["semgrep".to_string(), "llm".to_string()],
+        commit_reference: Some("abc123".to_string()),
+        ticket_reference: Some("SEC-123".to_string()),
+        priority_score: None,
+        cross_file_references: None,
+        verification_status: None,
+        verification_notes: None,
+        verification_error: None,
+        agent_evidence_path: None,
+        security_issue: None,
+        poc_code: None,
+        mitigation_code: None,
+        poc_format: None,
+        llm_model: None,
+        agent_mode: false,
+        statement_range: None,
+        triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
+    };
+
+    let score = ConfidenceCalculator::calculate_composite(&mut finding);
+    assert!(score > 0.9);
+}
+
+#[test]
+fn test_recalculate_priority_inline_migrated() {
+    let mut finding = VulnerabilityFinding {
+        id: "test".to_string(),
+        title: "Test".to_string(),
+        description: "Test".to_string(),
+        severity: Severity::Critical,
+        confidence_score: 0.8,
+        cwe_id: None,
+        file_path: "test.c".to_string(),
+        line_number: Some(42),
+        code_snippet: None,
+        diff_hunk: None,
+        recommendation: None,
+        code_location: None,
+        already_reported: false,
+        sources: vec!["semgrep".to_string()],
+        commit_reference: None,
+        ticket_reference: None,
+        priority_score: None,
+        cross_file_references: None,
+        verification_status: None,
+        verification_notes: None,
+        verification_error: None,
+        agent_evidence_path: None,
+        security_issue: None,
+        poc_code: None,
+        mitigation_code: None,
+        poc_format: None,
+        llm_model: None,
+        agent_mode: false,
+        statement_range: None,
+        triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
+    };
+
+    ConfidenceCalculator::recalculate_priority(&mut finding);
+    assert!(finding.priority_score.is_some());
+    assert!(finding.priority_score.unwrap() > 0.7);
+}

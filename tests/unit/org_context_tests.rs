@@ -199,3 +199,85 @@ fn test_symlink_containment_within_root() {
     // Cleanup
     let _ = fs::remove_dir_all(&temp_root);
 }
+
+// ============================================================================
+// Migrated inline tests from src/org_context.rs (7 tests)
+// ============================================================================
+
+
+#[test]
+fn test_render_disabled_inline_migrated() {
+    let cfg = OrgContextConfig {
+        enabled: false,
+        ..Default::default()
+    };
+    assert!(render(&cfg).is_none());
+}
+
+#[test]
+fn test_render_enabled_but_empty_inline_migrated() {
+    let cfg = OrgContextConfig {
+        enabled: true,
+        ..Default::default()
+    };
+    assert!(render(&cfg).is_none());
+}
+
+#[test]
+fn test_render_pii_inline_migrated() {
+    let cfg = OrgContextConfig {
+        enabled: true,
+        data_sensitivity: Some("pii".to_string()),
+        ..Default::default()
+    };
+    let result = render(&cfg).unwrap();
+    assert!(result.contains("at least High"));
+}
+
+#[test]
+fn test_render_vault_inline_migrated() {
+    let cfg = OrgContextConfig {
+        enabled: true,
+        secret_storage: Some("vault".to_string()),
+        ..Default::default()
+    };
+    let result = render(&cfg).unwrap();
+    assert!(result.contains("placeholders, NOT leaked secrets"));
+}
+
+#[test]
+fn test_render_risk_tolerance_inline_migrated() {
+    let cfg = OrgContextConfig {
+        enabled: true,
+        risk_tolerance: Some("low".to_string()),
+        ..Default::default()
+    };
+    let result = render(&cfg).unwrap();
+    assert!(result.contains("does NOT mean only report criticals"));
+}
+
+#[test]
+fn test_render_severity_rules_inline_migrated() {
+    let mut rules = HashMap::new();
+    rules.insert("XSS".to_string(), "Critical".to_string());
+    let cfg = OrgContextConfig {
+        enabled: true,
+        severity_rules: rules,
+        ..Default::default()
+    };
+    let result = render(&cfg).unwrap();
+    assert!(result.contains("OVERRIDE: XSS → Critical"));
+}
+
+#[test]
+fn test_render_stack_inline_migrated() {
+    let cfg = OrgContextConfig {
+        enabled: true,
+        stack: vec!["php".to_string(), "javascript".to_string()],
+        ..Default::default()
+    };
+    let result = render(&cfg).unwrap();
+    assert!(result.contains("The target is"));
+    assert!(result.contains("php"));
+    assert!(result.contains("javascript"));
+}

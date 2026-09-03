@@ -34,6 +34,90 @@ fn test_verification_status_display_failed() {
     assert_eq!(VerificationStatus::Failed.to_string(), "failed");
 }
 
+// ============================================================================
+// Migrated inline tests from src/findings.rs (5 tests)
+// ============================================================================
+
+#[test]
+fn test_generate_id_deterministic_inline_migrated() {
+    let id1 = VulnerabilityFinding::generate_id("test.c", Some(42), "CWE-79");
+    let id2 = VulnerabilityFinding::generate_id("test.c", Some(42), "CWE-79");
+    assert_eq!(id1, id2);
+}
+
+#[test]
+fn test_generate_id_different_inputs_inline_migrated() {
+    let id1 = VulnerabilityFinding::generate_id("test.c", Some(42), "CWE-79");
+    let id2 = VulnerabilityFinding::generate_id("test.c", Some(43), "CWE-79");
+    assert_ne!(id1, id2);
+}
+
+#[test]
+fn test_json_roundtrip_inline_migrated() {
+    let finding = VulnerabilityFinding {
+        id: "test-id".to_string(),
+        title: "Test Title".to_string(),
+        description: "Test Description".to_string(),
+        severity: Severity::High,
+        confidence_score: 0.8,
+        cwe_id: Some("CWE-79".to_string()),
+        file_path: "test.c".to_string(),
+        line_number: Some(42),
+        code_snippet: Some("printf(x)".to_string()),
+        diff_hunk: None,
+        recommendation: Some("Sanitize input".to_string()),
+        code_location: Some("test.c:42".to_string()),
+        already_reported: false,
+        sources: vec!["semgrep".to_string()],
+        commit_reference: None,
+        ticket_reference: None,
+        priority_score: Some(0.9),
+        cross_file_references: None,
+        verification_status: None,
+        verification_notes: None,
+        verification_error: None,
+        agent_evidence_path: None,
+        security_issue: None,
+        poc_code: Some("poc code".to_string()),
+        mitigation_code: Some("mitigation code".to_string()),
+        poc_format: Some("python".to_string()),
+        llm_model: None,
+        agent_mode: false,
+        statement_range: None,
+        triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
+    };
+
+    let json = serde_json::to_string(&finding).unwrap();
+    let deserialized: VulnerabilityFinding = serde_json::from_str(&json).unwrap();
+    assert_eq!(finding.id, deserialized.id);
+    assert_eq!(finding.severity, deserialized.severity);
+    assert_eq!(finding.file_path, deserialized.file_path);
+    assert_eq!(finding.poc_code, deserialized.poc_code);
+    assert_eq!(finding.mitigation_code, deserialized.mitigation_code);
+}
+
+#[test]
+fn test_severity_display_inline_migrated() {
+    assert_eq!(Severity::Critical.to_string(), "Critical");
+    assert_eq!(Severity::High.to_string(), "High");
+    assert_eq!(Severity::Medium.to_string(), "Medium");
+    assert_eq!(Severity::Low.to_string(), "Low");
+    assert_eq!(Severity::Info.to_string(), "Info");
+}
+
+#[test]
+fn test_verification_status_display_inline_migrated() {
+    assert_eq!(VerificationStatus::Confirmed.to_string(), "confirmed");
+    assert_eq!(
+        VerificationStatus::FalsePositive.to_string(),
+        "false_positive"
+    );
+    assert_eq!(VerificationStatus::NeedsReview.to_string(), "needs_review");
+    assert_eq!(VerificationStatus::Failed.to_string(), "failed");
+}
+
 #[test]
 fn test_verification_status_serialize() {
     let confirmed = serde_json::to_string(&VerificationStatus::Confirmed).unwrap();

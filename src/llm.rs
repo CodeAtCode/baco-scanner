@@ -186,7 +186,7 @@ fn get_client() -> &'static reqwest::Client {
 
 #[derive(Clone)]
 pub struct LlmClient {
-    config: LlmConfig,
+    pub config: LlmConfig,
     model_selector: Option<Arc<ModelSelector>>,
     metrics_tracker: Option<LlmMetricsTracker>,
     rate_limiter: Arc<RateLimiter>,
@@ -999,121 +999,6 @@ impl LlmChatClient for LlmClient {
 
 pub trait LlmProvider {
     fn chat(&self, messages: &[ChatMessage]) -> Result<String, ScanError>;
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use mockall::mock;
-
-    mock! {
-        #[derive(Debug)]
-        pub LlmProvider {}
-
-        impl LlmProvider for LlmProvider {
-            fn chat(&self, messages: &[ChatMessage]) -> Result<String, ScanError>;
-        }
-    }
-
-    #[test]
-    fn test_chat_message_assistant() {
-        let assistant = ChatMessage::assistant("I found a vulnerability");
-        assert_eq!(assistant.role, "assistant");
-        assert_eq!(assistant.content, "I found a vulnerability");
-    }
-
-    #[test]
-    fn test_llm_config_validation() {
-        let config = LlmConfig {
-            base_url: "https://api.test.com/v1".to_string(),
-            api_key: "test-key".to_string(),
-            model: "test-model".to_string(),
-            models: vec![],
-            timeout: 30,
-            max_retries: 3,
-            retry_backoff_ms: 1000,
-            temperature: 0.5,
-            ..Default::default()
-        };
-        assert_eq!(config.base_url, "https://api.test.com/v1");
-        assert_eq!(config.model, "test-model");
-    }
-
-    #[test]
-    fn test_llm_client_new() {
-        let config = LlmConfig {
-            base_url: "https://api.test.com/v1".to_string(),
-            api_key: "test-key".to_string(),
-            model: "test-model".to_string(),
-            models: vec![],
-            timeout: 30,
-            max_retries: 3,
-            retry_backoff_ms: 1000,
-            temperature: 0.5,
-            ..Default::default()
-        };
-        let client = LlmClient::new(config);
-        assert!(client.config.base_url.contains("api.test.com"));
-    }
-
-    #[tokio::test]
-    async fn test_mock_provider_chat_success() {
-        let mut mock_provider = MockLlmProvider::new();
-        mock_provider
-            .expect_chat()
-            .times(1)
-            .returning(|_| Ok("Successfully analyzed".to_string()));
-
-        let messages = vec![ChatMessage::user("Test message")];
-        let result = mock_provider.chat(&messages);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), "Successfully analyzed");
-    }
-
-    #[tokio::test]
-    async fn test_mock_provider_chat_error() {
-        let mut mock_provider = MockLlmProvider::new();
-        mock_provider
-            .expect_chat()
-            .times(1)
-            .returning(|_| Err(ScanError::LlmClientBuildError("API Error".to_string())));
-
-        let messages = vec![ChatMessage::user("Test message")];
-        let result = mock_provider.chat(&messages);
-        assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert!(matches!(err, ScanError::LlmClientBuildError(_)));
-    }
-
-    #[tokio::test]
-    async fn test_mock_provider_with_different_messages() {
-        let mut mock_provider = MockLlmProvider::new();
-        mock_provider.expect_chat().times(1).returning(|messages| {
-            assert_eq!(messages.len(), 2);
-            Ok(format!("Responded to {} messages", messages.len()))
-        });
-
-        let messages = vec![
-            ChatMessage::system("You are helpful"),
-            ChatMessage::user("Hello"),
-        ];
-        let result = mock_provider.chat(&messages);
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_chat_message_empty_content() {
-        let empty = ChatMessage::user("");
-        assert_eq!(empty.content, "");
-        assert_eq!(empty.role, "user");
-    }
-
-    #[test]
-    fn test_chat_message_long_content() {
-        let long_content = "A".repeat(1000);
-        let msg = ChatMessage::user(&long_content);
-        assert_eq!(msg.content.len(), 1000);
-    }
 }
 
 /// Parameters for record_metrics to reduce argument count

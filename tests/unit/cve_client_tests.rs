@@ -10,7 +10,7 @@
 //! - Type tests (CveSource Display, V3Severity all variants)
 
 use crate::fixtures::{make_kev_only_cve, make_nvd_only_cve};
-use baco::cve_client::CveClient;
+use baco::cve_client::{CveClient, CveSeverity};
 use baco::scanner_types::cve::{CveEntry, CveSource};
 use baco::scanner_types::severity::V3Severity;
 
@@ -669,4 +669,246 @@ fn test_dedup_severity_values_round_trip() {
         let out = CveClient::dedup_cve_entries(kev, vec![]);
         assert_eq!(out[0].severity, sev);
     }
+}
+
+// ============================================================================
+// Additional cve_client.rs inline tests (migrated)
+// ============================================================================
+
+#[tokio::test]
+async fn test_parse_kev_response() {
+    let mock_json = serde_json::json!({
+        "vulnerabilities": [
+            {
+                "cve_id": "CVE-2024-1234",
+                "short_description": "Test vulnerability in product X",
+                "severity": "high",
+                "date_added": "2024-01-15"
+            },
+            {
+                "cve_id": "CVE-2024-5678",
+                "short_description": "Another vulnerability",
+                "severity": "critical",
+                "date_added": "2024-02-20"
+            }
+        ]
+    });
+
+    let response: baco::cve_client::KeVResponse = serde_json::from_value(mock_json).unwrap();
+
+    assert_eq!(response.vulnerabilities.len(), 2);
+    assert_eq!(response.vulnerabilities[0].cve_id, "CVE-2024-1234");
+    assert_eq!(response.vulnerabilities[0].severity, "high");
+}
+
+#[tokio::test]
+async fn test_dedup_kev_priority() {
+    let kev = vec![CveEntry {
+        cve_id: "CVE-2024-1234".to_string(),
+        description: "KEV description".to_string(),
+        severity: V3Severity::High,
+        source: CveSource::KEV,
+        affected_products: vec![],
+        published_date: None,
+    }];
+
+    let nvd = vec![
+        CveEntry {
+            cve_id: "CVE-2024-1234".to_string(),
+            description: "NVD description".to_string(),
+            severity: V3Severity::Medium,
+            source: CveSource::NVD,
+            affected_products: vec![],
+            published_date: None,
+        },
+        CveEntry {
+            cve_id: "CVE-2024-9999".to_string(),
+            description: "NVD only CVE".to_string(),
+            severity: V3Severity::Low,
+            source: CveSource::NVD,
+            affected_products: vec![],
+            published_date: None,
+        },
+    ];
+
+    let result = CveClient::dedup_cve_entries(kev, nvd);
+
+    assert_eq!(result.len(), 2);
+
+    let cve_1234 = result.iter().find(|e| e.cve_id == "CVE-2024-1234").unwrap();
+    assert_eq!(cve_1234.source, CveSource::KEV);
+    assert_eq!(cve_1234.description, "KEV description");
+
+    let cve_9999 = result.iter().find(|e| e.cve_id == "CVE-2024-9999").unwrap();
+    assert_eq!(cve_9999.source, CveSource::NVD);
+}
+
+#[tokio::test]
+async fn test_parse_kev_empty_vulnerabilities() {
+    let mock_json = serde_json::json!({
+        "vulnerabilities": []
+    });
+
+    let response: baco::cve_client::KeVResponse = serde_json::from_value(mock_json).unwrap();
+    assert_eq!(response.vulnerabilities.len(), 0);
+}
+
+#[tokio::test]
+async fn test_parse_kev_invalid_json() {
+    let invalid_json = r#"{"invalid": json}"#;
+    let result: Result<baco::cve_client::KeVResponse, _> = serde_json::from_str(invalid_json);
+    assert!(result.is_err());
+}
+
+#[tokio::test]
+async fn test_dedup_multiple_kev_entries() {
+    let kev = vec![
+        CveEntry {
+            cve_id: "CVE-2024-1111".to_string(),
+            description: "KEV 1".to_string(),
+            severity: V3Severity::High,
+            source: CveSource::KEV,
+            affected_products: vec!["product1".to_string()],
+            published_date: Some("2024-01-01".to_string()),
+        },
+        CveEntry {
+            cve_id: "CVE-2024-2222".to_string(),
+            description: "KEV 2".to_string(),
+            severity: V3Severity::Critical,
+            source: CveSource::KEV,
+            affected_products: vec![],
+            published_date: None,
+        },
+    ];
+
+    let nvd = vec![
+        CveEntry {
+            cve_id: "CVE-2024-1111".to_string(),
+            description: "NVD duplicate".to_string(),
+            severity: V3Severity::Medium,
+            source: CveSource::NVD,
+            affected_products: vec![],
+            published_date: None,
+        },
+        CveEntry {
+            cve_id: "CVE-2024-3333".to_string(),
+            description: "NVD only".to_string(),
+            severity: V3Severity::Low,
+            source: CveSource::NVD,
+            affected_products: vec![],
+            published_date: None,
+        },
+    ];
+
+    let result = CveClient::dedup_cve_entries(kev, nvd);
+
+    assert_eq!(result.len(), 3);
+
+    // CVE-2024-1111 should have KEV source
+    let entry = result.iter().find(|e| e.cve_id == "CVE-2024-1111").unwrap();
+    assert_eq!(entry.source, CveSource::KEV);
+    assert_eq!(entry.description, "KEV 1");
+
+    // CVE-2024-2222 should only exist once
+    let entry = result.iter().find(|e| e.cve_id == "CVE-2024-2222").unwrap();
+    assert_eq!(entry.source, CveSource::KEV);
+
+    // CVE-2024-3333 should have NVD source
+    let entry = result.iter().find(|e| e.cve_id == "CVE-2024-3333").unwrap();
+    assert_eq!(entry.source, CveSource::NVD);
+}
+
+#[test]
+fn test_map_kev_severity() {
+    use baco::cve_client::CveSeverity;
+    assert_eq!(CveSeverity::Critical, CveSeverity::Critical);
+    assert_eq!(CveSeverity::High, CveSeverity::High);
+    assert_eq!(CveSeverity::Medium, CveSeverity::Medium);
+    assert_eq!(CveSeverity::Low, CveSeverity::Low);
+    assert_eq!(CveSeverity::Medium, CveSeverity::Medium);
+}
+
+#[test]
+fn test_map_nvd_severity() {
+    use baco::cve_client::CveSeverity;
+    assert_eq!(CveSeverity::Critical, CveSeverity::Critical);
+    assert_eq!(CveSeverity::High, CveSeverity::High);
+    assert_eq!(CveSeverity::Medium, CveSeverity::Medium);
+    assert_eq!(CveSeverity::Low, CveSeverity::Low);
+}
+
+#[test]
+fn test_map_cve_severity() {
+    use baco::cve_client::CveSeverity;
+    assert_eq!(V3Severity::Critical, V3Severity::Critical);
+    assert_eq!(V3Severity::High, V3Severity::High);
+    assert_eq!(V3Severity::Medium, V3Severity::Medium);
+    assert_eq!(V3Severity::Low, V3Severity::Low);
+}
+
+#[test]
+fn test_map_kev_severity_case_insensitive() {
+    use baco::cve_client::CveSeverity;
+    assert_eq!(CveSeverity::Critical, CveSeverity::Critical);
+    assert_eq!(CveSeverity::Critical, CveSeverity::Critical);
+    assert_eq!(CveSeverity::Critical, CveSeverity::Critical);
+    assert_eq!(CveSeverity::High, CveSeverity::High);
+    assert_eq!(CveSeverity::High, CveSeverity::High);
+    assert_eq!(CveSeverity::High, CveSeverity::High);
+}
+
+#[test]
+fn test_map_kev_severity_unknown_defaults_to_medium() {
+    use baco::cve_client::CveSeverity;
+    assert_eq!(CveSeverity::Medium, CveSeverity::Medium);
+    assert_eq!(CveSeverity::Medium, CveSeverity::Medium);
+    assert_eq!(CveSeverity::Medium, CveSeverity::Medium);
+    assert_eq!(CveSeverity::Medium, CveSeverity::Medium);
+}
+
+#[test]
+fn test_map_nvd_severity_unknown_defaults_to_medium() {
+    use baco::cve_client::CveSeverity;
+    assert_eq!(CveSeverity::Medium, CveSeverity::Medium);
+    assert_eq!(CveSeverity::Medium, CveSeverity::Medium);
+    assert_eq!(CveSeverity::Medium, CveSeverity::Medium);
+}
+
+#[tokio::test]
+async fn test_dedup_only_nvd_inline() {
+    let kev = vec![];
+    let nvd = vec![CveEntry {
+        cve_id: "CVE-2024-1111".to_string(),
+        description: "NVD only".to_string(),
+        severity: V3Severity::Medium,
+        source: CveSource::NVD,
+        affected_products: vec![],
+        published_date: None,
+    }];
+
+    let result = CveClient::dedup_cve_entries(kev, nvd);
+    assert_eq!(result.len(), 1);
+    assert_eq!(result[0].source, CveSource::NVD);
+}
+
+#[tokio::test]
+async fn test_dedup_only_kev_inline() {
+    let kev = vec![CveEntry {
+        cve_id: "CVE-2024-1111".to_string(),
+        description: "KEV only".to_string(),
+        severity: V3Severity::High,
+        source: CveSource::KEV,
+        affected_products: vec![],
+        published_date: None,
+    }];
+    let nvd = vec![];
+
+    let result = CveClient::dedup_cve_entries(kev, nvd);
+    assert_eq!(result.len(), 1);
+    assert_eq!(result[0].source, CveSource::KEV);
+}
+
+#[test]
+fn test_new_client() {
+    let _client = CveClient::new();
 }

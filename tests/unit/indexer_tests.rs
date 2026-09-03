@@ -3,6 +3,7 @@
 //! Covers: FileInfo, FileIndex structs and their methods
 
 use baco::indexer::{FileIndex, FileInfo};
+use baco::indexer::get_language_extensions;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
@@ -531,4 +532,219 @@ fn test_index_excludes_case_insensitive() {
     .unwrap();
 
     assert_eq!(index.files.len(), 1);
+}
+// ============================================================================
+// get_language_extensions() Tests
+// ============================================================================
+
+#[test]
+fn test_get_language_extensions() {
+    let exts = get_language_extensions(&["c".to_string()]);
+    assert_eq!(exts.get("c"), Some(&"c".to_string()));
+    assert_eq!(exts.get("h"), Some(&"c".to_string()));
+
+    let exts = get_language_extensions(&["cpp".to_string()]);
+    assert_eq!(exts.get("cpp"), Some(&"cpp".to_string()));
+    assert_eq!(exts.get("hpp"), Some(&"cpp".to_string()));
+
+    let exts = get_language_extensions(&["python".to_string()]);
+    assert_eq!(exts.get("py"), Some(&"python".to_string()));
+
+    let exts = get_language_extensions(&["rust".to_string()]);
+    assert_eq!(exts.get("rs"), Some(&"rust".to_string()));
+}
+
+#[test]
+fn test_get_language_extensions_unsupported() {
+    let exts = get_language_extensions(&["unknown".to_string()]);
+    assert!(exts.is_empty());
+}
+
+#[test]
+fn test_get_language_extensions_multiple() {
+    let exts =
+        get_language_extensions(&["c".to_string(), "python".to_string(), "rust".to_string()]);
+    assert_eq!(exts.get("c"), Some(&"c".to_string()));
+    assert_eq!(exts.get("py"), Some(&"python".to_string()));
+    assert_eq!(exts.get("rs"), Some(&"rust".to_string()));
+}
+
+// ============================================================================
+// FileIndex::index_project() Additional Tests
+// ============================================================================
+
+#[test]
+fn test_index_single_file() {
+    let temp_dir = std::env::temp_dir().join(format!(
+        "baco_test_index_{}",
+        chrono::Utc::now().timestamp()
+    ));
+    let _ = std::fs::create_dir_all(&temp_dir);
+    let test_file = temp_dir.join("test.c");
+    std::fs::write(&test_file, "int main() { return 0; }").unwrap();
+
+    let index = FileIndex::index_project(
+        temp_dir.to_str().unwrap(),
+        &["c".to_string()],
+        1024 * 1024,
+        &[],
+        true,
+    )
+    .unwrap();
+
+    assert_eq!(index.files.len(), 1);
+    assert_eq!(index.files[0].language, "c");
+
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn test_index_empty_directory() {
+    let temp_dir = std::env::temp_dir().join(format!(
+        "baco_test_empty_{}",
+        chrono::Utc::now().timestamp()
+    ));
+    let _ = std::fs::create_dir_all(&temp_dir);
+
+    let index = FileIndex::index_project(
+        temp_dir.to_str().unwrap(),
+        &["c".to_string()],
+        1024 * 1024,
+        &[],
+        true,
+    )
+    .unwrap();
+
+    assert_eq!(index.files.len(), 0);
+    assert_eq!(index.total_size, 0);
+
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn test_index_multiple_files() {
+    let temp_dir = std::env::temp_dir().join(format!(
+        "baco_test_multi_{}",
+        chrono::Utc::now().timestamp()
+    ));
+    let _ = std::fs::create_dir_all(&temp_dir);
+    std::fs::write(temp_dir.join("test.c"), "int x;").unwrap();
+    std::fs::write(temp_dir.join("test.cpp"), "int y;").unwrap();
+    std::fs::write(temp_dir.join("test.py"), "z = 1").unwrap();
+    std::fs::write(temp_dir.join("test.rs"), "fn main() {}").unwrap();
+    std::fs::write(temp_dir.join("test.go"), "package main").unwrap();
+    std::fs::write(temp_dir.join("test.java"), "public class Test {}").unwrap();
+    std::fs::write(temp_dir.join("test.cs"), "class Test {}").unwrap();
+    std::fs::write(temp_dir.join("test.js"), "const a = 1;").unwrap();
+    std::fs::write(temp_dir.join("test.ts"), "const b: string = \"hello\";").unwrap();
+    std::fs::write(temp_dir.join("test.rb"), "def hello;").unwrap();
+    std::fs::write(temp_dir.join("test.php"), "<?php echo 'hi';").unwrap();
+
+    let index = FileIndex::index_project(
+        temp_dir.to_str().unwrap(),
+        &[
+            "c".to_string(),
+            "cpp".to_string(),
+            "rust".to_string(),
+            "python".to_string(),
+            "go".to_string(),
+            "java".to_string(),
+            "csharp".to_string(),
+            "javascript".to_string(),
+            "typescript".to_string(),
+            "ruby".to_string(),
+            "php".to_string(),
+        ],
+        1024 * 1024,
+        &[],
+        true,
+    )
+    .unwrap();
+
+    assert_eq!(index.files.len(), 11);
+    assert!(index.total_size > 0);
+
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn test_index_excludes_directories() {
+    let temp_dir =
+        std::env::temp_dir().join(format!("baco_test_dirs_{}", chrono::Utc::now().timestamp()));
+    let _ = std::fs::create_dir_all(&temp_dir);
+
+    std::fs::write(temp_dir.join("test.c"), "int x;").unwrap();
+    let subdir = temp_dir.join("subdir");
+    std::fs::create_dir(&subdir).unwrap();
+    std::fs::write(subdir.join("test2.c"), "int y;").unwrap();
+
+    let index = FileIndex::index_project(
+        temp_dir.to_str().unwrap(),
+        &["c".to_string()],
+        1024 * 1024,
+        &[],
+        true,
+    )
+    .unwrap();
+
+    assert_eq!(index.files.len(), 2); // Both files included since no excludes
+
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn test_index_over_size_limit() {
+    let temp_dir = std::env::temp_dir().join("baco_test_size");
+    let _ = std::fs::create_dir_all(&temp_dir);
+
+    let large_file = temp_dir.join("large.c");
+    std::fs::write(&large_file, "0".repeat(2000).as_str()).unwrap();
+
+    let index = FileIndex::index_project(
+        temp_dir.to_str().unwrap(),
+        &["c".to_string()],
+        1000,
+        &[],
+        false,
+    )
+    .unwrap();
+
+    assert_eq!(index.files.len(), 0);
+
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn test_index_with_excludes() {
+    let temp_dir = std::env::temp_dir().join("baco_test_excludes");
+    let _ = std::fs::create_dir_all(&temp_dir);
+    std::fs::write(temp_dir.join("test.c"), "int x;").unwrap();
+    let subdir = temp_dir.join("tests");
+    std::fs::create_dir(&subdir).unwrap();
+    std::fs::write(subdir.join("test2.c"), "int y;").unwrap();
+
+    let index = FileIndex::index_project(
+        temp_dir.to_str().unwrap(),
+        &["c".to_string()],
+        1024 * 1024,
+        &["tests/".to_string()],
+        false,
+    )
+    .unwrap();
+
+    assert_eq!(index.files.len(), 1);
+
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn test_index_invalid_path() {
+    let result = FileIndex::index_project(
+        "/nonexistent/path/that/does/not/exist",
+        &["c".to_string()],
+        1024 * 1024,
+        &[],
+        false,
+    );
+    assert!(result.is_err());
 }

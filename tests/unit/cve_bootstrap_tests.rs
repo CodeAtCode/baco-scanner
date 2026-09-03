@@ -504,3 +504,193 @@ fn test_parse_go_mod_empty() {
 
     assert!(deps.is_empty());
 }
+
+// ============================================================================
+// Additional cve_bootstrap.rs inline tests (migrated)
+// ============================================================================
+
+#[test]
+fn test_parse_cargo_toml_dependencies_section_empty() {
+    let temp_dir = TempDir::new().unwrap();
+    fs::write(
+        temp_dir.path().join("Cargo.toml"),
+        r#"[package]
+name = "test"
+
+[dependencies]
+"#,
+    )
+    .unwrap();
+
+    let bootstrapper = CveBootstrapper::new(temp_dir.path().to_string_lossy().to_string());
+    let deps = bootstrapper.parse_cargo_toml(temp_dir.path()).unwrap();
+
+    assert!(deps.is_empty());
+}
+
+#[test]
+fn test_parse_cargo_toml_commented_deps() {
+    let temp_dir = TempDir::new().unwrap();
+    fs::write(
+        temp_dir.path().join("Cargo.toml"),
+        r#"[dependencies]
+# serde = "1.0"
+# tokio = "1.0"
+"#,
+    )
+    .unwrap();
+
+    let bootstrapper = CveBootstrapper::new(temp_dir.path().to_string_lossy().to_string());
+    let deps = bootstrapper.parse_cargo_toml(temp_dir.path()).unwrap();
+
+    assert!(deps.is_empty());
+}
+
+#[test]
+fn test_parse_package_json_empty() {
+    let temp_dir = TempDir::new().unwrap();
+    fs::write(temp_dir.path().join("package.json"), "{}").unwrap();
+
+    let bootstrapper = CveBootstrapper::new(temp_dir.path().to_string_lossy().to_string());
+    let (frameworks, deps) = bootstrapper.parse_package_json(temp_dir.path()).unwrap();
+
+    assert!(deps.is_empty());
+    assert!(frameworks.is_empty());
+}
+
+#[test]
+fn test_parse_package_json_deps_no_dev_deps() {
+    let temp_dir = TempDir::new().unwrap();
+    fs::write(
+        temp_dir.path().join("package.json"),
+        r#"{
+  "dependencies": {
+    "express": "^4.0.0"
+  }
+}
+"#,
+    )
+    .unwrap();
+
+    let bootstrapper = CveBootstrapper::new(temp_dir.path().to_string_lossy().to_string());
+    let (frameworks, deps) = bootstrapper.parse_package_json(temp_dir.path()).unwrap();
+
+    assert_eq!(deps.len(), 1);
+    assert!(frameworks.contains(&"Express".to_string()));
+}
+
+#[test]
+fn test_parse_package_json_nonexistent_path() {
+    let temp_dir = TempDir::new().unwrap();
+
+    let bootstrapper = CveBootstrapper::new(temp_dir.path().to_string_lossy().to_string());
+    let (frameworks, deps) = bootstrapper.parse_package_json(temp_dir.path()).unwrap();
+
+    assert!(deps.is_empty());
+    assert!(frameworks.is_empty());
+}
+
+#[test]
+fn test_parse_requirements_txt_empty() {
+    let temp_dir = TempDir::new().unwrap();
+    fs::write(temp_dir.path().join("requirements.txt"), "").unwrap();
+
+    let bootstrapper = CveBootstrapper::new(temp_dir.path().to_string_lossy().to_string());
+    let deps = bootstrapper
+        .parse_requirements_txt(temp_dir.path())
+        .unwrap();
+
+    assert!(deps.is_empty());
+}
+
+#[test]
+fn test_parse_requirements_txt_with_blank_lines() {
+    let temp_dir = TempDir::new().unwrap();
+    fs::write(
+        temp_dir.path().join("requirements.txt"),
+        r#"requests==2.28.0
+
+flask>=2.0.0
+
+numpy
+"#,
+    )
+    .unwrap();
+
+    let bootstrapper = CveBootstrapper::new(temp_dir.path().to_string_lossy().to_string());
+    let deps = bootstrapper
+        .parse_requirements_txt(temp_dir.path())
+        .unwrap();
+
+    assert_eq!(deps.len(), 3);
+}
+
+#[test]
+fn test_parse_requirements_txt_nonexistent_path() {
+    let temp_dir = TempDir::new().unwrap();
+
+    let bootstrapper = CveBootstrapper::new(temp_dir.path().to_string_lossy().to_string());
+    let deps = bootstrapper
+        .parse_requirements_txt(temp_dir.path())
+        .unwrap();
+
+    assert!(deps.is_empty());
+}
+
+#[test]
+fn test_parse_go_mod_single_line_require() {
+    let temp_dir = TempDir::new().unwrap();
+    fs::write(
+        temp_dir.path().join("go.mod"),
+        r#"module example.com/myapp
+
+go 1.20
+
+require github.com/gin-gonic/gin v1.9.0
+"#,
+    )
+    .unwrap();
+
+    let bootstrapper = CveBootstrapper::new(temp_dir.path().to_string_lossy().to_string());
+    let deps = bootstrapper.parse_go_mod(temp_dir.path()).unwrap();
+
+    assert_eq!(deps.len(), 1);
+    let dep = &deps[0];
+    assert_eq!(dep.name, "ithub.com/gin-gonic/gin");
+    assert_eq!(dep.version, "v1.9.0");
+}
+
+#[test]
+fn test_parse_go_mod_replace_directive_skipped() {
+    let temp_dir = TempDir::new().unwrap();
+    fs::write(
+        temp_dir.path().join("go.mod"),
+        r#"module example.com/myapp
+
+go 1.20
+
+require (
+	github.com/gin-gonic/gin v1.9.0
+)
+
+replace github.com/gin-gonic/gin => ./local/gin
+"#,
+    )
+    .unwrap();
+
+    let bootstrapper = CveBootstrapper::new(temp_dir.path().to_string_lossy().to_string());
+    let deps = bootstrapper.parse_go_mod(temp_dir.path()).unwrap();
+
+    assert_eq!(deps.len(), 1);
+    assert!(deps.iter().any(|d| d.name == "github.com/gin-gonic/gin"));
+}
+
+#[test]
+fn test_parse_go_mod_nonexistent_path() {
+    let temp_dir = TempDir::new().unwrap();
+
+    let bootstrapper = CveBootstrapper::new(temp_dir.path().to_string_lossy().to_string());
+    let deps = bootstrapper.parse_go_mod(temp_dir.path()).unwrap();
+
+    assert!(deps.is_empty());
+}

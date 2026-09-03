@@ -40,7 +40,7 @@ impl SemgrepRunner {
 }
 
 /// Raw finding structure before aggregation
-pub(crate) struct RawFinding {
+pub struct RawFinding {
     pub path: String,
     pub line: u32,
     pub end_line: u32,

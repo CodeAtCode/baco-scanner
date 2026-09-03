@@ -1,5 +1,5 @@
-mod parser;
-mod rules;
+pub mod parser;
+pub mod rules;
 mod runner;
 
 pub use rules::SemgrepRunner;
