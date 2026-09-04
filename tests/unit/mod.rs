@@ -145,7 +145,6 @@ mod semgrep_ruleset_cpe_tests;
 mod exploit_test_helpers;
 
 // Exploit module inline-migrated tests
-mod config_specifications_tests;
 mod context_path_tests;
 mod cost_estimate_tests;
 mod exploit_mod_tests;
@@ -154,6 +153,7 @@ mod llm_cache_tests;
 mod llm_metrics;
 mod llm_verification_tests;
 mod poc_compiler_tests;
+mod specifications_config_tests;
 mod tickets_coverage;
 mod variant_search_tests;
 

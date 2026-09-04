@@ -494,7 +494,7 @@ pub fn generate_html_report(
 
     // Sort files by finding count (descending)
     let mut sorted_files: Vec<_> = findings_by_file.into_iter().collect();
-    sorted_files.sort_by(|a, b| b.1.len().cmp(&a.1.len()));
+    sorted_files.sort_by_key(|a| std::cmp::Reverse(a.1.len()));
 
     // Generate finding cards grouped by file (T32)
     html.push_str(r#"<div class="findings-by-file">"#);
@@ -507,7 +507,7 @@ pub fn generate_html_report(
 
         // Render findings within this file group (maintaining severity order within group)
         let mut sorted_findings = file_findings;
-        sorted_findings.sort_by(|a, b| b.severity.cmp(&a.severity));
+        sorted_findings.sort_by_key(|a| std::cmp::Reverse(a.severity));
 
         for (finding_id, finding) in sorted_findings.iter().enumerate() {
             // Use a unique ID that includes the file group

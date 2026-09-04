@@ -191,7 +191,7 @@ pub fn format_diff_markdown(diff: &[FindingDiff]) -> String {
         .filter(|d| d.status == DiffStatus::Persisted)
         .collect();
     // Sort: severity_changed first
-    persisted_findings.sort_by(|a, b| b.severity_changed.cmp(&a.severity_changed));
+    persisted_findings.sort_by_key(|f| std::cmp::Reverse(f.severity_changed));
     if persisted_findings.is_empty() {
         lines.push("- None\n".to_string());
     } else {
