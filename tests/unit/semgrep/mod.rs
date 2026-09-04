@@ -15,7 +15,7 @@ use std::fs;
 mod parsing_edge_cases_tests;
 
 // Include migrated inline tests
-mod mod_inline_migrated_tests;
+mod core_tests;
 
 // ============================================================================
 // SemgrepRunner Construction Tests

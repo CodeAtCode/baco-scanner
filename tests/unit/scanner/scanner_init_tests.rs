@@ -1,6 +1,6 @@
 //! Tests for Scanner initialization and basic operations
 
-use tests::fixtures::{
+use crate::fixtures::{
     create_test_config, create_test_finding, create_test_findings, ensure_test_output_dir,
 };
 use baco::scanner::Scanner;
@@ -116,8 +116,8 @@ fn test_scanner_add_finding() {
     let scanner = Scanner::new(config, "/tmp/test-project".into(), false);
 
     // Add findings one by one
-    let finding1 = create_test_finding();
-    let finding2 = create_test_finding();
+    let finding1 = create_test_finding("f1", "Finding 1", "src/main.rs", 10);
+    let finding2 = create_test_finding("f2", "Finding 2", "src/lib.rs", 20);
 
     scanner.add_finding(finding1);
     scanner.add_finding(finding2);

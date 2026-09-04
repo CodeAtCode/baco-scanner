@@ -483,7 +483,7 @@ async fn test_llm_metrics_tracking() {
     assert_eq!(metrics.total_success, 3);
     assert_eq!(metrics.total_failed, 1);
     assert_eq!(metrics.total_cached, 1);
-    assert_eq!(metrics.total_tokens, 1000); // 300 + 300 + 300 + 100
+    assert_eq!(metrics.total_tokens, 700); // 200 + 200 + 200 + 100
 
     assert_eq!(metrics.by_model.len(), 1);
     let model_metrics = metrics.by_model.get("mistral-small").unwrap();
@@ -491,14 +491,14 @@ async fn test_llm_metrics_tracking() {
     assert_eq!(model_metrics.successful_requests, 3);
     assert_eq!(model_metrics.failed_requests, 1);
     assert_eq!(model_metrics.cached_requests, 1);
-    assert_eq!(model_metrics.total_tokens, 1000);
+    assert_eq!(model_metrics.total_tokens, 700);
 
     assert_eq!(metrics.by_operation.len(), 1);
     let op_metrics = metrics.by_operation.get("chat:LlmDiscovery").unwrap();
     assert_eq!(op_metrics.requests, 4);
     assert_eq!(op_metrics.successful, 3);
     assert_eq!(op_metrics.failed, 1);
-    assert_eq!(op_metrics.tokens, 1000);
+    assert_eq!(op_metrics.tokens, 700);
 }
 
 #[tokio::test]

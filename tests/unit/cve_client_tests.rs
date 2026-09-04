@@ -10,7 +10,7 @@
 //! - Type tests (CveSource Display, V3Severity all variants)
 
 use crate::fixtures::{make_kev_only_cve, make_nvd_only_cve};
-use baco::cve_client::{CveClient, CveSeverity};
+use baco::cve_client::CveClient;
 use baco::scanner_types::cve::{CveEntry, CveSource};
 use baco::scanner_types::severity::V3Severity;
 
@@ -839,7 +839,6 @@ fn test_map_nvd_severity() {
 
 #[test]
 fn test_map_cve_severity() {
-    use baco::cve_client::CveSeverity;
     assert_eq!(V3Severity::Critical, V3Severity::Critical);
     assert_eq!(V3Severity::High, V3Severity::High);
     assert_eq!(V3Severity::Medium, V3Severity::Medium);

@@ -204,7 +204,6 @@ fn test_symlink_containment_within_root() {
 // Migrated inline tests from src/org_context.rs (7 tests)
 // ============================================================================
 
-
 #[test]
 fn test_render_disabled_inline_migrated() {
     let cfg = OrgContextConfig {

@@ -6,8 +6,8 @@
 //!
 //! Reduces 98 lines of duplication across 15+ test groups to a single shared implementation.
 
-use baco::findings::{IssueCategory, SecurityIssue, Severity};
 use baco::findings::VulnerabilityFinding;
+use baco::findings::{IssueCategory, SecurityIssue, Severity};
 
 /// Helper to create test findings with customizable parameters.
 ///
@@ -21,7 +21,11 @@ use baco::findings::VulnerabilityFinding;
 ///
 /// # Returns
 /// A `VulnerabilityFinding` with default test values and customizable parameters
-pub fn make_test_finding(title: &str, severity: Severity, code: Option<&str>) -> VulnerabilityFinding {
+pub fn make_test_finding(
+    title: &str,
+    severity: Severity,
+    code: Option<&str>,
+) -> VulnerabilityFinding {
     VulnerabilityFinding {
         id: format!("test-{}", title.to_lowercase().replace(' ', "-")),
         title: title.to_string(),
@@ -57,6 +61,10 @@ pub fn make_test_finding(title: &str, severity: Severity, code: Option<&str>) ->
         poc_format: None,
         llm_model: None,
         agent_mode: false,
+        statement_range: None,
+        triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
     }
 }
 

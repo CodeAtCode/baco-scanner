@@ -630,7 +630,7 @@ fn test_batch_verify_filters_rejected() {
 // ============================================================================
 
 fn create_finding_inline(id: &str, file_path: &str, cwe_id: Option<&str>) -> VulnerabilityFinding {
-    use baco::findings::{Severity, TriageVerdict};
+    use baco::findings::Severity;
 
     VulnerabilityFinding {
         id: id.to_string(),

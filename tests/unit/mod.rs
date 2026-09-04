@@ -3,6 +3,7 @@
 //! These tests focus on isolated functionality without external dependencies.
 
 pub mod common;
+pub mod helpers;
 
 // Error taxonomy tests (T27)
 mod error_taxonomy_tests;
@@ -38,7 +39,7 @@ mod cross_file_analysis;
 
 mod llm;
 mod llm_analysis;
-mod poc_generation;
+mod poc_generation_tests;
 mod project_type;
 mod report_ai_aggregation;
 mod semgrep;
@@ -76,7 +77,7 @@ mod threat_model_tests;
 mod phase;
 
 // Standalone test modules
-mod llm_analysis_test;
+mod llm_analysis_helpers_tests;
 
 // BM25 retrieval tests
 mod bm25_search;
@@ -143,6 +144,19 @@ mod semgrep_ruleset_cpe_tests;
 // Exploit test helpers
 mod exploit_test_helpers;
 
+// Exploit module inline-migrated tests
+mod config_specifications_tests;
+mod context_path_tests;
+mod cost_estimate_tests;
+mod exploit_mod_tests;
+mod exploit_prompt_tests;
+mod llm_cache_tests;
+mod llm_metrics;
+mod llm_verification_tests;
+mod poc_compiler_tests;
+mod tickets_coverage;
+mod variant_search_tests;
+
 // Additional coverage: agent sandbox/session/tools, cve+misc, chain analysis, core utilities
 
 // Additional coverage: agent sandbox/session/tools, cve+misc, chain analysis, core utilities
@@ -162,6 +176,7 @@ mod worktree_staging_tests;
 
 // Additional coverage: enrichment, exploit harness
 mod ai_aggregation_enrichment_tests;
+mod exploit_harness_execution_tests;
 mod exploit_harness_tests;
 mod html_report_dir_creation_tests;
 
@@ -328,6 +343,7 @@ mod report_json_tests;
 mod report_sarif_tests;
 mod retrieval_bm25_tests;
 mod retrieval_mod_tests;
+mod scanner;
 mod scanner_helpers_tests;
 mod scanner_mod_tests;
 mod scanner_parallel_tests;

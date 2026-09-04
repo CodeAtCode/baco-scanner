@@ -9,7 +9,10 @@
 //! 6. Tool schema serialization
 //! 7. Edge cases: empty configs, None fields, defaults
 
-use baco::llm::{LlmProvider, ChatMessage, ChatResponse, ChatResponseWithModel, FunctionToolDefinition, LlmClient, LlmConfig, ModelSelector, ToolSchema};
+use baco::llm::{
+    ChatMessage, ChatResponse, ChatResponseWithModel, FunctionToolDefinition, LlmClient, LlmConfig,
+    LlmProvider, ModelSelector, ToolSchema,
+};
 use serde_json::json;
 
 // ============================================================================

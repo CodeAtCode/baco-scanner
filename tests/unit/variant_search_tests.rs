@@ -72,7 +72,7 @@ fn test_binary_files_skipped_inline_migrated() {
     use tempfile::NamedTempFile;
 
     let mut temp_file = NamedTempFile::new().unwrap();
-    temp_file.write_all(&vec![0u8; 100]).unwrap();
+    temp_file.write_all(&[0u8; 100]).unwrap();
 
     let searcher = VariantSearcher::new(
         temp_file

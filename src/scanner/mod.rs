@@ -19,8 +19,6 @@ pub use core::{Scanner, ScannerState};
 pub use pipeline::orchestrator::PhaseGraph;
 
 // Re-export phases for testing
-#[cfg(test)]
-pub use phases::{run_phase, PhaseConfig};
 
 // Re-export utility functions from env
 pub use env::{extract_owner_repo_from_url, get_git_remote_url};

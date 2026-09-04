@@ -2,8 +2,8 @@
 //!
 //! Covers: FileInfo, FileIndex structs and their methods
 
-use baco::indexer::{FileIndex, FileInfo};
 use baco::indexer::get_language_extensions;
+use baco::indexer::{FileIndex, FileInfo};
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;

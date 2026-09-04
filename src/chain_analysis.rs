@@ -124,7 +124,7 @@ impl ChainAnalyzer {
     }
 
     /// Extract directory from file path
-pub fn extract_directory(file_path: &str) -> String {
+    pub fn extract_directory(file_path: &str) -> String {
         if let Some(idx) = file_path.rfind('/') {
             file_path[..idx].to_string()
         } else {
@@ -133,7 +133,7 @@ pub fn extract_directory(file_path: &str) -> String {
     }
 
     /// Extract CWE number from optional CWE string (e.g., "CWE-89" -> "89")
-pub fn extract_cwe_number(cwe: &Option<String>) -> Option<&str> {
+    pub fn extract_cwe_number(cwe: &Option<String>) -> Option<&str> {
         cwe.as_ref()
             .and_then(|s| s.find('-').map(|idx| &s[idx + 1..]))
     }

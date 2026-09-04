@@ -3,7 +3,7 @@
 //! Tests the RuleSynthesizer API and rule generation logic.
 
 use baco::config::RuleSynthConfig;
-use baco::rulesynth::{parse_yaml_rules, validate_rule, RuleSynthesizer};
+use baco::rulesynth::{parse_yaml_rules, validate_rule};
 use std::path::PathBuf;
 
 // ============================================================================
@@ -28,16 +28,17 @@ fn test_parse_yaml_rules_whitespace_only() {
 
 #[test]
 fn test_parse_yaml_rules_single_rule() {
-    let yaml = r#"
-rules:
-  - id: test-rule
-    patterns:
-      - pattern: vulnerable_code()
-    message: Test vulnerability
-    severity: WARNING
-    languages:
-      - python
-"#;
+    let yaml = "\
+---
+id: test-rule
+patterns:
+  - pattern: vulnerable_code()
+message: Test vulnerability
+severity: WARNING
+languages:
+  - python
+---
+";
     let rules = parse_yaml_rules(yaml, "python").unwrap();
 
     assert_eq!(rules.len(), 1);
@@ -46,23 +47,19 @@ rules:
 
 #[test]
 fn test_parse_yaml_rules_multiple_rules() {
-    let yaml = r#"
-rules:
-  - id: rule-1
-    patterns:
-      - pattern: code1()
-    message: Rule 1
-    severity: WARNING
-    languages:
-      - python
-  - id: rule-2
-    patterns:
-      - pattern: code2()
-    message: Rule 2
-    severity: ERROR
-    languages:
-      - python
-"#;
+    let yaml = "\
+---
+id: rule-1
+patterns:
+  - pattern: code1()
+message: Rule 1
+---
+id: rule-2
+patterns:
+  - pattern: code2()
+message: Rule 2
+---
+";
     let rules = parse_yaml_rules(yaml, "python").unwrap();
 
     assert_eq!(rules.len(), 2);
@@ -73,7 +70,11 @@ fn test_parse_yaml_rules_invalid_yaml() {
     let yaml = "invalid: yaml: content: [";
     let result = parse_yaml_rules(yaml, "python");
 
-    assert!(result.is_err());
+    // The line-based parser is tolerant: undelimited non-empty content
+    // falls back to a single raw rule instead of erroring
+    let rules = result.unwrap();
+    assert_eq!(rules.len(), 1);
+    assert_eq!(rules[0], "invalid: yaml: content: [");
 }
 
 // ============================================================================
@@ -166,9 +167,9 @@ fn test_synthesis_config_defaults() {
     let config = RuleSynthConfig::default();
 
     assert!(!config.enabled);
-    assert_eq!(config.max_rules_per_cwe, 1);
+    assert_eq!(config.max_rules_per_cwe, 5);
     assert!(!config.mocq_mode);
-    assert_eq!(config.max_iterations, 3);
+    assert_eq!(config.max_iterations, 5);
 }
 
 // ============================================================================

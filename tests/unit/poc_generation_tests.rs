@@ -992,6 +992,7 @@ fn test_complete_template_coverage() {
 }
 // ============================================================================
 // Additional PoCGeneration Tests
+#[test]
 fn test_engine_creation() {
     let engine = PoCGenerationEngine::new();
     assert!(!engine.templates.is_empty());
@@ -1105,7 +1106,7 @@ fn test_unknown_cwe() {
 
     // Should still generate something through category fallback or similar
     // or return empty proofs
-    assert!(result.errors.len() >= 1 || result.proofs.len() >= 1);
+    assert!(!result.errors.is_empty() || !result.proofs.is_empty());
 }
 
 #[test]

@@ -74,9 +74,9 @@ pub enum ConfidenceFactor {
 #[derive(Debug, Clone, Default)]
 pub struct HistoricalData {
     /// Known false positive patterns by CWE.
-    false_positive_patterns: HashMap<String, Vec<String>>,
+    pub false_positive_patterns: HashMap<String, Vec<String>>,
     /// Known high confidence patterns by CWE.
-    high_confidence_patterns: HashMap<String, Vec<String>>,
+    pub high_confidence_patterns: HashMap<String, Vec<String>>,
     /// Verification history statistics.
     verification_stats: HashMap<String, VerificationStats>,
     /// Never-submit patterns: (CWE-or-keyword, regex-pattern) for findings that should never be reported.
@@ -307,7 +307,7 @@ impl ConfidenceRefinementPhase {
     }
 
     /// Refine confidence score for a single finding.
-    fn refine_confidence(
+    pub fn refine_confidence(
         &self,
         finding: &VulnerabilityFinding,
         _context: &AnalysisContext,

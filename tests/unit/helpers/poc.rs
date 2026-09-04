@@ -7,8 +7,8 @@
 //!
 //! Reduces duplication from multiple 26-35 line blocks to shared helpers.
 
-use baco::findings::{IssueCategory, SecurityIssue, Severity, VerificationStatus};
 use baco::findings::VulnerabilityFinding;
+use baco::findings::{IssueCategory, SecurityIssue, Severity, VerificationStatus};
 use baco::poc_generation::{PoCFormat, PoCGenerationEngine, PoCTemplate};
 use std::collections::HashMap;
 
@@ -53,6 +53,10 @@ pub fn create_test_finding(cwe_id: &str, severity: Severity) -> VulnerabilityFin
         poc_format: None,
         llm_model: None,
         agent_mode: false,
+        statement_range: None,
+        triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
     }
 }
 
@@ -105,6 +109,10 @@ pub fn create_test_finding_with_category(
         poc_format: None,
         llm_model: None,
         agent_mode: false,
+        statement_range: None,
+        triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
     }
 }
 
@@ -128,13 +136,13 @@ pub fn create_poc_template(
     description: &str,
     vulnerable_pattern: &str,
 ) -> PoCTemplate {
-    PoCTemplate {
-        cwe_id: cwe_id.to_string(),
+    PoCTemplate::new(
+        cwe_id.to_string(),
         format,
-        description: description.to_string(),
-        vulnerable_pattern: vulnerable_pattern.to_string(),
-        mitigation_pattern: None,
-    }
+        vulnerable_pattern.to_string(),
+        "safe_code".to_string(),
+        description.to_string(),
+    )
 }
 
 /// Creates a PoC template with mitigation pattern.
@@ -155,13 +163,13 @@ pub fn create_poc_template_with_mitigation(
     vulnerable_pattern: &str,
     mitigation_pattern: &str,
 ) -> PoCTemplate {
-    PoCTemplate {
-        cwe_id: cwe_id.to_string(),
+    PoCTemplate::new(
+        cwe_id.to_string(),
         format,
-        description: description.to_string(),
-        vulnerable_pattern: vulnerable_pattern.to_string(),
-        mitigation_pattern: Some(mitigation_pattern.to_string()),
-    }
+        vulnerable_pattern.to_string(),
+        mitigation_pattern.to_string(),
+        description.to_string(),
+    )
 }
 
 /// Creates a PoC generation engine with pre-loaded templates for testing.
@@ -187,7 +195,7 @@ pub fn create_poc_engine_with_templates(
 /// A `PoCGenerationEngine` with basic injection templates pre-loaded
 pub fn create_default_injection_engine() -> PoCGenerationEngine {
     let mut engine = PoCGenerationEngine::new();
-    
+
     // Add basic injection templates for testing
     let injection_templates = vec![
         (
@@ -209,10 +217,10 @@ pub fn create_default_injection_engine() -> PoCGenerationEngine {
             ),
         ),
     ];
-    
+
     for (key, template) in injection_templates {
         engine.templates.insert(key.to_string(), template);
     }
-    
+
     engine
 }

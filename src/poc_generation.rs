@@ -87,6 +87,23 @@ pub struct PoCTemplate {
 }
 
 impl PoCTemplate {
+    /// Create a new PoC template.
+    pub fn new(
+        cwe_id: String,
+        format: PoCFormat,
+        vulnerable_pattern: String,
+        safe_pattern: String,
+        description: String,
+    ) -> Self {
+        Self {
+            cwe_id,
+            format,
+            vulnerable_pattern,
+            safe_pattern,
+            description,
+        }
+    }
+
     /// Get the format of this template.
     pub fn format(&self) -> PoCFormat {
         self.format

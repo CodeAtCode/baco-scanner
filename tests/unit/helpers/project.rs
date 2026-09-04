@@ -12,15 +12,15 @@ use std::sync::LazyLock;
 use tempfile::TempDir;
 
 /// Shared module-level TempDir for tests that can reuse a single temp directory.
-/// 
+///
 /// This reduces 38+ individual TempDir::new() calls across test files,
 /// significantly reducing test startup time.
-static SHARED_TEMP_DIR: LazyLock<TempDir> = LazyLock::new(|| {
-    tempfile::tempdir().expect("Failed to create shared temp dir")
-});
+#[allow(clippy::incompatible_msrv)]
+static SHARED_TEMP_DIR: LazyLock<TempDir> =
+    LazyLock::new(|| tempfile::tempdir().expect("Failed to create shared temp dir"));
 
 /// Get a reference to the shared temp directory.
-/// 
+///
 /// Use this instead of `tempfile::tempdir()` for tests that don't need
 /// isolation between individual test cases.
 pub fn shared_temp_dir() -> &'static TempDir {
@@ -53,27 +53,9 @@ pub fn create_temp_cargo_project(content: &str) -> TempDir {
 ///
 /// # Returns
 /// A `TempDir` containing a Cargo.toml with the specified content
-pub fn create_temp_cargo_project_in_shared(name: &str, content: &str) -> TempDir {
+pub fn create_temp_cargo_project_in_shared(_name: &str, content: &str) -> TempDir {
     let shared = shared_temp_dir();
     let temp_dir = tempfile::tempdir_in(shared.path()).unwrap();
-    let cargo_path = temp_dir.path().join("Cargo.toml");
-    let mut file = fs::File::create(&cargo_path).unwrap();
-    file.write_all(content.as_bytes()).unwrap();
-    temp_dir
-}
-
-/// Helper to create a temporary directory with a Cargo.toml content.
-///
-/// This consolidates the duplicated `create_temp_cargo_project` function that appears
-/// in both `src/project_type.rs` tests and `tests/unit/project_type.rs`.
-///
-/// # Arguments
-/// * `content` - Cargo.toml content to write
-///
-/// # Returns
-/// A `TempDir` containing a Cargo.toml with the specified content
-pub fn create_temp_cargo_project(content: &str) -> TempDir {
-    let temp_dir = tempfile::tempdir().unwrap();
     let cargo_path = temp_dir.path().join("Cargo.toml");
     let mut file = fs::File::create(&cargo_path).unwrap();
     file.write_all(content.as_bytes()).unwrap();
@@ -105,7 +87,7 @@ pub fn create_temp_package_project(content: &str) -> TempDir {
 ///
 /// # Returns
 /// A `TempDir` containing a package.json with the specified content
-pub fn create_temp_package_project_in_shared(name: &str, content: &str) -> TempDir {
+pub fn create_temp_package_project_in_shared(_name: &str, content: &str) -> TempDir {
     let shared = shared_temp_dir();
     let temp_dir = tempfile::tempdir_in(shared.path()).unwrap();
     let package_path = temp_dir.path().join("package.json");
@@ -122,12 +104,9 @@ pub fn create_temp_package_project_in_shared(name: &str, content: &str) -> TempD
 ///
 /// # Returns
 /// A `TempDir` with a complete Rust project structure
-pub fn create_temp_rust_project(
-    cargo_content: &str,
-    main_content: Option<&str>,
-) -> TempDir {
+pub fn create_temp_rust_project(cargo_content: &str, main_content: Option<&str>) -> TempDir {
     let temp_dir = create_temp_cargo_project(cargo_content);
-    
+
     if let Some(content) = main_content {
         let src_dir = temp_dir.path().join("src");
         fs::create_dir_all(&src_dir).unwrap();
@@ -135,7 +114,7 @@ pub fn create_temp_rust_project(
         let mut file = fs::File::create(&main_path).unwrap();
         file.write_all(content.as_bytes()).unwrap();
     }
-    
+
     temp_dir
 }
 
@@ -147,12 +126,9 @@ pub fn create_temp_rust_project(
 ///
 /// # Returns
 /// A `TempDir` with a complete Node.js project structure
-pub fn create_temp_node_project(
-    package_content: &str,
-    index_content: Option<&str>,
-) -> TempDir {
+pub fn create_temp_node_project(package_content: &str, index_content: Option<&str>) -> TempDir {
     let temp_dir = create_temp_package_project(package_content);
-    
+
     if let Some(content) = index_content {
         let src_dir = temp_dir.path().join("src");
         fs::create_dir_all(&src_dir).unwrap();
@@ -160,6 +136,6 @@ pub fn create_temp_node_project(
         let mut file = fs::File::create(&index_path).unwrap();
         file.write_all(content.as_bytes()).unwrap();
     }
-    
+
     temp_dir
 }

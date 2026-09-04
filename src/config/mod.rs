@@ -3,7 +3,7 @@ mod knowledge;
 mod llm;
 mod phases;
 mod scanner;
-mod specifications;
+pub mod specifications;
 mod tickets;
 
 use crate::vuln_spec::schema::VulnSpecConfig;
