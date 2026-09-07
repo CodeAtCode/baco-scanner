@@ -5,7 +5,6 @@
 //! (b) exploit executed but not confirmed → does NOT set the marker
 
 use baco::exploit::{ExploitError, ExploitResult};
-use baco::findings::{Severity, VulnerabilityFinding};
 
 /// Test harness-unavailable error path sets the deployment testing marker
 #[test]

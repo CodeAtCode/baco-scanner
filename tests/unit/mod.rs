@@ -37,6 +37,7 @@ mod confidence_refinement;
 mod config;
 mod cross_file_analysis;
 
+mod deployment_marker_tests;
 mod llm;
 mod llm_analysis;
 mod poc_generation_tests;
@@ -204,6 +205,7 @@ mod pipeline_test_helpers;
 
 // Prompt test fixtures (shared between prompt_tests and prompt_templates_tests)
 mod prompt_test_fixtures;
+mod prompt_tests;
 
 // Prompt templates tests - covers BacoPhase/ProjectType enums, default prompts, template rendering
 mod prompt_templates_tests;

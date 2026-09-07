@@ -11,6 +11,7 @@ mod cwe_rag_in_prompt;
 mod cwe_rag_pipeline;
 mod determinism;
 mod moe_pipeline;
+mod rule_synth;
 mod semgrep;
 mod sv_trusteval;
 

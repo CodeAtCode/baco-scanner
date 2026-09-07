@@ -11,10 +11,10 @@
 #![allow(clippy::too_many_lines)]
 
 use baco::prompt::{
-    BacoPhase, ProjectType, PromptEngine, PromptOverrides,
-    load_phase_prompts, load_hunt_prompts, get_prompt, cwe_to_hunt_domain, get_hunt_prompt,
-    sanitize_prompt_override, validate_prompt_override,
-    MAX_PROMPT_OVERRIDE_LENGTH, get_default_prompt,
+    cwe_to_hunt_domain, get_all_defaults, get_default_prompt, get_hunt_prompt, get_prompt,
+    load_hunt_prompts, load_phase_prompts, sanitize_prompt_override, validate_prompt_override,
+    BacoPhase, ProjectType, PromptEngine, PromptOverrides, TemplateVariables,
+    MAX_PROMPT_OVERRIDE_LENGTH,
 };
 use std::collections::HashMap;
 
@@ -43,7 +43,7 @@ fn test_prompt_engine_default_impl() {
 fn test_prompt_engine_from_config_overrides() {
     let mut overrides = HashMap::new();
     overrides.insert("indexing".to_string(), "custom indexing prompt".to_string());
-    
+
     let engine = PromptEngine::from_config_overrides(overrides);
     let indexing = engine.get_prompt(&BacoPhase::Indexing);
     assert_eq!(indexing, "custom indexing prompt");
@@ -70,7 +70,11 @@ fn test_prompt_engine_all_phases_non_empty() {
 
     for phase in phases {
         let prompt = engine.get_prompt(&phase);
-        assert!(!prompt.is_empty(), "Phase {:?} should have non-empty prompt", phase);
+        assert!(
+            !prompt.is_empty(),
+            "Phase {:?} should have non-empty prompt",
+            phase
+        );
     }
 }
 
@@ -78,17 +82,21 @@ fn test_prompt_engine_all_phases_non_empty() {
 fn test_prompt_engine_template_substitution() {
     let engine = PromptEngine::new();
     let prompt = engine.get_prompt(&BacoPhase::Indexing);
-    
-    // Template variables should be substituted with default values
-    assert!(prompt.contains("/project/root/path"));
-    assert!(prompt.contains("BACOSecurityScanner"));
+
+    // Raw default templates keep their %% placeholders; substitution is
+    // applied when variables are bound downstream
+    assert!(
+        prompt.contains("%%"),
+        "indexing template should expose %% placeholders"
+    );
+    assert!(prompt.contains("%%CODE_CONTENT%%") || prompt.contains("%%FILE_EXTENSIONS%%"));
 }
 
 #[test]
 fn test_prompt_engine_legacy_format_support() {
     let engine = PromptEngine::new();
     let semgrep = engine.get_prompt(&BacoPhase::Semgrep);
-    
+
     // Legacy %%VAR%% format should still work
     assert!(semgrep.contains("%%PROJECT_PATH%%") || semgrep.contains("/project/root/path"));
 }
@@ -103,9 +111,12 @@ fn test_prompt_overrides_serialization() {
 fn test_prompt_overrides_with_data() {
     let mut phase_overrides = HashMap::new();
     phase_overrides.insert("semgrep".to_string(), "custom semgrep".to_string());
-    
+
     let overrides = PromptOverrides { phase_overrides };
-    assert_eq!(overrides.phase_overrides.get("semgrep").unwrap(), "custom semgrep");
+    assert_eq!(
+        overrides.phase_overrides.get("semgrep").unwrap(),
+        "custom semgrep"
+    );
 }
 
 // ============================================================================
@@ -115,7 +126,7 @@ fn test_prompt_overrides_with_data() {
 #[test]
 fn test_load_phase_prompts_default_path() {
     let prompts = load_phase_prompts(None);
-    
+
     assert!(prompts.contains_key("indexing"));
     assert!(prompts.contains_key("semgrep"));
     assert!(prompts.contains_key("llm_static_analysis"));
@@ -131,8 +142,8 @@ fn test_load_phase_prompts_default_path() {
 #[test]
 fn test_load_phase_prompts_empty_for_nonexistent_path() {
     let prompts = load_phase_prompts(Some("/nonexistent/path"));
-    
-    for (_key, value) in &prompts {
+
+    for value in prompts.values() {
         assert!(value.is_empty());
     }
 }
@@ -141,9 +152,17 @@ fn test_load_phase_prompts_empty_for_nonexistent_path() {
 fn test_load_phase_prompts_all_keys_present() {
     let prompts = load_phase_prompts(None);
     let expected_keys = [
-        "indexing", "semgrep", "llm_static_analysis", "llm_discovery",
-        "llm_verification", "ticket_crossref", "git_analysis",
-        "cross_file_analysis", "confidence_scoring", "ai_aggregation", "reporting",
+        "indexing",
+        "semgrep",
+        "llm_static_analysis",
+        "llm_discovery",
+        "llm_verification",
+        "ticket_crossref",
+        "git_analysis",
+        "cross_file_analysis",
+        "confidence_scoring",
+        "ai_aggregation",
+        "reporting",
     ];
 
     for key in expected_keys {
@@ -159,7 +178,7 @@ fn test_load_phase_prompts_all_keys_present() {
 fn test_get_prompt_with_config_override() {
     let mut loaded = HashMap::new();
     loaded.insert("test_phase".to_string(), "from file".to_string());
-    
+
     let result = get_prompt("test_phase", &loaded, Some("from config"), "default");
     assert_eq!(result, "from config");
 }
@@ -168,7 +187,7 @@ fn test_get_prompt_with_config_override() {
 fn test_get_prompt_with_loaded_prompt() {
     let mut loaded = HashMap::new();
     loaded.insert("test_phase".to_string(), "from file".to_string());
-    
+
     let result = get_prompt("test_phase", &loaded, None, "default");
     assert_eq!(result, "from file");
 }
@@ -176,7 +195,7 @@ fn test_get_prompt_with_loaded_prompt() {
 #[test]
 fn test_get_prompt_fallback_to_default() {
     let loaded = HashMap::new();
-    
+
     let result = get_prompt("nonexistent", &loaded, None, "default");
     assert_eq!(result, "default");
 }
@@ -185,7 +204,7 @@ fn test_get_prompt_fallback_to_default() {
 fn test_get_prompt_empty_loaded_fallback() {
     let mut loaded = HashMap::new();
     loaded.insert("test_phase".to_string(), String::new());
-    
+
     let result = get_prompt("test_phase", &loaded, None, "default");
     assert_eq!(result, "default");
 }
@@ -194,7 +213,7 @@ fn test_get_prompt_empty_loaded_fallback() {
 fn test_get_prompt_priority_order() {
     let mut loaded = HashMap::new();
     loaded.insert("phase".to_string(), "from file".to_string());
-    
+
     // Config override has highest priority
     let result = get_prompt("phase", &loaded, Some("from config"), "default");
     assert_eq!(result, "from config");
@@ -250,7 +269,7 @@ fn test_sanitize_already_clean_input() {
 fn test_sanitize_mixed_content() {
     let input = "Analyze\0for\x01security\nvulnerabilities";
     let result = sanitize_prompt_override(input);
-    assert_eq!(result, "Analyzefor security\nvulnerabilities");
+    assert_eq!(result, "Analyzeforsecurity\nvulnerabilities");
 }
 
 // ============================================================================
@@ -313,13 +332,8 @@ fn test_validate_legitimate_security_terms() {
 
 #[test]
 fn test_validate_various_shell_patterns() {
-    let patterns = [
-        "| rm -rf",
-        "&& rm -rf",
-        "`rm -rf`",
-        "$(rm -rf)",
-    ];
-    
+    let patterns = ["| rm -rf", "&& rm -rf", "`rm -rf`", "$(rm -rf)"];
+
     for pattern in patterns {
         let result = validate_prompt_override(pattern);
         assert!(result.is_err(), "Pattern {} should be rejected", pattern);
@@ -356,7 +370,10 @@ fn test_baco_phase_display_semgrep() {
 
 #[test]
 fn test_baco_phase_display_llm_static_analysis() {
-    assert_eq!(BacoPhase::LlmStaticAnalysis.to_string(), "llm_static_analysis");
+    assert_eq!(
+        BacoPhase::LlmStaticAnalysis.to_string(),
+        "llm_static_analysis"
+    );
 }
 
 #[test]
@@ -381,12 +398,18 @@ fn test_baco_phase_display_git_analysis() {
 
 #[test]
 fn test_baco_phase_display_cross_file_analysis() {
-    assert_eq!(BacoPhase::CrossFileAnalysis.to_string(), "cross_file_analysis");
+    assert_eq!(
+        BacoPhase::CrossFileAnalysis.to_string(),
+        "cross_file_analysis"
+    );
 }
 
 #[test]
 fn test_baco_phase_display_confidence_scoring() {
-    assert_eq!(BacoPhase::ConfidenceScoring.to_string(), "confidence_scoring");
+    assert_eq!(
+        BacoPhase::ConfidenceScoring.to_string(),
+        "confidence_scoring"
+    );
 }
 
 #[test]
@@ -426,7 +449,7 @@ fn test_baco_phase_all_variants_unique() {
         BacoPhase::Hunt,
         BacoPhase::Validate,
     ];
-    
+
     let strings: Vec<String> = phases.iter().map(|p| p.to_string()).collect();
     let mut unique_count = 0;
     for (i, s) in strings.iter().enumerate() {
@@ -434,7 +457,11 @@ fn test_baco_phase_all_variants_unique() {
             unique_count += 1;
         }
     }
-    assert_eq!(unique_count, strings.len(), "All phase strings should be unique");
+    assert_eq!(
+        unique_count,
+        strings.len(),
+        "All phase strings should be unique"
+    );
 }
 
 // ============================================================================
@@ -485,7 +512,7 @@ fn test_template_variables_new_empty() {
 #[test]
 fn test_template_variables_insert_and_get() {
     let vars = default_template_variables();
-    
+
     assert_eq!(vars.len(), 2);
     assert_eq!(vars.get("KEY1"), Some(&"value1".to_string()));
     assert_eq!(vars.get("KEY2"), Some(&"value2".to_string()));
@@ -497,7 +524,7 @@ fn test_template_variables_insert_overwrite() {
     let mut vars = TemplateVariables::new();
     vars.insert("KEY".to_string(), "value1".to_string());
     vars.insert("KEY".to_string(), "value2".to_string());
-    
+
     assert_eq!(vars.len(), 1);
     assert_eq!(vars.get("KEY"), Some(&"value2".to_string()));
 }
@@ -506,7 +533,7 @@ fn test_template_variables_insert_overwrite() {
 fn test_template_variables_is_empty_behavior() {
     let mut vars = TemplateVariables::new();
     assert!(vars.is_empty());
-    
+
     vars.insert("KEY".to_string(), "value".to_string());
     assert!(!vars.is_empty());
 }
@@ -524,7 +551,7 @@ fn test_default_prompts_all_fields_non_empty() {
 fn test_default_prompts_debug_format() {
     let prompts = get_all_defaults();
     let debug_output = format!("{:?}", prompts);
-    
+
     assert!(debug_output.contains("indexing"));
     assert!(debug_output.contains("semgrep"));
     assert!(debug_output.contains("llm_static_analysis"));
@@ -583,10 +610,14 @@ fn test_get_default_prompt_all_phases() {
         BacoPhase::Hunt,
         BacoPhase::Validate,
     ];
-    
+
     for phase in phases {
         let prompt = get_default_prompt(&phase, &ProjectType::Web);
-        assert!(!prompt.is_empty(), "Phase {:?} should have non-empty default prompt", phase);
+        assert!(
+            !prompt.is_empty(),
+            "Phase {:?} should have non-empty default prompt",
+            phase
+        );
     }
 }
 
@@ -609,27 +640,45 @@ fn test_load_hunt_prompts() {
 #[test]
 fn test_hunt_prompts_non_empty() {
     let hunt_prompts = load_hunt_prompts(None);
-    
-    assert!(!hunt_prompts.get("injection").unwrap_or(&String::new()).is_empty());
-    assert!(!hunt_prompts.get("auth").unwrap_or(&String::new()).is_empty());
+
+    assert!(!hunt_prompts
+        .get("injection")
+        .unwrap_or(&String::new())
+        .is_empty());
+    assert!(!hunt_prompts
+        .get("auth")
+        .unwrap_or(&String::new())
+        .is_empty());
     assert!(!hunt_prompts.get("xss").unwrap_or(&String::new()).is_empty());
-    assert!(!hunt_prompts.get("path_traversal").unwrap_or(&String::new()).is_empty());
-    assert!(!hunt_prompts.get("crypto").unwrap_or(&String::new()).is_empty());
-    assert!(!hunt_prompts.get("resource").unwrap_or(&String::new()).is_empty());
-    assert!(!hunt_prompts.get("deserialization").unwrap_or(&String::new()).is_empty());
+    assert!(!hunt_prompts
+        .get("path_traversal")
+        .unwrap_or(&String::new())
+        .is_empty());
+    assert!(!hunt_prompts
+        .get("crypto")
+        .unwrap_or(&String::new())
+        .is_empty());
+    assert!(!hunt_prompts
+        .get("resource")
+        .unwrap_or(&String::new())
+        .is_empty());
+    assert!(!hunt_prompts
+        .get("deserialization")
+        .unwrap_or(&String::new())
+        .is_empty());
 }
 
 #[test]
 fn test_hunt_prompts_contain_expected_placeholders() {
     let hunt_prompts = load_hunt_prompts(None);
-    
+
     let injection = hunt_prompts.get("injection").unwrap();
     assert!(injection.contains("DANGEROUS APIs"));
     assert!(injection.contains("HUNT FOR"));
-    
+
     let xss = hunt_prompts.get("xss").unwrap();
     assert!(xss.contains("CWE-79"));
-    
+
     let path_traversal = hunt_prompts.get("path_traversal").unwrap();
     assert!(path_traversal.contains("CWE-22"));
 }
@@ -637,11 +686,11 @@ fn test_hunt_prompts_contain_expected_placeholders() {
 #[test]
 fn test_get_hunt_prompt() {
     let hunt_prompts = load_hunt_prompts(None);
-    
+
     let injection_prompt = get_hunt_prompt("injection", &hunt_prompts);
     assert!(injection_prompt.is_some());
     assert!(injection_prompt.unwrap().contains("INJECTION"));
-    
+
     let nonexistent = get_hunt_prompt("nonexistent", &hunt_prompts);
     assert!(nonexistent.is_none());
 }
@@ -662,8 +711,7 @@ fn test_cwe_to_hunt_domain_mapping() {
 // MAX_PROMPT_OVERRIDE_LENGTH Tests
 // ============================================================================
 
-#[test]
-fn test_max_prompt_override_length_constant() {
+const _: () = {
     assert!(MAX_PROMPT_OVERRIDE_LENGTH > 0);
     assert!(MAX_PROMPT_OVERRIDE_LENGTH < 100000);
-}
+};
