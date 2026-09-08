@@ -65,7 +65,7 @@ pub async fn run_llm_discovery(
 ) -> ScanResult<(Vec<VulnerabilityFinding>, Vec<String>)> {
     let PhaseConfig {
         phase: _,
-        mut findings,
+        findings,
         pb,
         analyzed_files,
         metrics_tracker: _,
@@ -170,16 +170,8 @@ pub async fn run_llm_discovery(
     // Note: This requires access to scanner state, caller should handle this
 
     // Step 2: Continue with LLM discovery/enrichment
-    // Partition findings: already-described (LlmAnalysis evidence) vs needing discovery
-    let needs_discovery: Vec<_> = findings
-        .drain(..)
-        .filter(|f| {
-            !f.evidence
-                .iter()
-                .any(|e| matches!(e.source, crate::evidence::EvidenceSource::LlmAnalysis(_)))
-        })
-        .collect();
-    let already_described_count = findings.len();
+    let (needs_discovery, already_described) = partition_for_discovery(findings.clone());
+    let already_described_count = already_described.len();
 
     let enriched_findings = if let Some(_api_key) = &config.llm.phases.discovery.api_key {
         tracing::debug!("API key configured, running discovery");
@@ -193,8 +185,14 @@ pub async fn run_llm_discovery(
         // Enable steady tick for progress bar timer
         pb.enable_steady_tick(std::time::Duration::from_millis(100));
 
-        let client = crate::llm::create_llm_client_with_metrics(scanner, "discovery")
-            .expect("Failed to create LLM client for discovery phase");
+        let client = match crate::llm::create_llm_client_with_metrics(scanner, "discovery") {
+            Some(client) => client,
+            None => {
+                tracing::warn!("Discovery skipped: LLM client unavailable (incomplete llm.phases.discovery config)");
+                pb.set_position(base + 100);
+                return Ok((findings, analyzed_files.to_vec()));
+            }
+        };
 
         // Build prior runs skip list if enabled
         let prior_skip_list = if config.prior_runs.enabled {
@@ -390,5 +388,27 @@ pub async fn run_llm_discovery(
         needs_discovery
     };
 
-    Ok((enriched_findings, analyzed_files.to_vec()))
+    let mut all_findings = already_described;
+    all_findings.extend(enriched_findings);
+    tracing::info!(
+        "Discovery complete: {} findings ({} already described, {} enriched)",
+        all_findings.len(),
+        already_described_count,
+        all_findings.len() - already_described_count
+    );
+
+    Ok((all_findings, analyzed_files.to_vec()))
+}
+
+/// Split findings into (needs_discovery, already_described).
+/// already_described = findings carrying LlmAnalysis evidence; they must be
+/// preserved verbatim through the phase.
+pub fn partition_for_discovery(
+    findings: Vec<VulnerabilityFinding>,
+) -> (Vec<VulnerabilityFinding>, Vec<VulnerabilityFinding>) {
+    findings.into_iter().partition(|f| {
+        !f.evidence
+            .iter()
+            .any(|e| matches!(e.source, crate::evidence::EvidenceSource::LlmAnalysis(_)))
+    })
 }

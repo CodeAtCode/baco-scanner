@@ -5,8 +5,8 @@
 
 use baco::checkpoint::ScanPhase;
 use baco::config::{
-    LlmConfig, LlmPhasesConfig, OutputConfig, PerformanceSettings, ProjectConfig, ScannerConfig,
-    ScannerSettings, SemgrepSettings,
+    LlmConfig, LlmPhaseConfig, LlmPhasesConfig, OutputConfig, PerformanceSettings, ProjectConfig,
+    ScannerConfig, ScannerSettings, SemgrepSettings,
 };
 use baco::findings::{Severity, VulnerabilityFinding};
 use baco::scanner::Scanner;
@@ -704,17 +704,54 @@ fn create_config_without_llm_keys() -> baco::config::ScannerConfig {
         llm: LlmConfig {
             phases: LlmPhasesConfig {
                 // All phases have no API key, so LLM calls will be skipped
-                discovery: Default::default(),
-                verification: Default::default(),
-                aggregation: Default::default(),
-                semgrep: Default::default(),
-                ticket_crossref: Default::default(),
-                git_analysis: Default::default(),
-                cross_file_analysis: Default::default(),
-                confidence_scoring: Default::default(),
-                ai_aggregation: Default::default(),
-                reporting: Default::default(),
-                indexing: Default::default(),
+                discovery: LlmPhaseConfig {
+                    base_url: "http://localhost:11434".to_string(),
+                    api_key: None,
+                    model: "llama3.1".to_string(),
+                    models: vec![],
+                    temperature: None,
+                    timeout_secs: Some(30),
+                },
+                verification: LlmPhaseConfig {
+                    base_url: "http://localhost:11434".to_string(),
+                    api_key: None,
+                    model: "llama3.1".to_string(),
+                    models: vec![],
+                    temperature: None,
+                    timeout_secs: Some(30),
+                },
+                aggregation: LlmPhaseConfig {
+                    base_url: "http://localhost:11434".to_string(),
+                    api_key: None,
+                    model: "llama3.1".to_string(),
+                    models: vec![],
+                    temperature: None,
+                    timeout_secs: Some(30),
+                },
+                static_analysis: LlmPhaseConfig {
+                    base_url: "http://localhost:11434".to_string(),
+                    api_key: None,
+                    model: "llama3.1".to_string(),
+                    models: vec![],
+                    temperature: None,
+                    timeout_secs: Some(30),
+                },
+                security_agent_verification: LlmPhaseConfig {
+                    base_url: "http://localhost:11434".to_string(),
+                    api_key: None,
+                    model: "llama3.1".to_string(),
+                    models: vec![],
+                    temperature: None,
+                    timeout_secs: Some(30),
+                },
+                threat_modeling: LlmPhaseConfig {
+                    base_url: "http://localhost:11434".to_string(),
+                    api_key: None,
+                    model: "llama3.1".to_string(),
+                    models: vec![],
+                    temperature: None,
+                    timeout_secs: Some(30),
+                },
                 prompt_overrides: Default::default(),
             },
             ..Default::default()

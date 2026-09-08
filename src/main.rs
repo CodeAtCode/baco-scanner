@@ -752,26 +752,8 @@ async fn run_verify(
         tracing::error!("LLM verification API key is not configured.");
         std::process::exit(1);
     }
-    let client = baco::llm::LlmClient::new(baco::llm::LlmConfig {
-        base_url: config.llm.phases.verification.base_url.clone(),
-        api_key: config
-            .llm
-            .phases
-            .verification
-            .api_key
-            .clone()
-            .expect("api_key verified non-empty above"),
-        model: config.llm.phases.verification.model.clone(),
-        models: config.llm.phases.verification.get_models(),
-        timeout: config.llm.timeout_secs,
-        max_retries: config.llm.max_retries as u32,
-        retry_backoff_ms: config.llm.retry_backoff_ms,
-        temperature: 0.5,
-        max_reasoning_tokens: config.llm.max_reasoning_tokens,
-        enable_llm_cache: false,
-        cache_dir: None,
-        max_concurrent: 3,
-    });
+    let client =
+        baco::llm::LlmClient::new(baco::llm::phase_llm_config(&config, "verification", None)?);
     for finding in findings.iter_mut() {
         tracing::info!("Verifying finding: {}", finding.id);
         let messages = vec![

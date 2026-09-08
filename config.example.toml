@@ -163,7 +163,7 @@ project = "libxml2"
 # All flags default to disabled. Enable to opt in to experimental
 # research-backed analysis augmentations. See todo.md for details.
 
-# P1: VulTriage triple-path context augmentation — arXiv:2605.09461
+# VulTriage triple-path context augmentation — arXiv:2605.09461
 # Augments LLM input with control path (AST/CFG/DFG), knowledge path
 # (CWE pattern RAG), and semantic path (function summary) before judgement.
 #[vultriage]
@@ -172,21 +172,21 @@ project = "libxml2"
 #knowledge_path = true
 #semantic_path = true
 
-# P2.2: VulnLLM-R policy-based generation — arXiv:2605.09461
+# VulnLLM-R policy-based generation — arXiv:2605.09461
 # Queries the LLM N times to build a CWE candidate set, then a final
 # call picks one label. Increases LLM cost ~5x.
 #[policy_sampling]
 #enabled = false
 #samples = 4
 
-# P2.5: VulnLLM-R agent scaffold — arXiv:2605.09461
+# VulnLLM-R agent scaffold — arXiv:2605.09461
 # Builds 3-path call-graph context + function-lookup tool per target.
 #[agent_scaffold]
 #enabled = false
 #max_rounds = 5
 #paths_per_target = 3
 
-# P3: MoCQ neuro-symbolic rule synthesis (RuleSynthesis 2.0) — arXiv:2605.13918
+# MoCQ neuro-symbolic rule synthesis (RuleSynthesis 2.0) — arXiv:2605.13918
 # LLM proposes patterns in a DSL → symbolic validator gives feedback → loop.
 # Extends [scanner.rulesynth] with these fields:
 #[scanner.rulesynth]
@@ -194,7 +194,7 @@ project = "libxml2"
 #max_iterations = 5
 #corpus_path = "tests/fixtures/"
 
-# P4: PacVD primitive-API abstraction — arXiv:2605.07785
+# PacVD primitive-API abstraction — arXiv:2605.07785
 # Appends callee abstraction at one of four granularity levels to the
 # LLM prompt. Level 1 = fuzzy branches only; 4 = concrete branches + key vars.
 #[pacvd]
@@ -202,7 +202,7 @@ project = "libxml2"
 #level = 2
 #auto_level = false
 
-# P5: AgentFlow multi-agent harness synthesis — arXiv:2605.11835
+# AgentFlow multi-agent harness synthesis — arXiv:2605.11835
 # Represents the harness as a typed graph DSL with a search loop.
 # Most invasive integration — static harness only until P5.5.
 #[agent_flow]
@@ -213,7 +213,7 @@ project = "libxml2"
 # keep_artifacts = false  # Keep agent work artifacts (logs, temp files)
 
 
-# CPG-guided slicing (P3.1)
+# CPG-guided slicing
 [cpg]
 # Whether CPG slicing is enabled
 # enabled = false
@@ -222,7 +222,7 @@ project = "libxml2"
 # Maximum lines to include in a slice
 # slice_budget_lines = 200
 
-# Exploit synthesis (T3.2)
+# Exploit synthesis
 [exploit]
 # Whether exploit synthesis is enabled
 # enabled = false
@@ -249,14 +249,14 @@ project = "libxml2"
 # Whether to include the semantic path (function summary)
 # semantic_path = true
 
-# Policy-based generation (P2.2: VulnLLM-R)
+# Policy-based generation
 [policy_sampling]
 # Whether policy-based generation is enabled
 # enabled = false
 # Number of sampling rounds to build the policy
 # samples = 4
 
-# Agent scaffold (P2.5: VulnLLM-R)
+# Agent scaffold
 [agent_scaffold]
 # Whether the agent scaffold is enabled
 # enabled = false
@@ -265,7 +265,7 @@ project = "libxml2"
 # Number of call-graph paths to sample per target function
 # paths_per_target = 3
 
-# Primitive-API abstraction (P4: PacVD)
+# Primitive-API abstraction
 [pacvd]
 # Whether PacVD abstraction is enabled
 # enabled = false
@@ -290,7 +290,7 @@ enabled = false
 max_runs = 5
 
 # Org-context profile: organizational policy for prompt calibration
-# (Argus technique #5). Massive false-positive reducer: knowing where
+# Massive false-positive reducer: knowing where
 # secrets live prevents placeholder-as-leak findings.
 # [org_context]
 # enabled = false

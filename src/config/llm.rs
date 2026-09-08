@@ -36,21 +36,11 @@ pub struct LlmPhasesConfig {
     #[serde(default)]
     pub aggregation: LlmPhaseConfig,
     #[serde(default)]
-    pub semgrep: LlmPhaseConfig,
+    pub static_analysis: LlmPhaseConfig,
     #[serde(default)]
-    pub ticket_crossref: LlmPhaseConfig,
+    pub security_agent_verification: LlmPhaseConfig,
     #[serde(default)]
-    pub git_analysis: LlmPhaseConfig,
-    #[serde(default)]
-    pub cross_file_analysis: LlmPhaseConfig,
-    #[serde(default)]
-    pub confidence_scoring: LlmPhaseConfig,
-    #[serde(default)]
-    pub ai_aggregation: LlmPhaseConfig,
-    #[serde(default)]
-    pub reporting: LlmPhaseConfig,
-    #[serde(default)]
-    pub indexing: LlmPhaseConfig,
+    pub threat_modeling: LlmPhaseConfig,
     #[serde(default)]
     pub prompt_overrides: PromptOverrides,
 }

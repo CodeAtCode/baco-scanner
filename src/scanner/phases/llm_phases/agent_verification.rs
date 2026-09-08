@@ -42,8 +42,10 @@ pub async fn run_security_agent_verification(
         return Ok((findings, analyzed_files.to_vec()));
     }
 
-    let Some(_api_key) = &config.llm.phases.discovery.api_key else {
-        tracing::debug!("No API key for agent, skipping Security Agent verification");
+    let Some(_api_key) = &config.llm.phases.security_agent_verification.api_key else {
+        tracing::debug!(
+            "No API key for security_agent_verification, skipping Security Agent verification"
+        );
         pb.set_message(format!(
             "Phase {}/{}: No API key - skipping",
             phase_num, total
@@ -59,8 +61,17 @@ pub async fn run_security_agent_verification(
 
     let total_findings = findings.len();
 
-    let client = crate::llm::create_llm_client_with_metrics(scanner, "discovery")
-        .expect("Failed to create LLM client for Security Agent phase");
+    let client = match crate::llm::create_llm_client_with_metrics(
+        scanner,
+        "security_agent_verification",
+    ) {
+        Some(client) => client,
+        None => {
+            tracing::warn!("Security Agent verification skipped: LLM client unavailable (incomplete llm.phases.security_agent_verification config)");
+            pb.set_position(base + 100);
+            return Ok((findings, analyzed_files.to_vec()));
+        }
+    };
 
     // Agent scaffold context (P2.5) - build once before the findings loop
     let (fn_lookup_opt, call_graph_opt) = if config.agent_scaffold.enabled {

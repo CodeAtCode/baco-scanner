@@ -314,8 +314,14 @@ pub async fn run_llm_verification(
     if let Some(_api_key) = &config.llm.phases.verification.api_key {
         pb.enable_steady_tick(std::time::Duration::from_millis(100));
 
-        let client = crate::llm::create_llm_client_with_metrics(scanner, "verification")
-            .expect("Failed to create LLM client for verification phase");
+        let client = match crate::llm::create_llm_client_with_metrics(scanner, "verification") {
+            Some(client) => client,
+            None => {
+                tracing::warn!("Verification skipped: LLM client unavailable (incomplete llm.phases.verification config)");
+                pb.set_position(base + 100);
+                return Ok((findings, analyzed_files.to_vec(), Vec::new()));
+            }
+        };
 
         if use_agent_mode {
             let progress_cb = Arc::new(move |msg: String| {
@@ -361,6 +367,13 @@ pub async fn run_llm_verification(
                                 "LLM verification verdict: {:?}",
                                 finding.verification_status
                             ),
+                        );
+                        tracing::info!(
+                            "Verification verdict [agent]: {:?} — {} ({}:{:?})",
+                            finding.verification_status,
+                            finding.title,
+                            finding.file_path,
+                            finding.line_number
                         );
                     }
                     Err(e) => {
@@ -418,6 +431,13 @@ pub async fn run_llm_verification(
                                 "LLM verification verdict: {:?}",
                                 finding.verification_status
                             ),
+                        );
+                        tracing::info!(
+                            "Verification verdict [batched]: {:?} — {} ({}:{:?})",
+                            status,
+                            finding.title,
+                            finding.file_path,
+                            finding.line_number
                         );
                     }
                 }
@@ -601,6 +621,16 @@ pub async fn run_llm_verification(
             _ => kept_findings.push(finding),
         }
     }
+
+    for (finding, reason) in &rejected_findings {
+        let snippet: String = reason.chars().take(120).collect();
+        tracing::info!("Rejected: {} — {}", finding.title, snippet);
+    }
+    tracing::info!(
+        "Verification summary: {} kept, {} rejected",
+        kept_findings.len(),
+        rejected_findings.len()
+    );
 
     Ok((kept_findings, analyzed_files.to_vec(), rejected_findings))
 }

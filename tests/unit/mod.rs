@@ -324,6 +324,7 @@ mod prompt_scope_tests;
 
 // Batch LLM processing tests (T14)
 mod batch_llm_phases_tests;
+mod discovery_partition_tests;
 mod discovery_skip_baseline_tests;
 
 mod budget_chunk_tests;

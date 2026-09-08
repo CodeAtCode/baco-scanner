@@ -71,7 +71,8 @@ fn test_llm_config_default_temperature() {
 // ============================================================================
 
 #[test]
-fn test_phase_llm_config_uses_global_base_values() {
+fn test_phase_llm_config_uses_phase_base_url() {
+    // Phase base_url is used as-is (no global fallback exists)
     let scanner_config = baco::config::ScannerConfig {
         llm: ConfigLlmConfig {
             timeout_secs: 60,
@@ -82,12 +83,19 @@ fn test_phase_llm_config_uses_global_base_values() {
             max_reasoning_tokens: Some(4096),
             enable_llm_cache: true,
             cache_dir: Some("/tmp/cache".to_string()),
-            phases: LlmPhasesConfig::default(),
+            phases: LlmPhasesConfig {
+                discovery: LlmPhaseConfig {
+                    base_url: "https://api.test.local/v1".to_string(),
+                    model: "test-model".to_string(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
         },
         ..Default::default()
     };
 
-    let llm_config = llm::phase_llm_config(&scanner_config, "discovery", None);
+    let llm_config = llm::phase_llm_config(&scanner_config, "discovery", None).unwrap();
 
     assert_eq!(llm_config.timeout, 60);
     assert_eq!(llm_config.max_retries, 5);
@@ -126,7 +134,7 @@ fn test_phase_llm_config_applies_phase_overrides() {
         ..Default::default()
     };
 
-    let llm_config = llm::phase_llm_config(&scanner_config, "discovery", None);
+    let llm_config = llm::phase_llm_config(&scanner_config, "discovery", None).unwrap();
 
     // Phase overrides should apply
     assert_eq!(llm_config.timeout, 120); // Phase override
@@ -147,12 +155,19 @@ fn test_phase_llm_config_no_hardcoded_temperature() {
             max_reasoning_tokens: None,
             enable_llm_cache: false,
             cache_dir: None,
-            phases: LlmPhasesConfig::default(),
+            phases: LlmPhasesConfig {
+                verification: LlmPhaseConfig {
+                    base_url: "https://api.test.local/v1".to_string(),
+                    model: "test-model".to_string(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
         },
         ..Default::default()
     };
 
-    let llm_config = llm::phase_llm_config(&scanner_config, "verification", None);
+    let llm_config = llm::phase_llm_config(&scanner_config, "verification", None).unwrap();
 
     // Should use global temperature, not hardcoded value
     assert_eq!(llm_config.temperature, 0.7);
@@ -171,18 +186,26 @@ fn test_phase_llm_config_model_override() {
             max_reasoning_tokens: None,
             enable_llm_cache: false,
             cache_dir: None,
-            phases: LlmPhasesConfig::default(),
+            phases: LlmPhasesConfig {
+                discovery: LlmPhaseConfig {
+                    base_url: "https://api.test.local/v1".to_string(),
+                    model: "base-model".to_string(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
         },
         ..Default::default()
     };
 
-    let llm_config = llm::phase_llm_config(&scanner_config, "discovery", Some("override-model"));
+    let llm_config =
+        llm::phase_llm_config(&scanner_config, "discovery", Some("override-model")).unwrap();
 
     assert_eq!(llm_config.model, "override-model");
 }
 
 #[test]
-fn test_phase_llm_config_static_analysis_uses_discovery() {
+fn test_phase_llm_config_static_analysis_uses_own_slot() {
     let scanner_config = baco::config::ScannerConfig {
         llm: ConfigLlmConfig {
             timeout_secs: 30,
@@ -202,17 +225,26 @@ fn test_phase_llm_config_static_analysis_uses_discovery() {
                     timeout_secs: Some(60),
                     temperature: Some(0.8),
                 },
+                static_analysis: LlmPhaseConfig {
+                    base_url: "https://static-analysis.api.com".to_string(),
+                    api_key: Some("static-key".to_string()),
+                    model: "static-model".to_string(),
+                    models: vec![],
+                    timeout_secs: Some(90),
+                    temperature: Some(0.6),
+                },
                 ..Default::default()
             },
         },
         ..Default::default()
     };
 
-    // static_analysis should use discovery config
-    let llm_config = llm::phase_llm_config(&scanner_config, "static_analysis", None);
+    // static_analysis should use its own config (not discovery)
+    let llm_config = llm::phase_llm_config(&scanner_config, "static_analysis", None).unwrap();
 
-    assert_eq!(llm_config.model, "discovery-model");
-    assert_eq!(llm_config.temperature, 0.8);
+    assert_eq!(llm_config.model, "static-model");
+    assert_eq!(llm_config.temperature, 0.6);
+    assert_eq!(llm_config.base_url, "https://static-analysis.api.com");
 }
 
 // ============================================================================
@@ -242,4 +274,212 @@ fn test_static_analysis_schema_structure() {
     assert_eq!(schema["type"], "object");
     assert!(schema["properties"].is_object());
     assert_eq!(schema["required"].as_array().unwrap().len(), 7);
+    assert_eq!(schema["required"].as_array().unwrap().len(), 7);
+}
+
+// ============================================================================
+// T26 Regression Tests: phase_llm_config edge cases
+// ============================================================================
+
+#[test]
+fn test_phase_llm_config_preserves_full_model_list() {
+    // Verify that models vector is NOT replaced with vec![] (the original bug)
+    let scanner_config = baco::config::ScannerConfig {
+        llm: ConfigLlmConfig {
+            timeout_secs: 30,
+            max_retries: 3,
+            retry_backoff_ms: 1000,
+            max_concurrent: 3,
+            temperature: 0.5,
+            max_reasoning_tokens: None,
+            enable_llm_cache: false,
+            cache_dir: None,
+            phases: LlmPhasesConfig {
+                discovery: LlmPhaseConfig {
+                    base_url: "https://api.test.local/v1".to_string(),
+                    model: "m1".to_string(),
+                    models: vec!["m1".to_string(), "m2".to_string(), "m3".to_string()],
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+        },
+        ..Default::default()
+    };
+
+    let llm_config = llm::phase_llm_config(&scanner_config, "discovery", None).unwrap();
+
+    assert_eq!(llm_config.model, "m1");
+    assert_eq!(llm_config.models.len(), 3);
+    assert_eq!(
+        llm_config.models,
+        vec!["m1".to_string(), "m2".to_string(), "m3".to_string()]
+    );
+}
+
+#[test]
+fn test_phase_llm_config_errors_on_missing_base_url() {
+    // Verify error when base_url is empty
+    let scanner_config = baco::config::ScannerConfig {
+        llm: ConfigLlmConfig {
+            timeout_secs: 30,
+            max_retries: 3,
+            retry_backoff_ms: 1000,
+            max_concurrent: 3,
+            temperature: 0.5,
+            max_reasoning_tokens: None,
+            enable_llm_cache: false,
+            cache_dir: None,
+            phases: LlmPhasesConfig {
+                discovery: LlmPhaseConfig {
+                    base_url: "".to_string(),
+                    model: "test-model".to_string(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+        },
+        ..Default::default()
+    };
+
+    let result = llm::phase_llm_config(&scanner_config, "discovery", None);
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(matches!(err, baco::error::ScanError::Config { .. }));
+    let err_msg = err.to_string();
+    assert!(err_msg.contains("discovery"));
+    assert!(err_msg.contains("base_url"));
+}
+
+#[test]
+fn test_phase_llm_config_errors_on_missing_model() {
+    // Verify error when both model and models are empty
+    let scanner_config = baco::config::ScannerConfig {
+        llm: ConfigLlmConfig {
+            timeout_secs: 30,
+            max_retries: 3,
+            retry_backoff_ms: 1000,
+            max_concurrent: 3,
+            temperature: 0.5,
+            max_reasoning_tokens: None,
+            enable_llm_cache: false,
+            cache_dir: None,
+            phases: LlmPhasesConfig {
+                discovery: LlmPhaseConfig {
+                    base_url: "https://api.test.local/v1".to_string(),
+                    model: "".to_string(),
+                    models: vec![],
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+        },
+        ..Default::default()
+    };
+
+    let result = llm::phase_llm_config(&scanner_config, "discovery", None);
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(matches!(err, baco::error::ScanError::Config { .. }));
+    let err_msg = err.to_string();
+    assert!(err_msg.contains("discovery"));
+    assert!(err_msg.contains("model"));
+}
+
+#[test]
+fn test_phase_llm_config_model_override_replaces_models() {
+    // Verify model override takes precedence over phase models
+    let scanner_config = baco::config::ScannerConfig {
+        llm: ConfigLlmConfig {
+            timeout_secs: 30,
+            max_retries: 3,
+            retry_backoff_ms: 1000,
+            max_concurrent: 3,
+            temperature: 0.5,
+            max_reasoning_tokens: None,
+            enable_llm_cache: false,
+            cache_dir: None,
+            phases: LlmPhasesConfig {
+                discovery: LlmPhaseConfig {
+                    base_url: "https://api.test.local/v1".to_string(),
+                    model: "base-model".to_string(),
+                    models: vec!["base-model".to_string(), "alt-model".to_string()],
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+        },
+        ..Default::default()
+    };
+
+    let llm_config =
+        llm::phase_llm_config(&scanner_config, "discovery", Some("override-model")).unwrap();
+
+    assert_eq!(llm_config.model, "override-model");
+    assert_eq!(llm_config.models.len(), 1);
+    assert_eq!(llm_config.models, vec!["override-model".to_string()]);
+}
+
+// ============================================================================
+// Regression Tests: Graceful Skip Behavior
+// ============================================================================
+
+#[test]
+fn test_create_llm_client_with_metrics_returns_none_on_missing_base_url() {
+    // Regression test for user crash: phase with api_key but empty base_url should return None, not panic
+    use baco::config::{LlmPhaseConfig, LlmPhasesConfig};
+    let config = baco::config::ScannerConfig {
+        llm: baco::config::LlmConfig {
+            phases: LlmPhasesConfig {
+                security_agent_verification: LlmPhaseConfig {
+                    api_key: Some("test-key".to_string()),
+                    base_url: "".to_string(), // Empty base_url - should cause graceful skip
+                    model: "test-model".to_string(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let scanner = baco::scanner::Scanner::new(config, temp_dir.path().to_path_buf(), false);
+
+    let result = baco::llm::create_llm_client_with_metrics(&scanner, "security_agent_verification");
+
+    assert!(
+        result.is_none(),
+        "Should return None for incomplete config, not panic"
+    );
+}
+
+#[test]
+fn test_phase_llm_config_errors_gracefully_on_empty_base_url() {
+    // Verify that phase_llm_config returns an error (not a panic) when base_url is empty
+    let scanner_config = baco::config::ScannerConfig {
+        llm: baco::config::LlmConfig {
+            phases: LlmPhasesConfig {
+                discovery: LlmPhaseConfig {
+                    base_url: "".to_string(),
+                    model: "test-model".to_string(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let result = llm::phase_llm_config(&scanner_config, "discovery", None);
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    let err_msg = err.to_string();
+    assert!(err_msg.contains("discovery"));
+    assert!(err_msg.contains("base_url"));
 }

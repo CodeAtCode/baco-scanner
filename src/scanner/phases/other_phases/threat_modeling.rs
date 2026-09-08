@@ -42,10 +42,10 @@ pub async fn run_threat_modeling(
     };
 
     // Create LLM client for threat modeling using verification phase config
-    let llm_client = crate::llm::create_llm_client_with_metrics(scanner, "verification");
+    let llm_client = crate::llm::create_llm_client_with_metrics(scanner, "threat_modeling");
 
     if llm_client.is_none() {
-        tracing::warn!("No API key configured for threat modeling (llm.phases.verification.api_key); falling back to static STRIDE template");
+        tracing::warn!("No API key configured for threat modeling (llm.phases.threat_modeling.api_key); falling back to static STRIDE template");
     }
 
     // Run threat modeling with LLM client if available

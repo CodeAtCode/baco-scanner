@@ -3,7 +3,9 @@
 
 use baco::checkpoint::ScanPhase;
 use baco::config;
-use baco::config::{AgentConfig, LlmPhasesConfig, PerformanceSettings, ScannerSettings};
+use baco::config::{
+    AgentConfig, LlmPhaseConfig, LlmPhasesConfig, PerformanceSettings, ScannerSettings,
+};
 use baco::findings::{Severity, VerificationStatus, VulnerabilityFinding};
 use baco::llm_metrics::LlmMetricsTracker;
 use baco::scanner::phases::{run_phase, PhaseConfig};
@@ -50,7 +52,14 @@ fn create_test_config() -> config::ScannerConfig {
             performance: PerformanceSettings::default(),
         },
         llm: baco::config::LlmConfig {
-            phases: LlmPhasesConfig::default(),
+            phases: LlmPhasesConfig {
+                aggregation: LlmPhaseConfig {
+                    base_url: "http://localhost:11434".to_string(),
+                    model: "test-model".to_string(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
             timeout_secs: 30,
             max_retries: 3,
             retry_backoff_ms: 1000,
@@ -1046,7 +1055,7 @@ async fn test_semgrep_phase_with_nonexistent_path() {
 async fn test_llm_static_analysis_without_api_key() {
     let scanner = create_test_scanner();
     let mut config = create_test_config();
-    config.llm.phases.git_analysis.api_key = None;
+    config.llm.phases.static_analysis.api_key = None;
     let pb = ProgressBar::hidden();
     let metrics_tracker = LlmMetricsTracker::new();
     let analyzed_files: Vec<String> = vec![];

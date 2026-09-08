@@ -130,7 +130,7 @@ pub async fn run_llm_static_analysis(
 
     // Check for LLM discovery API key (used by LlmStaticAnalysis)
     tracing::info!("[LLM] Phase config check for LlmStaticAnalysis");
-    let phase_config = &config.llm.phases.discovery;
+    let phase_config = &config.llm.phases.static_analysis;
     tracing::info!(
         "[LLM] Phase config: base_url={}, api_key={:?}",
         phase_config.base_url,
@@ -144,7 +144,14 @@ pub async fn run_llm_static_analysis(
         pb.enable_steady_tick(std::time::Duration::from_millis(100));
 
         // Use unified LLM config construction helper (T26)
-        let llm_config = llm::phase_llm_config(config, "static_analysis", None);
+        let llm_config = match llm::phase_llm_config(config, "static_analysis", None) {
+            Ok(cfg) => cfg,
+            Err(e) => {
+                tracing::warn!("LLM static analysis skipped: {}", e);
+                pb.set_position(base + 100);
+                return Ok((findings, analyzed_files.to_vec()));
+            }
+        };
 
         let client =
             crate::llm::LlmClient::with_metrics(llm_config.clone(), Some(metrics_tracker.clone()));

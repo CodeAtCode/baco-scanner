@@ -29,7 +29,7 @@ pub async fn run_rule_synthesis(
     }
 
     let phase_config = &config.llm.phases.discovery;
-    let Some(api_key) = &phase_config.api_key else {
+    let Some(_api_key) = &phase_config.api_key else {
         tracing::warn!("Rule synthesis enabled but no LLM API key configured; skipping phase");
         pb.set_position(pb.position() + 100);
         return Ok((findings, analyzed_files.to_vec()));
@@ -47,20 +47,13 @@ pub async fn run_rule_synthesis(
         phase_num, total
     ));
 
-    let timeout = phase_config.timeout_secs.unwrap_or(config.llm.timeout_secs);
-    let llm_config = crate::llm::LlmConfig {
-        base_url: phase_config.base_url.clone(),
-        api_key: api_key.clone(),
-        model: phase_config.model.clone(),
-        models: phase_config.get_models(),
-        timeout,
-        max_retries: config.llm.max_retries as u32,
-        retry_backoff_ms: config.llm.retry_backoff_ms,
-        temperature: config.llm.temperature,
-        max_reasoning_tokens: config.llm.max_reasoning_tokens,
-        enable_llm_cache: false,
-        cache_dir: None,
-        max_concurrent: 3,
+    let llm_config = match crate::llm::phase_llm_config(config, "discovery", None) {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            tracing::warn!("Rule synthesis skipped: {}", e);
+            pb.set_position(pb.position() + 100);
+            return Ok((findings, analyzed_files.to_vec()));
+        }
     };
     let client = crate::llm::LlmClient::with_metrics(llm_config, Some(metrics_tracker.clone()));
 

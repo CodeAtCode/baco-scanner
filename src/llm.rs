@@ -1056,22 +1056,26 @@ pub fn create_llm_client_with_metrics(
     scanner: &crate::scanner::Scanner,
     phase_name: &str,
 ) -> Option<LlmClient> {
-    let phase_config = match phase_name {
-        "discovery" => &scanner.config.llm.phases.discovery,
-        "verification" => &scanner.config.llm.phases.verification,
-        _ => return None,
-    };
+    let phase_config = get_phase_config(&scanner.config.llm.phases, phase_name);
 
     let api_key = phase_config.api_key.as_ref();
     if api_key.is_none() {
         eprintln!(
-                "\u{1B}[33m[SCANNER] {} skipped: LLM not configured (set LLM_API_KEY or llm.api_key)\u{1B}[0m",
-                phase_name
-            );
+            "\u{1B}[33m[SCANNER] {} skipped: no API key configured (set llm.phases.{}.api_key)\u{1B}[0m",
+            phase_name, phase_name
+        );
+        return None;
     }
 
     // Use the new unified helper for consistency
-    let llm_config = phase_llm_config(&scanner.config, phase_name, None);
+    let llm_config = match phase_llm_config(&scanner.config, phase_name, None) {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            eprintln!("\u{1B}[33m[SCANNER] {} skipped: {}\u{1B}[0m", phase_name, e);
+            tracing::warn!("LLM phase '{}' config error: {}", phase_name, e);
+            return None;
+        }
+    };
 
     Some(LlmClient::with_metrics(
         llm_config,
@@ -1107,7 +1111,7 @@ pub fn phase_llm_config(
     scanner_config: &ScannerConfig,
     phase: &str,
     model_override: Option<&str>,
-) -> LlmConfig {
+) -> Result<LlmConfig, ScanError> {
     // Get global LLM settings
     let global_llm = &scanner_config.llm;
 
@@ -1115,11 +1119,14 @@ pub fn phase_llm_config(
     let phase_config = get_phase_config(&global_llm.phases, phase);
 
     // Build base_url: phase override > global
+    // If BOTH are empty, error
     let base_url = if !phase_config.base_url.is_empty() {
         phase_config.base_url.clone()
     } else {
-        // Default OpenAI endpoint
-        "https://api.openai.com/v1".to_string()
+        return Err(ScanError::Config {
+            message: format!("LLM phase '{}' has no base_url configured", phase),
+            source: None,
+        });
     };
 
     // Build api_key: phase override > env var > empty
@@ -1129,28 +1136,38 @@ pub fn phase_llm_config(
         .or_else(|| std::env::var("LLM_API_KEY").ok())
         .unwrap_or_default();
 
-    // Build model: override param > phase models > phase model > global
-    let model = if let Some(override_model) = model_override {
-        override_model.to_string()
-    } else if !phase_config.get_models().is_empty() {
-        phase_config.get_models()[0].clone()
-    } else if !phase_config.model.is_empty() {
-        phase_config.model.clone()
+    // Build models: model_override > phase_config.get_models()
+    let models: Vec<String> = if let Some(override_model) = model_override {
+        vec![override_model.to_string()]
     } else {
-        "gpt-4".to_string()
+        phase_config.get_models()
     };
+
+    // If no models, error
+    if models.is_empty() {
+        return Err(ScanError::Config {
+            message: format!("LLM phase '{}' has no model configured", phase),
+            source: None,
+        });
+    }
+
+    // Model field = first model in the list
+    let model = models[0].clone();
 
     // Build timeout: phase override > global
     let timeout = phase_config.timeout_secs.unwrap_or(global_llm.timeout_secs);
 
-    // Temperature: phase override > global - NEVER hardcode
+    // Temperature: phase override > global
     let temperature = phase_config.temperature.unwrap_or(global_llm.temperature);
 
-    LlmConfig {
+    // Log the constructed config
+    tracing::info!(phase = phase, model = %model, base_url = %base_url, "LLM config constructed");
+
+    Ok(LlmConfig {
         base_url,
         api_key,
         model,
-        models: vec![],
+        models,
         timeout,
         max_retries: global_llm.max_retries as u32,
         retry_backoff_ms: global_llm.retry_backoff_ms,
@@ -1159,7 +1176,7 @@ pub fn phase_llm_config(
         enable_llm_cache: global_llm.enable_llm_cache,
         cache_dir: global_llm.cache_dir.clone(),
         max_concurrent: global_llm.max_concurrent,
-    }
+    })
 }
 
 /// Get phase config by name from LlmPhasesConfig
@@ -1172,18 +1189,9 @@ fn get_phase_config(
         "discovery" => phases.discovery.clone(),
         "verification" => phases.verification.clone(),
         "aggregation" => phases.aggregation.clone(),
-        "semgrep" => phases.semgrep.clone(),
-        "ticket_crossref" => phases.ticket_crossref.clone(),
-        "git_analysis" => phases.git_analysis.clone(),
-        "cross_file_analysis" => phases.cross_file_analysis.clone(),
-        "confidence_scoring" => phases.confidence_scoring.clone(),
-        "ai_aggregation" => phases.ai_aggregation.clone(),
-        "reporting" => phases.reporting.clone(),
-        "indexing" => phases.indexing.clone(),
-        "static_analysis" => {
-            // static_analysis uses discovery config as fallback
-            phases.discovery.clone()
-        }
+        "static_analysis" => phases.static_analysis.clone(),
+        "security_agent_verification" => phases.security_agent_verification.clone(),
+        "threat_modeling" => phases.threat_modeling.clone(),
         _ => crate::config::LlmPhaseConfig::default(),
     }
 }

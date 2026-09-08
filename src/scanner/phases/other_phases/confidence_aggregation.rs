@@ -120,27 +120,14 @@ pub async fn run_ai_aggregation(
     } = cfg;
 
     tracing::info!("Running AI aggregation phase...");
-    let llm_config = crate::llm::LlmConfig {
-        base_url: config.llm.phases.aggregation.base_url.clone(),
-        api_key: config
-            .llm
-            .phases
-            .aggregation
-            .api_key
-            .clone()
-            .unwrap_or_default(),
-        model: config.llm.phases.aggregation.model.clone(),
-        models: config.llm.phases.aggregation.get_models(),
-        timeout: config.llm.timeout_secs,
-        max_retries: config.llm.max_retries as u32,
-        retry_backoff_ms: config.llm.retry_backoff_ms,
-        temperature: 0.5,
-        max_reasoning_tokens: None,
-        enable_llm_cache: false,
-        cache_dir: None,
-        max_concurrent: 3,
+    let llm_config = match crate::llm::phase_llm_config(config, "aggregation", None) {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            tracing::warn!("AI aggregation skipped: {}", e);
+            pb.set_position(pb.position() + 100);
+            return Ok((findings, analyzed_files.to_vec()));
+        }
     };
-
     let aggregation = crate::report::ai_aggregation::AiAggregationPhase::new(llm_config);
 
     // Enrich findings with LLM analysis (populates description and recommendation)
@@ -192,6 +179,12 @@ pub async fn run_reporting(
 
     // Get rejected findings from scanner state
     let rejected_findings = scanner.state.borrow().rejected_findings.clone();
+    tracing::info!(
+        "Reporting: {} findings, {} rejected (include_rejected={})",
+        findings.len(),
+        rejected_findings.len(),
+        config.output.include_rejected
+    );
 
     let json_path = format!("{}/findings.json", config.output.dir);
     if let Err(e) = crate::report::json::write_findings_json(

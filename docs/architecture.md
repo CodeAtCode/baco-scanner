@@ -20,16 +20,16 @@ BACO uses a **data-driven PhaseGraph** (`src/scanner/pipeline/orchestrator.rs`) 
 | 1 | Indexing | Always-on |
 | 2 | Semgrep | Always-on |
 | 3 | CPG Slice | `cpg.enabled=false` |
-| 4 | LLM Static Analysis | `llm.phases.indexing` (API key present) |
+| 4 | LLM Static Analysis | `llm.phases.static_analysis` (API key present) |
 | 5 | CWE Routing | Always-on |
 | 6 | Rule Synthesis | `rulesynth.enabled=false` |
 | 7 | LLM Discovery | `llm.phases.discovery` (API key present) |
 | 8 | LLM Verification | `llm.phases.verification` (API key present) |
 | 9 | Validate | `validate.enabled=false` |
 | 10 | SecurityAgent Verification | `agent.enabled=false` |
-| 11 | Ticket Cross-Reference | `llm.phases.ticket_crossref` (API key present) |
-| 12 | Git Analysis | `llm.phases.git_analysis` (API key present) |
-| 13 | Cross-File Analysis | `llm.phases.cross_file_analysis` (API key present) |
+| 11 | Ticket Cross-Reference | `tickets.systems` non-empty |
+| 12 | Git Analysis | Target is a git repository |
+| 13 | Cross-File Analysis | Always-on |
 | 14 | Confidence Scoring | `normalization.enabled=false` |
 | 15 | AI Aggregation | `llm.phases.aggregation` (API key present) |
 | 16 | Threat Modeling | `aggregation.tier_2_features.enabled=false` |
