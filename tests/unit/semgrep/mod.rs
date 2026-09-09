@@ -17,6 +17,9 @@ mod parsing_edge_cases_tests;
 // Include migrated inline tests
 mod core_tests;
 
+// Include multi-hit aggregation path tests
+mod aggregate_path_tests;
+
 // ============================================================================
 // SemgrepRunner Construction Tests
 // ============================================================================
@@ -459,8 +462,9 @@ fn test_aggregation_multiple_same_rule_creates_single_finding() {
 
     // Multiple same check_id should aggregate to single finding
     assert_eq!(findings.len(), 1);
-    assert_eq!(findings[0].file_path, "multiple_files");
-    assert!(findings[0].line_number.is_none());
+    // Should use first finding's path, not sentinel
+    assert_eq!(findings[0].file_path, "file1.py");
+    assert_eq!(findings[0].line_number, Some(1));
     assert!(findings[0]
         .code_snippet
         .as_ref()

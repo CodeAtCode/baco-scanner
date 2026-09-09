@@ -114,3 +114,108 @@ fn test_parse_prose_wrapping_json_degrades_to_needs_review() {
     assert_eq!(status, VerificationStatus::NeedsReview);
     assert_eq!(notes, input);
 }
+
+#[test]
+fn test_parse_array_shaped_json_salvages_first_element() {
+    // LLM sometimes returns array of objects - salvage path should extract first element
+    let input = r#"[
+        {
+            "seven_question_gate": {
+                "reachability": "yes",
+                "controllability": "no"
+            },
+            "triage_verdict": "needs_review",
+            "verification_status": "needs_review",
+            "verification_notes": "Input is not fully controlled by attacker",
+            "confidence": 0.3
+        }
+    ]"#;
+
+    let (status, notes) = parse_verification_verdict(input);
+    assert_eq!(status, VerificationStatus::NeedsReview);
+    // Should extract human notes, not raw JSON
+    assert_eq!(notes, "Input is not fully controlled by attacker");
+    // Notes should NOT contain '{' character (no raw JSON)
+    assert!(!notes.contains('{'));
+}
+
+#[test]
+fn test_parse_array_with_triage_verdict_field() {
+    // Array with triage_verdict instead of verification_status
+    let input = r#"[
+        {
+            "triage_verdict": "needs_review",
+            "verification_notes": "Insufficient evidence to confirm"
+        }
+    ]"#;
+
+    let (status, notes) = parse_verification_verdict(input);
+    assert_eq!(status, VerificationStatus::NeedsReview);
+    assert_eq!(notes, "Insufficient evidence to confirm");
+}
+
+#[test]
+fn test_parse_array_confirmed_status() {
+    // Array with confirmed status
+    let input = r#"[
+        {
+            "verification_status": "confirmed",
+            "verification_notes": "Exploit path demonstrated",
+            "confidence": 0.95
+        }
+    ]"#;
+
+    let (status, notes) = parse_verification_verdict(input);
+    assert_eq!(status, VerificationStatus::Confirmed);
+    assert_eq!(notes, "Exploit path demonstrated");
+    assert!(!notes.contains('{'));
+}
+
+#[test]
+fn test_parse_array_false_positive_status() {
+    // Array with false_positive status
+    let input = r#"[
+        {
+            "verification_status": "false_positive",
+            "verification_notes": "Input is sanitized at boundary"
+        }
+    ]"#;
+
+    let (status, notes) = parse_verification_verdict(input);
+    assert_eq!(status, VerificationStatus::FalsePositive);
+    assert_eq!(notes, "Input is sanitized at boundary");
+}
+
+#[test]
+fn test_parse_array_missing_notes_returns_empty() {
+    // Array without verification_notes field
+    let input = r#"[
+        {
+            "verification_status": "confirmed"
+        }
+    ]"#;
+
+    let (status, notes) = parse_verification_verdict(input);
+    assert_eq!(status, VerificationStatus::Confirmed);
+    assert_eq!(notes, "");
+}
+
+#[test]
+fn test_parse_array_empty_array_falls_back_to_raw() {
+    // Empty array - salvage fails, falls back to raw content
+    let input = "[]";
+
+    let (status, notes) = parse_verification_verdict(input);
+    assert_eq!(status, VerificationStatus::NeedsReview);
+    assert_eq!(notes, input);
+}
+
+#[test]
+fn test_parse_array_non_array_object_falls_back_to_raw() {
+    // Not an array, not a valid verdict object - falls back to raw
+    let input = r#"{"some_other_key": "value"}"#;
+
+    let (status, notes) = parse_verification_verdict(input);
+    assert_eq!(status, VerificationStatus::NeedsReview);
+    assert_eq!(notes, input);
+}

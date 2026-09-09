@@ -39,6 +39,12 @@ pub fn verify_citations(
     for finding in findings.iter_mut() {
         report.checked += 1;
 
+        // Tolerate legacy aggregate findings that used the sentinel path
+        if finding.file_path.is_empty() || finding.file_path == "multiple_files" {
+            // Count as checked but not passed/failed — skip verification
+            continue;
+        }
+
         let file_path = project_path.join(&finding.file_path);
 
         // Check if file exists and is readable

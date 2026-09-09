@@ -371,7 +371,9 @@ fn test_parse_semgrep_aggregated_multiple_locations() {
             .unwrap();
     // Multiple findings with same check_id should be aggregated
     assert_eq!(findings.len(), 1);
-    assert_eq!(findings[0].file_path, "multiple_files");
+    // Should use first finding's path, not sentinel
+    assert_eq!(findings[0].file_path, "file1.py");
+    assert_eq!(findings[0].line_number, Some(1));
     // Code snippet shows "Found in 3 files:" format
     assert!(findings[0]
         .code_snippet
@@ -888,5 +890,7 @@ fn test_parse_json_output_aggregation_logic() {
         baco::semgrep::parser::parse_json_output(json_multi.as_bytes(), &runner.exclude_rules)
             .unwrap();
     assert_eq!(findings.len(), 1);
-    assert_eq!(findings[0].file_path, "multiple_files");
+    // Should use first finding's path
+    assert_eq!(findings[0].file_path, "f1.py");
+    assert_eq!(findings[0].line_number, Some(1));
 }

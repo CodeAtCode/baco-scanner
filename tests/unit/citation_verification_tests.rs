@@ -145,3 +145,74 @@ fn test_empty_findings_slice() {
     assert_eq!(report.passed, 0);
     assert_eq!(report.failed, 0);
 }
+
+#[test]
+fn test_multiple_files_sentinel_skipped_without_penalty() {
+    // Finding with "multiple_files" sentinel path should be skipped
+    // without halving confidence or adding failure note
+    let temp_dir = TempDir::new().unwrap();
+
+    let finding = make_finding("multiple_files".to_string(), Some(1));
+    let original_confidence = finding.confidence_score;
+
+    let mut findings = vec![finding];
+    let report = verify_citations(&mut findings, temp_dir.path());
+
+    // Counted as checked but neither passed nor failed
+    assert_eq!(report.checked, 1);
+    assert_eq!(report.passed, 0);
+    assert_eq!(report.failed, 0);
+
+    // Confidence unchanged
+    assert_eq!(findings[0].confidence_score, original_confidence);
+
+    // No failure note added
+    assert!(findings[0].verification_notes.is_none());
+}
+
+#[test]
+fn test_empty_file_path_skipped_without_penalty() {
+    // Finding with empty file_path should also be skipped
+    let temp_dir = TempDir::new().unwrap();
+
+    let finding = make_finding("".to_string(), Some(1));
+    let original_confidence = finding.confidence_score;
+
+    let mut findings = vec![finding];
+    let report = verify_citations(&mut findings, temp_dir.path());
+
+    assert_eq!(report.checked, 1);
+    assert_eq!(report.passed, 0);
+    assert_eq!(report.failed, 0);
+    assert_eq!(findings[0].confidence_score, original_confidence);
+    assert!(findings[0].verification_notes.is_none());
+}
+
+#[test]
+fn test_mixed_findings_sentinel_and_real() {
+    // Mix of sentinel path and real file - sentinel skipped, real verified
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("real.rs");
+    let mut file = File::create(&file_path).unwrap();
+    writeln!(file, "line 1").unwrap();
+    writeln!(file, "line 2").unwrap();
+
+    let finding_sentinel = make_finding("multiple_files".to_string(), Some(1));
+    let finding_real = make_finding("real.rs".to_string(), Some(2));
+
+    let mut findings = vec![finding_sentinel, finding_real];
+    let report = verify_citations(&mut findings, temp_dir.path());
+
+    // Both checked, only real one passed
+    assert_eq!(report.checked, 2);
+    assert_eq!(report.passed, 1);
+    assert_eq!(report.failed, 0);
+
+    // Sentinel: confidence unchanged, no note
+    assert_eq!(findings[0].confidence_score, 0.8);
+    assert!(findings[0].verification_notes.is_none());
+
+    // Real file: confidence unchanged, no note (valid citation)
+    assert_eq!(findings[1].confidence_score, 0.8);
+    assert!(findings[1].verification_notes.is_none());
+}

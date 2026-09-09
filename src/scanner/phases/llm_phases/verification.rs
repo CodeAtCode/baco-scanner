@@ -640,6 +640,9 @@ pub async fn run_llm_verification(
 /// Code fences are stripped; if the text does not parse as the verdict
 /// object, the finding degrades to `NeedsReview` with the raw response
 /// preserved in the notes.
+///
+/// Salvage path: if strict parse fails and the content is a JSON array,
+/// take element 0 and extract verification_notes/status from it.
 pub fn parse_verification_verdict(content: &str) -> (VerificationStatus, String) {
     #[derive(Deserialize, Debug)]
     struct VerificationVerdict {
@@ -655,6 +658,7 @@ pub fn parse_verification_verdict(content: &str) -> (VerificationStatus, String)
         .trim_start_matches("json")
         .trim();
 
+    // Try strict parse first (existing behavior)
     match serde_json::from_str::<VerificationVerdict>(cleaned) {
         Ok(verdict) => {
             let status = match verdict.status.as_str() {
@@ -665,6 +669,47 @@ pub fn parse_verification_verdict(content: &str) -> (VerificationStatus, String)
             let notes = verdict.notes.unwrap_or_default();
             (status, notes)
         }
-        Err(_) => (VerificationStatus::NeedsReview, content.to_string()),
+        Err(_) => {
+            // Salvage path: try to parse as JSON array and take element 0
+            match serde_json::from_str::<serde_json::Value>(cleaned) {
+                Ok(val) => {
+                    if let Some(arr) = val.as_array() {
+                        if let Some(first_elem) = arr.first().and_then(|v| v.as_object()) {
+                            // Extract verification_notes
+                            let notes = first_elem
+                                .get("verification_notes")
+                                .and_then(|v| v.as_str())
+                                .map(|s| s.to_string())
+                                .unwrap_or_default();
+
+                            // Extract status from verification_status or triage_verdict
+                            let status_str = first_elem
+                                .get("verification_status")
+                                .or_else(|| first_elem.get("triage_verdict"))
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("");
+
+                            let status = match status_str {
+                                "confirmed" => VerificationStatus::Confirmed,
+                                "false_positive" => VerificationStatus::FalsePositive,
+                                _ => VerificationStatus::NeedsReview,
+                            };
+
+                            (status, notes)
+                        } else {
+                            // Salvage failed - empty array or first element not an object
+                            (VerificationStatus::NeedsReview, content.to_string())
+                        }
+                    } else {
+                        // Not an array - fall back to raw content
+                        (VerificationStatus::NeedsReview, content.to_string())
+                    }
+                }
+                Err(_) => {
+                    // Strict parse and salvage both failed - return raw content
+                    (VerificationStatus::NeedsReview, content.to_string())
+                }
+            }
+        }
     }
 }
