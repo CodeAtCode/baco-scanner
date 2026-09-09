@@ -44,51 +44,50 @@ impl Default for RuleSynthConfig {
         }
     }
 }
-
+pub const DEFAULT_RULESYNTH_OUTPUT_DIR: &str = "./output/generated_rules";
 pub fn default_rulesynth_output_dir() -> PathBuf {
-    PathBuf::from("./output/generated_rules")
+    PathBuf::from(DEFAULT_RULESYNTH_OUTPUT_DIR)
 }
-
+pub const DEFAULT_MAX_RULES_PER_CWE: usize = 5;
 pub fn default_max_rules_per_cwe() -> usize {
-    5
+    DEFAULT_MAX_RULES_PER_CWE
 }
-
+pub const DEFAULT_MOCQ_MAX_ITERATIONS: u8 = 5;
 pub fn default_mocq_max_iterations() -> u8 {
-    5
+    DEFAULT_MOCQ_MAX_ITERATIONS
 }
-
+pub const DEFAULT_ENABLE_THREAT_MODELING: bool = false;
 pub fn default_enable_threat_modeling() -> bool {
-    false
+    DEFAULT_ENABLE_THREAT_MODELING
 }
-
+pub const DEFAULT_ENABLE_ROOT_CAUSE_DEDUP: bool = true;
 pub fn default_enable_root_cause_dedup() -> bool {
-    true
+    DEFAULT_ENABLE_ROOT_CAUSE_DEDUP
 }
-
+pub const DEFAULT_ENABLE_MULTI_VERIFIER: bool = false;
 pub fn default_enable_multi_verifier() -> bool {
-    false
+    DEFAULT_ENABLE_MULTI_VERIFIER
 }
-
+pub const DEFAULT_ENABLE_AUTO_PATCHING: bool = false;
 pub fn default_enable_auto_patching() -> bool {
-    false
+    DEFAULT_ENABLE_AUTO_PATCHING
 }
-
+pub const DEFAULT_ENABLE_POC_COMPILATION: bool = false;
 pub fn default_enable_poc_compilation() -> bool {
-    false
+    DEFAULT_ENABLE_POC_COMPILATION
 }
-
+pub const DEFAULT_ENABLE_CONFIDENCE_REFINEMENT: bool = true;
 pub fn default_enable_confidence_refinement() -> bool {
-    true
+    DEFAULT_ENABLE_CONFIDENCE_REFINEMENT
 }
-
+pub const DEFAULT_ENABLE_CVE_BOOTSTRAP: bool = true;
 pub fn default_enable_cve_bootstrap() -> bool {
-    true
+    DEFAULT_ENABLE_CVE_BOOTSTRAP
 }
-
+pub const DEFAULT_ENABLE_VARIANT_SEARCH: bool = true;
 pub fn default_enable_variant_search() -> bool {
-    true
+    DEFAULT_ENABLE_VARIANT_SEARCH
 }
-
 /// Normalization tier for confidence calibration.
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize, PartialEq, Default)]
 pub enum NormalizationTier {
@@ -391,22 +390,23 @@ impl Default for AgentFlowConfig {
     }
 }
 
+pub const DEFAULT_POLICY_SAMPLES: u8 = 4;
 pub fn default_policy_samples() -> u8 {
-    4
+    DEFAULT_POLICY_SAMPLES
 }
-
+pub const DEFAULT_AGENT_MAX_ROUNDS: u8 = 5;
 pub fn default_agent_max_rounds() -> u8 {
-    5
+    DEFAULT_AGENT_MAX_ROUNDS
 }
-
+pub const DEFAULT_AGENT_PATHS_PER_TARGET: u8 = 3;
 pub fn default_agent_paths_per_target() -> u8 {
-    3
+    DEFAULT_AGENT_PATHS_PER_TARGET
 }
-
+pub const DEFAULT_PACVD_LEVEL: u8 = 2;
 pub fn default_pacvd_level() -> u8 {
-    2
+    DEFAULT_PACVD_LEVEL
 }
-
+pub const DEFAULT_AGENT_FLOW_MAX_ITERATIONS: u8 = 10;
 pub fn default_agent_flow_max_iterations() -> u8 {
-    10
+    DEFAULT_AGENT_FLOW_MAX_ITERATIONS
 }

@@ -282,7 +282,7 @@ fn test_generate_html_report_contains_metadata() {
     assert!(result.is_ok());
 
     let content = std::fs::read_to_string(output_path).unwrap();
-    assert!(content.contains("Scan Metadata"));
+    assert!(content.contains("View Scan Details & Metadata"));
     assert!(content.contains("Scan Date"));
     assert!(content.contains("Total Findings"));
 

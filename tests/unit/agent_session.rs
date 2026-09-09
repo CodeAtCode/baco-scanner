@@ -1306,3 +1306,43 @@ fn test_progress_callback_type() {
     cb("test message".to_string());
     // Just verify the callback can be created and invoked without panicking
 }
+
+#[test]
+fn test_parse_agent_verdict_fenced_json() {
+    let content = "```json\n{\n  \"compiled\": false,\n  \"test_passed\": false,\n  \"log\": \"Failed to compile\"\n}\n```";
+    let verdict = baco::agent::session::parse_agent_verdict(content);
+    assert!(!verdict.compiled);
+    assert!(!verdict.test_passed);
+    assert_eq!(verdict.log, "Failed to compile");
+}
+
+#[test]
+fn test_parse_agent_verdict_bare_json_confirmed() {
+    let verdict = baco::agent::session::parse_agent_verdict(
+        "{\"compiled\": true, \"test_passed\": true, \"log\": \"ok\"}",
+    );
+    assert!(verdict.compiled);
+    assert!(verdict.test_passed);
+    assert_eq!(verdict.log, "ok");
+}
+
+#[test]
+fn test_parse_agent_verdict_key_value_protocol() {
+    let verdict = baco::agent::session::parse_agent_verdict(
+        "compiled=true\ntest_passed=true\nVulnerability confirmed",
+    );
+    assert!(verdict.compiled);
+    assert!(verdict.test_passed);
+    assert_eq!(
+        verdict.log,
+        "compiled=true\ntest_passed=true\nVulnerability confirmed"
+    );
+}
+
+#[test]
+fn test_parse_agent_verdict_plain_text_falls_back() {
+    let verdict = baco::agent::session::parse_agent_verdict("Error: sandbox unavailable");
+    assert!(!verdict.compiled);
+    assert!(!verdict.test_passed);
+    assert_eq!(verdict.log, "Error: sandbox unavailable");
+}

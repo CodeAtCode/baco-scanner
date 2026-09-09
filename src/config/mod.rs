@@ -163,10 +163,32 @@ impl From<toml::de::Error> for ConfigError {
     }
 }
 
+pub fn expand_env_vars(content: &str) -> String {
+    let re = regex::Regex::new(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}").unwrap();
+
+    // Replace after scanning so values containing ${...} are never re-expanded
+    let mut replacements: Vec<(String, String)> = Vec::new();
+    for cap in re.captures_iter(content) {
+        let full_match = cap.get(0).unwrap().as_str().to_string();
+        let var_name = cap.get(1).unwrap().as_str();
+        if let Ok(var_value) = std::env::var(var_name) {
+            replacements.push((full_match, var_value));
+        }
+    }
+
+    // Apply all replacements
+    let mut result = content.to_string();
+    for (full_match, var_value) in replacements {
+        result = result.replace(&full_match, &var_value);
+    }
+    result
+}
+
 impl ScannerConfig {
     pub fn from_file(path: &str) -> Result<Self, ConfigError> {
         let content = fs::read_to_string(path)?;
-        let config: ScannerConfig = toml::from_str(&content)?;
+        let expanded = expand_env_vars(&content);
+        let config: ScannerConfig = toml::from_str(&expanded)?;
         Ok(config)
     }
 

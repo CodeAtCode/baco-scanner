@@ -32,14 +32,14 @@ BACO uses a **data-driven PhaseGraph** (`src/scanner/pipeline/orchestrator.rs`) 
 | 13 | Cross-File Analysis | Always-on |
 | 14 | Confidence Scoring | `normalization.enabled=false` |
 | 15 | AI Aggregation | `llm.phases.aggregation` (API key present) |
-| 16 | Threat Modeling | `aggregation.tier_2_features.enabled=false` |
-| 17 | Root Cause Deduplication | `aggregation.root_cause_dedup=true` |
-| 18 | Multi-Verifier (experimental stub, disabled by default) | `aggregation.multi_verifier=false` |
-| 19 | Auto-Patching | `aggregation.auto_patching=false` |
-| 20 | CVE Bootstrap | `aggregation.cve_bootstrap=true` |
-| 21 | PoC Compilation | `aggregation.poc_compilation=false` |
+| 16 | Threat Modeling | `scanner.performance.enable_threat_modeling=false` |
+| 17 | Root Cause Deduplication | `scanner.performance.enable_root_cause_dedup=true` |
+| 18 | Multi-Verifier (experimental stub, disabled by default) | `scanner.performance.enable_multi_verifier=false` |
+| 19 | Auto-Patching | `scanner.performance.enable_auto_patching=false` |
+| 20 | CVE Bootstrap | `scanner.performance.enable_cve_bootstrap=true` |
+| 21 | PoC Compilation | `scanner.performance.enable_poc_compilation=false` |
 | 22 | Exploit Synthesis | `exploit.enabled=false` |
-| 23 | Variant Search | `aggregation.variant_search=true` |
+| 23 | Variant Search | `scanner.performance.enable_variant_search=true` |
 | 24 | Reporting | Always-on |
 
 ## Data Flow

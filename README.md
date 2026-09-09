@@ -41,6 +41,13 @@ cp config.example.toml my-config.toml
 # Edit my-config.toml: set [project] path to your target code
 ./target/release/baco scan --config my-config.toml
 
+# Additional subcommands:
+./target/release/baco report --input findings.json --format html   # Generate report
+./target/release/baco verify --input findings.json                 # Verify findings
+./target/release/baco scan --config my.toml --dry-run              # Print estimate and exit
+./target/release/baco scan --config my.toml --target /path         # Override target path
+./target/release/baco scan --config my.toml --force                # Force full rescan
+
 - **24 phases run**: 4 parallel (Indexing, Semgrep, CpgSlice, LlmStaticAnalysis) + 20 sequential — see [Architecture](docs/architecture.md)
 - **Output in `baco-output/`**: `findings.json`, `report.html`, `report.sarif`, `checkpoint.json`
 - **Checkpoint file**: The scanner writes `checkpoint.json` after each phase. Re-running the scan auto-resumes from the checkpoint; use `./target/release/baco resume --checkpoint baco-output/checkpoint.json` for manual control.
@@ -53,7 +60,7 @@ cp config.example.toml my-config.toml
 
 ## Features
 
-- **24-phase pipeline**: Indexing → Semgrep → CpgSlice → LlmStaticAnalysis → LlmCweRouting → LlmDiscovery → LlmVerification → Validate → SecurityAgentVerification → TicketCrossRef → GitAnalysis → CrossFileAnalysis → ConfidenceScoring → AIAggregation → ThreatModeling → RootCauseDedup → MultiVerifier → AutoPatching → CveBootstrap → PocCompiler → VariantSearch → Reporting → (see [Architecture](docs/architecture.md) for full phase names)
+- **24-phase pipeline**: Indexing → Semgrep → CpgSlice → LlmStaticAnalysis → CweRouting → RuleSynthesis → LlmDiscovery → LlmVerification → Validate → SecurityAgentVerification → TicketCrossRef → GitAnalysis → CrossFileAnalysis → ConfidenceScoring → AiAggregation → ThreatModeling → RootCauseDedup → MultiVerifier → AutoPatching → CveBootstrap → PocCompiler → ExploitSynth → VariantSearch → Reporting (see [Architecture](docs/architecture.md) for full phase names)
 - **Parallel execution**: Indexing, Semgrep, CpgSlice, and LlmStaticAnalysis run concurrently; 20 sequential phases follow
 - **CWE-aware MoE**: BM25 RAG retrieval from CWE knowledge base, routes to specialized analysis paths
 - **Research-backed**: 16 academic papers integrated (VulTriage, VulIn, MoCQ, MoEVD, AgentFlow) — see [Research Integration](docs/research-integration.md)
@@ -93,7 +100,7 @@ See [Architecture](docs/architecture.md) for the PhaseGraph pipeline diagram, fu
 
 ## Research Foundation
 
-BACO integrates 20 academic papers from the [Awesome-LLMs-for-Vulnerability-Detection](https://github.com/huhusmang/Awesome-LLMs-for-Vulnerability-Detection) survey. Integrations span agentic workflows, context enhancement, rule synthesis, MoE routing, and confidence calibration.
+BACO integrates 16 academic papers from the [Awesome-LLMs-for-Vulnerability-Detection](https://github.com/huhusmang/Awesome-LLMs-for-Vulnerability-Detection) survey. Integrations span agentic workflows, context enhancement, rule synthesis, MoE routing, and confidence calibration.
 
 See [Research Integration](docs/research-integration.md) for per-paper details (techniques, results, config flags) and [Paper Survey](docs/llm-vuln-detection-papers-survey.md) for the full 36-paper survey.
 
@@ -101,7 +108,7 @@ See [Research Integration](docs/research-integration.md) for per-paper details (
 
 - [Architecture](docs/architecture.md) — PhaseGraph pipeline, all 24 phases, data flow
 - [Configuration](docs/configuration.md) — Config options, LLM setup, phase flags, prompt overrides
-- [Research Integration](docs/research-integration.md) — 20 integrated papers with techniques and results
+- [Research Integration](docs/research-integration.md) — 16 integrated papers with techniques and results
 - [Paper Survey](docs/llm-vuln-detection-papers-survey.md) — Full 36-paper survey
 - [Operator Tuning](docs/operator-tuning.md) — Performance flags and scenario-based tuning
 - [Output Interpretation](docs/output-interpretation.md) — Reading findings, confidence, triage verdicts

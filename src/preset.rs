@@ -1,7 +1,8 @@
 /// Preset system for loading project-type-specific scanner configurations.
 ///
-/// Presets provide a base configuration layer that can be overridden by user config.toml
-/// and CLI flags. Loading order: built-in defaults → preset file → user config.toml → CLI flags.
+/// Presets provide a base configuration layer that is overridden by user config.toml
+/// and CLI flags. Loading order: built-in defaults → user config.toml → preset file → CLI flags.
+/// Presets are applied on top of the user config and take precedence.
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::fs;

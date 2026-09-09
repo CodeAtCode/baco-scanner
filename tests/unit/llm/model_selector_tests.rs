@@ -1,4 +1,4 @@
-//! Round-robin selector tests for ModelSelector
+//! Round-robin selector tests for AtomicModelSelector
 //!
 //! Tests cover:
 //! 1. Round-robin selection with 3+ models
@@ -10,7 +10,7 @@
 //! 7. Weighted selection (if applicable)
 //! 8. Model order preservation
 
-use baco::llm::ModelSelector;
+use baco::llm::AtomicModelSelector;
 use std::sync::Arc;
 use std::thread;
 
@@ -20,20 +20,21 @@ use std::thread;
 
 #[test]
 fn test_round_robin_selection_with_three_models() {
-    let selector = ModelSelector::new(vec![
+    let selector = AtomicModelSelector::new(vec![
         "model-a".to_string(),
         "model-b".to_string(),
         "model-c".to_string(),
     ]);
 
     // Verify round-robin rotation is correct
-    assert_eq!(selector.next(), Some("model-a".to_string()));
-    assert_eq!(selector.next(), Some("model-b".to_string()));
-    assert_eq!(selector.next(), Some("model-c".to_string()));
+    // Verify round-robin rotation is correct
+    assert_eq!(selector.next(), "model-a".to_string());
+    assert_eq!(selector.next(), "model-b".to_string());
+    assert_eq!(selector.next(), "model-c".to_string());
     // Should cycle back to start
-    assert_eq!(selector.next(), Some("model-a".to_string()));
-    assert_eq!(selector.next(), Some("model-b".to_string()));
-    assert_eq!(selector.next(), Some("model-c".to_string()));
+    assert_eq!(selector.next(), "model-a".to_string());
+    assert_eq!(selector.next(), "model-b".to_string());
+    assert_eq!(selector.next(), "model-c".to_string());
 }
 
 // ============================================================================
@@ -42,11 +43,11 @@ fn test_round_robin_selection_with_three_models() {
 
 #[test]
 fn test_empty_models_array_fallback() {
-    let selector = ModelSelector::new(vec![]);
+    let selector = AtomicModelSelector::new(vec![]);
 
-    // Should return None for empty array
-    assert!(selector.next().is_none());
-    assert!(selector.next().is_none());
+    // Empty array returns empty string
+    assert!(selector.next().is_empty());
+    assert!(selector.next().is_empty());
 
     // all_models should return empty vector
     assert!(selector.all_models().is_empty());
@@ -58,12 +59,12 @@ fn test_empty_models_array_fallback() {
 
 #[test]
 fn test_single_model_case() {
-    let selector = ModelSelector::new(vec!["single-model".to_string()]);
+    let selector = AtomicModelSelector::new(vec!["single-model".to_string()]);
 
     // Should always return the same model
-    assert_eq!(selector.next(), Some("single-model".to_string()));
-    assert_eq!(selector.next(), Some("single-model".to_string()));
-    assert_eq!(selector.next(), Some("single-model".to_string()));
+    assert_eq!(selector.next(), "single-model".to_string());
+    assert_eq!(selector.next(), "single-model".to_string());
+    assert_eq!(selector.next(), "single-model".to_string());
 
     // Verify model count
     assert_eq!(selector.all_models().len(), 1);
@@ -78,11 +79,11 @@ fn test_single_model_case() {
 fn test_selector_state_reset_behavior() {
     // Note: ModelSelector doesn't have explicit reset, but we test that
     // it continues cycling correctly (implicit "reset" via modulo)
-    let selector = ModelSelector::new(vec!["model-1".to_string(), "model-2".to_string()]);
+    let selector = AtomicModelSelector::new(vec!["model-1".to_string(), "model-2".to_string()]);
 
     // Consume many selections
     for i in 0..1000 {
-        let model = selector.next().unwrap();
+        let model = selector.next();
         // Should alternate between model-1 and model-2
         if i % 2 == 0 {
             assert_eq!(model, "model-1");
@@ -92,7 +93,7 @@ fn test_selector_state_reset_behavior() {
     }
 
     // After 1000 calls (even number), should be back at model-1
-    assert_eq!(selector.next(), Some("model-1".to_string()));
+    assert_eq!(selector.next(), "model-1".to_string());
 }
 
 // ============================================================================
@@ -101,7 +102,7 @@ fn test_selector_state_reset_behavior() {
 
 #[test]
 fn test_concurrent_selector_instances() {
-    let selector = Arc::new(ModelSelector::new(vec![
+    let selector = Arc::new(AtomicModelSelector::new(vec![
         "concurrent-a".to_string(),
         "concurrent-b".to_string(),
         "concurrent-c".to_string(),
@@ -111,14 +112,13 @@ fn test_concurrent_selector_instances() {
 
     // Spawn multiple threads each making selections
     for thread_id in 0..10 {
-        let selector_clone = Arc::clone(&selector);
+        let selector_clone: Arc<AtomicModelSelector> = Arc::clone(&selector);
         handles.push(thread::spawn(move || {
-            let mut results = vec![];
+            let mut results: Vec<(usize, String)> = vec![];
             // Each thread makes 5 selections
             for _ in 0..5 {
-                if let Some(model) = selector_clone.next() {
-                    results.push((thread_id, model));
-                }
+                let model = selector_clone.next();
+                results.push((thread_id, model));
             }
             results
         }));
@@ -149,23 +149,24 @@ fn test_concurrent_selector_instances() {
 
 #[test]
 fn test_model_selection_after_exhaustion() {
-    let selector = ModelSelector::new(vec!["exhaust-1".to_string(), "exhaust-2".to_string()]);
+    let selector = AtomicModelSelector::new(vec!["exhaust-1".to_string(), "exhaust-2".to_string()]);
 
     // First round
-    assert_eq!(selector.next(), Some("exhaust-1".to_string()));
-    assert_eq!(selector.next(), Some("exhaust-2".to_string()));
+    assert_eq!(selector.next(), "exhaust-1".to_string());
+    assert_eq!(selector.next(), "exhaust-2".to_string());
 
     // Second round (after "exhaustion" of first cycle)
-    assert_eq!(selector.next(), Some("exhaust-1".to_string()));
-    assert_eq!(selector.next(), Some("exhaust-2".to_string()));
+    assert_eq!(selector.next(), "exhaust-1".to_string());
+    assert_eq!(selector.next(), "exhaust-2".to_string());
 
     // Third round
-    assert_eq!(selector.next(), Some("exhaust-1".to_string()));
-    assert_eq!(selector.next(), Some("exhaust-2".to_string()));
+    assert_eq!(selector.next(), "exhaust-1".to_string());
+    assert_eq!(selector.next(), "exhaust-2".to_string());
 
     // Should continue cycling indefinitely (no true exhaustion)
     for _ in 0..100 {
-        assert!(selector.next().is_some());
+        let model = selector.next();
+        assert!(!model.is_empty());
     }
 }
 
@@ -177,7 +178,8 @@ fn test_model_selection_after_exhaustion() {
 fn test_weighted_selection_not_applicable() {
     // Note: Current ModelSelector implementation uses simple round-robin
     // without weights. This test verifies the basic round-robin behavior.
-    let selector = ModelSelector::new(vec!["weighted-a".to_string(), "weighted-b".to_string()]);
+    let selector =
+        AtomicModelSelector::new(vec!["weighted-a".to_string(), "weighted-b".to_string()]);
 
     // Verify round-robin pattern returns both models
     let first = selector.next();
@@ -186,10 +188,10 @@ fn test_weighted_selection_not_applicable() {
     let fourth = selector.next();
 
     // Should return models in sequence (first call starts at index 0)
-    assert_eq!(first, Some("weighted-a".to_string()));
-    assert_eq!(second, Some("weighted-b".to_string()));
-    assert_eq!(third, Some("weighted-a".to_string()));
-    assert_eq!(fourth, Some("weighted-b".to_string()));
+    assert_eq!(first, "weighted-a".to_string());
+    assert_eq!(second, "weighted-b".to_string());
+    assert_eq!(third, "weighted-a".to_string());
+    assert_eq!(fourth, "weighted-b".to_string());
 }
 
 // ============================================================================
@@ -206,7 +208,7 @@ fn test_model_order_preservation() {
         "fifth".to_string(),
     ];
 
-    let selector = ModelSelector::new(models.clone());
+    let selector = AtomicModelSelector::new(models.clone());
 
     // Verify all_models preserves order
     let retrieved = selector.all_models();
@@ -214,14 +216,14 @@ fn test_model_order_preservation() {
     assert_eq!(retrieved, models);
 
     // Verify selection order matches insertion order
-    assert_eq!(selector.next(), Some("first".to_string()));
-    assert_eq!(selector.next(), Some("second".to_string()));
-    assert_eq!(selector.next(), Some("third".to_string()));
-    assert_eq!(selector.next(), Some("fourth".to_string()));
-    assert_eq!(selector.next(), Some("fifth".to_string()));
+    assert_eq!(selector.next(), "first".to_string());
+    assert_eq!(selector.next(), "second".to_string());
+    assert_eq!(selector.next(), "third".to_string());
+    assert_eq!(selector.next(), "fourth".to_string());
+    assert_eq!(selector.next(), "fifth".to_string());
 
     // Should wrap around to first
-    assert_eq!(selector.next(), Some("first".to_string()));
+    assert_eq!(selector.next(), "first".to_string());
 }
 
 // ============================================================================
@@ -231,18 +233,19 @@ fn test_model_order_preservation() {
 #[test]
 fn test_selector_new_with_various_inputs() {
     // Empty
-    let s1 = ModelSelector::new(vec![]);
-    assert!(s1.next().is_none());
+    let s1 = AtomicModelSelector::new(vec![]);
+    // Empty case returns empty string, not None
+    assert!(s1.next().is_empty());
 
     // Single
-    let s2 = ModelSelector::new(vec!["one".to_string()]);
-    assert_eq!(s2.next(), Some("one".to_string()));
+    let s2 = AtomicModelSelector::new(vec!["one".to_string()]);
+    assert_eq!(s2.next(), "one".to_string());
 
     // Many
     let many: Vec<String> = (0..50).map(|i| format!("model-{}", i)).collect();
-    let s3 = ModelSelector::new(many);
-    assert_eq!(s3.next(), Some("model-0".to_string()));
-    assert_eq!(s3.next(), Some("model-1".to_string()));
+    let s3 = AtomicModelSelector::new(many);
+    assert_eq!(s3.next(), "model-0".to_string());
+    assert_eq!(s3.next(), "model-1".to_string());
 }
 
 #[test]
@@ -250,9 +253,9 @@ fn test_selector_deterministic_behavior() {
     // Create multiple selectors with same input
     let models = vec!["a".to_string(), "b".to_string(), "c".to_string()];
 
-    let results: Vec<Vec<Option<String>>> = (0..5)
+    let results: Vec<Vec<String>> = (0..5)
         .map(|_| {
-            let selector = ModelSelector::new(models.clone());
+            let selector = AtomicModelSelector::new(models.clone());
             (0..6).map(|_| selector.next()).collect()
         })
         .collect();

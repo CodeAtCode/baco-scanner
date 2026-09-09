@@ -21,7 +21,7 @@ impl std::fmt::Display for VerificationStatus {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Severity {
     Critical,
@@ -29,6 +29,37 @@ pub enum Severity {
     Medium,
     Low,
     Info,
+}
+
+impl Severity {
+    /// Private helper for custom ordering: Critical > High > Medium > Low > Info
+    const fn rank(&self) -> u8 {
+        match self {
+            Severity::Critical => 4,
+            Severity::High => 3,
+            Severity::Medium => 2,
+            Severity::Low => 1,
+            Severity::Info => 0,
+        }
+    }
+}
+
+impl PartialOrd for Severity {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Severity {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.rank().cmp(&other.rank())
+    }
+}
+
+impl Severity {
+    pub const fn is_high_or_critical(&self) -> bool {
+        matches!(self, Severity::High | Severity::Critical)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -43,12 +74,6 @@ pub enum TriageVerdict {
     ChainRequired {
         chain_partner_ids: Vec<String>,
     },
-}
-
-impl Severity {
-    pub const fn is_high_or_critical(&self) -> bool {
-        matches!(self, Severity::High | Severity::Critical)
-    }
 }
 
 impl std::fmt::Display for Severity {

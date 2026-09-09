@@ -9,7 +9,8 @@
 //! - LLM phase configurations
 
 use baco::config::{
-    apply_env_overrides, AgentConfig, LlmPhaseConfig, PerformanceSettings, ScannerConfig,
+    apply_env_overrides, expand_env_vars, AgentConfig, LlmPhaseConfig, PerformanceSettings,
+    ScannerConfig,
 };
 use serial_test::serial;
 use std::collections::HashMap;
@@ -1324,5 +1325,160 @@ fn test_invalid_toml_returns_err() {
     assert!(
         result.is_err(),
         "Invalid TOML should return an error, not panic"
+    );
+}
+
+// ============================================================================
+// Environment Variable Expansion Tests
+// ============================================================================
+
+#[test]
+fn test_expand_env_vars_set_var() {
+    let content = r#"
+[project]
+name = "test"
+path = "${TEST_PROJECT_PATH}"
+"#;
+
+    let mut guard = EnvVarGuard::new();
+    guard.set("TEST_PROJECT_PATH", "/actual/path");
+    let expanded = expand_env_vars(content);
+
+    assert!(expanded.contains("path = \"/actual/path\""));
+    assert!(!expanded.contains("${TEST_PROJECT_PATH}"));
+}
+
+#[test]
+fn test_expand_env_vars_unset_var() {
+    let content = r#"
+[project]
+name = "test"
+path = "${UNSET_VAR_NAME}"
+"#;
+
+    // Ensure var is unset
+    std::env::remove_var("UNSET_VAR_NAME");
+
+    let expanded = expand_env_vars(content);
+
+    // Unset vars should remain as literal text
+    assert!(expanded.contains("${UNSET_VAR_NAME}"));
+}
+
+#[test]
+fn test_expand_env_vars_multiple_vars() {
+    let content = r#"
+[project]
+name = "${PROJECT_NAME}"
+path = "${PROJECT_PATH}"
+"#;
+
+    let mut guard = EnvVarGuard::new();
+    guard.set("PROJECT_NAME", "my-project");
+    guard.set("PROJECT_PATH", "/my/path");
+    let expanded = expand_env_vars(content);
+
+    assert!(expanded.contains("name = \"my-project\""));
+    assert!(expanded.contains("path = \"/my/path\""));
+}
+
+#[test]
+fn test_from_file_with_env_vars() {
+    use std::fs;
+    use tempfile::TempDir;
+
+    let tmpdir = TempDir::new().unwrap();
+    let config_path = tmpdir.path().join("config.toml");
+
+    let config_content = r#"
+[project]
+name = "test"
+path = "${TEST_CONFIG_PATH}"
+
+[output]
+dir = "output"
+
+[scanner]
+max_file_size_kb = 1024
+"#;
+
+    fs::write(&config_path, config_content).unwrap();
+
+    let mut guard = EnvVarGuard::new();
+    guard.set("TEST_CONFIG_PATH", tmpdir.path().to_str().unwrap());
+
+    let config_result = ScannerConfig::from_file(config_path.to_str().unwrap());
+
+    assert!(config_result.is_ok());
+    let config = config_result.unwrap();
+    assert_eq!(config.project.path, tmpdir.path().to_str().unwrap());
+}
+
+#[test]
+fn test_from_file_with_unset_env_vars() {
+    use std::fs;
+    use tempfile::TempDir;
+
+    let tmpdir = TempDir::new().unwrap();
+    let config_path = tmpdir.path().join("config.toml");
+
+    let config_content = r#"
+[project]
+name = "test"
+path = "${UNSET_CONFIG_PATH}"
+
+[output]
+dir = "output"
+
+[scanner]
+max_file_size_kb = 1024
+"#;
+
+    fs::write(&config_path, config_content).unwrap();
+
+    // Ensure var is unset
+    std::env::remove_var("UNSET_CONFIG_PATH");
+
+    // The config will parse but the path will be the literal string
+    let config_result = ScannerConfig::from_file(config_path.to_str().unwrap());
+    assert!(config_result.is_ok());
+    let config = config_result.unwrap();
+    assert_eq!(config.project.path, "${UNSET_CONFIG_PATH}");
+}
+
+#[test]
+#[serial]
+fn test_apply_env_overrides_scan_path() {
+    let mut guard = EnvVarGuard::new();
+    guard.set("LLM_DISCOVERY_KEY", "test-api-key-123");
+
+    let toml_str = r#"
+        [project]
+        name = "test"
+        path = "/tmp/test"
+
+        [output]
+        dir = "./out"
+
+        [scanner]
+        max_file_size_kb = 100
+
+        [llm.phases.discovery]
+        base_url = "http://localhost:11434"
+        model = "test-model"
+    "#;
+
+    let mut config: ScannerConfig = toml::from_str(toml_str).unwrap();
+
+    // Before override, api_key should be None (not set in config)
+    assert!(config.llm.phases.discovery.api_key.is_none());
+
+    // Apply env overrides
+    apply_env_overrides(&mut config);
+
+    // After override, api_key should be set from env var
+    assert_eq!(
+        config.llm.phases.discovery.api_key,
+        Some("test-api-key-123".to_string())
     );
 }

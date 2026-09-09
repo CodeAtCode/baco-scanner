@@ -76,7 +76,7 @@ fn test_generate_html_report_contains_doctype_and_head() {
     assert!(content.contains("<!DOCTYPE html>"));
     assert!(content.contains("<head>"));
     assert!(content.contains("<meta charset=\"UTF-8\">"));
-    assert!(content.contains("Prism.js"));
+    assert!(content.contains("Prism"));
 
     let _ = fs::remove_file(output_path);
 }
@@ -156,7 +156,7 @@ fn test_generate_html_report_contains_scan_metadata() {
     assert!(result.is_ok());
 
     let content = fs::read_to_string(output_path).unwrap();
-    assert!(content.contains("Scan Metadata"));
+    assert!(content.contains("View Scan Details & Metadata"));
     assert!(content.contains("Scan Date"));
     assert!(content.contains("Total Findings"));
     assert!(content.contains("1")); // Total findings count

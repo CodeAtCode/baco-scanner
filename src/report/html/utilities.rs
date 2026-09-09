@@ -135,29 +135,3 @@ pub fn build_recommendation_section(rec: &str) -> String {
         markdown_to_html(rec)
     )
 }
-
-/// Detect programming language from file extension
-pub fn detect_language(file_path: &str) -> &'static str {
-    if let Some(ext) = file_path.rsplit('.').next() {
-        match ext.to_lowercase().as_str() {
-            "py" => "python",
-            "js" => "javascript",
-            "ts" => "typescript",
-            "tsx" => "typescript",
-            "rs" => "rust",
-            "go" => "go",
-            "java" => "java",
-            "c" => "c",
-            "cpp" | "cc" | "cxx" => "cpp",
-            "h" | "hpp" => "cpp",
-            "php" | "phtml" => "php",
-            "sql" => "sql",
-            "yml" | "yaml" => "yaml",
-            "json" => "json",
-            "sh" | "bash" => "bash",
-            _ => "",
-        }
-    } else {
-        ""
-    }
-}

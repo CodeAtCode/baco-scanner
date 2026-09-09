@@ -10,6 +10,8 @@ use std::time::Duration;
 use thiserror::Error;
 use tracing::{info, warn};
 
+use crate::staging::core::apply_patch_to_worktree;
+
 /// Errors that can occur during git worktree operations
 #[derive(Debug, Error)]
 pub enum WorktreeError {
@@ -112,37 +114,8 @@ impl WorktreeManager {
     pub fn apply_patch(&self, worktree_path: &Path, patch_content: &str) -> WorktreeResult<()> {
         info!("Applying patch to worktree at {:?}", worktree_path);
 
-        let mut output = Command::new("git")
-            .current_dir(worktree_path)
-            .args(["apply", "-"])
-            .stdin(std::process::Stdio::piped())
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
-            .spawn()
-            .map_err(|e| WorktreeError::GitCommandFailed(e.to_string()))?;
-
-        // Write patch to stdin
-        use std::io::Write;
-        if let Some(ref mut stdin) = output.stdin {
-            stdin
-                .write_all(patch_content.as_bytes())
-                .map_err(|e| WorktreeError::GitCommandFailed(e.to_string()))?;
-        }
-
-        let result = output
-            .wait_with_output()
-            .map_err(|e| WorktreeError::GitCommandFailed(e.to_string()))?;
-
-        if !result.status.success() {
-            let stderr = String::from_utf8_lossy(&result.stderr);
-            return Err(WorktreeError::CheckoutFailed(format!(
-                "Patch apply failed: {}",
-                stderr
-            )));
-        }
-
-        info!("Patch applied successfully");
-        Ok(())
+        apply_patch_to_worktree(worktree_path, patch_content)
+            .map_err(|e| WorktreeError::CheckoutFailed(format!("Patch apply failed: {}", e)))
     }
 
     /// Run validation commands in the worktree

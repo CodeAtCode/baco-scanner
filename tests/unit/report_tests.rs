@@ -16,6 +16,7 @@ use baco::report::ai_aggregation::enrichment::EnrichmentService;
 use baco::report::ai_aggregation::models::*;
 use baco::report::html::{render_finding, utilities};
 use baco::report::json::write_findings_json;
+use baco::report::presenter;
 use std::collections::HashMap;
 
 use super::report_fixtures::make_finding;
@@ -92,49 +93,49 @@ fn test_write_findings_json_empty_findings() {
 
 #[test]
 fn test_detect_language_python() {
-    assert_eq!(utilities::detect_language("src/main.py"), "python");
-    assert_eq!(utilities::detect_language("/path/to/script.py"), "python");
+    assert_eq!(presenter::detect_language("src/main.py"), "python");
+    assert_eq!(presenter::detect_language("/path/to/script.py"), "python");
 }
 
 #[test]
 fn test_detect_language_javascript() {
-    assert_eq!(utilities::detect_language("app.js"), "javascript");
+    assert_eq!(presenter::detect_language("app.js"), "javascript");
 }
 
 #[test]
 fn test_detect_language_typescript() {
-    assert_eq!(utilities::detect_language("src/app.ts"), "typescript");
+    assert_eq!(presenter::detect_language("src/app.ts"), "typescript");
     assert_eq!(
-        utilities::detect_language("src/component.tsx"),
+        presenter::detect_language("src/component.tsx"),
         "typescript"
     );
 }
 
 #[test]
 fn test_detect_language_rust() {
-    assert_eq!(utilities::detect_language("src/lib.rs"), "rust");
+    assert_eq!(presenter::detect_language("src/lib.rs"), "rust");
 }
 
 #[test]
 fn test_detect_language_go() {
-    assert_eq!(utilities::detect_language("main.go"), "go");
+    assert_eq!(presenter::detect_language("main.go"), "go");
 }
 
 #[test]
 fn test_detect_language_c() {
-    assert_eq!(utilities::detect_language("src/main.c"), "c");
+    assert_eq!(presenter::detect_language("src/main.c"), "c");
 }
 
 #[test]
 fn test_detect_language_cpp() {
-    assert_eq!(utilities::detect_language("src/main.cpp"), "cpp");
-    assert_eq!(utilities::detect_language("src/main.cc"), "cpp");
+    assert_eq!(presenter::detect_language("src/main.cpp"), "cpp");
+    assert_eq!(presenter::detect_language("src/main.cc"), "cpp");
 }
 
 #[test]
 fn test_detect_language_unknown() {
-    assert_eq!(utilities::detect_language("src/unknown.xyz"), "");
-    assert_eq!(utilities::detect_language("README"), "");
+    assert_eq!(presenter::detect_language("src/unknown.xyz"), "");
+    assert_eq!(presenter::detect_language("README"), "");
 }
 
 #[test]

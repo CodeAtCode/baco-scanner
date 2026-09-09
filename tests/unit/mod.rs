@@ -213,6 +213,9 @@ mod prompt_templates_tests;
 // Findings module tests
 mod findings_tests;
 
+// Severity ordering regression tests
+mod severity_order_tests;
+
 // MultiVerifier phase tests
 mod multi_verifier_phase_tests;
 

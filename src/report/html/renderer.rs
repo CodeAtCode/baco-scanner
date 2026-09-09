@@ -18,11 +18,9 @@ pub fn generate_html_report(
 ) -> Result<(), String> {
     let gate_enabled = config.map(|c| c.output.evidence_gate).unwrap_or(false);
 
-    // Apply evidence gate filter for main body (Verified + Supported only)
     let filtered_findings: Vec<VulnerabilityFinding> =
         crate::report::apply_evidence_gate(findings, config);
 
-    // Collect unverified findings for appendix (when gate is enabled)
     let unverified_findings: Vec<&VulnerabilityFinding> = if gate_enabled {
         findings
             .iter()
@@ -38,24 +36,20 @@ pub fn generate_html_report(
     let scan_date = Utc::now().format("%Y-%m-%d %H:%M:%S UTC");
     let total_findings = filtered_findings.len();
 
-    // Collect unique languages from findings for conditional Prism.js loading
     let mut languages: std::collections::HashSet<String> = std::collections::HashSet::new();
     for finding in findings {
-        let lang = super::utilities::detect_language(&finding.file_path);
+        let lang = super::presenter::detect_language(&finding.file_path);
         if !lang.is_empty() {
             languages.insert(lang.to_string());
         }
-        // Also check diff_hunk for diff language
         if finding.diff_hunk.is_some() {
             languages.insert("diff".to_string());
         }
     }
 
-    // Embed Prism.js assets inline for self-contained HTML (T31)
     let prism_core_js = include_str!("assets/prism-core.min.js");
     let prism_css = include_str!("assets/prism-tomorrow.min.css");
 
-    // Generate language-specific Prism.js includes only for detected languages
     let prism_language_scripts = languages
         .iter()
         .filter_map(|lang| match lang.as_str() {
@@ -77,7 +71,6 @@ pub fn generate_html_report(
         .collect::<Vec<_>>()
         .join("\n    ");
 
-    // Extract model names from config
     let models_html = if let Some(cfg) = config {
         let discovery_models = cfg.llm.phases.discovery.get_models();
         let verification_models = cfg.llm.phases.verification.get_models();
@@ -111,16 +104,10 @@ pub fn generate_html_report(
         r#"<div class="metadata-item"><div class="metadata-label">AI Models</div><div class="metadata-value">Not configured</div></div>"#.to_string()
     };
 
-    // Calculate statistics by severity
     let stats = calculate_severity_stats(findings);
-
-    // Generate filter buttons
     let filter_buttons_html = build_filter_buttons(&stats);
-
-    // Generate summary cards
     let summary_cards_html = build_summary_cards(&stats);
 
-    // Calculate average confidence
     let avg_confidence = if findings.is_empty() {
         0.0
     } else {
@@ -131,16 +118,12 @@ pub fn generate_html_report(
             / findings.len() as f64
     };
 
-    // Calculate verification stats
     let verified = findings
         .iter()
         .filter(|f| f.verification_status.is_some())
         .count();
     let already_reported = findings.iter().filter(|f| f.already_reported).count();
 
-    // Format LLM metrics - removed, not used in current implementation
-    let llm_metrics_html = String::new();
-    // Add empty state message if no findings
     let empty_state = if total_findings == 0 {
         build_empty_state_message()
     } else {
@@ -154,7 +137,6 @@ pub fn generate_html_report(
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BACO Security Report</title>
-    <!-- Prism.js embedded inline for self-contained HTML (T31) -->
     <style>
 {}    </style>
     <script>
@@ -207,7 +189,7 @@ pub fn generate_html_report(
         :root {{
             --critical: #dc3545;
             --high: #fd7e14;
-            --medium: #ffc107;
+            --medium: #d39e00;
             --low: #28a745;
             --info: #17a2b8;
         }}
@@ -216,6 +198,11 @@ pub fn generate_html_report(
         h1 {{ color: #1a1a1a; border-bottom: 3px solid #0066cc; padding-bottom: 15px; margin-bottom: 30px; font-size: 2rem; }}
         h2 {{ color: #333; margin-top: 40px; margin-bottom: 20px; font-size: 1.5rem; }}
         h3 {{ color: #1a1a1a; font-size: 1.1rem; margin-bottom: 12px; cursor: pointer; }}
+        
+        .at-a-glance {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }}
+        .glance-item {{ padding: 15px; border: 1px solid #dee2e6; border-radius: 8px; background: #f8f9fa; }}
+        .glance-label {{ font-size: 0.8rem; color: #6c757d; text-transform: uppercase; font-weight: 600; }}
+        .glance-value {{ font-size: 1.2rem; font-weight: 700; color: #212529; }}
         
         .metadata {{ background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 20px; margin: 20px 0; }}
         .metadata-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }}
@@ -240,7 +227,7 @@ pub fn generate_html_report(
         .card p {{ font-size: 0.9rem; opacity: 0.9; text-transform: capitalize; }}
         
         .filters {{ display: flex; gap: 10px; margin: 20px 0; flex-wrap: wrap; align-items: center; }}
-        .filter-btn {{ padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem; transition: all 0.2s; }}
+        .filter-btn {{ padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem; transition: all 0.2s; font-weight: 500; }}
         .filter-btn.active {{ box-shadow: 0 0 0 2px #0066cc; }}
         .filter-btn.critical {{ background: #fee2e2; color: #dc3545; }}
         .filter-btn.high {{ background: #ffebe0; color: #fd7e14; }}
@@ -254,22 +241,6 @@ pub fn generate_html_report(
         
         .toggle-btns {{ display: flex; gap: 10px; }}
         .toggle-btn {{ padding: 8px 12px; border: 1px solid #dee2e6; border-radius: 6px; background: white; cursor: pointer; }}
-        
-        /* LLM Metrics Section */
-        .llm-metrics-section {{ background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 25px; margin: 30px 0; }}
-        .llm-metrics-section h2 {{ color: #0066cc; margin-bottom: 20px; font-size: 1.5rem; }}
-        .llm-metrics-section h3 {{ color: #333; margin: 25px 0 15px 0; font-size: 1.2rem; }}
-        .metrics-summary {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 30px; }}
-        .metric-summary-item {{ background: white; padding: 15px; border-radius: 6px; border: 1px solid #dee2e6; text-align: center; }}
-        .metric-summary-item .metric-label {{ font-size: 0.8rem; color: #6c757d; text-transform: uppercase; margin-bottom: 8px; }}
-        .metric-summary-item .metric-value {{ font-size: 1.8rem; font-weight: 700; color: #212529; }}
-        .metric-summary-item .metric-value.success {{ color: #28a745; }}
-        .metric-summary-item .metric-value.error {{ color: #dc3545; }}
-        .metrics-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; }}
-        .metric-card {{ background: white; padding: 15px; border-radius: 6px; border: 1px solid #dee2e6; }}
-        .metric-card .metric-label {{ font-size: 0.85rem; color: #6c757d; text-transform: uppercase; margin-bottom: 8px; font-weight: 600; }}
-        .metric-card .metric-value {{ font-size: 1.4rem; font-weight: 700; color: #212529; margin-bottom: 5px; }}
-        .metric-card .metric-detail {{ font-size: 0.85rem; color: #495057; margin-bottom: 3px; }}
         
         .finding {{ background: #fff; border-left: 5px solid #0066cc; padding: 20px; margin: 20px 0; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid #e9ecef; }}
         .finding.critical {{ border-left-color: var(--critical); background: #fff5f5; }}
@@ -363,7 +334,10 @@ pub fn generate_html_report(
         .file-group-summary::-webkit-details-marker {{ display: none; }}
         .file-group[open] .file-group-summary {{ border-bottom: 1px solid #dee2e6; background: #e9ecef; }}
         .file-group .finding {{ margin: 10px 15px; border-left-width: 3px; }}
-
+        
+        .priority-section {{ margin: 30px 0; padding: 20px; background: #fff5f5; border: 2px solid #dc3545; border-radius: 12px; }}
+        .priority-section h2 {{ margin-top: 0; color: #c82333; border-bottom: 2px solid #dc3545; padding-bottom: 10px; }}
+        
         @media print {{
             body {{ background: white; padding: 0; color: black; }}
             .container {{ box-shadow: none; border: none; padding: 0; width: 100%; max-width: none; }}
@@ -405,49 +379,56 @@ pub fn generate_html_report(
     <div class="container">
         <h1>🔒 BACO Security Vulnerability Report</h1>
         
-        <h2>Scan Metadata</h2>
-        <div class="metadata">
+        <div class="at-a-glance">
+            <div class="glance-item">
+                <div class="glance-label">Scan Date</div>
+                <div class="glance-value">{}</div>
+            </div>
+            <div class="glance-item">
+                <div class="glance-label">Total Findings</div>
+                <div class="glance-value">{}</div>
+            </div>
+            <div class="glance-item">
+                <div class="glance-label">Critical / High</div>
+                <div class="glance-value">{} / {}</div>
+            </div>
+        </div>
+
+        <details class="metadata">
+            <summary style="cursor: pointer; font-weight: 600; margin-bottom: 15px;">🔍 View Scan Details & Metadata</summary>
             <div class="metadata-grid">
-                <div class="metadata-item">
-                    <div class="metadata-label">Scan Date</div>
-                    <div class="metadata-value">{}</div>
-                </div>
+                {}
                 <div class="metadata-item">
                     <div class="metadata-label">Total Findings</div>
                     <div class="metadata-value">{}</div>
                 </div>
-                {}
             </div>
-        </div>
+            <div class="stats-dashboard">
+                <div class="stat-card">
+                    <div class="value">{:.1}%</div>
+                    <div class="label">Avg Confidence</div>
+                </div>
+                <div class="stat-card">
+                    <div class="value">{}</div>
+                    <div class="label">Verified</div>
+                </div>
+                <div class="stat-card">
+                    <div class="value">{}</div>
+                    <div class="label">Already Reported</div>
+                </div>
+                <div class="stat-card">
+                    <div class="value">{}</div>
+                    <div class="label">Unique Files</div>
+                </div>
+            </div>
+        </details>
         
-        {}
-        
-        <h2>Statistics Dashboard</h2>
-        <div class="stats-dashboard">
-            <div class="stat-card">
-                <div class="value">{:.1}%</div>
-                <div class="label">Avg Confidence</div>
-            </div>
-            <div class="stat-card">
-                <div class="value">{}</div>
-                <div class="label">Verified</div>
-            </div>
-            <div class="stat-card">
-                <div class="value">{}</div>
-                <div class="label">Already Reported</div>
-            </div>
-            <div class="stat-card">
-                <div class="value">{}</div>
-                <div class="label">Unique Files</div>
-            </div>
-        </div>
-        
-        <h2>Summary by Severity</h2>
+        <h2 style="margin-top: 30px;">Summary by Severity</h2>
         <div class="summary">
             {}
         </div>
         
-        <h2>Detailed Findings</h2>
+        <h2 style="margin-top: 30px;">Detailed Findings</h2>
         {}
         <div class="filters">
             <button class="filter-btn all active" data-filter="all" onclick="document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); this.classList.add('active'); filterFindings('all')">All</button>
@@ -467,8 +448,10 @@ pub fn generate_html_report(
         prism_language_scripts,
         scan_date,
         total_findings,
+        stats.critical,
+        stats.high,
         models_html,
-        llm_metrics_html,
+        total_findings,
         avg_confidence * 100.0,
         verified,
         already_reported,
@@ -483,53 +466,72 @@ pub fn generate_html_report(
         total_findings
     );
 
-    // T32: Group findings by file for better review flow
-    let mut findings_by_file: HashMap<String, Vec<&VulnerabilityFinding>> = HashMap::new();
-    for finding in &filtered_findings {
-        findings_by_file
-            .entry(finding.file_path.clone())
-            .or_default()
-            .push(finding);
-    }
+    if total_findings > 0 {
+        let priority_findings: Vec<&VulnerabilityFinding> = filtered_findings
+            .iter()
+            .filter(|f| {
+                matches!(
+                    f.severity,
+                    crate::findings::Severity::Critical | crate::findings::Severity::High
+                )
+            })
+            .collect();
 
-    // Sort files by finding count (descending)
-    let mut sorted_files: Vec<_> = findings_by_file.into_iter().collect();
-    sorted_files.sort_by_key(|a| std::cmp::Reverse(a.1.len()));
+        if !priority_findings.is_empty() {
+            html.push_str(r#"<div class="priority-section">"#);
+            html.push_str(r#"<h2>🚨 Priority Findings (Critical & High)</h2>"#);
 
-    // Generate finding cards grouped by file (T32)
-    html.push_str(r#"<div class="findings-by-file">"#);
-    for (file_path, file_findings) in sorted_files {
-        html.push_str(&format!(
-            r#"<details class="file-group"><summary class="file-group-summary">📄 {} ({}) findings</summary>"#,
-            html_escape::encode_text(&file_path),
-            file_findings.len()
-        ));
+            let mut sorted_priority = priority_findings;
+            sorted_priority.sort_by_key(|a| std::cmp::Reverse(a.severity));
 
-        // Render findings within this file group (maintaining severity order within group)
-        let mut sorted_findings = file_findings;
-        sorted_findings.sort_by_key(|a| std::cmp::Reverse(a.severity));
-
-        for (finding_id, finding) in sorted_findings.iter().enumerate() {
-            // Use a unique ID that includes the file group
-            let global_id = format!(
-                "{}-{}",
-                html_escape::encode_text(&file_path).replace('/', "-"),
-                finding_id
-            );
-            html.push_str(&render_finding_with_id(finding, &global_id));
+            for (idx, finding) in sorted_priority.iter().enumerate() {
+                let global_id = format!("priority-{}", idx);
+                html.push_str(&render_finding_with_id(finding, &global_id));
+            }
+            html.push_str("</div>");
         }
 
-        html.push_str("</details>");
-    }
-    html.push_str("</div>");
+        let mut findings_by_file: HashMap<String, Vec<&VulnerabilityFinding>> = HashMap::new();
+        for finding in &filtered_findings {
+            findings_by_file
+                .entry(finding.file_path.clone())
+                .or_default()
+                .push(finding);
+        }
 
-    // Append unverified findings section when gate is enabled
+        let mut sorted_files: Vec<_> = findings_by_file.into_iter().collect();
+        sorted_files.sort_by_key(|a| std::cmp::Reverse(a.1.len()));
+
+        html.push_str(r#"<div class="findings-by-file">"#);
+        for (file_path, file_findings) in sorted_files {
+            html.push_str(&format!(
+                r#"<details class="file-group"><summary class="file-group-summary">📄 {} ({}) findings</summary>"#,
+                html_escape::encode_text(&file_path),
+                file_findings.len()
+            ));
+
+            let mut sorted_findings = file_findings;
+            sorted_findings.sort_by_key(|a| std::cmp::Reverse(a.severity));
+
+            for (finding_id, finding) in sorted_findings.iter().enumerate() {
+                let global_id = format!(
+                    "{}-{}",
+                    html_escape::encode_text(&file_path).replace('/', "-"),
+                    finding_id
+                );
+                html.push_str(&render_finding_with_id(finding, &global_id));
+            }
+
+            html.push_str("</details>");
+        }
+        html.push_str("</div>");
+    }
+
     let include_rejected = config.map(|c| c.output.include_rejected).unwrap_or(false);
 
     let appendix_html = {
         let mut sections = Vec::new();
 
-        // Unverified findings appendix
         if gate_enabled && !unverified_findings.is_empty() {
             let appendix_findings: String = unverified_findings
                 .iter()
@@ -576,7 +578,6 @@ pub fn generate_html_report(
             ));
         }
 
-        // Rejected findings appendix
         if include_rejected {
             if let Some(rejected) = rejected_findings {
                 if !rejected.is_empty() {
@@ -637,7 +638,6 @@ pub fn generate_html_report(
         filtered_findings.len()
     ));
 
-    // Create parent directory if it doesn't exist
     if let Some(parent) = std::path::Path::new(output_path).parent() {
         std::fs::create_dir_all(parent)
             .map_err(|e| format!("Failed to create output directory: {}", e))?;

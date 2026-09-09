@@ -1,9 +1,9 @@
 use baco::findings::Severity;
 use baco::report::html::utilities::{
     build_empty_state_message, build_filter_buttons, build_recommendation_section,
-    build_summary_cards, calculate_severity_stats, detect_language, markdown_to_html,
-    SeverityStats,
+    build_summary_cards, calculate_severity_stats, markdown_to_html, SeverityStats,
 };
+use baco::report::presenter::detect_language;
 
 // ============================================================================
 // markdown_to_html Tests

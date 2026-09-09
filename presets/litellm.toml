@@ -41,6 +41,9 @@ models = ["mistral-small"]
 [llm.phases.verification]
 model = "mistral-medium"
 
+[llm.phases.aggregation]
+model = "mistral-medium"
+
 [triage]
 enabled = true
 model = "mistral-small"

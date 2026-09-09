@@ -1,10 +1,41 @@
 //! Core staging area and worktree management
 
 use crate::staging::error::{StagingError, StagingResult};
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
+
+/// Applies a patch to a worktree by piping content to `git apply -`.
+/// Returns Ok(()) on success, or an error with stderr on failure.
+pub(crate) fn apply_patch_to_worktree(
+    worktree_path: &Path,
+    patch_content: &str,
+) -> Result<(), String> {
+    let mut output = Command::new("git")
+        .current_dir(worktree_path)
+        .args(["apply", "-"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| e.to_string())?;
+
+    if let Some(ref mut stdin) = output.stdin {
+        stdin
+            .write_all(patch_content.as_bytes())
+            .map_err(|e| e.to_string())?;
+    }
+
+    let result = output.wait_with_output().map_err(|e| e.to_string())?;
+
+    if !result.status.success() {
+        return Err(String::from_utf8_lossy(&result.stderr).to_string());
+    }
+
+    Ok(())
+}
 
 /// Monotonic worktree name sequence: nanosecond timestamps can collide across
 /// threads, producing identical worktree paths.
@@ -65,25 +96,7 @@ impl StagingArea {
 
         tracing::info!("Applying patch to {:?}", self.worktree_path);
 
-        // Write patch to temp file
-        let patch_path = self.worktree_path.join("patch.diff");
-        std::fs::write(&patch_path, diff)
-            .map_err(|e| StagingError::PatchApply(format!("Failed to write patch: {}", e)))?;
-
-        // Apply patch
-        let output = Command::new("git")
-            .current_dir(&self.worktree_path)
-            .args(["apply", "--verbose", patch_path.to_str().unwrap()])
-            .output()
-            .map_err(|e| StagingError::PatchApply(e.to_string()))?;
-
-        if !output.status.success() {
-            return Err(StagingError::PatchApply(
-                String::from_utf8_lossy(&output.stderr).to_string(),
-            ));
-        }
-
-        Ok(())
+        apply_patch_to_worktree(&self.worktree_path, diff).map_err(StagingError::PatchApply)
     }
 
     /// Validates the patch by running cargo check and cargo test

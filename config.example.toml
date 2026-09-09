@@ -157,7 +157,6 @@ project = "libxml2"
 #[agent]
 # enabled = false       # Set to true to enable the agent
 # max_turns = 10        # Maximum agent conversation turns per issue
-# keep_artifacts = false  # Keep agent work artifacts (logs, temp files)
 
 # --- Paper-Integration Research Flags (P1-P5) ---
 # All flags default to disabled. Enable to opt in to experimental
@@ -209,8 +208,6 @@ project = "libxml2"
 #enabled = false
 #max_iterations = 10
 #requires_instrumented_target = false
-# trusted_paths = ["."] # Filesystem paths the agent is allowed to access
-# keep_artifacts = false  # Keep agent work artifacts (logs, temp files)
 
 
 # CPG-guided slicing

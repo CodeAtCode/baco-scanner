@@ -5,6 +5,7 @@
 
 use crate::evidence::{classify_finding, VerificationTier};
 use crate::findings::{Severity, VulnerabilityFinding};
+use crate::report::presenter;
 use chrono::Utc;
 
 /// Generate a markdown-formatted security report.
@@ -210,13 +211,9 @@ fn render_finding(finding: &VulnerabilityFinding) -> String {
     ));
 
     // Location
-    let line_str = finding
-        .line_number
-        .map(|l| format!(":{}", l))
-        .unwrap_or_default();
     md.push_str(&format!(
-        "**Location:** `{}`{}\n\n",
-        finding.file_path, line_str
+        "**Location:** {}\n\n",
+        presenter::format_location_markdown(&finding.file_path, finding.line_number)
     ));
 
     // Description
@@ -232,47 +229,17 @@ fn render_finding(finding: &VulnerabilityFinding) -> String {
     let tier = classify_finding(&finding.evidence, finding.confidence_score);
     md.push_str(&format!("**Evidence Tier:** {:?}\n\n", tier));
 
-    // Code snippet if present
-    if let Some(snippet) = &finding.code_snippet {
-        md.push_str("**Code:**\n\n");
-        md.push_str("```text\n");
-        md.push_str(snippet);
-        md.push_str("\n```\n\n");
-    }
-
-    // Diff hunk if present
-    if let Some(hunk) = &finding.diff_hunk {
-        md.push_str("**Diff:**\n\n");
-        md.push_str("```diff\n");
-        md.push_str(hunk);
-        md.push_str("\n```\n\n");
-    }
+    // Code snippet and diff hunk if present
+    let code_presenter = presenter::CodeSnippetPresenter::new(finding);
+    md.push_str(&code_presenter.render_markdown(&finding.file_path));
 
     // Recommendation
-    if let Some(rec) = &finding.recommendation {
-        md.push_str("**Recommendation:**\n\n");
-        md.push_str(rec);
-        md.push_str("\n\n");
-    }
+    let rec_presenter = presenter::RecommendationPresenter::new(finding);
+    md.push_str(&rec_presenter.render_markdown());
 
     // Mitigation code if present
-    if let Some(mitigation) = &finding.mitigation_code {
-        md.push_str("**Mitigation:**\n\n");
-        // Detect language from file extension
-        let lang = detect_language(&finding.file_path);
-        md.push_str(&format!("```{}\n", lang));
-        md.push_str(mitigation);
-        md.push_str("\n```\n\n");
-    }
-
-    // PoC code if present
-    if let Some(poc) = &finding.poc_code {
-        md.push_str("**Proof of Concept:**\n\n");
-        let poc_lang = finding.poc_format.as_deref().unwrap_or("text");
-        md.push_str(&format!("```{}\n", poc_lang));
-        md.push_str(poc);
-        md.push_str("\n```\n\n");
-    }
+    let code_section = presenter::CodeSectionPresenter::new(finding);
+    md.push_str(&code_section.render_markdown());
 
     // Sources
     if !finding.sources.is_empty() {
@@ -285,38 +252,4 @@ fn render_finding(finding: &VulnerabilityFinding) -> String {
     }
 
     md
-}
-
-/// Detect programming language from file extension.
-fn detect_language(file_path: &str) -> &'static str {
-    if let Some(ext) = std::path::Path::new(file_path).extension() {
-        match ext.to_str().unwrap_or("") {
-            "py" => "python",
-            "js" => "javascript",
-            "ts" => "typescript",
-            "tsx" => "typescript",
-            "rs" => "rust",
-            "go" => "go",
-            "java" => "java",
-            "c" => "c",
-            "cc" | "cpp" | "cxx" => "cpp",
-            "h" | "hpp" => "cpp",
-            "sql" => "sql",
-            "yaml" | "yml" => "yaml",
-            "json" => "json",
-            "sh" | "bash" => "bash",
-            "rb" => "ruby",
-            "php" => "php",
-            "cs" => "csharp",
-            "swift" => "swift",
-            "kt" => "kotlin",
-            "scala" => "scala",
-            "pl" | "pm" => "perl",
-            "lua" => "lua",
-            "sol" => "solidity",
-            _ => "text",
-        }
-    } else {
-        "text"
-    }
 }

@@ -195,6 +195,9 @@ async fn run_scan(
         preset.merge_into(&mut config);
     }
 
+    // Apply env overrides (mirrors run_verify behavior)
+    config::apply_env_overrides(&mut config);
+
     // Apply CLI flag override
     if evidence_gate {
         config.output.evidence_gate = true;

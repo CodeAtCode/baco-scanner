@@ -80,7 +80,7 @@ enable_variant_search = true
 | --- | --- | --- |
 | `enable_threat_modeling` | `false` | None (read-only analysis) |
 | `enable_root_cause_dedup` | `true` | None |
-| `enable_multi_verifier` | `true` | Additional LLM API calls |
+| `enable_multi_verifier` | `false` | Additional LLM API calls |
 | `enable_auto_patching` | `false` | Writes code files, runs git commands in a staging worktree |
 | `enable_poc_compilation` | `false` | Spawns external compilers |
 | `enable_confidence_refinement` | `true` | None |
@@ -89,6 +89,33 @@ enable_variant_search = true
 
 See [`docs/architecture.md`](architecture.md) for the full 24-phase pipeline description.
 
+## Router Configuration (MoE)
+
+The `[router]` section configures the Mixture-of-Experts routing for per-CWE and per-language prompt/model selection.
+
+```toml
+[router]
+enabled = false
+default_prompt = "llm_static_analysis"
+
+# CWE-specific prompt/model overrides
+[router.cwe_overrides]
+"CWE-79" = { prompt_template = "xss_analysis", model_override = "mistral-small" }
+"CWE-89" = { prompt_template = "sqli_analysis", model_override = "qwen35" }
+
+# Language-specific prompt/model overrides
+[router.language_overrides]
+"php" = { prompt_template = "php_security", model_override = null }
+"python" = { prompt_template = "python_security", model_override = null }
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | bool | `false` | Enable MoE routing |
+| `default_prompt` | str | `"llm_static_analysis"` | Default prompt template name |
+| `cwe_overrides` | map | `{}` | CWE ID → PromptSpec overrides |
+| `language_overrides` | map | `{}` | Language → PromptSpec overrides |
+
 ## LLM Configuration
 
 BACO supports single or multiple models per phase. When multiple models are configured, they are used in round-robin fashion to distribute load across different models/providers.
@@ -96,6 +123,17 @@ BACO supports single or multiple models per phase. When multiple models are conf
 **Default temperature:** `0.5` (controlled randomness for better security analysis)
 
 **Default max_reasoning_tokens:** unset (`None` — no cap unless configured)
+
+**Per-phase overrides:** Each phase supports optional `timeout_secs` and `temperature` overrides:
+
+```toml
+[llm.phases.discovery]
+base_url = "https://api.mistral.ai/v1"
+api_key = "${MISTRAL_API_KEY}"
+model = "mistral-small"
+timeout_secs = 120      # Per-phase timeout override
+temperature = 0.3       # Per-phase temperature override
+```
 
 **Single model:**
 ```toml
@@ -140,8 +178,6 @@ When enabled, the LLM Discovery phase reads source files directly before analyzi
 enabled = false
 max_turns = 10           # Max conversation turns with tools
 tool_timeout_secs = 60   # Timeout for tool execution
-trusted_paths = ["."]    # Paths allowed for tool operations
-keep_artifacts = false   # Keep generated test files
 ```
 
 **Benefits:**
@@ -149,7 +185,7 @@ keep_artifacts = false   # Keep generated test files
 - Uses tools (file_read, pattern_search) for deeper analysis
 - Provides more accurate vulnerability descriptions with context
 
-### 2. SecurityAgent Verification (Phase 7)
+### 2. SecurityAgent Verification (Phase 10)
 A **separate verification phase** that uses an embedded security agent with tools to **prove or disprove** findings:
 
 - **file_read**: Examine vulnerable code in context
@@ -157,7 +193,7 @@ A **separate verification phase** that uses an embedded security agent with tool
 - **file_write**: Create proof-of-concept test cases
 - **run_test**: Execute tests to verify exploitability
 
-The agent automatically removes false positives when tests pass, reducing noise in the final report. This phase runs **after** LLM Verification and **before** Ticket Cross-Reference.
+The agent automatically removes false positives when tests pass, reducing noise in the final report. This phase runs **after** Validate (Phase 9) and **before** Ticket Cross-Reference (Phase 11).
 
 ## Prompt Customization
 
@@ -234,7 +270,7 @@ Prompts are validated (max 10,000 characters, no null bytes) before use.
 
 ```toml
 [[tickets.systems]]
-type = "github"
+system_type = "github"
 url = "https://api.github.com"
 credentials.token = "${GITHUB_TOKEN}"
 ```
@@ -259,11 +295,36 @@ include_rejected = false
 | `evidence_gate` | bool | `false` | When true, only findings classified as verified or supported by the evidence gate reach report.html and the SARIF output. findings.json always contains every finding with its verification_tier attached. |
 | `include_rejected` | bool | `false` | When true, rejected findings (investigated & dismissed) are persisted in the JSON report's `rejected` array and shown in the HTML report's "Investigated & Dismissed" appendix. |
 
+## Environment Variables
+
+| Env Var | Usage |
+|---------|-------|
+| `LLM_DISCOVERY_KEY` | Overrides `llm.phases.discovery.api_key` |
+| `LLM_VERIFICATION_KEY` | Overrides `llm.phases.verification.api_key` |
+| `LLM_AGGREGATION_KEY` | Overrides `llm.phases.aggregation.api_key` |
+| `TICKET_GITHUB_KEY` | Overrides `[[tickets.systems]]` api_key for GitHub |
+| `TICKET_GITLAB_KEY` | Overrides `[[tickets.systems]]` api_key for GitLab |
+| `LLM_CONFIG_PATH` | Path to custom LLM configuration file (overrides default prompts) |
+
 ## Output Formats
 
 - **findings.json**: Complete vulnerability data with all 16 fields
 - **report.html**: Visual report with severity colors, code snippets, AI summary
 - **report.sarif**: SARIF format for CI/CD integration
+
+## Aggregation Configuration
+
+The `[aggregation]` section configures the AI Aggregation phase settings.
+
+```toml
+[aggregation]
+# Path to the false positive store JSON file
+fp_store_path = "./fp-store.json"
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `fp_store_path` | str | `None` | Path to JSON file storing false positive patterns |
 
 ## Paper-Integration Research Flags
 
@@ -538,8 +599,8 @@ Presets are bundled TOML overlays that pre-configure BACO for a target project
 type. They set language lists, exclude paths, semgrep rulesets, triage, budget,
 and per-CWE false-positive patterns in one step.
 
-**Loading order:** built-in defaults → preset file → user `config.toml` → CLI flags.
-The user config and CLI flags override the preset.
+**Loading order:** built-in defaults → user `config.toml` → preset file → CLI flags.
+Presets are applied on top of the user config and take precedence. Note that `[scanner.performance]` is wholesale-replaced by the preset (not merged).
 
 ### Built-in Presets
 
@@ -558,7 +619,7 @@ The user config and CLI flags override the preset.
 baco scan --config my.toml --preset wordpress-core
 
 # List available presets (built-in + ~/.config/baco/presets/*.toml)
-baco presets
+baco preset list
 ```
 
 ### Preset TOML Structure
@@ -622,7 +683,8 @@ enabled = false
 
 [agent]
 enabled = false
-trusted_paths = []
+max_turns = 10
+tool_timeout_secs = 60
 ```
 
 ### Custom Presets
@@ -648,8 +710,7 @@ baco scan --config my.toml --preset my-project
 | `priority`   | `enabled`, `git_recent_boost`, `entry_point_boost`, `small_file_boost`    |
 | `budget`     | `enabled`, `max_llm_calls`, `reserve_percent_for_high_risk`               |
 | `agent_flow` | `enabled`, `max_iterations`, `requires_instrumented_target`                |
-| `agent`      | `enabled`, `max_turns`, `tool_timeout_secs`, `trusted_paths`               |
+| `agent`      | `enabled`, `max_turns`, `tool_timeout_secs`               |
 | `knowledge`  | `fp_patterns` (map of CWE → list of false-positive indicator strings)     |
 
-Unset fields keep the base `ScannerConfig` default; the user `config.toml` and
-CLI flags still override the preset.
+Unset fields keep the base `ScannerConfig` default; CLI flags still override the preset.

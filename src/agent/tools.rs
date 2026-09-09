@@ -168,7 +168,7 @@ impl Tool for TestRunTool {
         // Determine interpreter based on file extension
         let full_str = full.to_string_lossy().to_string();
         let (cmd, cmd_args) = if path.ends_with(".py") {
-            ("python", vec![full_str.as_str()])
+            ("python3", vec![full_str.as_str()])
         } else if path.ends_with(".rs") {
             (
                 "rustc",

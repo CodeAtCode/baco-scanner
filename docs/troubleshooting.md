@@ -6,8 +6,8 @@ Common issues and solutions for the Baco SAST scanner.
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| `[SCANNER] analysis skipped: LLM not configured (set LLM_API_KEY or llm.api_key)` | Missing API key | Export `LLM_API_KEY=your_key` or add `llm.api_key` to config.toml |
-| Phases show "No API key configured - skipping" | LLM API key not set | Set `LLM_API_KEY` environment variable before running |
+| `[SCANNER] analysis skipped: LLM not configured (set LLM_API_KEY or llm.api_key)` | Missing API key | Add `api_key` inside each `[llm.phases.<slot>]` (discovery, verification, aggregation, static_analysis, security_agent_verification, threat_modeling) or set per-slot env vars (`LLM_DISCOVERY_KEY`, `LLM_VERIFICATION_KEY`, `LLM_AGGREGATION_KEY`, etc.) |
+| Phases show "No API key configured - skipping" | LLM API key not set | Set per-phase API keys via `[llm.phases.discovery.api_key]` or env vars (`LLM_DISCOVERY_KEY`, `LLM_VERIFICATION_KEY`, etc.) |
 | Duplicate LLM API calls during scan | Cache disabled by default | Set `enable_llm_cache = true` in `[llm]` section of config.toml |
 | Threat modeling output is static STRIDE template | Feature disabled by default | Set `enable_threat_modeling = true` in config.toml (documentation-only output) |
 
@@ -47,7 +47,7 @@ Common issues and solutions for the Baco SAST scanner.
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| "unknown key in [llm.phases]" error | Invalid config.toml key | Remove unknown keys; only `enable_llm_cache`, `api_key`, `base_url` are valid |
+| "unknown key in [llm.phases]" error | Invalid config.toml key | Unknown keys are silently ignored. Valid keys per phase: `model`, `models`, `temperature`, `timeout_secs`, `api_key`, `base_url` |
 | "missing [project] path" error | Required field absent | Add `project.path = "src/"` to config.toml |
 | Config parse errors at startup | Malformed TOML | Validate config.toml syntax; check for missing brackets or quotes |
 
@@ -60,14 +60,21 @@ Common issues and solutions for the Baco SAST scanner.
 
 **When this appears:** During any phase that requires LLM assistance (code analysis, threat modeling, report generation).
 
-**Why:** The scanner checks for API credentials at startup. If neither the `LLM_API_KEY` environment variable nor the `llm.api_key` config option is set, it skips LLM-dependent phases.
+**Why:** The scanner checks for API credentials at startup. Per-phase API keys must be set in `[llm.phases.<slot>]` sections (discovery, verification, aggregation, static_analysis, security_agent_verification, threat_modeling) or via per-slot environment variables (`LLM_DISCOVERY_KEY`, `LLM_VERIFICATION_KEY`, `LLM_AGGREGATION_KEY`, etc.).
 
-**Solution:** Choose one method:
-- Environment variable (recommended for CI/CD): `export LLM_API_KEY=sk-...`
-- Config file (for local development): Add to `config.toml`:
+**Solution:** Configure per-phase API keys:
+- In config.toml:
   ```toml
-  [llm]
+  [llm.phases.discovery]
   api_key = "sk-..."
+  
+  [llm.phases.verification]
+  api_key = "sk-..."
+  ```
+- Or via environment variables (per-slot):
+  ```bash
+  export LLM_DISCOVERY_KEY=sk-...
+  export LLM_VERIFICATION_KEY=sk-...
   ```
 
 ### Scan Failed
@@ -111,7 +118,7 @@ Resume with: baco resume --checkpoint <path>
 
 - Check config.toml for syntax errors
 - Verify Joern is installed and in PATH
-- Ensure LLM_API_KEY is set correctly
+- Ensure per-phase LLM API keys are set (`[llm.phases.discovery.api_key]` or env vars like `LLM_DISCOVERY_KEY`)
 - Review checkpoint.json for scan state
 - Clear output directory for fresh start
 
@@ -125,7 +132,7 @@ baco resume --checkpoint <path-to-checkpoint.json>
 **Force full rescan:**
 ```bash
 rm -rf <output-dir>/
-baco scan
+baco scan --config <config.toml>
 ```
 
 **Enable LLM caching:**
@@ -136,7 +143,9 @@ enable_llm_cache = true
 
 **Set API key:**
 ```bash
-export LLM_API_KEY=your_api_key_here
+export LLM_DISCOVERY_KEY=your_api_key_here
+export LLM_VERIFICATION_KEY=your_api_key_here
+export LLM_AGGREGATION_KEY=your_api_key_here
 ```
 
 **Verify Joern installation:**

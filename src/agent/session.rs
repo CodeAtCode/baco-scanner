@@ -360,7 +360,6 @@ impl AgentSession {
         let mut test_source_path = None;
         let mut compile_path = None;
         let mut tools_used = Vec::new();
-        let mut confirmed = false;
 
         loop {
             turn += 1;
@@ -410,11 +409,6 @@ impl AgentSession {
                     }
 
                     test_log = response.content.clone();
-                    if response.content.contains("compiled=true")
-                        && response.content.contains("test_passed=true")
-                    {
-                        confirmed = true;
-                    }
                     break;
                 }
                 Err(e) => {
@@ -425,17 +419,18 @@ impl AgentSession {
             }
         }
 
+        let verdict = parse_agent_verdict(&test_log);
+        let confirmed = verdict.compiled && verdict.test_passed;
         let mut verified_finding = finding.clone();
-        if confirmed {
-            verified_finding.verification_status =
-                Some(crate::findings::VerificationStatus::Confirmed);
-            verified_finding.verification_notes =
-                Some("Agent verified with passing test".to_string());
+        verified_finding.verification_status = Some(if confirmed {
+            crate::findings::VerificationStatus::Confirmed
         } else {
-            verified_finding.verification_status =
-                Some(crate::findings::VerificationStatus::NeedsReview);
-            verified_finding.verification_notes = Some(test_log.clone());
-        }
+            crate::findings::VerificationStatus::NeedsReview
+        });
+        verified_finding.verification_notes = Some(format!(
+            "compiled={}, test_passed={}\n\n{}",
+            verdict.compiled, verdict.test_passed, verdict.log
+        ));
 
         Ok(AgentFinding {
             finding: verified_finding,
@@ -451,3 +446,45 @@ impl AgentSession {
 // Note: Context window pruning is not currently implemented in AgentSession.
 // The session enforces max_turns but does not prune message history based on context window size.
 // This is noted for future implementation.
+
+/// Parsed outcome of the agent's final verification message.
+pub struct AgentVerdict {
+    pub compiled: bool,
+    pub test_passed: bool,
+    pub log: String,
+}
+
+/// Models emit either the documented key=value protocol (`compiled=true`) or a
+/// JSON envelope (`compiled`/`test_passed`/`log` fields); accept both.
+pub fn parse_agent_verdict(content: &str) -> AgentVerdict {
+    let trimmed = content.trim();
+    let json_candidate = trimmed
+        .strip_prefix("```json")
+        .or_else(|| trimmed.strip_prefix("```"))
+        .map(str::trim)
+        .and_then(|s| s.strip_suffix("```"))
+        .map(str::trim)
+        .unwrap_or(trimmed);
+
+    if let Ok(value) = serde_json::from_str::<serde_json::Value>(json_candidate) {
+        if let Some(obj) = value.as_object() {
+            let flag = |key: &str| obj.get(key).and_then(|v| v.as_bool()).unwrap_or(false);
+            let log = obj
+                .get("log")
+                .and_then(|v| v.as_str())
+                .map(str::to_string)
+                .unwrap_or_else(|| content.to_string());
+            return AgentVerdict {
+                compiled: flag("compiled"),
+                test_passed: flag("test_passed"),
+                log,
+            };
+        }
+    }
+
+    AgentVerdict {
+        compiled: content.contains("compiled=true"),
+        test_passed: content.contains("test_passed=true"),
+        log: content.to_string(),
+    }
+}

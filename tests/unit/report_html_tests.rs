@@ -11,6 +11,7 @@
 
 use baco::findings::{Severity, VulnerabilityFinding};
 use baco::report::html::{render_finding, utilities};
+use baco::report::presenter;
 use std::fs;
 use std::path::Path;
 use tempfile::TempDir;
@@ -398,88 +399,88 @@ fn test_build_filter_buttons_all_severities() {
 
 #[test]
 fn test_detect_language_python() {
-    assert_eq!(utilities::detect_language("src/main.py"), "python");
-    assert_eq!(utilities::detect_language("/path/to/script.py"), "python");
+    assert_eq!(presenter::detect_language("src/main.py"), "python");
+    assert_eq!(presenter::detect_language("/path/to/script.py"), "python");
 }
 
 #[test]
 fn test_detect_language_javascript() {
-    assert_eq!(utilities::detect_language("app.js"), "javascript");
+    assert_eq!(presenter::detect_language("app.js"), "javascript");
 }
 
 #[test]
 fn test_detect_language_typescript() {
-    assert_eq!(utilities::detect_language("src/app.ts"), "typescript");
+    assert_eq!(presenter::detect_language("src/app.ts"), "typescript");
     assert_eq!(
-        utilities::detect_language("src/component.tsx"),
+        presenter::detect_language("src/component.tsx"),
         "typescript"
     );
 }
 
 #[test]
 fn test_detect_language_rust() {
-    assert_eq!(utilities::detect_language("src/lib.rs"), "rust");
+    assert_eq!(presenter::detect_language("src/lib.rs"), "rust");
 }
 
 #[test]
 fn test_detect_language_go() {
-    assert_eq!(utilities::detect_language("main.go"), "go");
+    assert_eq!(presenter::detect_language("main.go"), "go");
 }
 
 #[test]
 fn test_detect_language_java() {
-    assert_eq!(utilities::detect_language("src/Main.java"), "java");
+    assert_eq!(presenter::detect_language("src/Main.java"), "java");
 }
 
 #[test]
 fn test_detect_language_c() {
-    assert_eq!(utilities::detect_language("src/main.c"), "c");
+    assert_eq!(presenter::detect_language("src/main.c"), "c");
 }
 
 #[test]
 fn test_detect_language_cpp() {
-    assert_eq!(utilities::detect_language("src/main.cpp"), "cpp");
-    assert_eq!(utilities::detect_language("src/main.cc"), "cpp");
-    assert_eq!(utilities::detect_language("src/main.cxx"), "cpp");
+    assert_eq!(presenter::detect_language("src/main.cpp"), "cpp");
+    assert_eq!(presenter::detect_language("src/main.cc"), "cpp");
+    assert_eq!(presenter::detect_language("src/main.cxx"), "cpp");
 }
 
 #[test]
 fn test_detect_language_sql() {
-    assert_eq!(utilities::detect_language("query.sql"), "sql");
+    assert_eq!(presenter::detect_language("query.sql"), "sql");
 }
 
 #[test]
 fn test_detect_language_yaml() {
-    assert_eq!(utilities::detect_language("config.yml"), "yaml");
-    assert_eq!(utilities::detect_language("config.yaml"), "yaml");
+    assert_eq!(presenter::detect_language("config.yml"), "yaml");
+    assert_eq!(presenter::detect_language("config.yaml"), "yaml");
 }
 
 #[test]
 fn test_detect_language_json() {
-    assert_eq!(utilities::detect_language("package.json"), "json");
+    assert_eq!(presenter::detect_language("package.json"), "json");
 }
 
 #[test]
 fn test_detect_language_bash() {
-    assert_eq!(utilities::detect_language("script.sh"), "bash");
-    assert_eq!(utilities::detect_language("script.bash"), "bash");
+    assert_eq!(presenter::detect_language("script.sh"), "bash");
+    assert_eq!(presenter::detect_language("script.bash"), "bash");
 }
 
 #[test]
 fn test_detect_language_unknown_extension() {
-    assert_eq!(utilities::detect_language("src/unknown.xyz"), "");
+    assert_eq!(presenter::detect_language("src/unknown.xyz"), "");
 }
 
 #[test]
 fn test_detect_language_no_extension() {
-    assert_eq!(utilities::detect_language("README"), "");
-    assert_eq!(utilities::detect_language("Makefile"), "");
+    assert_eq!(presenter::detect_language("README"), "");
+    assert_eq!(presenter::detect_language("Makefile"), "");
 }
 
 #[test]
 fn test_detect_language_case_insensitive() {
-    assert_eq!(utilities::detect_language("src/main.PY"), "python");
-    assert_eq!(utilities::detect_language("src/main.RS"), "rust");
+    assert_eq!(presenter::detect_language("src/main.PY"), "python");
+    assert_eq!(presenter::detect_language("src/main.RS"), "rust");
 }
 
 // ============================================================================

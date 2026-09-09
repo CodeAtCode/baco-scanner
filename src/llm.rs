@@ -60,13 +60,13 @@ impl LlmConfig {
     }
 }
 
-/// Round-robin selector for multiple models
-pub struct ModelSelector {
+/// Round-robin model selector with atomic index for thread-safety
+pub struct AtomicModelSelector {
     models: Vec<String>,
     index: AtomicUsize,
 }
 
-impl ModelSelector {
+impl AtomicModelSelector {
     pub fn new(models: Vec<String>) -> Self {
         Self {
             models,
@@ -75,12 +75,12 @@ impl ModelSelector {
     }
 
     /// Get next model in round-robin fashion
-    pub fn next(&self) -> Option<String> {
+    pub fn next(&self) -> String {
         if self.models.is_empty() {
-            return None;
+            return String::new();
         }
         let idx = self.index.fetch_add(1, Ordering::SeqCst) % self.models.len();
-        Some(self.models[idx].clone())
+        self.models[idx].clone()
     }
 
     /// Get all models
@@ -187,7 +187,8 @@ fn get_client() -> &'static reqwest::Client {
 #[derive(Clone)]
 pub struct LlmClient {
     pub config: LlmConfig,
-    model_selector: Option<Arc<ModelSelector>>,
+    /// Round-robin model selection state (only used when multiple models configured)
+    models: Option<Arc<AtomicModelSelector>>,
     metrics_tracker: Option<LlmMetricsTracker>,
     rate_limiter: Arc<RateLimiter>,
 }
@@ -203,9 +204,9 @@ impl LlmClient {
     }
 
     pub fn with_metrics(config: LlmConfig, tracker: Option<LlmMetricsTracker>) -> Self {
-        let models = config.get_models();
-        let model_selector = if models.len() > 1 {
-            Some(Arc::new(ModelSelector::new(models)))
+        let model_list = config.get_models();
+        let models = if model_list.len() > 1 {
+            Some(Arc::new(AtomicModelSelector::new(model_list)))
         } else {
             None
         };
@@ -215,7 +216,7 @@ impl LlmClient {
 
         Self {
             config,
-            model_selector,
+            models,
             metrics_tracker: tracker,
             rate_limiter,
         }
@@ -223,11 +224,8 @@ impl LlmClient {
 
     /// Get current model (uses round-robin if multiple models configured)
     fn get_current_model(&self) -> String {
-        if let Some(ref selector) = self.model_selector {
-            selector.next().unwrap_or_else(|| {
-                // Fallback to first available model if selector is exhausted
-                selector.all_models().first().cloned().unwrap_or_default()
-            })
+        if let Some(ref selector) = self.models {
+            selector.next()
         } else {
             // No selector: use config.model or first from config.models
             if !self.config.model.is_empty() {
@@ -242,7 +240,7 @@ impl LlmClient {
 
     /// Get all configured models
     pub fn get_all_models(&self) -> Vec<String> {
-        if let Some(ref selector) = self.model_selector {
+        if let Some(ref selector) = self.models {
             selector.all_models()
         } else {
             vec![self.config.model.clone()]
