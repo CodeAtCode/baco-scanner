@@ -325,10 +325,13 @@ async fn test_security_agent_verification_skips_without_api_key() {
 fn test_build_stable_verification_prefix_includes_seven_question_gate() {
     let findings = vec![create_test_finding("test-1", Severity::High)];
     let hunt_prompts: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    let required_primitives: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
 
     let prefix = baco::scanner::phases::llm_phases::verification::build_stable_verification_prefix(
         &findings,
         &hunt_prompts,
+        &required_primitives,
     );
 
     assert!(

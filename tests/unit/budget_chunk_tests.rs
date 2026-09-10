@@ -53,6 +53,7 @@ mod priority_config_tests {
 #[cfg(test)]
 mod priority_scoring_tests {
     use baco::scanner::phases::llm_phases::static_analysis::compute_file_priority_score;
+    use std::collections::HashMap;
     use std::path::PathBuf;
 
     fn make_file_info(path: &str, size: u64) -> baco::indexer::FileInfo {
@@ -75,7 +76,7 @@ mod priority_scoring_tests {
             entry_point_patterns: vec![],
             sink_patterns: vec![],
         };
-        let score = compute_file_priority_score(&file, &priority);
+        let score = compute_file_priority_score(&file, &priority, &HashMap::new());
         // Multiplicative: 2.0 (git) * 1.5 (entry_point) * 1.2 (small_file) = 3.6
         assert!((score - 3.6).abs() < 1e-6, "Expected ~3.6, got {}", score);
     }
@@ -91,7 +92,7 @@ mod priority_scoring_tests {
             entry_point_patterns: vec![],
             sink_patterns: vec![],
         };
-        let score = compute_file_priority_score(&file, &priority);
+        let score = compute_file_priority_score(&file, &priority, &HashMap::new());
         assert_eq!(score, 1.5 * 1.2);
     }
 
@@ -106,7 +107,7 @@ mod priority_scoring_tests {
             entry_point_patterns: vec![],
             sink_patterns: vec![],
         };
-        let score = compute_file_priority_score(&file, &priority);
+        let score = compute_file_priority_score(&file, &priority, &HashMap::new());
         assert_eq!(score, 1.5 * 1.2);
     }
 
@@ -121,7 +122,7 @@ mod priority_scoring_tests {
             entry_point_patterns: vec![],
             sink_patterns: vec![],
         };
-        let score = compute_file_priority_score(&file, &priority);
+        let score = compute_file_priority_score(&file, &priority, &HashMap::new());
         assert_eq!(score, 1.5 * 1.2);
     }
 
@@ -136,7 +137,7 @@ mod priority_scoring_tests {
             entry_point_patterns: vec![],
             sink_patterns: vec![],
         };
-        let score = compute_file_priority_score(&file, &priority);
+        let score = compute_file_priority_score(&file, &priority, &HashMap::new());
         assert_eq!(score, 1.2); // small_file only
     }
 
@@ -151,7 +152,7 @@ mod priority_scoring_tests {
             entry_point_patterns: vec![],
             sink_patterns: vec![],
         };
-        let score = compute_file_priority_score(&file, &priority);
+        let score = compute_file_priority_score(&file, &priority, &HashMap::new());
         assert_eq!(score, 1.0); // no boosts
     }
 
@@ -166,7 +167,7 @@ mod priority_scoring_tests {
             entry_point_patterns: vec![],
             sink_patterns: vec![],
         };
-        let score = compute_file_priority_score(&file, &priority);
+        let score = compute_file_priority_score(&file, &priority, &HashMap::new());
         assert_eq!(score, 1.2); // small_file only
     }
 }

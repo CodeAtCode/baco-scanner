@@ -316,6 +316,63 @@ void safe_format(char *user_input) {{
     None
 }
 
+/// Byte cap per chunk of an oversized file (~24 KB ≈ 6-8K LLM tokens).
+const CHUNK_MAX_BYTES: usize = 24_000;
+/// Upper bound on LLM calls per oversized file; bounds cost on huge inputs.
+const MAX_CHUNKS_PER_FILE: usize = 24;
+/// Hard read cap for the chunked path so pathological inputs are skipped.
+const MAX_CHUNK_READ_BYTES: usize = 10 * 1024 * 1024;
+
+/// A line-exact slice of a file: `text` is exactly `lines[start_line..=end_line]`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChunkRange {
+    pub start_line: usize,
+    pub end_line: usize,
+    pub text: String,
+}
+
+/// Map a reported line to an absolute file line.
+///
+/// Models sometimes echo the prompt's annotated absolute range and sometimes
+/// count from 1 within the excerpt; treat an in-range value as absolute, a
+/// chunk-relative value as offset by `start_line`, and clamp the rest.
+pub fn map_chunk_line(reported: i64, start_line: usize, end_line: usize) -> u32 {
+    let start = start_line as i64;
+    let end = end_line as i64;
+    if reported >= start && reported <= end {
+        reported.max(1) as u32
+    } else if reported >= 1 && reported + start - 1 <= end {
+        (reported + start - 1) as u32
+    } else {
+        start.max(1) as u32
+    }
+}
+
+/// Start byte of the line containing `byte`.
+fn line_start(content: &str, byte: usize) -> usize {
+    content[..byte].rfind('\n').map(|p| p + 1).unwrap_or(0)
+}
+
+/// Byte just past the line containing `byte`.
+fn line_end(content: &str, byte: usize) -> usize {
+    content[byte..]
+        .find('\n')
+        .map(|p| byte + p + 1)
+        .unwrap_or(content.len())
+}
+
+/// Map a language name to its bundled tree-sitter parser, if any.
+fn tree_sitter_language(language: &str) -> Option<tree_sitter::Language> {
+    match language.to_lowercase().as_str() {
+        "rust" => Some(tree_sitter_rust::LANGUAGE.into()),
+        "c" | "c++" | "cpp" => Some(tree_sitter_c::LANGUAGE.into()),
+        "python" => Some(tree_sitter_python::LANGUAGE.into()),
+        "javascript" | "typescript" | "tsx" => Some(tree_sitter_javascript::LANGUAGE.into()),
+        "php" => Some(tree_sitter_php::LANGUAGE_PHP.into()),
+        _ => None,
+    }
+}
+
 /// Analyzes source code files using LLM to find vulnerabilities
 pub struct LlmAnalyzer {
     client: LlmClient,
@@ -411,15 +468,6 @@ impl LlmAnalyzer {
         false
     }
 
-    /// Read file content safely
-    pub fn read_file_content(&self, path: &Path) -> Option<String> {
-        let metadata = fs::metadata(path).ok()?;
-        if metadata.len() > self.max_file_size as u64 {
-            return None; // File too large
-        }
-        fs::read_to_string(path).ok()
-    }
-
     /// Get default LLM static analysis prompt (fallback)
     fn default_llm_static_analysis_prompt() -> String {
         include_str!("../prompts/phases/llm_static_analysis.md")
@@ -442,18 +490,45 @@ impl LlmAnalyzer {
         self
     }
 
-    /// Analyze a single file for vulnerabilities
+    /// Analyze a single file for vulnerabilities.
+    ///
+    /// Files within the configured size limit are analyzed in one shot.
+    /// Oversized files are split into line-exact tree-sitter chunks and
+    /// analyzed per chunk instead of being silently skipped.
     pub async fn analyze_file(&self, path: &Path) -> Result<Vec<VulnerabilityFinding>, String> {
-        let content = match self.read_file_content(path) {
-            Some(c) => c,
-            None => return Ok(Vec::new()), // Skip large or unreadable files
+        let metadata = fs::metadata(path).ok();
+        if let Some(meta) = &metadata {
+            if meta.len() > MAX_CHUNK_READ_BYTES as u64 {
+                tracing::warn!(
+                    "Skipping {}: {} bytes exceeds the hard read cap",
+                    path.display(),
+                    meta.len()
+                );
+                return Ok(Vec::new());
+            }
+        }
+        let content = match fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(_) => return Ok(Vec::new()), // unreadable (binary/permissions)
         };
 
+        if content.len() <= self.max_file_size {
+            return self.analyze_single_shot(path, &content).await;
+        }
+        self.analyze_chunked(path, &content).await
+    }
+
+    /// Single-shot analysis for files within the configured size limit.
+    async fn analyze_single_shot(
+        &self,
+        path: &Path,
+        content: &str,
+    ) -> Result<Vec<VulnerabilityFinding>, String> {
         let file_path = path.to_string_lossy().to_string();
         let extension = path.extension().and_then(|e| e.to_str()).unwrap_or("");
 
         // Retrieve relevant CWE specifications using RAG
-        let cwe_specs = self.retrieve_cwe_specs(&file_path, &content);
+        let cwe_specs = self.retrieve_cwe_specs(&file_path, content);
 
         // Use loaded prompt template with variable substitution
         let prompt = self
@@ -462,7 +537,7 @@ impl LlmAnalyzer {
             .replace("%%FILE_PATH%%", &file_path)
             .replace("%%LINE_RANGE%%", "1-max")
             .replace("%%CONTEXT_LINES%%", "3")
-            .replace("%%CODE_CONTENT%%", &self.truncate_code(&content))
+            .replace("%%CODE_CONTENT%%", &self.truncate_code(content))
             .replace("%%CWE_SPECS%%", &cwe_specs);
 
         // Debug: log prompt length and first 300 chars
@@ -481,39 +556,19 @@ impl LlmAnalyzer {
 
         let messages = vec![
             crate::llm::ChatMessage::system(
-                "You are a security expert analyzing code for vulnerabilities. Return ONLY valid JSON array."
+                "You are a security expert analyzing code for vulnerabilities. Return ONLY valid JSON array.",
             ),
-            crate::llm::ChatMessage::user(&user_prompt)
+            crate::llm::ChatMessage::user(&user_prompt),
         ];
 
         // Use structured output if enabled, otherwise fall back to regular chat
         let response = if self.enable_structured_output {
-            // Define the JSON schema for structured findings
-            let schema = serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "findings": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "title": {"type": "string"},
-                                "cwe_id": {"type": "string"},
-                                "severity": {"type": "string"},
-                                "file": {"type": "string"},
-                                "line": {"type": "integer"},
-                                "description": {"type": "string"},
-                                "recommendation": {"type": "string"}
-                            },
-                            "required": ["title", "cwe_id", "severity", "file", "line", "description", "recommendation"]
-                        }
-                    }
-                },
-                "required": ["findings"]
-            });
-
             self.client
-                .chat_with_json_schema(&messages, "vulnerability_findings", schema)
+                .chat_with_json_schema(
+                    &messages,
+                    "vulnerability_findings",
+                    Self::findings_json_schema(),
+                )
                 .await
         } else {
             self.client.chat(&messages).await
@@ -546,6 +601,171 @@ impl LlmAnalyzer {
                 Ok(Vec::new())
             }
         }
+    }
+
+    /// JSON schema for structured vulnerability findings output.
+    fn findings_json_schema() -> serde_json::Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "findings": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "title": {"type": "string"},
+                            "cwe_id": {"type": "string"},
+                            "severity": {"type": "string"},
+                            "file": {"type": "string"},
+                            "line": {"type": "integer"},
+                            "description": {"type": "string"},
+                            "recommendation": {"type": "string"}
+                        },
+                        "required": ["title", "cwe_id", "severity", "file", "line", "description", "recommendation"]
+                    }
+                }
+            },
+            "required": ["findings"]
+        })
+    }
+
+    /// Chunked analysis for oversized files: split into line-exact
+    /// tree-sitter slices and run one LLM call per slice, remapping reported
+    /// line numbers back to absolute file lines.
+    async fn analyze_chunked(
+        &self,
+        path: &Path,
+        content: &str,
+    ) -> Result<Vec<VulnerabilityFinding>, String> {
+        let file_path = path.to_string_lossy().to_string();
+        let extension = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+
+        let Some(language) = Self::language_for_extension(extension) else {
+            tracing::warn!(
+                "Skipping oversized file {} ({} KB): no tree-sitter chunker for .{}",
+                file_path,
+                content.len() / 1024,
+                extension
+            );
+            return Ok(Vec::new());
+        };
+
+        let mut chunks = Self::chunk_file_with_ranges(content, language, CHUNK_MAX_BYTES);
+        if chunks.is_empty() {
+            tracing::warn!(
+                "Skipping oversized file {} ({} KB): chunking produced no usable slices",
+                file_path,
+                content.len() / 1024
+            );
+            return Ok(Vec::new());
+        }
+        if chunks.len() > MAX_CHUNKS_PER_FILE {
+            tracing::warn!(
+                "File {} needs {} chunks, analyzing the first {} (call limit)",
+                file_path,
+                chunks.len(),
+                MAX_CHUNKS_PER_FILE
+            );
+            chunks.truncate(MAX_CHUNKS_PER_FILE);
+        }
+
+        tracing::info!(
+            "Analyzing oversized file {} in {} chunk(s) ({} KB total)",
+            file_path,
+            chunks.len(),
+            content.len() / 1024
+        );
+
+        let cwe_specs = self.retrieve_cwe_specs(&file_path, content);
+        let mut all_findings = Vec::new();
+
+        for chunk in &chunks {
+            let line_range = format!("{}-{}", chunk.start_line, chunk.end_line);
+            let prompt = self
+                .prompt_template
+                .replace("%%LANGUAGE%%", extension)
+                .replace("%%FILE_PATH%%", &file_path)
+                .replace("%%LINE_RANGE%%", &line_range)
+                .replace("%%CONTEXT_LINES%%", "3")
+                .replace("%%CODE_CONTENT%%", &self.truncate_code(&chunk.text))
+                .replace("%%CWE_SPECS%%", &cwe_specs);
+
+            let user_prompt = if let Some(ref prefix) = &self.context_prefix {
+                format!("{}\n\n{}", prefix, prompt)
+            } else {
+                prompt
+            };
+
+            let messages = vec![
+                crate::llm::ChatMessage::system(&format!(
+                    "You are a security expert analyzing code for vulnerabilities. Return ONLY valid JSON array. The excerpt starts at line {} of the original file.",
+                    chunk.start_line
+                )),
+                crate::llm::ChatMessage::user(&user_prompt),
+            ];
+
+            let response = if self.enable_structured_output {
+                self.client
+                    .chat_with_json_schema(
+                        &messages,
+                        "vulnerability_findings",
+                        Self::findings_json_schema(),
+                    )
+                    .await
+            } else {
+                self.client.chat(&messages).await
+            };
+
+            let response = match response {
+                Ok(r) => r,
+                Err(e) => {
+                    tracing::error!(
+                        "LLM chunk analysis failed for {} (lines {}-{}): {}",
+                        file_path,
+                        chunk.start_line,
+                        chunk.end_line,
+                        e
+                    );
+                    continue;
+                }
+            };
+
+            let parsed = if self.enable_structured_output {
+                self.parse_structured_llm_response(
+                    &response.content,
+                    &file_path,
+                    &response.model_used,
+                )
+            } else {
+                self.parse_llm_response(&response.content, &file_path, &response.model_used)
+            };
+
+            match parsed {
+                Ok(mut findings) => {
+                    for finding in &mut findings {
+                        if let Some(line) = finding.line_number {
+                            finding.line_number = Some(map_chunk_line(
+                                i64::from(line),
+                                chunk.start_line,
+                                chunk.end_line,
+                            ));
+                        }
+                    }
+                    all_findings.extend(findings);
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "Unparseable LLM response for chunk {}:{}-{}: {}",
+                        file_path,
+                        chunk.start_line,
+                        chunk.end_line,
+                        e
+                    );
+                }
+            }
+        }
+
+        Ok(all_findings)
     }
 
     /// Retrieve relevant CWE specifications based on file path and code content
@@ -620,19 +840,8 @@ impl LlmAnalyzer {
 
     /// Parse content and extract function/class chunks
     fn parse_and_chunk(&self, content: &str, language: &str, max_bytes: usize) -> Vec<String> {
-        // Map language to tree-sitter parser
-        let lang = match language.to_lowercase().as_str() {
-            "rust" => Some(tree_sitter_rust::LANGUAGE.into()),
-            "c" | "c++" | "cpp" => Some(tree_sitter_c::LANGUAGE.into()),
-            "python" => Some(tree_sitter_python::LANGUAGE.into()),
-            "javascript" | "typescript" | "tsx" => Some(tree_sitter_javascript::LANGUAGE.into()),
-            "php" => Some(tree_sitter_php::LANGUAGE_PHP.into()),
-            _ => None,
-        };
-
-        let lang = match lang {
-            Some(l) => l,
-            None => return vec![],
+        let Some(lang) = tree_sitter_language(language) else {
+            return vec![];
         };
 
         let mut parser = tree_sitter::Parser::new();
@@ -750,6 +959,193 @@ impl LlmAnalyzer {
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
             Self::extract_function_ranges(child, _content, ranges);
+        }
+    }
+
+    /// Tree-sitter language name for a file extension, if a chunker exists.
+    pub fn language_for_extension(ext: &str) -> Option<&'static str> {
+        match ext.to_lowercase().as_str() {
+            "php" | "phtml" => Some("php"),
+            "rs" => Some("rust"),
+            "py" | "pyw" => Some("python"),
+            "js" | "jsx" => Some("javascript"),
+            "ts" | "tsx" => Some("typescript"),
+            "c" | "h" => Some("c"),
+            "cpp" | "hpp" | "cc" | "hh" | "cxx" | "hxx" => Some("cpp"),
+            _ => None,
+        }
+    }
+
+    /// Split `content` into line-exact chunks, each within `max_bytes`.
+    ///
+    /// Top-level functions/classes are grouped under the cap; a unit still
+    /// too large is first split into its direct children (e.g. methods of a
+    /// huge class), then hard-split at line boundaries. Every chunk's `text`
+    /// is exactly `lines[start_line..=end_line]` of the original file, so
+    /// reported line offsets map back losslessly. Returns empty when the
+    /// language has no tree-sitter parser or no function-like structure.
+    pub fn chunk_file_with_ranges(
+        content: &str,
+        language: &str,
+        max_bytes: usize,
+    ) -> Vec<ChunkRange> {
+        let all_ranges = Self::collect_function_ranges(content, language);
+        if all_ranges.is_empty() {
+            return Vec::new();
+        }
+
+        let mut units = Self::top_level_ranges(&all_ranges);
+
+        // Give oversized units (e.g. one huge class) method-level granularity.
+        let mut refined: Vec<(usize, usize)> = Vec::with_capacity(units.len());
+        for (start, end) in units.drain(..) {
+            if end - start <= max_bytes {
+                refined.push((start, end));
+                continue;
+            }
+            let children: Vec<(usize, usize)> = all_ranges
+                .iter()
+                .copied()
+                .filter(|(cs, ce)| *cs > start && *ce < end)
+                .collect();
+            let child_units = Self::top_level_ranges(&children);
+            if child_units.is_empty() {
+                refined.push((start, end)); // hard-split later
+            } else {
+                refined.extend(child_units);
+            }
+        }
+        refined.sort_unstable();
+
+        // Snap byte boundaries outward to whole lines so each chunk's text is
+        // an exact contiguous file slice (a method body starts at `{` mid-line
+        // otherwise, dropping its signature).
+        let mut snapped: Vec<(usize, usize)> = refined
+            .iter()
+            .map(|(s, e)| (line_start(content, *s), line_end(content, *e)))
+            .collect();
+        snapped.sort_unstable();
+        let units_span = Self::top_level_ranges(&snapped);
+
+        let line_of = |byte: usize| content[..byte].matches('\n').count() + 1;
+        let mut chunks: Vec<ChunkRange> = Vec::new();
+        let mut group: Option<(usize, usize)> = None;
+
+        for (start, end) in units_span {
+            if end - start > max_bytes {
+                if let Some((gs, ge)) = group.take() {
+                    chunks.push(Self::chunk_from_span(content, gs, ge, &line_of));
+                }
+                Self::hard_split_range(content, start, end, max_bytes, &line_of, &mut chunks);
+            } else if let Some((gs, ge)) = group {
+                if end - gs <= max_bytes {
+                    group = Some((gs, end));
+                } else {
+                    chunks.push(Self::chunk_from_span(content, gs, ge, &line_of));
+                    group = Some((start, end));
+                }
+            } else {
+                group = Some((start, end));
+            }
+        }
+        if let Some((gs, ge)) = group {
+            chunks.push(Self::chunk_from_span(content, gs, ge, &line_of));
+        }
+        chunks
+    }
+
+    fn chunk_from_span(
+        content: &str,
+        start_byte: usize,
+        end_byte: usize,
+        line_of: &impl Fn(usize) -> usize,
+    ) -> ChunkRange {
+        // A snapped end byte sits at the start of the next line; a trailing
+        // newline terminates the last covered line rather than opening one.
+        let prefix = &content[..end_byte];
+        let end_line = if prefix.ends_with('\n') {
+            prefix.matches('\n').count()
+        } else {
+            prefix.matches('\n').count() + 1
+        };
+        ChunkRange {
+            start_line: line_of(start_byte),
+            end_line,
+            text: content[start_byte..end_byte].to_string(),
+        }
+    }
+
+    /// Byte ranges of function/class-like nodes, via tree-sitter.
+    fn collect_function_ranges(content: &str, language: &str) -> Vec<(usize, usize)> {
+        let Some(lang) = tree_sitter_language(language) else {
+            return Vec::new();
+        };
+        let mut parser = tree_sitter::Parser::new();
+        if parser.set_language(&lang).is_err() {
+            return Vec::new();
+        }
+        let Some(tree) = parser.parse(content, None) else {
+            return Vec::new();
+        };
+        let mut ranges = Vec::new();
+        Self::extract_function_ranges(tree.root_node(), content, &mut ranges);
+        ranges
+    }
+
+    /// Keep only ranges not contained in another range (outermost structures).
+    fn top_level_ranges(ranges: &[(usize, usize)]) -> Vec<(usize, usize)> {
+        let mut sorted = ranges.to_vec();
+        // Containers must sort before the nodes they contain.
+        sorted.sort_by(|a, b| a.0.cmp(&b.0).then(b.1.cmp(&a.1)));
+        let mut result: Vec<(usize, usize)> = Vec::new();
+        for (start, end) in sorted {
+            match result.last() {
+                Some(last) if start < last.1 => {} // nested: covered by container
+                _ => result.push((start, end)),
+            }
+        }
+        result
+    }
+
+    /// Split a single oversized byte range at line boundaries, each part
+    /// within `max_bytes` (a single line longer than the cap stays whole).
+    fn hard_split_range(
+        content: &str,
+        start_byte: usize,
+        end_byte: usize,
+        max_bytes: usize,
+        line_of: &impl Fn(usize) -> usize,
+        chunks: &mut Vec<ChunkRange>,
+    ) {
+        let slice = &content[start_byte..end_byte];
+        let base_line = line_of(start_byte);
+        let mut part_start = 0usize;
+        let mut cursor = 0usize;
+
+        for line in slice.split_inclusive('\n') {
+            if cursor > part_start && cursor + line.len() > max_bytes {
+                chunks.push(Self::slice_chunk(slice, base_line, part_start, cursor));
+                part_start = cursor;
+            }
+            cursor += line.len();
+        }
+        if cursor > part_start {
+            chunks.push(Self::slice_chunk(slice, base_line, part_start, cursor));
+        }
+    }
+
+    fn slice_chunk(slice: &str, base_line: usize, from: usize, to: usize) -> ChunkRange {
+        let start_line = base_line + slice[..from].matches('\n').count();
+        let complete = slice[..to].matches('\n').count();
+        let end_line = if slice[..to].ends_with('\n') {
+            base_line + complete - 1
+        } else {
+            base_line + complete
+        };
+        ChunkRange {
+            start_line,
+            end_line,
+            text: slice[from..to].to_string(),
         }
     }
 

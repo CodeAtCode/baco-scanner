@@ -565,7 +565,10 @@ fn run_dry_run(
 
     for file in files {
         let lang = file.language.clone();
-        let score = compute_file_priority_score(file, &config.priority);
+        let hook_map = baco::hook_registry::load_hook_map(&baco::hook_registry::hook_map_path(
+            std::path::PathBuf::from(&config.output.dir).as_path(),
+        ));
+        let score = compute_file_priority_score(file, &config.priority, &hook_map);
         total_priority += score;
         files_by_lang.entry(lang).or_default().push(file);
     }

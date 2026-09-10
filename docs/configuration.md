@@ -608,6 +608,8 @@ Presets are applied on top of the user config and take precedence. Note that `[s
 |--------------------|-------------------------------------------------|-----------------------|
 | `wordpress-core`   | WordPress core audit                            | php, javascript       |
 | `wordpress-plugin` | WordPress plugin audit                          | php                   |
+| `django`           | Django web application audit                    | python                |
+| `laravel`          | Laravel web application audit                   | php                   |
 | `litellm`          | LiteLLM proxy codebase                          | python                |
 | `oss-python`       | Generic OSS Python project                      | python                |
 | `oss-monorepo`     | Polyglot OSS monorepo                           | python, rust          |
@@ -639,7 +641,17 @@ max_file_size_kb = 256
 exclude_paths = ["wp-content/*", "tests/*", "*.min.js"]
 
 [scanner.semgrep]
-config = ["p/wordpress", "p/php", "p/security"]
+rulesets = ["p/wordpress", "p/php", "p/security"]
+# Inline semgrep rule YAML (full `rules:` blocks), materialized to temp files
+# at scan time and passed as extra --config args. Keeps presets self-contained.
+custom_rules = ['''
+rules:
+  - id: my-custom-rule-high
+    languages: [php]
+    severity: ERROR
+    message: example rule
+    pattern: eval($X)
+''']
 
 [scanner.performance]
 enable_incremental_scan = true
@@ -678,6 +690,16 @@ max_llm_calls = 600
 "CWE-352" = ["check_admin_referer(", "wp_verify_nonce("]
 "CWE-862" = ["current_user_can(", "is_admin()"]
 
+[knowledge.required_security_primitives]
+"php" = ["wp_verify_nonce", "check_admin_referer", "check_ajax_referer", "current_user_can", "user_can"]
+
+[knowledge.hook_registry.php]
+hook_label = "rest_route"
+registrations = [
+    '''(?si)add_action\s*\(\s*[\x27\x22]((?:wp_ajax|wp_ajax_nopriv|admin_post|admin_post_nopriv)[^\x27\x22]*)[\x27\x22]\s*,\s*''',
+    '''(?si)register_rest_route\s*\([^;]*?[\x27\x22]callback[\x27\x22]\s*=>\s*''',
+]
+
 [agent_flow]
 enabled = false
 
@@ -704,13 +726,13 @@ baco scan --config my.toml --preset my-project
 | Section      | Key fields                                                                 |
 |--------------|---------------------------------------------------------------------------|
 | `project`    | `name`, `path`, `languages`                                               |
-| `scanner`    | `max_file_size_kb`, `exclude_paths`, `semgrep.rulesets`, `performance.*`  |
+| `scanner`    | `max_file_size_kb`, `exclude_paths`, `semgrep.rulesets`, `semgrep.custom_rules`, `performance.*`  |
 | `llm`        | `timeout_secs`, `max_concurrent`, `temperature`, `phases.*`               |
 | `triage`     | `enabled`, `model`, `batch_size`, `suspicion_threshold`                   |
 | `priority`   | `enabled`, `git_recent_boost`, `entry_point_boost`, `small_file_boost`    |
 | `budget`     | `enabled`, `max_llm_calls`, `reserve_percent_for_high_risk`               |
 | `agent_flow` | `enabled`, `max_iterations`, `requires_instrumented_target`                |
 | `agent`      | `enabled`, `max_turns`, `tool_timeout_secs`               |
-| `knowledge`  | `fp_patterns` (map of CWE → list of false-positive indicator strings)     |
+| `knowledge`  | `fp_patterns` (map of CWE → list of false-positive indicator strings), `required_security_primitives` (map of language → list of required primitives), `hook_registry` (map of language → HookRegistryLanguageConfig with `hook_label`, `registrations` regexes with optional `(?P<hook>)` capture, `handler_patterns` override) |
 
 Unset fields keep the base `ScannerConfig` default; CLI flags still override the preset.

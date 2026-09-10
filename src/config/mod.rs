@@ -1,5 +1,5 @@
 mod env;
-mod knowledge;
+pub mod knowledge;
 mod llm;
 mod phases;
 mod scanner;

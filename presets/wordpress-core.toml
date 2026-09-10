@@ -21,6 +21,87 @@ exclude_paths = [
 
 [scanner.semgrep]
 rulesets = ["p/wordpress", "p/php", "p/security"]
+# Inline semgrep rules, materialized to temp files at scan time and passed as
+# extra --config args. Keeps the preset self-contained (no external rules file).
+custom_rules = ['''
+rules:
+  - id: wp-superglobal-file-read-high
+    languages: [php]
+    severity: ERROR
+    message: >
+      Reads a file path directly from a request superglobal, allowing arbitrary
+      file read / path traversal.
+    metadata:
+      cwe:
+        - "CWE-22: Improper Limitation of a Pathname to a Restricted Directory"
+    pattern-either:
+      - pattern: file_get_contents($_GET[$KEY])
+      - pattern: file_get_contents($_REQUEST[$KEY])
+      - pattern: file_get_contents($_POST[$KEY])
+      - pattern: readfile($_GET[$KEY])
+      - pattern: readfile($_REQUEST[$KEY])
+
+  - id: wp-open-redirect-superglobal-medium
+    languages: [php]
+    severity: WARNING
+    message: >
+      Redirects to a URL taken from a request superglobal (open redirect).
+    metadata:
+      cwe:
+        - "CWE-601: URL Redirection to Untrusted Site ('Open Redirect')"
+    pattern-either:
+      - pattern: wp_redirect($_GET[$KEY])
+      - pattern: wp_redirect($_REQUEST[$KEY])
+      - pattern: wp_redirect($_POST[$KEY])
+
+  - id: wp-ajax-dispatch-missing-nonce-high
+    languages: [php]
+    severity: ERROR
+    message: >
+      Dispatches a request-supplied action without any nonce verification
+      (CSRF-able privileged action).
+    metadata:
+      cwe:
+        - "CWE-352: Cross-Site Request Forgery (CSRF)"
+    patterns:
+      - pattern-either:
+          - pattern: $_GET["action"]
+          - pattern: $_REQUEST["action"]
+          - pattern: $_GET['action']
+          - pattern: $_REQUEST['action']
+      - pattern-not-inside: |
+          function $FUNC(...) {
+            ...
+            check_ajax_referer(...);
+            ...
+          }
+      - pattern-not-inside: |
+          function $FUNC(...) {
+            ...
+            check_admin_referer(...);
+            ...
+          }
+      - pattern-not-inside: |
+          function $FUNC(...) {
+            ...
+            wp_verify_nonce(...);
+            ...
+          }
+
+  - id: php-weak-hash-md5-medium
+    languages: [php]
+    severity: WARNING
+    message: >
+      MD5 over concatenated inputs used as a security value (predictable token).
+    metadata:
+      cwe:
+        - "CWE-327: Use of a Broken or Risky Cryptographic Algorithm"
+    pattern-either:
+      - pattern: md5($A . $B)
+      - pattern: md5($_GET[$KEY])
+      - pattern: md5($_REQUEST[$KEY])
+      - pattern: md5(uniqid())
+''']
 
 [scanner.performance]
 enable_incremental_scan = true
@@ -66,6 +147,12 @@ entry_point_patterns = [
   "wp-includes/user.php",
   "wp-includes/formatting.php",
   "wp-includes/kses.php",
+  "add_action(",
+  "add_filter(",
+  "register_rest_route(",
+  "register_activation_hook(",
+  "wp_ajax_",
+  "admin_post_",
 ]
 sink_patterns = [
   "$wpdb->query",
@@ -94,6 +181,9 @@ sink_patterns = [
   "require_once",
   "wp_redirect",
   "wp_kses(",
+  "file_get_contents(",
+  "fopen(",
+  "md5(",
 ]
 
 
@@ -117,6 +207,16 @@ max_llm_calls = 600
   "check_ajax_referer(",
 ]
 "CWE-862" = ["current_user_can(", "user_can(", "is_admin()"]
+
+[knowledge.required_security_primitives]
+"php" = ["wp_verify_nonce", "check_admin_referer", "check_ajax_referer", "current_user_can", "user_can"]
+
+[knowledge.hook_registry.php]
+hook_label = "rest_route"
+registrations = [
+    '''(?si)add_action\s*\(\s*[\x27\x22](?P<hook>(?:wp_ajax|wp_ajax_nopriv|admin_post|admin_post_nopriv)[^\x27\x22]*)[\x27\x22]\s*,\s*''',
+    '''(?si)register_rest_route\s*\([^;]*?[\x27\x22]callback[\x27\x22]\s*=>\s*''',
+]
 
 [agent_flow]
 enabled = false

@@ -341,13 +341,19 @@ impl AgentSession {
         // Always run agent verification loop - don't skip even if description exists
         // The agent needs to use tools to actually verify the finding
         let system_prompt = "Write a test proving this vulnerability. Use file_write to create a test, test_compile to verify it compiles, and test_run to execute it. Report in JSON: {compiled: true|false, test_passed: true|false, log: \"reason\"}";
+        let description = match finding.code_snippet.as_deref() {
+            Some(code) if finding.description.is_empty() => {
+                format!("(no textual description; target code):\n{}", code)
+            }
+            _ => finding.description.clone(),
+        };
         let user_content = format!(
             "Finding to verify:\nTitle: {}\nFile: {}\nLine: {}\nSeverity: {}\nDescription: {}\n\nCreate and run a proof-of-concept test.",
             finding.title,
             finding.file_path,
             finding.line_number.map(|l| l.to_string()).unwrap_or_default(),
             finding.severity,
-            finding.description
+            description
         );
 
         let mut messages = vec![

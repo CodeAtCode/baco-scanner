@@ -38,8 +38,10 @@ fn test_verification_stable_prefix_identical() {
     let hunt_prompts: HashMap<String, String> = HashMap::new();
 
     // Build stable prefixes for both findings
-    let prefix1 = build_stable_verification_prefix(&[finding1.clone()], &hunt_prompts);
-    let prefix2 = build_stable_verification_prefix(&[finding2.clone()], &hunt_prompts);
+    let prefix1 =
+        build_stable_verification_prefix(&[finding1.clone()], &hunt_prompts, &HashMap::new());
+    let prefix2 =
+        build_stable_verification_prefix(&[finding2.clone()], &hunt_prompts, &HashMap::new());
 
     // Prefixes should be identical (same phase + domain combination)
     assert_eq!(
@@ -141,8 +143,10 @@ fn test_volatile_content_differs() {
 
     let hunt_prompts: HashMap<String, String> = HashMap::new();
 
-    let stable1 = build_stable_verification_prefix(&[finding1.clone()], &hunt_prompts);
-    let stable2 = build_stable_verification_prefix(&[finding2.clone()], &hunt_prompts);
+    let stable1 =
+        build_stable_verification_prefix(&[finding1.clone()], &hunt_prompts, &HashMap::new());
+    let stable2 =
+        build_stable_verification_prefix(&[finding2.clone()], &hunt_prompts, &HashMap::new());
     let volatile1 = build_volatile_verification_tail(&[finding1.clone()], &hunt_prompts);
     let volatile2 = build_volatile_verification_tail(&[finding2.clone()], &hunt_prompts);
 
@@ -193,12 +197,12 @@ fn test_batch_prefix_stability() {
 
     // Batch 1: findings 1, 2
     let batch1 = vec![finding1.clone(), finding2.clone()];
-    let prefix1 = build_stable_verification_prefix(&batch1, &hunt_prompts);
+    let prefix1 = build_stable_verification_prefix(&batch1, &hunt_prompts, &HashMap::new());
     let volatile1 = build_volatile_verification_tail(&batch1, &hunt_prompts);
 
     // Batch 2: findings 2, 3
     let batch2 = vec![finding2.clone(), finding3.clone()];
-    let prefix2 = build_stable_verification_prefix(&batch2, &hunt_prompts);
+    let prefix2 = build_stable_verification_prefix(&batch2, &hunt_prompts, &HashMap::new());
     let volatile2 = build_volatile_verification_tail(&batch2, &hunt_prompts);
 
     // Prefixes should be identical (same domain/phase)

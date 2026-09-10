@@ -14,6 +14,9 @@ use crate::config::ScannerConfig;
 pub const BUILTIN_PRESETS: &[&str] = &[
     "wordpress-core",
     "wordpress-plugin",
+    "django",
+    "laravel",
+    "cpp",
     "litellm",
     "oss-python",
     "oss-monorepo",
@@ -69,6 +72,9 @@ impl PresetOverlay {
             }
             if !scanner.semgrep.exclude_rules.is_empty() {
                 base.scanner.semgrep.exclude_rules = scanner.semgrep.exclude_rules.clone();
+            }
+            if !scanner.semgrep.custom_rules.is_empty() {
+                base.scanner.semgrep.custom_rules = scanner.semgrep.custom_rules.clone();
             }
             // Performance settings
             base.scanner.performance = scanner.performance.clone();
@@ -155,6 +161,13 @@ impl PresetOverlay {
             if !knowledge.fp_patterns.is_empty() {
                 base.knowledge.fp_patterns = knowledge.fp_patterns.clone();
             }
+            if !knowledge.required_security_primitives.is_empty() {
+                base.knowledge.required_security_primitives =
+                    knowledge.required_security_primitives.clone();
+            }
+            if !knowledge.hook_registry.is_empty() {
+                base.knowledge.hook_registry = knowledge.hook_registry.clone();
+            }
         }
     }
 }
@@ -195,6 +208,9 @@ fn get_bundled_preset(name: &str) -> Option<&'static str> {
     match name {
         "wordpress-core" => Some(include_str!("../presets/wordpress-core.toml")),
         "wordpress-plugin" => Some(include_str!("../presets/wordpress-plugin.toml")),
+        "django" => Some(include_str!("../presets/django.toml")),
+        "laravel" => Some(include_str!("../presets/laravel.toml")),
+        "cpp" => Some(include_str!("../presets/cpp.toml")),
         "litellm" => Some(include_str!("../presets/litellm.toml")),
         "oss-python" => Some(include_str!("../presets/oss-python.toml")),
         "oss-monorepo" => Some(include_str!("../presets/oss-monorepo.toml")),

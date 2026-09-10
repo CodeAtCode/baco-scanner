@@ -87,6 +87,7 @@ max_concurrent = 2
 | `max_file_size_kb` | `[scanner]` | 512 | Skip larger files |
 | `exclude_paths` | `[scanner]` | `["tests/", "docs/", "target/"]` | Glob patterns to skip |
 | `exclude_rules` | `[scanner.semgrep]` | `[]` | Semgrep rule IDs to skip |
+| `custom_rules` | `[scanner.semgrep]` | `[]` | Inline semgrep YAML `rules:` blocks shipped in presets; materialized to temp files at scan time |
 
 ## Trade-off Callouts
 

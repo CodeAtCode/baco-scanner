@@ -3,6 +3,7 @@
 //! These tests focus on isolated functionality without external dependencies.
 pub mod common;
 pub mod helpers;
+pub mod hook_registry_tests;
 // Error taxonomy tests (T27)
 // Include centralized fixtures
 pub use fixtures::*;
@@ -105,6 +106,7 @@ mod budget_chunk_tests;
 mod chain_analysis_tests;
 mod checkpoint_resume_tests;
 mod checkpoint_tests;
+mod chunked_analysis_tests;
 mod citation_verification_tests;
 mod confidence_aggregation_tests;
 mod confidence_normalization;
@@ -249,6 +251,7 @@ mod scanner_sequential_tests;
 mod scanner_types_tests;
 mod semantic_path;
 mod semgrep;
+mod semgrep_custom_rules_tests;
 mod semgrep_ruleset_cpe_tests;
 mod severity_order_tests;
 mod severity_rubric_tests;
@@ -275,3 +278,4 @@ mod variant_search_tests;
 mod verification_verdict_tests;
 mod vuln_spec_tests;
 mod worktree_staging_tests;
+mod wp_primitive_prompt_tests;

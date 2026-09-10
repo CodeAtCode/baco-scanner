@@ -264,7 +264,6 @@ fn test_preset_fp_patterns_merge() {
 #[test]
 fn test_presets_contain_only_known_keys() {
     // Anti-phantom guard: verify all preset keys are known
-    // Build the set of known key paths by serializing a fully-populated PresetOverlay
     use std::collections::HashSet;
 
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
@@ -275,6 +274,39 @@ fn test_presets_contain_only_known_keys() {
         "oss-python",
         "oss-monorepo",
     ];
+
+    // Known leaf key paths (wildcard patterns for tables with arbitrary children)
+    let known_keys: HashSet<String> = [
+        // Project section
+        "project.*".to_string(),
+        // Scanner section
+        "scanner.*".to_string(),
+        "scanner.semgrep.*".to_string(),
+        "scanner.performance.*".to_string(),
+        // LLM section
+        "llm.*".to_string(),
+        "llm.phases.*".to_string(),
+        "llm.phases.discovery.*".to_string(),
+        "llm.phases.verification.*".to_string(),
+        "llm.phases.aggregation.*".to_string(),
+        // Triage section
+        "triage.*".to_string(),
+        // Priority section
+        "priority.*".to_string(),
+        // Budget section
+        "budget.*".to_string(),
+        // Knowledge section (includes fp_patterns, required_security_primitives, hook_registry)
+        "knowledge.*".to_string(),
+        "knowledge.fp_patterns.*".to_string(),
+        "knowledge.required_security_primitives.*".to_string(),
+        "knowledge.hook_registry.*".to_string(),
+        // Agent section
+        "agent_flow.*".to_string(),
+        "agent.*".to_string(),
+    ]
+    .iter()
+    .cloned()
+    .collect();
 
     for name in &preset_names {
         let preset_path = format!("{}/presets/{}.toml", manifest_dir, name);
@@ -288,14 +320,22 @@ fn test_presets_contain_only_known_keys() {
         let mut preset_paths = HashSet::new();
         collect_key_paths(&value, "", &mut preset_paths);
 
-        // For now, just verify the TOML parses (full key validation requires
-        // PresetOverlay serialization which may not compile until parallel lane lands)
-        // This test will be enhanced when PresetOverlay::try_into(toml::Value) is available
-        assert!(
-            !preset_paths.is_empty(),
-            "Preset {} should have at least some keys",
-            name
-        );
+        // Verify each preset path matches a known pattern
+        for path in &preset_paths {
+            let matches = known_keys.iter().any(|known| {
+                if known.ends_with(".*") {
+                    let prefix = &known[..known.len() - 2];
+                    path.starts_with(prefix)
+                } else {
+                    *path == *known
+                }
+            });
+            assert!(
+                matches,
+                "Preset {} has unknown key path: {} (known: {:?})",
+                name, path, known_keys
+            );
+        }
     }
 }
 

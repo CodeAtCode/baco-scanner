@@ -66,6 +66,66 @@ pub async fn run_indexing(
         tracing::info!("Saved hash store with {} entries", hash_store.len());
     }
 
+    // Extract framework hooks from language-matched files and save hook map
+    // Skip entirely if no hook_registry config is provided
+    let _hook_map = if !config.knowledge.hook_registry.is_empty() {
+        let mut hook_map: std::collections::HashMap<String, Vec<String>> =
+            std::collections::HashMap::new();
+
+        for file_info in &index.files {
+            // Only process files whose language has a hook_registry config entry
+            let lang = file_info.language.to_lowercase();
+            if let Some(lang_cfg) = config.knowledge.hook_registry.get(&lang) {
+                if let Ok(content) = std::fs::read_to_string(&file_info.path) {
+                    let registrations = crate::hook_registry::extract_hooks(&content, lang_cfg);
+                    if !registrations.is_empty() {
+                        let path_str = file_info.path.to_string_lossy().to_string();
+                        let handlers: Vec<String> =
+                            registrations.into_iter().map(|r| r.handler).collect();
+                        hook_map.insert(path_str, handlers);
+                    }
+                }
+            }
+            // Also check .phtml extension as PHP alias
+            if file_info
+                .path
+                .extension()
+                .map(|e| e.to_string_lossy().to_lowercase())
+                == Some("phtml".to_string())
+            {
+                if let Some(lang_cfg) = config.knowledge.hook_registry.get("php") {
+                    if let Ok(content) = std::fs::read_to_string(&file_info.path) {
+                        let registrations = crate::hook_registry::extract_hooks(&content, lang_cfg);
+                        if !registrations.is_empty() {
+                            let path_str = file_info.path.to_string_lossy().to_string();
+                            let handlers: Vec<String> =
+                                registrations.into_iter().map(|r| r.handler).collect();
+                            hook_map.insert(path_str, handlers);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Save hook map if non-empty
+        if !hook_map.is_empty() {
+            let hook_map_path =
+                crate::hook_registry::hook_map_path(PathBuf::from(&config.output.dir).as_path());
+            if let Some(parent) = hook_map_path.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            if let Err(e) = crate::hook_registry::save_hook_map(&hook_map_path, &hook_map) {
+                tracing::warn!("Failed to save hook map: {}", e);
+            } else {
+                tracing::info!("Saved hook map with {} entries", hook_map.len());
+            }
+        }
+
+        hook_map
+    } else {
+        std::collections::HashMap::new()
+    };
+
     // Log statistics about incremental scanning
     if _previous_hash_store.is_some() {
         let unchanged_count = index

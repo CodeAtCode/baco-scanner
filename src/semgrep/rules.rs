@@ -4,6 +4,9 @@ use crate::findings::Severity;
 pub struct SemgrepRunner {
     pub rulesets: Vec<String>,
     pub exclude_rules: Vec<String>,
+    /// Inline rule YAML documents (preset `custom_rules`), materialized to
+    /// temp .yml files at scan time.
+    pub custom_rules: Vec<String>,
 }
 
 impl SemgrepRunner {
@@ -11,7 +14,14 @@ impl SemgrepRunner {
         Self {
             rulesets,
             exclude_rules,
+            custom_rules: Vec::new(),
         }
+    }
+
+    /// Builder: attach inline rule YAML documents from preset `custom_rules`.
+    pub fn with_custom_rules(mut self, custom_rules: Vec<String>) -> Self {
+        self.custom_rules = custom_rules;
+        self
     }
 
     /// Check if a rule check_id should be excluded based on exclude_rules patterns.

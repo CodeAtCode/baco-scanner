@@ -1,0 +1,202 @@
+# BACO preset — Django
+[project]
+name = "django"
+languages = ["python", "javascript", "html"]
+
+[scanner]
+max_file_size_kb = 512
+exclude_paths = [
+  "node_modules/*",
+  ".venv/*",
+  "venv/*",
+  "staticfiles/*",
+  "media/*",
+  "migrations/*",
+  "dist/*",
+  "build/*",
+  "*.min.js",
+  "*.min.css",
+  "tests/*",
+  "test/*",
+  "*.map",
+]
+
+[scanner.semgrep]
+rulesets = ["p/django", "p/python", "p/security"]
+custom_rules = ['''
+rules:
+  - id: django-mark-safe-request-data-high
+    languages: [python]
+    severity: ERROR
+    message: >
+      mark_safe fed request data, allowing XSS if data contains HTML.
+    metadata:
+      cwe:
+        - "CWE-79: Improper Neutralization of Input During Web Page Generation"
+    pattern-either:
+      - pattern: mark_safe(request.$FIELD)
+      - pattern: mark_safe(request.$FIELD.$METHOD(...))
+      - pattern: mark_safe(request.$FIELD.get(...))
+
+  - id: django-raw-sql-interpolation-high
+    languages: [python]
+    severity: ERROR
+    message: >
+      Raw SQL with string interpolation, allowing SQL injection.
+    metadata:
+      cwe:
+        - "CWE-89: Improper Neutralization of Special Elements used in an SQL Command"
+    pattern-either:
+      - pattern: $MODEL.raw(f"...")
+      - pattern: $MODEL.raw("..." % $X)
+      - pattern: $MODEL.raw("...".format(...))
+      - patterns:
+          - pattern-either:
+              - pattern: $MODEL.extra(where=...)
+              - pattern: $MODEL.extra(select=...)
+          - metavariable-regex:
+              metavariable: $X
+              regex: .+
+
+  - id: django-open-redirect-medium
+    languages: [python]
+    severity: WARNING
+    message: >
+      Redirect to request-supplied URL, allowing open redirect.
+    metadata:
+      cwe:
+        - "CWE-601: URL Redirection to Untrusted Site"
+    pattern-either:
+      - pattern: redirect(request.$FIELD)
+      - pattern: redirect(request.$FIELD.get(...))
+      - pattern: HttpResponseRedirect(request.$FIELD)
+      - pattern: HttpResponseRedirect(request.$FIELD.get(...))
+
+  - id: django-pickle-loads-request-high
+    languages: [python]
+    severity: ERROR
+    message: >
+      pickle.loads on request data, allowing remote code execution.
+    metadata:
+      cwe:
+        - "CWE-502: Deserialization of Untrusted Data"
+    pattern-either:
+      - pattern: pickle.loads(request.$FIELD)
+      - pattern: pickle.loads(request.$FIELD.get(...))
+''']
+
+[scanner.performance]
+enable_incremental_scan = true
+enable_multi_verifier = false
+enable_variant_search = true
+enable_cve_bootstrap = true
+
+[llm]
+temperature = 0.2
+max_concurrent = 4
+enable_llm_cache = true
+
+[llm.phases.discovery]
+models = ["mistral-small"]
+
+[llm.phases.verification]
+model = "mistral-medium"
+
+[llm.phases.aggregation]
+model = "mistral-medium"
+
+[triage]
+enabled = true
+model = "mistral-small"
+batch_size = 8
+suspicion_threshold = 0.30
+
+[priority]
+entry_point_patterns = [
+  "path(",
+  "re_path(",
+  "url(",
+  "urlpatterns",
+  "as_view(",
+  "api_view",
+  "admin.site.register",
+  "forms.py",
+  "views.py",
+  "urls.py",
+]
+sink_patterns = [
+  "raw(",
+  "extra(",
+  "mark_safe(",
+  "eval(",
+  "exec(",
+  "pickle.loads",
+  "subprocess.",
+  "os.system",
+  "os.popen",
+  "redirect(",
+  "HttpResponseRedirect",
+  "request.GET",
+  "request.POST",
+  "request.FILES",
+  "open(",
+  "send_file(",
+  "base64.b64decode",
+]
+
+[budget]
+enabled = true
+max_llm_calls = 250
+
+[knowledge.fp_patterns]
+"CWE-89" = [
+  "objects.filter(",
+  "objects.get(",
+  "objects.create(",
+  "objects.update(",
+]
+"CWE-79" = [
+  "escape(",
+  "format_html(",
+  "bleach.clean(",
+]
+"CWE-352" = [
+  "csrf_protect",
+  "CsrfViewMiddleware",
+]
+"CWE-862" = [
+  "login_required",
+  "LoginRequiredMixin",
+  "PermissionRequiredMixin",
+  "permission_classes",
+]
+
+[knowledge.required_security_primitives]
+"python" = [
+  "csrf_protect",
+  "CsrfViewMiddleware",
+  "login_required",
+  "LoginRequiredMixin",
+  "PermissionRequiredMixin",
+  "IsAuthenticated",
+  "permission_classes",
+]
+
+[knowledge.hook_registry.python]
+hook_label = ""
+registrations = [
+  '''(?si)\bpath\s*\(\s*[\x27\x22](?P<hook>[^\x27\x22]*)[\x27\x22]\s*,\s*''',
+  '''(?si)\bre_path\s*\(\s*[\x27\x22](?P<hook>[^\x27\x22]*)[\x27\x22]\s*,\s*''',
+  '''(?si)\burl\s*\(\s*[\x27\x22](?P<hook>[^\x27\x22]*)[\x27\x22]\s*,\s*''',
+]
+handler_patterns = [
+  '''^[ \t]*([a-zA-Z_][a-zA-Z0-9_.]*)''',
+]
+
+[agent_flow]
+enabled = false
+requires_instrumented_target = false
+
+[agent]
+enabled = false
+trusted_paths = []

@@ -1,0 +1,125 @@
+# C++ Security Preset for baco
+# Optimized for C/C++ codebases with focus on memory safety and command injection
+
+[project]
+name = "cpp"
+languages = ["cpp"]
+
+[scanner]
+max_file_size_kb = 2048
+exclude_paths = ["node_modules/*", ".venv/*", "venv/*", "dist/*", "build/*", "*.min.js", "*.min.css", "tests/*", "test/*", "*.map", "third_party/*", "external/*", "vendor/*"]
+
+[scanner.semgrep]
+rulesets = ["p/c"]
+custom_rules = ['''
+rules:
+  - id: cpp-gets-critical
+    languages: [cpp]
+    severity: ERROR
+    message: >
+      Use of gets() function, which is inherently unsafe and always leads to
+      buffer overflow vulnerabilities.
+    metadata:
+      cwe:
+        - "CWE-120: Buffer Copy without Checking Size of Input"
+    pattern: gets(...)
+
+  - id: cpp-strcpy-high
+    languages: [cpp]
+    severity: ERROR
+    message: >
+      Use of strcpy() without bounds checking, allowing buffer overflow.
+    metadata:
+      cwe:
+        - "CWE-120: Buffer Copy without Checking Size of Input"
+    pattern-either:
+      - pattern: strcpy($DST, $SRC)
+      - pattern: strcat($DST, $SRC)
+
+  - id: cpp-memcpy-variable-size-high
+    languages: [cpp]
+    severity: WARNING
+    message: >
+      memcpy call detected - ensure size parameter is validated against destination buffer.
+    metadata:
+      cwe:
+        - "CWE-120: Buffer Copy without Checking Size of Input"
+    pattern: memcpy($DST, $SRC, $SIZE)
+
+  - id: cpp-system-command-high
+    languages: [cpp]
+    severity: ERROR
+    message: >
+      Use of system() with potentially untrusted input, allowing command
+      injection attacks.
+    metadata:
+      cwe:
+        - "CWE-78: Improper Neutralization of Special Elements used in an OS Command"
+    pattern: system($CMD)
+
+  - id: cpp-printf-nonliteral-format-high
+    languages: [cpp]
+    severity: ERROR
+    message: >
+      printf with non-literal format string, allowing format string attacks.
+    metadata:
+      cwe:
+        - "CWE-134: Use of Externally-Controlled Format String"
+    patterns:
+      - pattern: printf($FMT)
+      - pattern-not: printf("...")
+      - pattern-not: printf('...')
+''']
+
+[scanner.performance]
+enable_caching = true
+max_workers = 4
+parallel_threshold_kb = 100
+skip_large_files_mb = 5
+
+[llm]
+temperature = 0.2
+max_concurrent = 4
+enable_llm_cache = true
+
+[llm.phases.discovery]
+models = ["mistral-small"]
+
+[llm.phases.verification]
+model = "mistral-medium"
+
+[llm.phases.aggregation]
+model = "mistral-medium"
+
+[triage]
+enabled = true
+model = "mistral-small"
+batch_size = 8
+suspicion_threshold = 0.6
+
+[priority]
+enabled = true
+git_recent_boost = 2.0
+entry_point_boost = 3.0
+small_file_boost = 1.5
+entry_point_patterns = ["main(", "int main", "extern \"C\"", "WINAPI"]
+sink_patterns = ["strcpy(", "strcat(", "memcpy(", "sprintf(", "gets(", "system(", "printf("]
+
+[budget]
+enabled = true
+max_llm_calls = 250
+reserve_percent_for_high_risk = 20
+
+[knowledge.required_security_primitives]
+"cpp" = ["bounds check", "size validation", "std::string", "at()", "length()"]
+
+[agent_flow]
+enabled = false
+max_iterations = 10
+requires_instrumented_target = false
+
+[agent]
+enabled = false
+max_turns = 15
+tool_timeout_secs = 300
+trusted_paths = []

@@ -22,6 +22,11 @@ pub struct SemgrepSettings {
     pub rulesets: Vec<String>,
     #[serde(default)]
     pub exclude_rules: Vec<String>,
+    /// Inline semgrep rule YAML documents (full `rules:` blocks) shipped in
+    /// presets; materialized to temp files and passed as extra `--config` args
+    /// at scan time so presets stay self-contained.
+    #[serde(default)]
+    pub custom_rules: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

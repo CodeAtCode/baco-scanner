@@ -1,0 +1,217 @@
+# BACO preset — Laravel
+[project]
+name = "laravel"
+languages = ["php", "javascript"]
+
+[scanner]
+max_file_size_kb = 512
+exclude_paths = [
+  "vendor/*",
+  "node_modules/*",
+  "storage/*",
+  "bootstrap/cache/*",
+  "public/build/*",
+  "dist/*",
+  "build/*",
+  "*.min.js",
+  "*.min.css",
+  "tests/*",
+  "test/*",
+  "*.map",
+]
+
+[scanner.semgrep]
+rulesets = ["p/laravel", "p/php", "p/security"]
+custom_rules = ['''
+rules:
+  - id: laravel-raw-sql-builder-high
+    languages: [php]
+    severity: ERROR
+    message: >
+      Query builder raw SQL method with variable input, allowing SQL injection.
+    metadata:
+      cwe:
+        - "CWE-89: Improper Neutralization of Special Elements used in an SQL Command"
+    pattern-either:
+      - patterns:
+          - pattern: DB::raw($VAR)
+          - pattern-not: DB::raw("...")
+          - pattern-not: DB::raw('...')
+      - patterns:
+          - pattern: DB::table(...)->whereRaw($VAR)
+          - pattern-not: DB::table(...)->whereRaw("...")
+          - pattern-not: DB::table(...)->whereRaw('...')
+      - patterns:
+          - pattern: DB::table(...)->selectRaw($VAR)
+          - pattern-not: DB::table(...)->selectRaw("...")
+          - pattern-not: DB::table(...)->selectRaw('...')
+      - patterns:
+          - pattern: DB::table(...)->orderByRaw($VAR)
+          - pattern-not: DB::table(...)->orderByRaw("...")
+          - pattern-not: DB::table(...)->orderByRaw('...')
+      - patterns:
+          - pattern: DB::table(...)->havingRaw($VAR)
+          - pattern-not: DB::table(...)->havingRaw("...")
+          - pattern-not: DB::table(...)->havingRaw('...')
+      - patterns:
+          - pattern: DB::table(...)->groupByRaw($VAR)
+          - pattern-not: DB::table(...)->groupByRaw("...")
+          - pattern-not: DB::table(...)->groupByRaw('...')
+
+  - id: laravel-unserialize-request-high
+    languages: [php]
+    severity: ERROR
+    message: >
+      unserialize on request data, allowing remote code execution.
+    metadata:
+      cwe:
+        - "CWE-502: Deserialization of Untrusted Data"
+    pattern-either:
+      - pattern: unserialize($request->input($KEY))
+      - pattern: unserialize($request->$ANY)
+
+  - id: laravel-open-redirect-medium
+    languages: [php]
+    severity: WARNING
+    message: >
+      Redirect to request-supplied URL, allowing open redirect.
+    metadata:
+      cwe:
+        - "CWE-601: URL Redirection to Untrusted Site"
+    pattern-either:
+      - pattern: redirect($request->input($KEY))
+      - pattern: redirect($request->query($KEY))
+      - pattern: redirect()->away($request->$ANY)
+
+  - id: laravel-eval-request-high
+    languages: [php]
+    severity: ERROR
+    message: >
+      eval on request data, allowing remote code execution.
+    metadata:
+      cwe:
+        - "CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code"
+    pattern-either:
+      - pattern: eval($request->$ANY)
+      - pattern: eval($request->input($KEY))
+''']
+
+[scanner.performance]
+enable_incremental_scan = true
+enable_multi_verifier = false
+enable_variant_search = true
+enable_cve_bootstrap = true
+
+[llm]
+temperature = 0.2
+max_concurrent = 4
+enable_llm_cache = true
+
+[llm.phases.discovery]
+models = ["mistral-small"]
+
+[llm.phases.verification]
+model = "mistral-medium"
+
+[llm.phases.aggregation]
+model = "mistral-medium"
+
+[triage]
+enabled = true
+model = "mistral-small"
+batch_size = 8
+suspicion_threshold = 0.30
+
+[priority]
+entry_point_patterns = [
+  "Route::",
+  "routes/web.php",
+  "routes/api.php",
+  "Controller",
+  "__invoke",
+  "handle(",
+  "middleware(",
+  "->name(",
+]
+sink_patterns = [
+  "DB::raw",
+  "whereRaw",
+  "selectRaw",
+  "orderByRaw",
+  "havingRaw",
+  "groupByRaw",
+  "statement(",
+  "unserialize(",
+  "eval(",
+  "$_GET",
+  "$_POST",
+  "$_REQUEST",
+  "exec(",
+  "system(",
+  "shell_exec",
+  "passthru",
+  "proc_open",
+  "File::get",
+  "Storage::get",
+  "response()->download",
+  "redirect(",
+  "base64_decode",
+  "curl_exec",
+]
+
+[knowledge.fp_patterns]
+"CWE-89" = [
+  "->where(",
+  "->whereIn(",
+  "DB::select(",
+  "DB::insert(",
+  "DB::update(",
+  "DB::delete(",
+  "->toSql(",
+]
+"CWE-79" = [
+  "e(",
+  "htmlspecialchars(",
+]
+"CWE-352" = [
+  "csrf_field(",
+  "@csrf",
+  "csrf_token(",
+  "VerifyCsrfToken",
+]
+"CWE-862" = [
+  "$this->authorize(",
+  "Gate::",
+  "abort_unless(",
+  "abort_if(",
+  "middleware('auth')",
+]
+
+[knowledge.required_security_primitives]
+"php" = [
+  "csrf",
+  "VerifyCsrfToken",
+  "$this->authorize",
+  "Gate::",
+  "middleware('auth'",
+  "abort_unless",
+  "abort_if",
+]
+
+[knowledge.hook_registry.php]
+hook_label = ""
+registrations = [
+  '''(?si)\bRoute::\s*(?:get|post|put|patch|delete|options|any)\s*\(\s*[\x27\x22](?P<hook>[^\x27\x22]*)[\x27\x22]\s*,\s*''',
+]
+handler_patterns = [
+  '''^[ \t]*\[\s*[a-zA-Z_\x5c][a-zA-Z0-9_\x5c]*::class\s*,\s*[\x27\x22]([a-zA-Z_][a-zA-Z0-9_]*)[\x27\x22]\s*\]''',
+  '''^[ \t]*[\x27\x22]([a-zA-Z_\x5c][a-zA-Z0-9_\x5c]*@[a-zA-Z_][a-zA-Z0-9_]*)[\x27\x22]''',
+]
+
+[agent_flow]
+enabled = false
+requires_instrumented_target = false
+
+[agent]
+enabled = false
+trusted_paths = []

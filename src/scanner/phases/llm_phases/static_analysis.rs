@@ -132,9 +132,9 @@ pub async fn run_llm_static_analysis(
     tracing::info!("[LLM] Phase config check for LlmStaticAnalysis");
     let phase_config = &config.llm.phases.static_analysis;
     tracing::info!(
-        "[LLM] Phase config: base_url={}, api_key={:?}",
+        "[LLM] Phase config: base_url={}, api_key set={}",
         phase_config.base_url,
-        phase_config.api_key
+        phase_config.api_key.is_some()
     );
 
     if let Some(_api_key) = &phase_config.api_key {
@@ -204,10 +204,16 @@ pub async fn run_llm_static_analysis(
 
         // Priority scoring (T18): sort files by priority score
         let prioritized_files: Vec<_> = if config.priority.enabled {
+            // Load hook map for WordPress entry point detection
+            let hook_map =
+                crate::hook_registry::load_hook_map(&crate::hook_registry::hook_map_path(
+                    std::path::PathBuf::from(&config.output.dir).as_path(),
+                ));
+
             let mut scored: Vec<_> = files_to_analyze
                 .iter()
                 .map(|f| {
-                    let score = compute_file_priority_score(f, &config.priority);
+                    let score = compute_file_priority_score(f, &config.priority, &hook_map);
                     (f, score)
                 })
                 .collect();
@@ -668,6 +674,7 @@ Files to analyze:
 pub fn compute_file_priority_score(
     file_info: &crate::indexer::FileInfo,
     priority: &crate::config::PriorityConfig,
+    hook_map: &std::collections::HashMap<String, Vec<String>>,
 ) -> f32 {
     let mut score = 1.0;
     let path_str = file_info.path.to_string_lossy().to_string();
@@ -700,6 +707,11 @@ pub fn compute_file_priority_score(
         if builtin_patterns.iter().any(|p| filename.starts_with(p)) {
             score *= priority.entry_point_boost;
         }
+    }
+
+    // Hook map boost: if file has registered WordPress hooks, treat as entry point
+    if hook_map.contains_key(&path_str) {
+        score *= priority.entry_point_boost;
     }
 
     // Sink boost: content-based security relevance (only for files <= 1MB)

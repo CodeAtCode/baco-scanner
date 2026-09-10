@@ -31,6 +31,7 @@ struct BatchVerdictItem {
 pub fn build_stable_verification_prefix(
     findings: &[VulnerabilityFinding],
     hunt_prompts: &HashMap<String, String>,
+    required_primitives: &HashMap<String, Vec<String>>,
 ) -> String {
     let mut prefix = String::from(
         "You are a security vulnerability verifier. Analyze findings and return JSON array verdicts.\n\
@@ -117,7 +118,50 @@ pub fn build_stable_verification_prefix(
         }
     }
 
+    // Add required security primitives section per language
+    // Build set of languages present in findings based on file extensions
+    let mut finding_languages: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for finding in findings {
+        let lang = extract_language_from_path(&finding.file_path);
+        finding_languages.insert(lang);
+    }
+
+    // Sort language keys alphabetically for byte-stable output
+    let mut sorted_langs: Vec<&String> = required_primitives
+        .keys()
+        .filter(|k| finding_languages.contains(*k))
+        .collect();
+    sorted_langs.sort();
+
+    for lang_key in sorted_langs {
+        if let Some(primitives) = required_primitives.get(lang_key) {
+            if !primitives.is_empty() {
+                let primitives_str = primitives.join(", ");
+                prefix.push_str(&format!(
+                    "## Required Security Primitives (language: {})\n\
+                     For findings in {} files that describe privileged actions (database writes, option updates, capability-gated routes, AJAX/REST handlers), the following framework primitives MUST be present in the shown code or surrounding context before the privileged action:\n\
+                     {}\n\
+                     If NONE of these primitives appear in the code or its surrounding context, treat the ABSENCE as evidence strengthening the finding (missing CSRF/authorization control). If any primitive IS present, treat it as a mitigating factor and record it in mitigating_factors.\n\n",
+                    lang_key, lang_key, primitives_str
+                ));
+            }
+        }
+    }
+
     prefix
+}
+
+/// Extract language key from file path for required primitives matching.
+/// .phtml -> "php"; otherwise extension string as-is.
+fn extract_language_from_path(file_path: &str) -> String {
+    if let Some(ext) = std::path::Path::new(file_path).extension() {
+        let ext_str = ext.to_string_lossy().to_lowercase();
+        if ext_str == "phtml" {
+            return "php".to_string();
+        }
+        return ext_str;
+    }
+    String::new()
 }
 
 /// Build volatile tail for verification prompt (finding-specific content)
@@ -232,6 +276,7 @@ pub async fn verify_findings_batched<C: LlmChatClient>(
     findings: &[VulnerabilityFinding],
     batch_size: usize,
     hunt_prompts: &HashMap<String, String>,
+    required_primitives: &HashMap<String, Vec<String>>,
 ) -> Vec<(VerificationStatus, String)> {
     if batch_size <= 1 || findings.is_empty() {
         // Signal fallback needed by returning empty vec
@@ -247,7 +292,7 @@ pub async fn verify_findings_batched<C: LlmChatClient>(
 
         let prompt_text = format!(
             "{}{}",
-            build_stable_verification_prefix(batch, hunt_prompts),
+            build_stable_verification_prefix(batch, hunt_prompts, required_primitives),
             build_volatile_verification_tail(batch, hunt_prompts)
         );
         let messages = vec![
@@ -400,8 +445,14 @@ pub async fn run_llm_verification(
 
             if batch_size > 1 {
                 // Batched path
-                let batch_results =
-                    verify_findings_batched(&client, &findings, batch_size, &hunt_prompts).await;
+                let batch_results = verify_findings_batched(
+                    &client,
+                    &findings,
+                    batch_size,
+                    &hunt_prompts,
+                    &config.knowledge.required_security_primitives,
+                )
+                .await;
 
                 // Apply batch results to findings
                 for (i, finding) in findings.iter_mut().enumerate() {
@@ -463,6 +514,7 @@ pub async fn run_llm_verification(
                     let stable_prefix = build_stable_verification_prefix(
                         std::slice::from_ref(finding),
                         &hunt_prompts,
+                        &config.knowledge.required_security_primitives,
                     );
                     let volatile_tail = build_volatile_verification_tail(
                         std::slice::from_ref(finding),

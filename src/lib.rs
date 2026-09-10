@@ -42,6 +42,7 @@ pub mod exploit;
 pub mod file_hash;
 pub mod findings;
 pub mod git_analysis;
+pub mod hook_registry;
 pub mod incremental_scan;
 pub mod indexer;
 pub mod llm;

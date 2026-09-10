@@ -12,6 +12,10 @@ use serde_json::json;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+fn empty_primitives() -> HashMap<String, Vec<String>> {
+    HashMap::new()
+}
+
 /// Counting LLM client that tracks the number of chat calls
 struct CountingLlmClient {
     responses: Vec<String>,
@@ -101,7 +105,8 @@ async fn test_verification_n_findings_leq_batch_size() {
     .unwrap()];
 
     let client = CountingLlmClient::new(responses);
-    let results = verify_findings_batched(&client, &findings, 8, &hunt_prompts).await;
+    let results =
+        verify_findings_batched(&client, &findings, 8, &hunt_prompts, &empty_primitives()).await;
 
     assert_eq!(
         client.get_call_count(),
@@ -137,7 +142,8 @@ async fn test_verification_n_findings_spanning_k_batches() {
     ];
 
     let client = CountingLlmClient::new(responses);
-    let results = verify_findings_batched(&client, &findings, 8, &hunt_prompts).await;
+    let results =
+        verify_findings_batched(&client, &findings, 8, &hunt_prompts, &empty_primitives()).await;
 
     assert_eq!(
         client.get_call_count(),
@@ -189,7 +195,8 @@ async fn test_empty_findings_zero_calls() {
     let hunt_prompts: HashMap<String, String> = HashMap::new();
 
     let client = CountingLlmClient::new(vec![]);
-    let results = verify_findings_batched(&client, &findings, 8, &hunt_prompts).await;
+    let results =
+        verify_findings_batched(&client, &findings, 8, &hunt_prompts, &empty_primitives()).await;
 
     assert_eq!(
         client.get_call_count(),
@@ -209,7 +216,8 @@ async fn test_parse_failure_batch_counts_as_one_call() {
     let responses = vec!["This is not valid JSON".to_string()];
 
     let client = CountingLlmClient::new(responses);
-    let results = verify_findings_batched(&client, &findings, 8, &hunt_prompts).await;
+    let results =
+        verify_findings_batched(&client, &findings, 8, &hunt_prompts, &empty_primitives()).await;
 
     assert_eq!(
         client.get_call_count(),
