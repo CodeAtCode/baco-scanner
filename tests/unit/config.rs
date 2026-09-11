@@ -8,6 +8,7 @@
 //! - Validation logic
 //! - LLM phase configurations
 
+use baco::config::scanner::ScanPipelineProfile;
 use baco::config::{
     apply_env_overrides, expand_env_vars, AgentConfig, LlmPhaseConfig, PerformanceSettings,
     ScannerConfig,
@@ -81,6 +82,68 @@ fn test_max_file_size_kb_defaults_to_512_when_omitted() {
     let config: ScannerConfig = toml::from_str(toml_str).unwrap();
     assert_eq!(config.scanner.max_file_size_kb, 512);
     assert_eq!(ScannerConfig::default().scanner.max_file_size_kb, 512);
+}
+
+#[test]
+fn test_profile_default_is_core() {
+    let toml_str = r#"
+        [project]
+        name = "t"
+        path = "/tmp/t"
+        [output]
+        dir = "./out"
+    "#;
+
+    let config: ScannerConfig = toml::from_str(toml_str).unwrap();
+    assert_eq!(config.scanner.profile, ScanPipelineProfile::Core);
+}
+
+#[test]
+fn test_profile_explicit_core() {
+    let toml_str = r#"
+        [project]
+        name = "t"
+        path = "/tmp/t"
+        [output]
+        dir = "./out"
+        [scanner]
+        profile = "core"
+    "#;
+
+    let config: ScannerConfig = toml::from_str(toml_str).unwrap();
+    assert_eq!(config.scanner.profile, ScanPipelineProfile::Core);
+}
+
+#[test]
+fn test_profile_explicit_all() {
+    let toml_str = r#"
+        [project]
+        name = "t"
+        path = "/tmp/t"
+        [output]
+        dir = "./out"
+        [scanner]
+        profile = "all"
+    "#;
+
+    let config: ScannerConfig = toml::from_str(toml_str).unwrap();
+    assert_eq!(config.scanner.profile, ScanPipelineProfile::All);
+}
+
+#[test]
+fn test_profile_invalid_fails() {
+    let toml_str = r#"
+        [project]
+        name = "t"
+        path = "/tmp/t"
+        [output]
+        dir = "./out"
+        [scanner]
+        profile = "invalid"
+    "#;
+
+    let result: Result<ScannerConfig, _> = toml::from_str(toml_str);
+    assert!(result.is_err(), "Invalid profile should fail to parse");
 }
 
 #[test]

@@ -1,6 +1,7 @@
 //! Scanner orchestration - main run() method with parallel/sequential phase execution
 
 use crate::checkpoint::ScanPhase;
+use crate::config::ScanPipelineProfile;
 use crate::findings::{Severity, VulnerabilityFinding};
 use crate::scanner::checkpoint::EarlyTerminationInfo;
 use crate::scanner::checkpoint::{load_checkpoint_findings, save_checkpoint};
@@ -132,6 +133,7 @@ async fn run_parallel_phases(
     completed_phases: &[ScanPhase],
 ) -> Result<(Vec<VulnerabilityFinding>, Vec<String>), String> {
     let is_phase_completed = |phase: &ScanPhase| completed_phases.contains(phase);
+    let profile = scanner.config.scanner.profile;
 
     // Create semaphore for parallel task limiting
     let max_parallel = scanner.config.scanner.performance.max_parallel_tasks;
@@ -225,7 +227,11 @@ async fn run_parallel_phases(
             None
         };
 
-    let cpg_slice_handle = if !is_phase_completed(&ScanPhase::CpgSlice) {
+    // CpgSlice is experimental - skip it in core profile
+    let cpg_slice_handle = if profile == ScanPipelineProfile::Core {
+        tracing::info!("profile=core: skipping experimental phase CpgSlice");
+        None
+    } else if !is_phase_completed(&ScanPhase::CpgSlice) {
         let this = scanner;
         let pb = pb.clone();
         let initial_findings = findings.clone();
@@ -436,6 +442,65 @@ fn sequential_phases() -> [ScanPhase; 20] {
     ]
 }
 
+/// Core phases: the set of phases that constitute a sensible default scan.
+/// These are the phases that run under profile="core".
+const CORE_PHASES: &[ScanPhase] = &[
+    ScanPhase::Indexing,
+    ScanPhase::Semgrep,
+    ScanPhase::CweRouting,
+    ScanPhase::LlmStaticAnalysis,
+    ScanPhase::LlmDiscovery,
+    ScanPhase::LlmVerification,
+    ScanPhase::TicketCrossRef,
+    ScanPhase::GitAnalysis,
+    ScanPhase::CrossFileAnalysis,
+    ScanPhase::ConfidenceScoring,
+    ScanPhase::AiAggregation,
+    ScanPhase::RootCauseDedup,
+    ScanPhase::CveBootstrap,
+    ScanPhase::Reporting,
+];
+
+/// Experimental phases: phases that are excluded from the core profile.
+/// These run only under profile="all" (and still respect individual feature flags).
+const EXPERIMENTAL_PHASES: &[ScanPhase] = &[
+    ScanPhase::CpgSlice,
+    ScanPhase::RuleSynthesis,
+    ScanPhase::Validate,
+    ScanPhase::SecurityAgentVerification,
+    ScanPhase::ThreatModeling,
+    ScanPhase::MultiVerifier,
+    ScanPhase::AutoPatching,
+    ScanPhase::PocCompiler,
+    ScanPhase::ExploitSynth,
+    ScanPhase::VariantSearch,
+];
+
+/// Check if a phase is part of the core profile
+fn is_core_phase(phase: &ScanPhase) -> bool {
+    CORE_PHASES.contains(phase)
+}
+
+/// Get the list of experimental phases as strings for logging
+fn experimental_phase_names() -> Vec<String> {
+    EXPERIMENTAL_PHASES
+        .iter()
+        .map(|p| match p {
+            ScanPhase::CpgSlice => "CpgSlice".to_string(),
+            ScanPhase::RuleSynthesis => "RuleSynthesis".to_string(),
+            ScanPhase::Validate => "Validate".to_string(),
+            ScanPhase::SecurityAgentVerification => "SecurityAgentVerification".to_string(),
+            ScanPhase::ThreatModeling => "ThreatModeling".to_string(),
+            ScanPhase::MultiVerifier => "MultiVerifier".to_string(),
+            ScanPhase::AutoPatching => "AutoPatching".to_string(),
+            ScanPhase::PocCompiler => "PocCompiler".to_string(),
+            ScanPhase::ExploitSynth => "ExploitSynth".to_string(),
+            ScanPhase::VariantSearch => "VariantSearch".to_string(),
+            _ => format!("{:?}", p),
+        })
+        .collect()
+}
+
 /// Execute sequential phases
 async fn run_sequential_phases(
     scanner: &super::Scanner,
@@ -446,6 +511,7 @@ async fn run_sequential_phases(
     start_position: u64,
 ) -> Result<(Vec<VulnerabilityFinding>, Vec<String>), String> {
     let all_sequential_phases = sequential_phases();
+    let profile = scanner.config.scanner.profile;
 
     let is_phase_completed = |phase: &ScanPhase| completed_phases.contains(phase);
 
@@ -458,6 +524,30 @@ async fn run_sequential_phases(
                 "Skipping {:?} phase (already completed in previous run)",
                 phase
             );
+            continue;
+        }
+
+        // Profile-based skipping: skip experimental phases when profile=core
+        if profile == ScanPipelineProfile::Core && !is_core_phase(phase) {
+            tracing::info!("profile=core: skipping experimental phase {:?}", phase);
+            // Record as completed for checkpoint consistency
+            if let Err(e) = save_checkpoint(
+                &scanner.checkpoint_path,
+                &scanner.config,
+                &findings,
+                &analyzed_files,
+                phase,
+                &scanner.metrics_tracker,
+                None,
+            )
+            .await
+            {
+                tracing::warn!(
+                    "Failed to save checkpoint after skipping {:?}: {}",
+                    phase,
+                    e
+                );
+            }
             continue;
         }
 
@@ -725,6 +815,19 @@ pub(super) async fn run_scanner(
         (Vec::new(), Vec::new(), Vec::new())
     };
 
+    // Profile handling: log skipped experimental phases for core profile
+    let profile = scanner.config.scanner.profile;
+    if profile == ScanPipelineProfile::Core {
+        let skipped = experimental_phase_names();
+        tracing::info!(
+            "profile=core: {} experimental phases skipped ({:?})",
+            skipped.len(),
+            skipped
+        );
+    } else {
+        tracing::info!("profile=all: all phases enabled (individually flag-gated)");
+    }
+
     let enable_parallel = true;
     let sequential_phase_count = 20; // 20 sequential phases including Validate
     let total_phases = 4 + sequential_phase_count; // 4 parallel + 20 sequential = 24
@@ -783,7 +886,8 @@ pub(super) async fn run_scanner(
     }
     health.set_analyzed(analyzed_files.len() as u64);
     let llm_metrics = scanner.metrics_tracker.finalize().await;
-    let (ok_calls, failed_calls) = crate::scan_health::from_llm_metrics(&llm_metrics);
+    let (ok_calls, failed_calls) =
+        crate::scan_health::from_llm_metrics(&llm_metrics, Some(&scanner.config.llm.pricing));
     health.set_llm_counts(ok_calls, failed_calls);
     if ok_calls + failed_calls == 0 {
         eprintln!(

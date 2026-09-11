@@ -1,6 +1,7 @@
 use crate::findings::VulnerabilityFinding;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::fs;
 use std::path::Path;
 
@@ -37,6 +38,39 @@ pub enum ScanPhase {
     ExploitSynth,
     Complete,
     Error,
+}
+
+impl fmt::Display for ScanPhase {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ScanPhase::Indexing => write!(f, "Indexing"),
+            ScanPhase::Semgrep => write!(f, "Semgrep"),
+            ScanPhase::CweRouting => write!(f, "CweRouting"),
+            ScanPhase::CpgSlice => write!(f, "CpgSlice"),
+            ScanPhase::LlmStaticAnalysis => write!(f, "LlmStaticAnalysis"),
+            ScanPhase::LlmDiscovery => write!(f, "LlmDiscovery"),
+            ScanPhase::LlmVerification => write!(f, "LlmVerification"),
+            ScanPhase::TicketCrossRef => write!(f, "TicketCrossRef"),
+            ScanPhase::GitAnalysis => write!(f, "GitAnalysis"),
+            ScanPhase::CrossFileAnalysis => write!(f, "CrossFileAnalysis"),
+            ScanPhase::ConfidenceScoring => write!(f, "ConfidenceScoring"),
+            ScanPhase::AiAggregation => write!(f, "AiAggregation"),
+            ScanPhase::Reporting => write!(f, "Reporting"),
+            ScanPhase::ThreatModeling => write!(f, "ThreatModeling"),
+            ScanPhase::RootCauseDedup => write!(f, "RootCauseDedup"),
+            ScanPhase::MultiVerifier => write!(f, "MultiVerifier"),
+            ScanPhase::AutoPatching => write!(f, "AutoPatching"),
+            ScanPhase::CveBootstrap => write!(f, "CveBootstrap"),
+            ScanPhase::PocCompiler => write!(f, "PocCompiler"),
+            ScanPhase::VariantSearch => write!(f, "VariantSearch"),
+            ScanPhase::SecurityAgentVerification => write!(f, "SecurityAgentVerification"),
+            ScanPhase::RuleSynthesis => write!(f, "RuleSynthesis"),
+            ScanPhase::Validate => write!(f, "Validate"),
+            ScanPhase::ExploitSynth => write!(f, "ExploitSynth"),
+            ScanPhase::Complete => write!(f, "Complete"),
+            ScanPhase::Error => write!(f, "Error"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

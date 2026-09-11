@@ -1,9 +1,11 @@
 use crate::agent::ToolCall;
+use crate::config::llm::ModelPricing;
 use crate::error::ScanError;
 pub use crate::llm_cache;
 pub use crate::llm_metrics::LlmMetricsTracker;
 use crate::rate_limiter::RateLimiter;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::sync::OnceLock;
@@ -30,6 +32,10 @@ pub struct LlmConfig {
     /// Maximum concurrent LLM requests (default: 4)
     #[serde(default = "default_max_concurrent")]
     pub max_concurrent: usize,
+    /// Optional pricing table for cost estimation: model name → { prompt_per_1k, completion_per_1k }
+    /// When empty, only token counts are reported (no cost line).
+    #[serde(default)]
+    pub pricing: HashMap<String, ModelPricing>,
 }
 
 /// Default max_concurrent = 4 (configured via TOML, applied at runtime)
@@ -170,6 +176,7 @@ impl Default for LlmConfig {
             enable_llm_cache: false,
             cache_dir: None,
             max_concurrent: 4,
+            pricing: HashMap::new(),
         }
     }
 }
@@ -1176,6 +1183,7 @@ pub fn phase_llm_config(
         enable_llm_cache: global_llm.enable_llm_cache,
         cache_dir: global_llm.cache_dir.clone(),
         max_concurrent: global_llm.max_concurrent,
+        pricing: global_llm.pricing.clone(),
     })
 }
 

@@ -210,9 +210,180 @@ fn test_from_llm_metrics_helper() {
         ..Default::default()
     };
 
-    let (ok, failed) = from_llm_metrics(&metrics);
+    let (ok, failed) = from_llm_metrics(&metrics, None);
     assert_eq!(ok, 10);
     assert_eq!(failed, 3);
+}
+
+#[test]
+fn test_per_phase_token_aggregation() {
+    use baco::llm_metrics::OperationMetrics;
+    use std::collections::HashMap;
+
+    let mut operation_metrics: HashMap<String, OperationMetrics> = HashMap::new();
+    operation_metrics.insert(
+        "op1:phase1".to_string(),
+        OperationMetrics {
+            operation: "op1".to_string(),
+            phase: "phase1".to_string(),
+            requests: 2,
+            successful: 2,
+            failed: 0,
+            tokens: 300,
+            prompt_tokens: 200,
+            completion_tokens: 100,
+        },
+    );
+    operation_metrics.insert(
+        "op2:phase1".to_string(),
+        OperationMetrics {
+            operation: "op2".to_string(),
+            phase: "phase1".to_string(),
+            requests: 1,
+            successful: 1,
+            failed: 0,
+            tokens: 150,
+            prompt_tokens: 100,
+            completion_tokens: 50,
+        },
+    );
+    operation_metrics.insert(
+        "op3:phase2".to_string(),
+        OperationMetrics {
+            operation: "op3".to_string(),
+            phase: "phase2".to_string(),
+            requests: 1,
+            successful: 1,
+            failed: 0,
+            tokens: 200,
+            prompt_tokens: 150,
+            completion_tokens: 50,
+        },
+    );
+
+    let spend = ScanHealth::compute_phase_spend(&operation_metrics, None);
+    assert_eq!(spend.len(), 2);
+
+    let phase1 = spend.iter().find(|s| s.phase == "phase1").unwrap();
+    assert_eq!(phase1.prompt_tokens, 300);
+    assert_eq!(phase1.completion_tokens, 150);
+    assert_eq!(phase1.total_tokens, 450);
+    assert!(phase1.cost.is_none()); // No pricing provided
+
+    let phase2 = spend.iter().find(|s| s.phase == "phase2").unwrap();
+    assert_eq!(phase2.prompt_tokens, 150);
+    assert_eq!(phase2.completion_tokens, 50);
+    assert_eq!(phase2.total_tokens, 200);
+    assert!(phase2.cost.is_none());
+}
+
+#[test]
+fn test_cost_math_with_pricing() {
+    use baco::config::ModelPricing;
+    use baco::llm_metrics::OperationMetrics;
+    use std::collections::HashMap;
+
+    let mut operation_metrics: HashMap<String, OperationMetrics> = HashMap::new();
+    operation_metrics.insert(
+        "op1:discovery".to_string(),
+        OperationMetrics {
+            operation: "op1".to_string(),
+            phase: "discovery".to_string(),
+            requests: 1,
+            successful: 1,
+            failed: 0,
+            tokens: 1000,
+            prompt_tokens: 800,
+            completion_tokens: 200,
+        },
+    );
+
+    let mut pricing: HashMap<String, ModelPricing> = HashMap::new();
+    pricing.insert(
+        "gpt-4".to_string(),
+        ModelPricing {
+            prompt_per_1k: 0.03,
+            completion_per_1k: 0.06,
+        },
+    );
+
+    let spend = ScanHealth::compute_phase_spend(&operation_metrics, Some(&pricing));
+    assert_eq!(spend.len(), 1);
+
+    let discovery = &spend[0];
+    assert_eq!(discovery.prompt_tokens, 800);
+    assert_eq!(discovery.completion_tokens, 200);
+    // Cost = (800/1000) * 0.03 + (200/1000) * 0.06 = 0.024 + 0.012 = 0.036
+    assert!((discovery.cost.unwrap() - 0.036).abs() < 0.001);
+}
+
+#[test]
+fn test_empty_pricing_no_cost() {
+    use baco::llm_metrics::OperationMetrics;
+    use std::collections::HashMap;
+
+    let mut operation_metrics: HashMap<String, OperationMetrics> = HashMap::new();
+    operation_metrics.insert(
+        "op1:verification".to_string(),
+        OperationMetrics {
+            operation: "op1".to_string(),
+            phase: "verification".to_string(),
+            requests: 1,
+            successful: 1,
+            failed: 0,
+            tokens: 500,
+            prompt_tokens: 400,
+            completion_tokens: 100,
+        },
+    );
+
+    let spend = ScanHealth::compute_phase_spend(&operation_metrics, None);
+    assert_eq!(spend.len(), 1);
+    assert!(spend[0].cost.is_none()); // Empty pricing = no cost
+    assert_eq!(spend[0].total_tokens, 500); // Tokens still reported
+}
+
+#[test]
+fn test_summary_method_output_contains_per_phase_lines() {
+    use baco::llm_metrics::OperationMetrics;
+    use std::collections::HashMap;
+
+    let mut operation_metrics: HashMap<String, OperationMetrics> = HashMap::new();
+    operation_metrics.insert(
+        "op1:llm_static_analysis".to_string(),
+        OperationMetrics {
+            operation: "op1".to_string(),
+            phase: "LlmStaticAnalysis".to_string(),
+            requests: 2,
+            successful: 2,
+            failed: 0,
+            tokens: 1000,
+            prompt_tokens: 700,
+            completion_tokens: 300,
+        },
+    );
+    operation_metrics.insert(
+        "op2:llm_discovery".to_string(),
+        OperationMetrics {
+            operation: "op2".to_string(),
+            phase: "LlmDiscovery".to_string(),
+            requests: 1,
+            successful: 1,
+            failed: 0,
+            tokens: 800,
+            prompt_tokens: 600,
+            completion_tokens: 200,
+        },
+    );
+
+    let spend = ScanHealth::compute_phase_spend(&operation_metrics, None);
+    assert_eq!(spend.len(), 2);
+
+    // Verify per-phase lines are present
+    let has_static = spend.iter().any(|s| s.phase == "LlmStaticAnalysis");
+    let has_discovery = spend.iter().any(|s| s.phase == "LlmDiscovery");
+    assert!(has_static);
+    assert!(has_discovery);
 }
 
 #[test]

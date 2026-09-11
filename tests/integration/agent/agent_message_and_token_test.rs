@@ -126,6 +126,8 @@ fn test_html_report_includes_token_metrics() {
             successful: 2,
             failed: 0,
             tokens: 2700,
+            prompt_tokens: 2000,
+            completion_tokens: 700,
         },
     );
 
@@ -172,6 +174,7 @@ fn test_html_report_includes_token_metrics() {
                 failed: m.failed as usize,
             })
             .collect(),
+        phase_spend: Default::default(),
     };
 
     assert_eq!(summary.total_tokens, 2700);

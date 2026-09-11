@@ -1,10 +1,10 @@
-mod env;
+pub mod env;
 pub mod knowledge;
-mod llm;
-mod phases;
-mod scanner;
+pub mod llm;
+pub mod phases;
+pub mod scanner;
 pub mod specifications;
-mod tickets;
+pub mod tickets;
 
 use crate::vuln_spec::schema::VulnSpecConfig;
 pub use env::*;
@@ -318,6 +318,10 @@ pub fn default_true() -> bool {
 
 pub fn default_four() -> usize {
     4
+}
+
+pub fn default_max_file_size_kb() -> u64 {
+    512
 }
 
 /// Org-context profile: prompt calibration from organizational policy.

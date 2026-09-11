@@ -21,10 +21,33 @@ pub struct LlmConfig {
     pub enable_llm_cache: bool,
     #[serde(default)]
     pub cache_dir: Option<String>,
+    /// Optional pricing table for cost estimation: model name → { prompt_per_1k, completion_per_1k }
+    /// When empty, only token counts are reported (no cost line).
+    #[serde(default)]
+    pub pricing: HashMap<String, ModelPricing>,
 }
 
 fn default_enable_llm_cache() -> bool {
     false
+}
+
+/// Pricing for a specific LLM model (per 1K tokens)
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ModelPricing {
+    /// Cost per 1K prompt tokens (in USD or currency unit of choice)
+    #[serde(default)]
+    pub prompt_per_1k: f64,
+    /// Cost per 1K completion tokens (in USD or currency unit of choice)
+    #[serde(default)]
+    pub completion_per_1k: f64,
+}
+
+impl ModelPricing {
+    /// Calculate cost for given token counts
+    pub fn cost(&self, prompt_tokens: u64, completion_tokens: u64) -> f64 {
+        (prompt_tokens as f64 / 1000.0) * self.prompt_per_1k
+            + (completion_tokens as f64 / 1000.0) * self.completion_per_1k
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

@@ -361,6 +361,40 @@ fn line_end(content: &str, byte: usize) -> usize {
         .unwrap_or(content.len())
 }
 
+/// Field specification for static analysis JSON output (prompt↔parser contract).
+///
+/// This const source defines ALL fields the parser expects from the LLM's JSON response.
+/// It is the SINGLE SOURCE OF TRUTH for both:
+/// - The prompt's JSON example (rendered at test time or prompt-build time)
+/// - The parser's field extraction logic
+///
+/// Format: (field_name, json_type, is_required)
+pub const STATIC_ANALYSIS_FIELDS: &[(&str, &str, bool)] = &[
+    ("severity", "string", true),
+    ("title", "string", true),
+    ("description", "string", true),
+    ("line", "integer", true),
+    ("cwe_id", "string", true),
+    ("code_snippet", "object", true), // { before, code, after }
+    ("exploit_scenario", "string", true),
+    ("attack_complexity", "string", true),
+    ("impact", "string", true),
+    ("fix_code", "string", true),
+    ("diff_hunk", "string", true),
+    ("recommendation", "string", true),
+    ("false_positive_probability", "string", true),
+];
+
+/// Field specification for verification batch JSON output (prompt↔parser contract).
+///
+/// This defines the BatchVerdictItem structure used in verification.rs.
+/// The index field is OPTIONAL (positional fallback supported).
+pub const VERIFICATION_BATCH_FIELDS: &[(&str, &str, bool)] = &[
+    ("index", "integer", false), // Optional - positional fallback
+    ("verification_status", "string", true),
+    ("verification_notes", "string", false), // Optional but expected
+];
+
 /// Map a language name to its bundled tree-sitter parser, if any.
 fn tree_sitter_language(language: &str) -> Option<tree_sitter::Language> {
     match language.to_lowercase().as_str() {

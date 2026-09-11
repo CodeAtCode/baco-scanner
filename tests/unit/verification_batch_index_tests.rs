@@ -4,14 +4,19 @@
 //! 1. Well-formed responses WITH index field → correct mapping
 //! 2. Responses WITHOUT index field → positional fallback with warning
 //! 3. Malformed responses → salvage path without mass-degradation
+//!
+//! Contract tests ensure BatchVerdictItem fields match the prompt JSON examples.
 
 use baco::error::ScanError;
 use baco::findings::{Severity, VerificationStatus, VulnerabilityFinding};
 use baco::llm::{ChatMessage, ChatResponseWithModel, LlmChatClient};
+use baco::llm_analysis::VERIFICATION_BATCH_FIELDS;
 use baco::scanner::phases::llm_phases::verification::{
     parse_batch_verification_verdict, verify_findings_batched,
 };
 use std::collections::HashMap;
+use std::fs;
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 /// Mock LLM client for testing
@@ -230,4 +235,134 @@ async fn test_verify_findings_batched_without_index_fallback() {
     assert_eq!(results[1].0, VerificationStatus::FalsePositive);
     assert_eq!(results[2].0, VerificationStatus::NeedsReview);
     assert_eq!(results[3].0, VerificationStatus::Confirmed);
+}
+
+/// Contract test: verify VERIFICATION_BATCH_FIELDS matches the parser's BatchVerdictItem struct.
+#[test]
+fn test_verification_batch_fields_spec_consistency() {
+    // This test ensures the field spec is complete and accurate.
+    // It checks that all fields referenced in the spec are accounted for.
+
+    let mut has_index = false;
+    let mut has_verification_status = false;
+    let mut has_verification_notes = false;
+
+    for (field_name, expected_type, is_required) in VERIFICATION_BATCH_FIELDS.iter() {
+        match *field_name {
+            "index" => {
+                has_index = true;
+                assert!(
+                    !is_required,
+                    "index field should be optional for positional fallback"
+                );
+                assert_eq!(*expected_type, "integer", "index should be integer type");
+            }
+            "verification_status" => {
+                has_verification_status = true;
+                assert!(*is_required, "verification_status is required");
+                assert_eq!(
+                    *expected_type, "string",
+                    "verification_status should be string type"
+                );
+            }
+            "verification_notes" => {
+                has_verification_notes = true;
+                // notes is optional but expected
+                assert_eq!(
+                    *expected_type, "string",
+                    "verification_notes should be string type"
+                );
+            }
+            other => {
+                panic!("Unexpected field in VERIFICATION_BATCH_FIELDS: {}", other);
+            }
+        }
+    }
+
+    assert!(
+        has_index,
+        "VERIFICATION_BATCH_FIELDS must include 'index' field"
+    );
+    assert!(
+        has_verification_status,
+        "VERIFICATION_BATCH_FIELDS must include 'verification_status' field"
+    );
+    assert!(
+        has_verification_notes,
+        "VERIFICATION_BATCH_FIELDS must include 'verification_notes' field"
+    );
+}
+
+/// Contract test: verify the volatile tail prompt includes index field instruction.
+#[test]
+fn test_verification_prompt_includes_index_field_instruction() {
+    // The volatile tail (build_volatile_verification_tail) should instruct the LLM
+    // to include the index field in each verdict object.
+
+    // Read the verification.rs source to check the instruction
+    let verification_path = Path::new("src/scanner/phases/llm_phases/verification.rs");
+    let content =
+        fs::read_to_string(verification_path).expect("Should be able to read verification.rs");
+
+    // Check that the instruction mentions the index field
+    assert!(
+        content.contains("\"index\""),
+        "Verification prompt should include instruction about 'index' field"
+    );
+
+    // Check that it shows the example format with index
+    assert!(
+        content.contains(r#""index": 0"#),
+        "Verification prompt should show example with index value"
+    );
+}
+
+/// Contract test: parse example with and without index field both succeed.
+#[test]
+fn test_verification_batch_accepts_both_index_formats() {
+    // Example WITH index field
+    let with_index = r#"[
+        {"index": 0, "verification_status": "confirmed", "verification_notes": "First"},
+        {"index": 1, "verification_status": "false_positive", "verification_notes": "Second"}
+    ]"#;
+
+    let results_with = parse_batch_verification_verdict(with_index, 2);
+    assert_eq!(results_with.len(), 2);
+    assert_eq!(results_with[0].0, VerificationStatus::Confirmed);
+    assert_eq!(results_with[1].0, VerificationStatus::FalsePositive);
+
+    // Example WITHOUT index field (positional fallback)
+    let without_index = r#"[
+        {"verification_status": "confirmed", "verification_notes": "First"},
+        {"verification_status": "false_positive", "verification_notes": "Second"}
+    ]"#;
+
+    let results_without = parse_batch_verification_verdict(without_index, 2);
+    assert_eq!(results_without.len(), 2);
+    assert_eq!(results_without[0].0, VerificationStatus::Confirmed);
+    assert_eq!(results_without[1].0, VerificationStatus::FalsePositive);
+
+    // Both should produce the same results
+    assert_eq!(results_with, results_without);
+}
+
+/// Contract test: verify field types in verification batch examples.
+#[test]
+fn test_verification_batch_field_types() {
+    // Test that index is parsed as integer (when present)
+    let json_with_index = r#"[
+        {"index": 0, "verification_status": "confirmed", "verification_notes": "Test"}
+    ]"#;
+
+    let results = parse_batch_verification_verdict(json_with_index, 1);
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].0, VerificationStatus::Confirmed);
+
+    // Test that string fields are properly handled
+    let json_with_strings = r#"[
+        {"index": 1, "verification_status": "false_positive", "verification_notes": "Detailed notes here"}
+    ]"#;
+
+    let results = parse_batch_verification_verdict(json_with_strings, 1);
+    assert_eq!(results[0].1, "Detailed notes here");
 }

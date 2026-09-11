@@ -187,6 +187,7 @@ pub async fn run_exploit_synth(
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
+        pricing: config.llm.pricing.clone(),
     };
     let client = crate::llm::LlmClient::with_metrics(llm_config, Some(metrics_tracker.clone()));
 
@@ -311,6 +312,7 @@ pub async fn run_validate(
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
+        pricing: config.llm.pricing.clone(),
     };
     let client = crate::llm::LlmClient::with_metrics(llm_config, Some(metrics_tracker.clone()));
 

@@ -74,6 +74,7 @@ cp config.toml my-config.toml
 
 ## Features
 
+- **Pipeline profiles**: `core` (default) runs essential phases; `all` enables experimental phases (still individually flag-gated) — set with `scanner.profile = "core" | "all"`
 - **Pipeline phases**: Indexing → Semgrep → CpgSlice (`[cpg]` section, requires Joern) → LlmStaticAnalysis → CweRouting (`router.enabled`) → RuleSynthesis (experimental) → LlmDiscovery → LlmVerification → Validate (opt-in) → SecurityAgentVerification (opt-in) → TicketCrossRef → GitAnalysis → CrossFileAnalysis → ConfidenceScoring → AiAggregation → ThreatModeling (`enable_threat_modeling`) → RootCauseDedup → MultiVerifier (`enable_multi_verifier`, experimental) → AutoPatching (`enable_auto_patching`, opt-in) → CveBootstrap → PocCompiler (`enable_poc_compilation`, opt-in) → ExploitSynth (`[exploit]` section, experimental) → VariantSearch → Reporting
 - **Parallel execution**: Indexing, Semgrep, CpgSlice, and LlmStaticAnalysis run concurrently; 20 sequential phases follow
 - **CWE-aware MoE (opt-in)**: BM25 RAG retrieval from CWE knowledge base, routes to specialized analysis paths — enable with `router.enabled = true`
@@ -83,6 +84,35 @@ cp config.toml my-config.toml
 - **Multiple outputs**: JSON, HTML, SARIF
 - **Config-driven**: TOML config with env var overrides
 - **Ticket systems**: Configurable via `[[tickets.systems]]` TOML blocks (supports any system type via `system_type` field) — see [Configuration](docs/configuration.md) for setup
+
+### Phase reference table
+
+| Phase | Profile | Enabling flag / condition |
+|-------|---------|----------------------------|
+| Indexing | Core | Always runs |
+| Semgrep | Core | Always runs |
+| CpgSlice | Experimental | `scanner.profile = "all"` + `[cpg]` section |
+| LlmStaticAnalysis | Core | Always runs |
+| CweRouting | Core | `router.enabled = true` |
+| RuleSynthesis | Experimental | `scanner.profile = "all"` |
+| LlmDiscovery | Core | Always runs |
+| LlmVerification | Core | Always runs |
+| Validate | Experimental | `scanner.profile = "all"` + `[validate]` section |
+| SecurityAgentVerification | Experimental | `scanner.profile = "all"` + `[agent]` section |
+| TicketCrossRef | Core | Always runs |
+| GitAnalysis | Core | Always runs |
+| CrossFileAnalysis | Core | Always runs |
+| ConfidenceScoring | Core | Always runs |
+| AiAggregation | Core | Always runs |
+| ThreatModeling | Experimental | `scanner.profile = "all"` + `enable_threat_modeling = true` |
+| RootCauseDedup | Core | Always runs |
+| MultiVerifier | Experimental | `scanner.profile = "all"` + `enable_multi_verifier = true` |
+| AutoPatching | Experimental | `scanner.profile = "all"` + `enable_auto_patching = true` |
+| CveBootstrap | Core | Always runs |
+| PocCompiler | Experimental | `scanner.profile = "all"` + `enable_poc_compilation = true` |
+| ExploitSynth | Experimental | `scanner.profile = "all"` + `[exploit]` section |
+| VariantSearch | Experimental | `scanner.profile = "all"` + `enable_variant_search = true` |
+| Reporting | Core | Always runs |
 
 ## Evidence & Verification Techniques
 

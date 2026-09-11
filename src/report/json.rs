@@ -43,6 +43,10 @@ pub struct LlmMetricsSummary {
 
     /// Metriche per operazione
     pub operations: Vec<OperationMetricsSummary>,
+
+    /// Per-phase spend (tokens + optional cost)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub phase_spend: Option<Vec<PhaseSpendSummary>>,
 }
 
 #[derive(Serialize)]
@@ -62,6 +66,18 @@ pub struct OperationMetricsSummary {
     pub requests: usize,
     pub successful: usize,
     pub failed: usize,
+}
+
+/// Per-phase spend summary for JSON output
+#[derive(Serialize)]
+pub struct PhaseSpendSummary {
+    pub phase: String,
+    pub prompt_tokens: usize,
+    pub completion_tokens: usize,
+    pub total_tokens: usize,
+    /// Cost (only included when pricing is configured)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cost: Option<f64>,
 }
 
 /// Rejected finding with its rejection reason for JSON serialization
@@ -134,6 +150,12 @@ pub fn write_findings_json(
                 })
                 .collect();
 
+            // Per-phase spend: aggregate from operation metrics (before consuming)
+            let phase_spend = crate::scan_health::ScanHealth::compute_phase_spend(
+                &metrics.by_operation,
+                config.map(|c| &c.llm.pricing),
+            );
+
             let operations: Vec<OperationMetricsSummary> = metrics
                 .by_operation
                 .into_values()
@@ -155,6 +177,22 @@ pub fn write_findings_json(
                 avg_latency_ms: metrics.avg_latency_ms,
                 models,
                 operations,
+                phase_spend: if phase_spend.is_empty() {
+                    None
+                } else {
+                    Some(
+                        phase_spend
+                            .into_iter()
+                            .map(|ps| PhaseSpendSummary {
+                                phase: ps.phase,
+                                prompt_tokens: ps.prompt_tokens as usize,
+                                completion_tokens: ps.completion_tokens as usize,
+                                total_tokens: ps.total_tokens as usize,
+                                cost: ps.cost,
+                            })
+                            .collect(),
+                    )
+                },
             }
         }),
         scan_health,

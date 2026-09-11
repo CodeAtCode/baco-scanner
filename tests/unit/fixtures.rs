@@ -210,6 +210,7 @@ pub fn create_test_config() -> ScannerConfig {
         scanner: ScannerSettings {
             max_file_size_kb: 1024,
             exclude_paths: vec![],
+            profile: baco::config::scanner::ScanPipelineProfile::Core,
             semgrep: SemgrepSettings {
                 ..Default::default()
             },
@@ -224,6 +225,7 @@ pub fn create_test_config() -> ScannerConfig {
             max_retries: 0,
             retry_backoff_ms: 0,
             max_concurrent: 4,
+            pricing: Default::default(),
             phases: baco::config::LlmPhasesConfig {
                 discovery: LlmPhaseConfig {
                     base_url: "http://localhost:11434".to_string(),
@@ -332,6 +334,7 @@ pub fn create_minimal_config() -> ScannerConfig {
         scanner: ScannerSettings {
             max_file_size_kb: 1024,
             exclude_paths: vec![],
+            profile: baco::config::scanner::ScanPipelineProfile::Core,
             semgrep: SemgrepSettings::default(),
             performance: PerformanceSettings::default(),
         },

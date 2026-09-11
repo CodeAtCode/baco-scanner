@@ -1,8 +1,18 @@
+use crate::config::{default_four, default_max_file_size_kb, default_true};
 use crate::vuln_spec::schema::VulnSpecConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::config::{default_four, default_true};
+/// Pipeline profile selection: which phases run by default
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum ScanPipelineProfile {
+    /// Core profile: runs the essential phases that constitute a sensible default scan
+    #[default]
+    Core,
+    /// All profile: runs all phases including experimental ones (still individually flag-gated)
+    All,
+}
 
 /// Pattern configuration for variant search
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -18,31 +28,19 @@ pub struct VariantSearchPattern {
     pub context_keywords: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ScannerSettings {
     #[serde(default = "default_max_file_size_kb")]
     pub max_file_size_kb: u64,
     #[serde(default)]
     pub exclude_paths: Vec<String>,
+    /// Pipeline profile: "core" (default) or "all"
+    #[serde(default)]
+    pub profile: ScanPipelineProfile,
     #[serde(default)]
     pub semgrep: SemgrepSettings,
     #[serde(default)]
     pub performance: PerformanceSettings,
-}
-
-fn default_max_file_size_kb() -> u64 {
-    512
-}
-
-impl Default for ScannerSettings {
-    fn default() -> Self {
-        Self {
-            max_file_size_kb: default_max_file_size_kb(),
-            exclude_paths: Vec::new(),
-            semgrep: SemgrepSettings::default(),
-            performance: PerformanceSettings::default(),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

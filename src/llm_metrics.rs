@@ -28,6 +28,12 @@ pub struct OperationMetrics {
     pub successful: u64,
     pub failed: u64,
     pub tokens: u64,
+    /// Prompt tokens per operation entry
+    #[serde(default)]
+    pub prompt_tokens: u64,
+    /// Completion tokens per operation entry
+    #[serde(default)]
+    pub completion_tokens: u64,
 }
 
 /// Aggregated LLM metrics for the entire scan
@@ -110,6 +116,8 @@ impl LlmMetricsTracker {
             op_entry.failed += 1;
         }
         op_entry.tokens += params.prompt_tokens + params.completion_tokens;
+        op_entry.prompt_tokens += params.prompt_tokens;
+        op_entry.completion_tokens += params.completion_tokens;
     }
 
     /// Record a cached request (from LLM cache)
@@ -153,6 +161,8 @@ impl LlmMetricsTracker {
         op_entry.requests += 1;
         op_entry.successful += 1;
         op_entry.tokens += tokens;
+        // Cached requests: tokens are counted as prompt tokens (no completion)
+        op_entry.prompt_tokens += tokens;
     }
 
     /// Record positional fallback usage in batch verification
