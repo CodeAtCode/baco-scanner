@@ -79,6 +79,14 @@ rules:
 ''']
 ```
 
+### Semgrep severity mapping
+
+Semgrep findings have their severity determined by:
+1. **First**: `extra.severity` from semgrep output (ERROR→High, WARNING→Medium, INFO/INVENTORY→Low)
+2. **Fallback**: check_id keywords (e.g., "critical" in ID raises severity)
+3. **Important**: check_id keywords can only **raise** severity, never lower it
+
+```toml
 # --- Phase enable flags ---
 # Each flag controls whether a specific analysis phase runs during the scan.
 
@@ -333,6 +341,9 @@ include_rejected = false
 ## Environment Variables
 
 | Env Var | Usage |
+## Environment Variables
+
+| Env Var | Usage |
 |---------|-------|
 | `LLM_DISCOVERY_KEY` | Overrides `llm.phases.discovery.api_key` |
 | `LLM_VERIFICATION_KEY` | Overrides `llm.phases.verification.api_key` |
@@ -342,7 +353,6 @@ include_rejected = false
 | `LLM_THREAT_MODELING_KEY` | Overrides `llm.phases.threat_modeling.api_key` |
 | `TICKET_GITHUB_KEY` | Overrides `[[tickets.systems]]` api_key for GitHub |
 | `TICKET_GITLAB_KEY` | Overrides `[[tickets.systems]]` api_key for GitLab |
-| `LLM_CONFIG_PATH` | Path to custom LLM configuration file (overrides default prompts) |
 
 ## Output Formats
 
@@ -648,15 +658,10 @@ Presets are applied on top of the user config and take precedence. Note that `[s
 | `wordpress-plugin` | WordPress plugin audit                          | php                   |
 | `django`           | Django web application audit                    | python                |
 | `laravel`          | Laravel web application audit                   | php                   |
+| `cpp`              | C/C++ security audit (memory safety, command injection) | cpp           |
 | `litellm`          | LiteLLM proxy codebase                          | python                |
 | `oss-python`       | Generic OSS Python project                      | python                |
 | `oss-monorepo`     | Polyglot OSS monorepo                           | python, rust          |
-
-### Usage
-
-```bash
-# Apply a preset via CLI
-baco scan --config my.toml --preset wordpress-core
 
 # List available presets (built-in + ~/.config/baco/presets/*.toml)
 baco preset list

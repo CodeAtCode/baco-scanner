@@ -27,12 +27,14 @@ pub struct LlmConfig {
     pub enable_llm_cache: bool,
     #[serde(default)]
     pub cache_dir: Option<String>,
+    /// Maximum concurrent LLM requests (default: 4)
     #[serde(default = "default_max_concurrent")]
     pub max_concurrent: usize,
 }
 
+/// Default max_concurrent = 4 (configured via TOML, applied at runtime)
 fn default_max_concurrent() -> usize {
-    3
+    4
 }
 
 fn default_runtime_temperature() -> f32 {
@@ -167,7 +169,7 @@ impl Default for LlmConfig {
             max_reasoning_tokens: None,
             enable_llm_cache: false,
             cache_dir: None,
-            max_concurrent: 3,
+            max_concurrent: 4,
         }
     }
 }

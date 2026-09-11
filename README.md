@@ -36,35 +36,50 @@ pip install semgrep
 # 3. Set your LLM API key
 export MISTRAL_API_KEY="your-key-here"
 
-# 4. Configure and scan
-cp config.example.toml my-config.toml
+# 4. Run pre-flight checks
+./target/release/baco doctor
+
+# 5. Configure and scan
+cp config.toml my-config.toml
 # Edit my-config.toml: set [project] path to your target code
 ./target/release/baco scan --config my-config.toml
+```
 
-# Additional subcommands:
-./target/release/baco report --input findings.json --format html   # Generate report
-./target/release/baco verify --input findings.json                 # Verify findings
-./target/release/baco scan --config my.toml --dry-run              # Print estimate and exit
-./target/release/baco scan --config my.toml --target /path         # Override target path
-./target/release/baco scan --config my.toml --force                # Force full rescan
+### Additional subcommands
 
-- **24 phases run**: 4 parallel (Indexing, Semgrep, CpgSlice, LlmStaticAnalysis) + 20 sequential — some phases disabled by default (see [Configuration](docs/configuration.md))
-- **Output in `baco-output/`**: `findings.json`, `report.html`, `report.sarif`, `checkpoint.json`
-- **Checkpoint file**: The scanner writes `checkpoint.json` after each phase. Re-running the scan auto-resumes from the checkpoint; use `./target/release/baco resume --checkpoint baco-output/checkpoint.json` for manual control.
+```bash
+# Pre-flight checks (config parse, preset resolve, LLM phases, semgrep, python3, Joern-if-CPG, output dir, disk space)
+./target/release/baco doctor --json
+
+# Evaluate precision/recall/F1 vs ground truth
+./target/release/baco eval --target /path/to/fixtures --ground-truth eval/oracles/target.json
+
+# Generate report
+./target/release/baco report --input findings.json --format html
+
+# Verify findings
+./target/release/baco verify --input findings.json
+
+# Scan options
+./target/release/baco scan --config my.toml --dry-run   # Print estimate and exit
+./target/release/baco scan --config my.toml --target /path  # Override target path
+./target/release/baco scan --config my.toml --force     # Force full rescan
+```
+
+- **Phases**: 4 parallel (Indexing, Semgrep, CpgSlice, LlmStaticAnalysis) + sequential phases — some disabled by default (see [Configuration](docs/configuration.md))
 
 ### What happens next
 
-- **24 phases run**: 4 parallel (Indexing, Semgrep, CpgSlice, LlmStaticAnalysis) + 20 sequential — some phases disabled by default (see [Configuration](docs/configuration.md))
-- **Output in `baco-output/`**: `findings.json`, `report.html`, `report.sarif`
-- **Resume interrupted scans**: `./target/release/baco resume --checkpoint baco-output/checkpoint.json`
+- **Phases**: 4 parallel (Indexing, Semgrep, CpgSlice, LlmStaticAnalysis) + sequential phases — some disabled by default (see [Configuration](docs/configuration.md))
 
 ## Features
 
-- **24-phase pipeline**: Indexing → Semgrep → CpgSlice (`[cpg]` section, requires Joern) → LlmStaticAnalysis → CweRouting (enable with `router.enabled`) → RuleSynthesis (experimental) → LlmDiscovery → LlmVerification → Validate (opt-in) → SecurityAgentVerification (opt-in) → TicketCrossRef → GitAnalysis → CrossFileAnalysis → ConfidenceScoring → AiAggregation → ThreatModeling (`enable_threat_modeling`) → RootCauseDedup → MultiVerifier (`enable_multi_verifier`, experimental stub) → AutoPatching (`enable_auto_patching`, opt-in) → CveBootstrap → PocCompiler (`enable_poc_compilation`, opt-in) → ExploitSynth (`[exploit]` section, experimental) → VariantSearch → Reporting
+- **Pipeline phases**: Indexing → Semgrep → CpgSlice (`[cpg]` section, requires Joern) → LlmStaticAnalysis → CweRouting (`router.enabled`) → RuleSynthesis (experimental) → LlmDiscovery → LlmVerification → Validate (opt-in) → SecurityAgentVerification (opt-in) → TicketCrossRef → GitAnalysis → CrossFileAnalysis → ConfidenceScoring → AiAggregation → ThreatModeling (`enable_threat_modeling`) → RootCauseDedup → MultiVerifier (`enable_multi_verifier`, experimental) → AutoPatching (`enable_auto_patching`, opt-in) → CveBootstrap → PocCompiler (`enable_poc_compilation`, opt-in) → ExploitSynth (`[exploit]` section, experimental) → VariantSearch → Reporting
 - **Parallel execution**: Indexing, Semgrep, CpgSlice, and LlmStaticAnalysis run concurrently; 20 sequential phases follow
 - **CWE-aware MoE (opt-in)**: BM25 RAG retrieval from CWE knowledge base, routes to specialized analysis paths — enable with `router.enabled = true`
 - **Research-backed**: 16 academic papers integrated (VulTriage, VulIn, MoCQ, MoEVD, AgentFlow) — see [Research Integration](docs/research-integration.md)
 - **Checkpoint/resume**: Crash recovery after each phase
+- **Pre-flight checks**: `baco doctor` validates config, presets, LLM phases, semgrep, python3, Joern (if CPG enabled), output dir, and disk space
 - **Multiple outputs**: JSON, HTML, SARIF
 - **Config-driven**: TOML config with env var overrides
 - **Ticket systems**: Configurable via `[[tickets.systems]]` TOML blocks (supports any system type via `system_type` field) — see [Configuration](docs/configuration.md) for setup
@@ -77,7 +92,7 @@ cp config.example.toml my-config.toml
 - **Rejected-findings persistence**: `include_rejected = true` persists "rejected" array in JSON + "Investigated & Dismissed" appendix in HTML
 - **Requires-deployment-testing marker (experimental)**: Exploit synthesis marks unverifiable findings when Docker sandbox unavailable — enable with `[exploit]` section
 - **Org-context calibration (opt-in)**: Organizational policy profile (stack, infra, secret_storage, data_sensitivity, severity_rules) injected into prompts to reduce false positives — enable with `[org_context]` section
-- **Eval oracles**: Known-answer harness under `eval/` with labeled vulnerable/secure fixtures; recall/precision scoring via `BACO_EVAL=1` — see [`eval/README.md`](eval/README.md)
+- **Eval oracles**: Known-answer harness under `eval/` with labeled vulnerable/secure fixtures; precision/recall/F1 scoring via `baco eval --target <path> --ground-truth <oracle.json>` — see [`eval/README.md`](eval/README.md)
 
 ## Supported Languages
 

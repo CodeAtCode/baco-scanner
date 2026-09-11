@@ -15,6 +15,21 @@ The eval harness uses **labeled vulnerable/secure aligned pairs**:
 
 ## Running the Eval
 
+### CLI mode (recommended)
+
+```bash
+# Evaluate precision/recall/F1 vs ground truth
+baco eval --target /path/to/fixtures --ground-truth eval/oracles/target.json
+```
+
+The eval command:
+1. Loads the oracle file from `--ground-truth` path
+2. Scans the fixture files in `--target` path (or uses existing findings via `--findings`)
+3. Scores findings against expected/expected_suppressed
+4. Outputs precision, recall, and F1 score metrics
+
+### Environment mode (legacy)
+
 ```bash
 # Set the environment variable to enable eval mode
 export BACO_EVAL=1
@@ -30,7 +45,7 @@ The scanner will:
 1. Load the oracle file from `eval/oracles/<target>.json`
 2. Scan the fixture files in `eval/fixtures/<target>/`
 3. Score findings against expected/expected_suppressed
-4. Output a ScoreReport with recall/precision metrics
+4. Output a ScoreReport with recall/precision/F1 metrics
 
 ## Adding New Targets
 

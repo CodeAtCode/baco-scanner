@@ -498,3 +498,27 @@ async fn test_mock_provider_with_different_messages() {
     let result = mock_provider.chat(&messages);
     assert!(result.is_ok());
 }
+
+// ============================================================================
+// LlmConfig Consolidation Tests
+// ============================================================================
+
+#[test]
+fn test_llm_config_single_canonical_default_max_concurrent() {
+    // Verify that max_concurrent defaults to 4 (the unified config-side default)
+    let config = LlmConfig::default();
+    assert_eq!(
+        config.max_concurrent, 4,
+        "LlmConfig default max_concurrent must be 4 (unified config default)"
+    );
+}
+
+#[test]
+fn test_llm_config_default_temperature() {
+    // Verify that temperature defaults to 0.5
+    let config = LlmConfig::default();
+    assert_eq!(
+        config.temperature, 0.5,
+        "LlmConfig default temperature must be 0.5"
+    );
+}

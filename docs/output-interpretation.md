@@ -139,13 +139,28 @@ Combine severity and confidence to decide what to fix first:
 - High severity + low confidence → **verify before fixing**
 - Low severity + high confidence → **fix when convenient**
 
+## Scan Health Summary
+
+At end-of-scan, baco writes a console summary and includes a `scan_health` section in the JSON report when `output.include_rejected = true`.
+
+**Console summary shows:**
+- Phases run/skipped
+- LLM ok/failed counts
+- File counts
+
+**Zero-LLM-calls warning**: If no LLM calls were made during the scan, a warning is emitted.
+
+**JSON report nuance**: The JSON output structure depends on `output.include_rejected`:
+- When `include_rejected = true`: JSON is an object with `findings`, `rejected`, `summary`, and `scan_health` fields
+- When `include_rejected = false`: JSON is a top-level array of findings
+
 ## Report Artifacts
 
 baco generates three output files:
 
 | File | Purpose |
 |------|---------|
-| `findings.json` | Full JSON array of all `VulnerabilityFinding` objects. Use for programmatic processing or custom reports. With evidence gating on, each entry includes its `verification_tier`. |
+| `findings.json` | Full JSON data. When `include_rejected = true`, object with `findings`, `rejected`, `summary`, `scan_health`. Otherwise, top-level array. With evidence gating on, each entry includes its `verification_tier`. |
 | `report.html` | Human-readable HTML report with severity breakdown, charts, and clickable finding details. With evidence gating on, shows verified + supported findings and an appendix of unverified ones. |
 | `report.sarif` | SARIF output for CI/CD integration. With evidence gating on, contains only verified + supported findings. |
 | `checkpoint.json` | Internal state for resuming interrupted scans. Do not edit manually. |

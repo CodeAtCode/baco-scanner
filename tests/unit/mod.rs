@@ -141,6 +141,7 @@ mod diff_analysis_edge_tests;
 mod discovery_partition_tests;
 mod discovery_routing_tests;
 mod discovery_skip_baseline_tests;
+mod docs_numbers_tests;
 mod dry_run_tests;
 mod error_taxonomy_edge_tests;
 mod error_taxonomy_tests;

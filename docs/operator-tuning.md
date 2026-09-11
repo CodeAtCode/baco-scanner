@@ -72,15 +72,22 @@ max_concurrent = 2
 | `enable_file_filtering` | bool | true | Filters low-value files (minified, vendor) |
 | `enable_threat_modeling` | bool | false | STRIDE-based threat analysis |
 | `enable_root_cause_dedup` | bool | true | Collapses findings with same root cause |
+| Flag | Type | Default | Effect |
+|------|------|---------|--------|
+| `enable_incremental_scan` | bool | false | Skips unchanged files via SHA256 hash comparison |
+| `max_parallel_tasks` | int | 4 | Max concurrent scan tasks |
+| `enable_file_filtering` | bool | true | Filters low-value files (minified, vendor) |
+| `enable_threat_modeling` | bool | false | STRIDE-based threat analysis |
+| `enable_root_cause_dedup` | bool | true | Collapses findings with same root cause |
 | `enable_multi_verifier` | bool | false | Additional LLM verification passes |
 | `enable_auto_patching` | bool | false | Generates fix patches — opt-in |
 | `enable_poc_compilation` | bool | false | Compiles PoC exploits — opt-in |
 | `enable_confidence_refinement` | bool | true | Re-calibrates confidence scores |
 | `enable_cve_bootstrap` | bool | true | Enriches findings with CVE data |
 | `enable_variant_search` | bool | true | Searches for variant vulnerability instances |
-| `early_termination_threshold` | float | 1000.0 | Stops scan after N findings (0.0 disables) |
-
-## General Settings
+| `early_termination_threshold` | float | 1000.0 | Stops scan after N medium+ findings (0.0 disables; Info findings excluded) |
+| `never_submit_enabled` | bool | true | Enables never-submit pattern filter |
+| `never_submit_multiplier` | float | 0.1 | Confidence multiplier when never-submit pattern matches |
 
 | Setting | Section | Default | Effect |
 |---------|---------|---------|--------|
@@ -113,8 +120,24 @@ Use to suppress known false positives. Document each exclusion.
 Controls when the scan stops based on finding count. Set to `0.0` to disable.
 
 ```toml
+### Early Termination Threshold
+
+Controls when the scan stops based on finding count. Only medium-and-above findings are counted (Info findings are excluded to prevent flooding). Set to `0.0` to disable.
+
+```toml
 [scanner.performance]
 early_termination_threshold = 500.0
 ```
 
-Scan stops after N findings. Useful for very large codebases.
+Scan stops after N medium+ findings. Useful for very large codebases. When triggered, an `early_termination` section is recorded in the JSON report.
+
+### Agent Flow Gate
+
+Multi-agent harness synthesis (opt-in, default OFF). Enable only after understanding the requirements:
+
+```toml
+[agent_flow]
+enabled = false
+max_iterations = 10
+requires_instrumented_target = false
+```

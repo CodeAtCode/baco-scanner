@@ -13,6 +13,8 @@ BACO uses a **data-driven PhaseGraph** (`src/scanner/pipeline/orchestrator.rs`) 
 
 **Core Pipeline (24 phases):**
 
+**Core Pipeline**:
+
 > **Note:** Phase order is defined in `PhaseGraph::new()` (src/scanner/pipeline/orchestrator.rs:28-53). This table is manually maintained and should be updated when that code changes.
 
 | Phase # | Name | Config gate (default) |
