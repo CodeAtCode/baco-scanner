@@ -49,11 +49,12 @@ impl SemgrepRunner {
                 .arg(&target_path_clone);
 
             // Add multiple --config args if rulesets are specified
-            // If empty, semgrep uses its default/bundled ruleset
-            if self_clone.rulesets.is_empty() {
-                // No explicit config - let semgrep use default behavior
+            // If empty, derive defaults from project languages
+            let effective_rulesets = self_clone.derive_default_rulesets();
+            if effective_rulesets.is_empty() {
+                // No rulesets - let semgrep use its default behavior
             } else {
-                for ruleset in &self_clone.rulesets {
+                for ruleset in &effective_rulesets {
                     cmd.arg("--config").arg(ruleset);
                 }
             }

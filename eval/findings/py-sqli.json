@@ -1,0 +1,42 @@
+[
+  {
+    "id": "py-sqli-001",
+    "title": "SQL Injection via f-string",
+    "description": "User input is interpolated directly into SQL query using Python f-string",
+    "severity": "high",
+    "confidence_score": 0.95,
+    "cwe_id": "CWE-89",
+    "file_path": "vulnerable.py",
+    "line_number": 15,
+    "code_snippet": "query = f\"SELECT * FROM users WHERE id = {user_id}\"",
+    "diff_hunk": null,
+    "recommendation": "Use parameterized queries with placeholders",
+    "code_location": null,
+    "already_reported": false,
+    "sources": ["semgrep"],
+    "commit_reference": null,
+    "ticket_reference": null,
+    "priority_score": null,
+    "cross_file_references": null,
+    "verification_status": null,
+    "verification_notes": null,
+    "verification_error": null,
+    "agent_evidence_path": null,
+    "security_issue": {
+      "category": "injection",
+      "cwe_id": "CWE-89",
+      "owasp_category": null,
+      "mitre_attack": null,
+      "custom_tags": []
+    },
+    "poc_code": null,
+    "mitigation_code": null,
+    "poc_format": null,
+    "llm_model": null,
+    "agent_mode": false,
+    "statement_range": null,
+    "triage_verdict": null,
+    "evidence": [],
+    "verification_tier": null
+  }
+]

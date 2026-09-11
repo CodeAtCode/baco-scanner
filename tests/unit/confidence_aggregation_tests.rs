@@ -73,7 +73,7 @@ fn test_run_with_empty_findings() {
     let context = AnalysisContext::default();
     let findings: Vec<VulnerabilityFinding> = vec![];
 
-    let results = phase.run(findings, &context);
+    let results = phase.run(findings, &context, true, 0.1);
 
     assert!(results.is_empty());
 }
@@ -91,7 +91,7 @@ fn test_run_with_single_finding() {
         0.5,
     )];
 
-    let results = phase.run(findings, &context);
+    let results = phase.run(findings, &context, true, 0.1);
 
     assert_eq!(results.len(), 1);
     assert!(results.contains_key("f1"));
@@ -107,7 +107,7 @@ fn test_run_preserves_all_finding_ids() {
         create_test_finding("f3", "Test 3", "test3.rs", 30, Severity::Low, 0.4),
     ];
 
-    let results = phase.run(findings, &context);
+    let results = phase.run(findings, &context, true, 0.1);
 
     assert_eq!(results.len(), 3);
     assert!(results.contains_key("f1"));
@@ -127,7 +127,7 @@ fn test_refinement_with_verified_status_increases_confidence() {
     let mut finding = create_test_finding("f1", "Verified", "test.rs", 10, Severity::Medium, 0.5);
     finding.verification_status = Some(VerificationStatus::Confirmed);
 
-    let results = phase.run(vec![finding], &context);
+    let results = phase.run(vec![finding], &context, true, 0.1);
     let refinement = results.get("f1").unwrap();
 
     assert!(refinement.refined_score > refinement.original_score);
@@ -145,7 +145,7 @@ fn test_refinement_with_false_positive_status_decreases_confidence() {
         create_test_finding("f1", "False Positive", "test.rs", 10, Severity::Medium, 0.7);
     finding.verification_status = Some(VerificationStatus::FalsePositive);
 
-    let results = phase.run(vec![finding], &context);
+    let results = phase.run(vec![finding], &context, true, 0.1);
     let refinement = results.get("f1").unwrap();
 
     assert!(refinement.refined_score < refinement.original_score);
@@ -167,7 +167,7 @@ fn test_refinement_with_multiple_sources_increases_confidence() {
         "manual".to_string(),
     ];
 
-    let results = phase.run(vec![finding], &context);
+    let results = phase.run(vec![finding], &context, true, 0.1);
     let refinement = results.get("f1").unwrap();
 
     assert!(refinement.refined_score > refinement.original_score);
@@ -189,7 +189,7 @@ fn test_refinement_with_cross_file_references_increases_confidence() {
         create_test_finding("f1", "Cross-file", "source.rs", 10, Severity::Medium, 0.5);
     finding.cross_file_references = Some(vec!["related finding".to_string()]);
 
-    let results = phase.run(vec![finding], &context);
+    let results = phase.run(vec![finding], &context, true, 0.1);
     let refinement = results.get("f1").unwrap();
 
     assert!(refinement.refined_score > refinement.original_score);
@@ -205,7 +205,7 @@ fn test_refinement_with_test_file_decreases_confidence() {
 
     let finding = create_test_finding("f1", "Test code", "src/test.rs", 10, Severity::Medium, 0.7);
 
-    let results = phase.run(vec![finding], &context);
+    let results = phase.run(vec![finding], &context, true, 0.1);
     let refinement = results.get("f1").unwrap();
 
     assert!(refinement.refined_score < refinement.original_score);
@@ -228,7 +228,7 @@ fn test_refinement_with_vendor_file_decreases_confidence() {
         0.7,
     );
 
-    let results = phase.run(vec![finding], &context);
+    let results = phase.run(vec![finding], &context, true, 0.1);
     let refinement = results.get("f1").unwrap();
 
     assert!(refinement.refined_score < refinement.original_score);
@@ -252,7 +252,7 @@ fn test_refinement_with_high_severity_boost() {
     );
     finding.verification_status = Some(VerificationStatus::Confirmed);
 
-    let results = phase.run(vec![finding], &context);
+    let results = phase.run(vec![finding], &context, true, 0.1);
     let refinement = results.get("f1").unwrap();
 
     // Should get both verified boost and severity boost
@@ -544,7 +544,7 @@ fn test_apply_refinements_updates_findings() {
     finding.verification_status = Some(VerificationStatus::Confirmed);
 
     let mut findings = vec![finding];
-    let refinements = phase.run(findings.clone(), &context);
+    let refinements = phase.run(findings.clone(), &context, true, 0.1);
 
     phase.apply_refinements(&mut findings, &refinements);
 
@@ -565,7 +565,7 @@ fn test_refinement_clamps_to_valid_range() {
     let mut finding = create_test_finding("f1", "Low", "test.rs", 10, Severity::Low, 0.1);
     finding.verification_status = Some(VerificationStatus::FalsePositive);
 
-    let results = phase.run(vec![finding], &context);
+    let results = phase.run(vec![finding], &context, true, 0.1);
     let refinement = results.get("f1").unwrap();
 
     assert!(refinement.refined_score >= 0.0);
@@ -582,7 +582,7 @@ fn test_refinement_with_never_submit_pattern_heavily_penalized() {
     finding.description = "Content Security Policy not configured".to_string();
     finding.cwe_id = Some("CWE-693".to_string());
 
-    let results = phase.run(vec![finding], &context);
+    let results = phase.run(vec![finding], &context, true, 0.1);
     let refinement = results.get("f1").unwrap();
 
     // Should be heavily penalized (multiplied by 0.1)
@@ -597,7 +597,7 @@ fn test_refinement_with_triage_true_positive() {
     let mut finding = create_test_finding("f1", "Triaged", "source.rs", 10, Severity::Medium, 0.5);
     finding.verification_notes = Some("triage: true_positive confirmed".to_string());
 
-    let results = phase.run(vec![finding], &context);
+    let results = phase.run(vec![finding], &context, true, 0.1);
     let refinement = results.get("f1").unwrap();
 
     assert!(refinement.refined_score > refinement.original_score);
@@ -614,7 +614,7 @@ fn test_refinement_with_triage_false_positive() {
     let mut finding = create_test_finding("f1", "Triaged FP", "test.rs", 10, Severity::Medium, 0.7);
     finding.verification_notes = Some("triage: false_positive identified".to_string());
 
-    let results = phase.run(vec![finding], &context);
+    let results = phase.run(vec![finding], &context, true, 0.1);
     let refinement = results.get("f1").unwrap();
 
     assert!(refinement.refined_score < refinement.original_score);
@@ -632,7 +632,7 @@ fn test_refinement_with_rationale_validated() {
         create_test_finding("f1", "Validated", "source.rs", 10, Severity::Medium, 0.5);
     finding.verification_notes = Some("rationale: validated as sound".to_string());
 
-    let results = phase.run(vec![finding], &context);
+    let results = phase.run(vec![finding], &context, true, 0.1);
     let refinement = results.get("f1").unwrap();
 
     assert!(refinement.refined_score > refinement.original_score);
@@ -651,7 +651,7 @@ fn test_refinement_with_downgrade_triage_verdict() {
         adjusted_severity: Severity::Medium,
     });
 
-    let results = phase.run(vec![finding], &context);
+    let results = phase.run(vec![finding], &context, true, 0.1);
     let refinement = results.get("f1").unwrap();
 
     assert!(refinement.refined_score < refinement.original_score);
@@ -694,7 +694,7 @@ fn test_full_refinement_workflow() {
         { create_test_finding("f4", "Test code", "src/test.rs", 40, Severity::Medium, 0.7) },
     ];
 
-    let refinements = phase.run(findings.clone(), &context);
+    let refinements = phase.run(findings.clone(), &context, true, 0.1);
 
     // Verify all findings have refinements
     assert_eq!(refinements.len(), 4);
@@ -726,4 +726,145 @@ fn test_record_verification_result_updates_history() {
     assert_eq!(stats.total, 3);
     assert_eq!(stats.confirmed, 2);
     assert_eq!(stats.false_positives, 1);
+}
+
+// ============================================================================
+// Never-submit Pattern Filter Tests
+// ============================================================================
+
+#[test]
+fn test_never_submit_pattern_enabled_with_default_multiplier() {
+    let phase = ConfidenceRefinementPhase::new();
+    let context = AnalysisContext::default();
+
+    // Create a finding that matches the never-submit pattern (missing.*header)
+    // Use a non-test file path to avoid other factors interfering
+    let mut finding = create_test_finding(
+        "f1",
+        "Missing security header detected",
+        "src/main.rs",
+        10,
+        Severity::Medium,
+        0.8,
+    );
+    finding.description = "The response is missing a required security header".to_string();
+
+    // Run with never-submit enabled and default multiplier (0.1)
+    let results = phase.run(vec![finding], &context, true, 0.1);
+    let refinement = results.get("f1").unwrap();
+
+    // Confidence should be reduced to 10% of original (0.8 * 0.1 = 0.08)
+    assert!((refinement.refined_score - 0.08).abs() < 0.01);
+    assert!(refinement
+        .factors
+        .iter()
+        .any(|f| matches!(f, ConfidenceFactor::NeverSubmitMatch { .. })));
+}
+
+#[test]
+fn test_never_submit_pattern_disabled_no_penalty() {
+    let phase = ConfidenceRefinementPhase::new();
+    let context = AnalysisContext::default();
+
+    // Create a finding that would match the never-submit pattern
+    // Use a non-test file path to avoid other factors interfering
+    let mut finding = create_test_finding(
+        "f1",
+        "Missing security header detected",
+        "src/main.rs",
+        10,
+        Severity::Medium,
+        0.8,
+    );
+    finding.description = "The response is missing a required security header".to_string();
+
+    // Run with never-submit disabled
+    let results = phase.run(vec![finding], &context, false, 0.1);
+    let refinement = results.get("f1").unwrap();
+
+    // Confidence should remain unchanged (no never-submit penalty applied)
+    // and no other factors should apply
+    assert_eq!(refinement.refined_score, refinement.original_score);
+    assert!(!refinement
+        .factors
+        .iter()
+        .any(|f| matches!(f, ConfidenceFactor::NeverSubmitMatch { .. })));
+}
+
+#[test]
+fn test_never_submit_pattern_custom_multiplier() {
+    let phase = ConfidenceRefinementPhase::new();
+    let context = AnalysisContext::default();
+
+    // Create a finding that matches the never-submit pattern
+    // Use a non-test file path to avoid other factors interfering
+    let mut finding = create_test_finding(
+        "f1",
+        "Content security policy issue",
+        "src/main.rs",
+        10,
+        Severity::Medium,
+        0.8,
+    );
+    finding.description = "content.security.policy is not configured".to_string();
+
+    // Run with custom multiplier (0.5)
+    let results = phase.run(vec![finding], &context, true, 0.5);
+    let refinement = results.get("f1").unwrap();
+
+    // Confidence should be reduced to 50% of original (0.8 * 0.5 = 0.4)
+    assert!((refinement.refined_score - 0.4).abs() < 0.01);
+    assert!(refinement
+        .factors
+        .iter()
+        .any(|f| matches!(f, ConfidenceFactor::NeverSubmitMatch { .. })));
+}
+
+#[test]
+fn test_never_submit_pattern_content_security_policy() {
+    let phase = ConfidenceRefinementPhase::new();
+    let context = AnalysisContext::default();
+
+    let mut finding = create_test_finding(
+        "f1",
+        "CSP violation",
+        "src/main.rs",
+        10,
+        Severity::Medium,
+        0.9,
+    );
+    finding.description = "content.security.policy is missing".to_string();
+
+    let results = phase.run(vec![finding], &context, true, 0.1);
+    let refinement = results.get("f1").unwrap();
+
+    // Should match the content.security.policy pattern
+    // Confidence should be 0.9 * 0.1 = 0.09
+    assert!((refinement.refined_score - 0.09).abs() < 0.01);
+}
+
+#[test]
+fn test_never_submit_pattern_no_match_unchanged() {
+    let phase = ConfidenceRefinementPhase::new();
+    let context = AnalysisContext::default();
+
+    // Create a finding that does NOT match any never-submit pattern
+    let finding = create_test_finding(
+        "f1",
+        "SQL injection vulnerability",
+        "test.rs",
+        10,
+        Severity::High,
+        0.8,
+    );
+
+    let results = phase.run(vec![finding], &context, true, 0.1);
+    let refinement = results.get("f1").unwrap();
+
+    // Confidence should not be affected by never-submit filter
+    // (may still be affected by other factors, but not never-submit)
+    assert!(!refinement
+        .factors
+        .iter()
+        .any(|f| matches!(f, ConfidenceFactor::NeverSubmitMatch { .. })));
 }

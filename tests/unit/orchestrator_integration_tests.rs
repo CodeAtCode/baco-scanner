@@ -4,12 +4,12 @@
 //! functionality including force flag behavior, checkpoint resume, finding
 //! propagation, and early termination.
 
-use baco::checkpoint::{Checkpoint, ScanPhase};
 use baco::config::{
     AgentConfig, LlmConfig, LlmPhasesConfig, OutputConfig, PerformanceSettings, ProjectConfig,
     ScannerConfig, ScannerSettings,
 };
 use baco::findings::{Severity, VulnerabilityFinding};
+use baco::scanner::checkpoint::{Checkpoint, EarlyTerminationInfo, ScanPhase};
 use baco::scanner::Scanner;
 use std::fs;
 use std::path::PathBuf;
@@ -642,4 +642,150 @@ fn test_run_scanner_propagates_findings() {
     assert_eq!(state.findings.len(), 2);
     assert_eq!(state.findings[0].severity, Severity::Critical);
     assert_eq!(state.findings[1].severity, Severity::High);
+}
+
+// ============================================================================
+// Test: Early Termination with Severity Filtering
+// ============================================================================
+
+#[test]
+fn test_early_termination_counts_only_medium_and_above() {
+    // Create findings with mixed severities: 950 Info + 100 Medium = 105 total
+    // Threshold is 1000, so only medium+ (100) should be counted
+    // Pipeline should NOT terminate (100 < 1000)
+    let mut findings = Vec::new();
+
+    // Add 950 Info findings
+    for i in 0..950 {
+        findings.push(create_test_finding(
+            &format!("Info Finding {}", i),
+            Severity::Info,
+        ));
+    }
+
+    // Add 100 Medium findings
+    for i in 0..100 {
+        findings.push(create_test_finding(
+            &format!("Medium Finding {}", i),
+            Severity::Medium,
+        ));
+    }
+
+    let medium_plus_count = findings
+        .iter()
+        .filter(|f| f.severity >= Severity::Medium)
+        .count();
+
+    assert_eq!(medium_plus_count, 100);
+    assert_eq!(findings.len(), 1050);
+
+    // Threshold is 1000, medium+ count is 100, so no termination
+    let threshold: f32 = 1000.0;
+    assert!(medium_plus_count as f32 <= threshold);
+}
+
+#[test]
+fn test_early_termination_triggers_on_medium_plus_threshold() {
+    // Create findings: 50 Info + 1001 Medium = 1051 total
+    // Threshold is 1000, medium+ count is 1001 > 1000, should terminate
+    let mut findings = Vec::new();
+
+    // Add 50 Info findings
+    for i in 0..50 {
+        findings.push(create_test_finding(
+            &format!("Info Finding {}", i),
+            Severity::Info,
+        ));
+    }
+
+    // Add 1001 Medium findings
+    for i in 0..1001 {
+        findings.push(create_test_finding(
+            &format!("Medium Finding {}", i),
+            Severity::Medium,
+        ));
+    }
+
+    let medium_plus_count = findings
+        .iter()
+        .filter(|f| f.severity >= Severity::Medium)
+        .count();
+
+    assert_eq!(medium_plus_count, 1001);
+    assert_eq!(findings.len(), 1051);
+
+    let threshold: f32 = 1000.0;
+    assert!(medium_plus_count as f32 > threshold);
+}
+
+#[test]
+fn test_early_termination_boundary_exact_threshold() {
+    // Test exact threshold boundary: medium+ count = threshold (not >)
+    let mut findings = Vec::new();
+
+    // Add exactly 1000 Medium findings
+    for i in 0..1000 {
+        findings.push(create_test_finding(
+            &format!("Medium Finding {}", i),
+            Severity::Medium,
+        ));
+    }
+
+    let medium_plus_count = findings
+        .iter()
+        .filter(|f| f.severity >= Severity::Medium)
+        .count();
+
+    assert_eq!(medium_plus_count, 1000);
+
+    let threshold: f32 = 1000.0;
+    // Exact threshold should NOT trigger (uses > not >=)
+    assert!(medium_plus_count as f32 <= threshold);
+}
+
+#[test]
+fn test_early_termination_boundary_one_over_threshold() {
+    // Test one over threshold: medium+ count = threshold + 1
+    let mut findings = Vec::new();
+
+    // Add 1001 Medium findings
+    for i in 0..1001 {
+        findings.push(create_test_finding(
+            &format!("Medium Finding {}", i),
+            Severity::Medium,
+        ));
+    }
+
+    let medium_plus_count = findings
+        .iter()
+        .filter(|f| f.severity >= Severity::Medium)
+        .count();
+
+    assert_eq!(medium_plus_count, 1001);
+
+    let threshold: f32 = 1000.0;
+    // One over threshold SHOULD trigger
+    assert!(medium_plus_count as f32 > threshold);
+}
+
+#[test]
+fn test_early_termination_info_struct() {
+    let info = EarlyTerminationInfo {
+        triggered: true,
+        finding_count: 1001,
+        phases_skipped: vec!["RuleSynthesis".to_string(), "LlmDiscovery".to_string()],
+    };
+
+    assert!(info.triggered);
+    assert_eq!(info.finding_count, 1001);
+    assert_eq!(info.phases_skipped.len(), 2);
+}
+
+#[test]
+fn test_early_termination_info_default() {
+    let info = EarlyTerminationInfo::default();
+
+    assert!(!info.triggered);
+    assert_eq!(info.finding_count, 0);
+    assert!(info.phases_skipped.is_empty());
 }

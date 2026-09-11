@@ -1305,10 +1305,18 @@ impl LlmAnalyzer {
                 let severity_str = item.get("severity").and_then(|v| v.as_str());
                 let title = item.get("title").and_then(|v| v.as_str());
                 let description = item.get("description").and_then(|v| v.as_str());
-                let line = item.get("line").and_then(|v| v.as_i64());
+                let line = item
+                    .get("line")
+                    .and_then(|v| v.as_i64())
+                    .unwrap_or_else(|| {
+                        tracing::warn!(
+                            "LLM finding '{}' has no line number; defaulting to 1",
+                            title.unwrap_or("<untitled>")
+                        );
+                        1
+                    });
 
-                // Skip if essential fields are missing
-                if let (Some(severity_str), Some(title), Some(line)) = (severity_str, title, line) {
+                if let (Some(severity_str), Some(title)) = (severity_str, title) {
                     // Use description from LLM response (may be empty if LLM didn't provide one)
                     let description = description.map(|s| s.to_string()).unwrap_or_default();
 
@@ -1316,7 +1324,8 @@ impl LlmAnalyzer {
                         "critical" => Severity::Critical,
                         "high" => Severity::High,
                         "medium" => Severity::Medium,
-                        _ => Severity::Low,
+                        "low" => Severity::Low,
+                        _ => Severity::Medium,
                     };
 
                     // Parse fix_code field (NEW - shows fixed code, not continuation)

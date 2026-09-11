@@ -314,100 +314,143 @@ pub async fn run_security_agent_verification(
     }
 
     // AgentFlow multi-agent harness synthesis
-    if config.agent_flow.enabled {
-        // Gate: requires_instrumented_target check
-        // When requires_instrumented_target is true, we check for instrumentation signal.
-        // Since no per-target instrumentation signal is available in config context,
-        // the honest gate is to skip synthesis when the flag is set.
-        let enter_agent_flow = if config.agent_flow.requires_instrumented_target {
-            tracing::info!("Skipping agent_flow: requires_instrumented_target=true and no instrumentation signal for target");
-            false
-        } else {
-            tracing::info!("AgentFlow enabled, running harness search loop");
-            true
-        };
+    if config
+        .llm
+        .phases
+        .security_agent_verification
+        .agent_flow
+        .enabled
+    {
+        tracing::debug!("AgentFlow gate enabled for security_agent_verification phase");
+        pb.set_message("Phase 10/24: AgentFlow harness synthesis...");
 
-        if enter_agent_flow {
-            pb.set_message("Phase 10/24: AgentFlow harness synthesis...");
+        for finding in findings.iter_mut() {
+            // Build a minimal harness from the finding
+            let mut harness = crate::agent_flow::dsl::AgentFlowHarness::new();
+            let _analyst = harness.add_agent(crate::agent_flow::dsl::Agent {
+                role: format!(
+                    "analyst_{}",
+                    finding
+                        .title
+                        .replace(" ", "_")
+                        .chars()
+                        .take(20)
+                        .collect::<String>()
+                ),
+                prompt: format!(
+                    "Analyze vulnerability: {}\nLocation: {}\nDescription: {}",
+                    finding.title, finding.file_path, finding.description
+                ),
+                model: config.llm.phases.discovery.model.clone(),
+                tools: std::collections::BTreeSet::new(),
+            });
 
-            for finding in findings.iter_mut() {
-                // Build a minimal harness from the finding
-                let mut harness = crate::agent_flow::dsl::AgentFlowHarness::new();
-                let _analyst = harness.add_agent(crate::agent_flow::dsl::Agent {
-                    role: format!(
-                        "analyst_{}",
-                        finding
-                            .title
-                            .replace(" ", "_")
-                            .chars()
-                            .take(20)
-                            .collect::<String>()
-                    ),
-                    prompt: format!(
-                        "Analyze vulnerability: {}\nLocation: {}\nDescription: {}",
-                        finding.title, finding.file_path, finding.description
-                    ),
-                    model: config.llm.phases.discovery.model.clone(),
-                    tools: std::collections::BTreeSet::new(),
-                });
+            let mut current_harness = harness;
+            let max_iterations = config
+                .llm
+                .phases
+                .security_agent_verification
+                .agent_flow
+                .max_iterations;
+            let mut diagnosis_summary: Option<String> = None;
+            let mut proposed_rewrite: Option<String> = None;
 
-                let mut current_harness = harness;
-                let max_iterations = config.agent_flow.max_iterations;
-
-                for iter in 0..max_iterations {
-                    // Execute the harness
-                    let execution =
-                        match crate::agent_flow::execute(&current_harness, &client).await {
-                            Ok(r) => r,
-                            Err(e) => {
-                                tracing::warn!("AgentFlow execute iter {} failed: {}", iter, e);
-                                break;
-                            }
-                        };
-
-                    // Build feedback channels from execution result
-                    let mut feedback_channels = std::collections::BTreeSet::new();
-                    if execution.is_success() {
-                        feedback_channels.insert(crate::agent_flow::dsl::FeedbackChannel::Outcome);
-                    }
-
-                    // Diagnose the result
-                    let diagnostic = crate::agent_flow::diagnose(
-                        &execution,
-                        &feedback_channels,
-                        if execution.is_success() {
-                            vec![crate::agent_flow::diagnoser::FeedbackSignal::Pass]
-                        } else {
-                            vec![crate::agent_flow::diagnoser::FeedbackSignal::Fail(
-                                "some agents failed".to_string(),
-                            )]
-                        },
-                    );
-
-                    if diagnostic.is_success() {
-                        tracing::info!("AgentFlow converged at iter {}", iter);
+            for iter in 0..max_iterations {
+                // Execute the harness
+                let execution = match crate::agent_flow::execute(&current_harness, &client).await {
+                    Ok(r) => r,
+                    Err(e) => {
+                        tracing::warn!("AgentFlow execute iter {} failed: {}", iter, e);
                         break;
                     }
+                };
 
-                    // Propose a rewrite
-                    match crate::agent_flow::propose_rewrite(&client, &diagnostic, &current_harness)
-                        .await
-                    {
-                        Ok(proposal) => {
-                            current_harness =
-                                crate::agent_flow::apply_rewrite(&current_harness, &proposal);
-                        }
-                        Err(e) => {
-                            tracing::warn!("AgentFlow propose_rewrite iter {} failed: {}", iter, e);
-                            break;
-                        }
+                // Build feedback channels from execution result
+                let mut feedback_channels = std::collections::BTreeSet::new();
+                if execution.is_success() {
+                    feedback_channels.insert(crate::agent_flow::dsl::FeedbackChannel::Outcome);
+                }
+
+                // Diagnose the result
+                let diagnostic = crate::agent_flow::diagnose(
+                    &execution,
+                    &feedback_channels,
+                    if execution.is_success() {
+                        vec![crate::agent_flow::diagnoser::FeedbackSignal::Pass]
+                    } else {
+                        vec![crate::agent_flow::diagnoser::FeedbackSignal::Fail(
+                            "some agents failed".to_string(),
+                        )]
+                    },
+                );
+
+                // Capture diagnosis summary
+                diagnosis_summary = Some(crate::agent_flow::format_diagnostic(&diagnostic));
+
+                if diagnostic.is_success() {
+                    tracing::info!("AgentFlow converged at iter {}", iter);
+                    break;
+                }
+
+                // Propose a rewrite
+                match crate::agent_flow::propose_rewrite(&client, &diagnostic, &current_harness)
+                    .await
+                {
+                    Ok(proposal) => {
+                        let rationale = proposal.rationale.clone();
+                        proposed_rewrite = Some(rationale);
+                        current_harness =
+                            crate::agent_flow::apply_rewrite(&current_harness, &proposal);
+                    }
+                    Err(e) => {
+                        tracing::warn!("AgentFlow propose_rewrite iter {} failed: {}", iter, e);
+                        break;
                     }
                 }
             }
 
-            pb.set_position(base + 100);
-            tracing::info!("AgentFlow harness synthesis complete");
+            // Attach output to finding
+            let has_diagnosis = diagnosis_summary.is_some();
+            let has_rewrite = proposed_rewrite.is_some();
+
+            if let Some(summary) = diagnosis_summary {
+                finding.add_evidence(
+                    crate::evidence::EvidenceSource::SecurityAgentVerification(
+                        "agent_flow_diagnosis".into(),
+                    ),
+                    1.0,
+                    format!("AgentFlow diagnosis: {}", summary),
+                );
+                if finding.verification_notes.is_none() {
+                    finding.verification_notes = Some(summary);
+                }
+            }
+
+            if let Some(rewrite) = proposed_rewrite {
+                finding.add_evidence(
+                    crate::evidence::EvidenceSource::SecurityAgentVerification(
+                        "agent_flow_rewrite".into(),
+                    ),
+                    1.0,
+                    format!("AgentFlow proposed rewrite: {}", rewrite),
+                );
+            }
+
+            // Warn if flow produced nothing
+            if !has_diagnosis && !has_rewrite {
+                tracing::warn!(
+                    "AgentFlow produced no output for finding: {}",
+                    finding.title
+                );
+            }
         }
+
+        pb.set_position(base + 100);
+        tracing::info!("AgentFlow harness synthesis complete");
+    } else {
+        tracing::debug!(
+            "AgentFlow disabled for security_agent_verification phase, skipping harness synthesis"
+        );
     }
 
     pb.set_position(base + 100);

@@ -19,6 +19,7 @@ mod core_tests;
 
 // Include multi-hit aggregation path tests
 mod aggregate_path_tests;
+mod severity_mapping_tests;
 
 // ============================================================================
 // SemgrepRunner Construction Tests
@@ -654,4 +655,108 @@ fn test_semgrep_runner_clone_for_async() {
 
     assert_eq!(runner.rulesets, runner_clone.rulesets);
     assert_eq!(runner.exclude_rules, runner_clone.exclude_rules);
+}
+
+// ============================================================================
+// Language-Derived Default Rulesets Tests
+// ============================================================================
+
+#[test]
+fn test_derive_default_rulesets_empty_returns_empty() {
+    let runner = SemgrepRunner::new(vec![], vec![]).with_languages(vec![]);
+
+    let defaults = runner.derive_default_rulesets();
+    assert!(defaults.is_empty());
+}
+
+#[test]
+fn test_derive_default_rulesets_python() {
+    let runner = SemgrepRunner::new(vec![], vec![]).with_languages(vec!["python".to_string()]);
+
+    let defaults = runner.derive_default_rulesets();
+    assert_eq!(defaults, vec!["p/python".to_string()]);
+}
+
+#[test]
+fn test_derive_default_rulesets_javascript() {
+    let runner = SemgrepRunner::new(vec![], vec![]).with_languages(vec!["javascript".to_string()]);
+
+    let defaults = runner.derive_default_rulesets();
+    assert_eq!(defaults, vec!["p/javascript".to_string()]);
+}
+
+#[test]
+fn test_derive_default_rulesets_js_alias() {
+    let runner = SemgrepRunner::new(vec![], vec![]).with_languages(vec!["js".to_string()]);
+
+    let defaults = runner.derive_default_rulesets();
+    assert_eq!(defaults, vec!["p/javascript".to_string()]);
+}
+
+#[test]
+fn test_derive_default_rulesets_php() {
+    let runner = SemgrepRunner::new(vec![], vec![]).with_languages(vec!["php".to_string()]);
+
+    let defaults = runner.derive_default_rulesets();
+    assert_eq!(defaults, vec!["p/php".to_string()]);
+}
+
+#[test]
+fn test_derive_default_rulesets_c() {
+    let runner = SemgrepRunner::new(vec![], vec![]).with_languages(vec!["c".to_string()]);
+
+    let defaults = runner.derive_default_rulesets();
+    assert_eq!(defaults, vec!["p/c".to_string()]);
+}
+
+#[test]
+fn test_derive_default_rulesets_cpp() {
+    let runner = SemgrepRunner::new(vec![], vec![]).with_languages(vec!["cpp".to_string()]);
+
+    let defaults = runner.derive_default_rulesets();
+    assert_eq!(defaults, vec!["p/c".to_string()]);
+}
+
+#[test]
+fn test_derive_default_rulesets_multi_language_union() {
+    let runner = SemgrepRunner::new(vec![], vec![]).with_languages(vec![
+        "python".to_string(),
+        "javascript".to_string(),
+        "php".to_string(),
+    ]);
+
+    let defaults = runner.derive_default_rulesets();
+    assert_eq!(defaults.len(), 3);
+    assert!(defaults.contains(&"p/python".to_string()));
+    assert!(defaults.contains(&"p/javascript".to_string()));
+    assert!(defaults.contains(&"p/php".to_string()));
+}
+
+#[test]
+fn test_derive_default_rulesets_explicit_not_overridden() {
+    let runner = SemgrepRunner::new(vec!["custom/ruleset".to_string()], vec![])
+        .with_languages(vec!["python".to_string()]);
+
+    let defaults = runner.derive_default_rulesets();
+    assert_eq!(defaults, vec!["custom/ruleset".to_string()]);
+}
+
+#[test]
+fn test_derive_default_rulesets_unknown_language_ignored() {
+    let runner = SemgrepRunner::new(vec![], vec![])
+        .with_languages(vec!["rust".to_string(), "go".to_string()]);
+
+    let defaults = runner.derive_default_rulesets();
+    assert!(defaults.is_empty());
+}
+
+#[test]
+fn test_derive_default_rulesets_case_insensitive() {
+    let runner = SemgrepRunner::new(vec![], vec![])
+        .with_languages(vec!["PYTHON".to_string(), "Php".to_string()]);
+
+    let defaults = runner.derive_default_rulesets();
+    assert_eq!(defaults.len(), 2);
+    assert!(defaults.contains(&"p/python".to_string()));
+    assert!(defaults.contains(&"p/php".to_string()));
 }

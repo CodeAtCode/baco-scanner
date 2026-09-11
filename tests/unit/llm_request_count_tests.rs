@@ -105,7 +105,7 @@ async fn test_verification_n_findings_leq_batch_size() {
     .unwrap()];
 
     let client = CountingLlmClient::new(responses);
-    let results =
+    let (results, _fallback_count) =
         verify_findings_batched(&client, &findings, 8, &hunt_prompts, &empty_primitives()).await;
 
     assert_eq!(
@@ -142,7 +142,7 @@ async fn test_verification_n_findings_spanning_k_batches() {
     ];
 
     let client = CountingLlmClient::new(responses);
-    let results =
+    let (results, _fallback_count) =
         verify_findings_batched(&client, &findings, 8, &hunt_prompts, &empty_primitives()).await;
 
     assert_eq!(
@@ -203,7 +203,7 @@ async fn test_empty_findings_zero_calls() {
         0,
         "Expected 0 LLM calls for empty findings"
     );
-    assert_eq!(results.len(), 0, "Expected empty results");
+    assert_eq!(results.0.len(), 0, "Expected empty results");
 }
 
 #[tokio::test]
@@ -216,7 +216,7 @@ async fn test_parse_failure_batch_counts_as_one_call() {
     let responses = vec!["This is not valid JSON".to_string()];
 
     let client = CountingLlmClient::new(responses);
-    let results =
+    let (results, _fallback_count) =
         verify_findings_batched(&client, &findings, 8, &hunt_prompts, &empty_primitives()).await;
 
     assert_eq!(

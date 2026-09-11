@@ -48,7 +48,7 @@ fn test_write_findings_json_empty_findings() {
 
     let _ = fs::remove_file(output_path);
 
-    let result = write_findings_json(&findings, &[], output_path, None, None);
+    let result = write_findings_json(&findings, &[], output_path, None, None, None, None);
 
     assert!(result.is_ok());
     assert!(Path::new(output_path).exists());
@@ -66,7 +66,7 @@ fn test_write_findings_json_single_finding() {
 
     let _ = fs::remove_file(output_path);
 
-    let result = write_findings_json(&findings, &[], output_path, None, None);
+    let result = write_findings_json(&findings, &[], output_path, None, None, None, None);
 
     assert!(result.is_ok());
 
@@ -90,7 +90,7 @@ fn test_write_findings_json_multiple_findings() {
 
     let _ = fs::remove_file(output_path);
 
-    let result = write_findings_json(&findings, &[], output_path, None, None);
+    let result = write_findings_json(&findings, &[], output_path, None, None, None, None);
 
     assert!(result.is_ok());
 
@@ -115,7 +115,7 @@ fn test_write_findings_json_with_cwe_id() {
 
     let _ = fs::remove_file(output_path);
 
-    let result = write_findings_json(&findings, &[], output_path, None, None);
+    let result = write_findings_json(&findings, &[], output_path, None, None, None, None);
 
     assert!(result.is_ok());
 
@@ -134,7 +134,7 @@ fn test_write_findings_json_with_code_snippet() {
 
     let _ = fs::remove_file(output_path);
 
-    let result = write_findings_json(&findings, &[], output_path, None, None);
+    let result = write_findings_json(&findings, &[], output_path, None, None, None, None);
 
     assert!(result.is_ok());
 
@@ -152,7 +152,15 @@ fn test_write_findings_json_creates_parent_dirs() {
 
     let _ = fs::remove_dir_all(&temp_dir);
 
-    let result = write_findings_json(&findings, &[], output_path.to_str().unwrap(), None, None);
+    let result = write_findings_json(
+        &findings,
+        &[],
+        output_path.to_str().unwrap(),
+        None,
+        None,
+        None,
+        None,
+    );
 
     assert!(result.is_ok());
     assert!(output_path.exists());
@@ -170,7 +178,7 @@ fn test_write_findings_json_valid_json() {
 
     let _ = fs::remove_file(output_path);
 
-    let result = write_findings_json(&findings, &[], output_path, None, None);
+    let result = write_findings_json(&findings, &[], output_path, None, None, None, None);
 
     assert!(result.is_ok());
 
@@ -215,12 +223,13 @@ fn test_write_findings_json_with_llm_metrics() {
                 tokens: 5000,
             },
         )]),
+        positional_fallbacks: 0,
     };
     let output_path = "/tmp/test_with_metrics.json";
 
     let _ = fs::remove_file(output_path);
 
-    let result = write_findings_json(&findings, &[], output_path, None, None);
+    let result = write_findings_json(&findings, &[], output_path, None, None, None, None);
 
     assert!(result.is_ok());
 
@@ -245,7 +254,7 @@ fn test_write_findings_json_preserves_severity_levels() {
 
     let _ = fs::remove_file(output_path);
 
-    let result = write_findings_json(&findings, &[], output_path, None, None);
+    let result = write_findings_json(&findings, &[], output_path, None, None, None, None);
 
     assert!(result.is_ok());
 
@@ -271,7 +280,7 @@ fn test_write_findings_json_preserves_confidence_scores() {
 
     let _ = fs::remove_file(output_path);
 
-    let result = write_findings_json(&findings, &[], output_path, None, None);
+    let result = write_findings_json(&findings, &[], output_path, None, None, None, None);
 
     assert!(result.is_ok());
 
@@ -298,7 +307,7 @@ fn test_write_findings_json_preserves_sources() {
 
     let _ = fs::remove_file(output_path);
 
-    let result = write_findings_json(&findings, &[], output_path, None, None);
+    let result = write_findings_json(&findings, &[], output_path, None, None, None, None);
 
     assert!(result.is_ok());
 
@@ -318,7 +327,7 @@ fn test_write_findings_json_without_line_number() {
 
     let _ = fs::remove_file(output_path);
 
-    let result = write_findings_json(&findings, &[], output_path, None, None);
+    let result = write_findings_json(&findings, &[], output_path, None, None, None, None);
 
     assert!(result.is_ok());
 
@@ -340,7 +349,7 @@ fn test_write_findings_json_with_recommendation() {
 
     let _ = fs::remove_file(output_path);
 
-    let result = write_findings_json(&findings, &[], output_path, None, None);
+    let result = write_findings_json(&findings, &[], output_path, None, None, None, None);
 
     assert!(result.is_ok());
 
@@ -359,7 +368,7 @@ fn test_write_findings_json_with_already_reported() {
 
     let _ = fs::remove_file(output_path);
 
-    let result = write_findings_json(&findings, &[], output_path, None, None);
+    let result = write_findings_json(&findings, &[], output_path, None, None, None, None);
 
     assert!(result.is_ok());
 
@@ -383,7 +392,7 @@ fn test_write_findings_json_with_poc_and_mitigation() {
 
     let _ = fs::remove_file(output_path);
 
-    let result = write_findings_json(&findings, &[], output_path, None, None);
+    let result = write_findings_json(&findings, &[], output_path, None, None, None, None);
 
     assert!(result.is_ok());
 
@@ -405,7 +414,7 @@ fn test_write_findings_json_with_agent_mode() {
 
     let _ = fs::remove_file(output_path);
 
-    let result = write_findings_json(&findings, &[], output_path, None, None);
+    let result = write_findings_json(&findings, &[], output_path, None, None, None, None);
 
     assert!(result.is_ok());
 

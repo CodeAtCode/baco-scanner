@@ -21,6 +21,8 @@ pub struct CveEntry {
     pub source: CveSource,
     pub affected_products: Vec<String>,
     pub published_date: Option<String>,
+    #[serde(default)]
+    pub cwe_ids: Vec<String>,
 }
 
 impl CveEntry {
@@ -32,6 +34,7 @@ impl CveEntry {
             source,
             affected_products: Vec::new(),
             published_date: None,
+            cwe_ids: Vec::new(),
         }
     }
 }

@@ -39,6 +39,7 @@ fn test_phase_llm_config_empty_models_returns_error() {
                     models: vec![],
                     temperature: None,
                     timeout_secs: None,
+                    agent_flow: Default::default(),
                 },
                 ..Default::default()
             },
@@ -74,6 +75,7 @@ fn test_phase_llm_config_valid_config_preserves_models_in_order() {
                     ],
                     temperature: None,
                     timeout_secs: None,
+                    agent_flow: Default::default(),
                 },
                 ..Default::default()
             },
@@ -108,6 +110,7 @@ fn test_phase_llm_config_phase_override_beats_global() {
                     models: vec![],
                     temperature: Some(0.3), // Phase override
                     timeout_secs: Some(30), // Phase override
+                    agent_flow: Default::default(),
                 },
                 ..Default::default()
             },
@@ -138,6 +141,7 @@ fn test_phase_llm_config_model_override_takes_precedence() {
                     models: vec!["configured-model".to_string()],
                     temperature: None,
                     timeout_secs: None,
+                    agent_flow: Default::default(),
                 },
                 ..Default::default()
             },
@@ -172,6 +176,7 @@ fn test_create_llm_client_with_metrics_none_on_missing_api_key() {
                     models: vec![],
                     temperature: None,
                     timeout_secs: None,
+                    agent_flow: Default::default(),
                 },
                 ..Default::default()
             },
@@ -205,6 +210,7 @@ fn test_create_llm_client_with_metrics_none_on_missing_base_url() {
                     models: vec![],
                     temperature: None,
                     timeout_secs: None,
+                    agent_flow: Default::default(),
                 },
                 ..Default::default()
             },
@@ -242,6 +248,7 @@ fn test_create_llm_client_with_metrics_none_on_empty_models() {
                     models: vec![], // No models
                     temperature: None,
                     timeout_secs: None,
+                    agent_flow: Default::default(),
                 },
                 ..Default::default()
             },
@@ -280,6 +287,7 @@ fn test_create_llm_client_with_metrics_some_on_valid_config() {
                     models: vec![],
                     temperature: None,
                     timeout_secs: None,
+                    agent_flow: Default::default(),
                 },
                 ..Default::default()
             },

@@ -139,6 +139,7 @@ fn test_html_report_includes_token_metrics() {
         avg_latency_ms: 1350.0,
         by_model,
         by_operation,
+        positional_fallbacks: 0,
     };
 
     let summary = LlmMetricsSummary {

@@ -2,9 +2,9 @@
 //!
 //! These tests cover the exact requirements specified in the audit pinning.
 
-use baco::checkpoint::{Checkpoint, ScanPhase};
 use baco::evidence::{Evidence, EvidenceSource, VerificationTier};
 use baco::findings::{Severity, VulnerabilityFinding};
+use baco::scanner::checkpoint::{Checkpoint, EarlyTerminationInfo, ScanPhase};
 use chrono::Utc;
 use std::fs;
 
@@ -369,6 +369,62 @@ fn test_findings_preserve_verification_tier_and_evidence() {
         loaded_finding.evidence[1].detail, "LLM confirms the vulnerability pattern",
         "second evidence detail should match"
     );
+
+    let _ = fs::remove_file(&temp_path);
+}
+
+// ============================================================================
+// TEST 11: Early termination field in checkpoint
+// ============================================================================
+
+#[test]
+fn test_checkpoint_early_termination_field() {
+    let mut checkpoint = Checkpoint::new("early-term-test", "/tmp/project", Utc::now());
+    checkpoint.current_phase = ScanPhase::LlmStaticAnalysis;
+
+    // Add early termination info
+    checkpoint.early_termination = Some(EarlyTerminationInfo {
+        triggered: true,
+        finding_count: 1001,
+        phases_skipped: vec![
+            "RuleSynthesis".to_string(),
+            "LlmDiscovery".to_string(),
+            "LlmVerification".to_string(),
+        ],
+    });
+
+    let temp_path = temp_checkpoint_path("early_term_field");
+    checkpoint.save(&temp_path).unwrap();
+
+    let loaded = Checkpoint::load(&temp_path).unwrap();
+
+    assert!(loaded.early_termination.is_some());
+    let et = loaded.early_termination.unwrap();
+    assert!(et.triggered);
+    assert_eq!(et.finding_count, 1001);
+    assert_eq!(et.phases_skipped.len(), 3);
+    assert_eq!(et.phases_skipped[0], "RuleSynthesis");
+
+    let _ = fs::remove_file(&temp_path);
+}
+
+// ============================================================================
+// TEST 12: Checkpoint round-trip with early_termination=None (backward compat)
+// ============================================================================
+
+#[test]
+fn test_checkpoint_roundtrip_without_early_termination() {
+    let mut checkpoint = Checkpoint::new("no-et-test", "/tmp/project", Utc::now());
+    checkpoint.current_phase = ScanPhase::Semgrep;
+    // early_termination is None by default
+
+    let temp_path = temp_checkpoint_path("no_et_roundtrip");
+    checkpoint.save(&temp_path).unwrap();
+
+    let loaded = Checkpoint::load(&temp_path).unwrap();
+
+    // Should be None, not cause deserialization error
+    assert!(loaded.early_termination.is_none());
 
     let _ = fs::remove_file(&temp_path);
 }

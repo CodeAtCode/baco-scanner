@@ -5,6 +5,10 @@
 
 #![allow(dead_code)] // Some helpers are only used by unit tests, not integration tests
 
+/// Mock LLM client for testing
+#[path = "agent/mock_llm.rs"]
+pub mod mock_llm;
+
 /// Helper to create a VulnerabilityFinding for unit tests (multi_verifier/root_cause_dedup style)
 ///
 /// This matches the signature used in tests/unit/multi_verifier_phase_tests.rs

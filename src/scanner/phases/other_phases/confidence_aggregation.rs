@@ -59,7 +59,12 @@ pub async fn run_confidence_scoring(
     let refinement = crate::confidence_refinement::ConfidenceRefinementPhase::with_config_knowledge(
         &config.knowledge,
     );
-    let refined_scores = refinement.run(findings.clone(), &context);
+    let refined_scores = refinement.run(
+        findings.clone(),
+        &context,
+        config.scanner.performance.never_submit_enabled,
+        config.scanner.performance.never_submit_multiplier,
+    );
 
     // Apply refined scores to findings
     let mut updated_findings = Vec::new();
@@ -193,6 +198,8 @@ pub async fn run_reporting(
         json_path.as_str(),
         Some(llm_metrics),
         Some(config),
+        None,
+        None, // scan_health - not wired yet
     ) {
         tracing::warn!("Failed to write JSON report: {}", e);
     } else if config.prior_runs.enabled {

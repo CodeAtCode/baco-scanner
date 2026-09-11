@@ -317,8 +317,10 @@ mod parse_response_tests {
 
         let result = analyzer.parse_llm_response(json_response, "src/missing.rs", "test-model");
         assert!(result.is_ok());
-        // Missing line should result in empty findings
-        assert!(result.unwrap().is_empty());
+        // Missing line defaults to 1 instead of dropping the finding
+        let findings = result.unwrap();
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].line_number, Some(1));
     }
 
     #[test]
@@ -377,7 +379,7 @@ mod parse_response_tests {
             ("high", Severity::High),
             ("medium", Severity::Medium),
             ("low", Severity::Low),
-            ("unknown", Severity::Low), // Default for unknown severities
+            ("unknown", Severity::Medium), // Unknown severity strings map to Medium
         ];
 
         for (severity_str, expected_severity) in test_cases {

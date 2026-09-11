@@ -26,7 +26,6 @@ pub mod analysis_context; // AnalysisContext persistence (renamed from context.r
 pub mod chain_analysis;
 pub mod checkpoint;
 pub mod citation_verification;
-pub mod confidence;
 pub mod confidence_refinement;
 pub mod config;
 pub mod context; // Context extraction module
@@ -35,6 +34,7 @@ pub mod cpg; // CPG-guided slicing (T3.1)
 pub mod crossfile;
 pub mod cve_bootstrap;
 pub mod cve_client;
+pub mod doctor; // Pre-flight health checks
 pub mod error;
 pub mod eval;
 pub mod evidence;
@@ -66,7 +66,7 @@ pub mod root_cause_dedup;
 pub mod router;
 pub mod rulesynth;
 pub mod run_store;
-pub mod scan_diff;
+pub mod scan_health;
 pub mod scanner;
 pub mod scanner_types;
 pub mod semgrep;
@@ -78,4 +78,3 @@ pub mod tools;
 pub mod validation;
 pub mod variant_search;
 pub mod vuln_spec; // VulInSpec specification-guided detection
-pub mod worktree_staging;

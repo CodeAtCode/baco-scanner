@@ -159,8 +159,34 @@ pub async fn run_variant_search(
 
     tracing::info!("Running variant search phase");
 
+    // No patterns configured - variant search is a no-op
+    if config
+        .scanner
+        .performance
+        .variant_search_patterns
+        .is_empty()
+    {
+        tracing::warn!(
+            "Variant search: no patterns configured, skipping search (add patterns to scanner.performance.variant_search_patterns)"
+        );
+        return Ok((findings, analyzed_files.to_vec()));
+    }
+
+    let patterns: Vec<crate::variant_search::SearchPattern> = config
+        .scanner
+        .performance
+        .variant_search_patterns
+        .iter()
+        .map(|p| crate::variant_search::SearchPattern {
+            vulnerability_type: p.vulnerability_type.clone(),
+            code_pattern: p.code_pattern.clone(),
+            context_keywords: p.context_keywords.clone(),
+        })
+        .collect();
+
     let searcher =
-        crate::variant_search::VariantSearcher::new(target_path.to_string_lossy().to_string());
+        crate::variant_search::VariantSearcher::new(target_path.to_string_lossy().to_string())
+            .with_patterns(patterns);
 
     match searcher.search_variants() {
         Ok(variant_hits) => {

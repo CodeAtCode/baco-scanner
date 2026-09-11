@@ -12,7 +12,7 @@
 //! - Path traversal prevention
 //! - Dangerous code validation
 
-use baco::agent::mock_llm::MockLlmClient;
+use crate::fixtures::mock_llm::MockLlmClient;
 use baco::agent::sandbox::ToolSandbox;
 use baco::agent::tool_schema::{default_tools, tool_definitions, Tool, ToolRegistry};
 use baco::agent::tools::{

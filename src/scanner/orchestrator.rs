@@ -1,7 +1,8 @@
 //! Scanner orchestration - main run() method with parallel/sequential phase execution
 
 use crate::checkpoint::ScanPhase;
-use crate::findings::VulnerabilityFinding;
+use crate::findings::{Severity, VulnerabilityFinding};
+use crate::scanner::checkpoint::EarlyTerminationInfo;
 use crate::scanner::checkpoint::{load_checkpoint_findings, save_checkpoint};
 use crate::scanner::helpers::log_and_aggregate_llm_results;
 
@@ -321,17 +322,50 @@ async fn run_parallel_phases(
     });
 
     // Check for early termination after parallel phases
+    // Only count Medium-and-above findings (Critical, High, Medium) toward the threshold
+    let medium_plus_count = findings
+        .iter()
+        .filter(|f| f.severity >= Severity::Medium)
+        .count();
     let threshold = scanner
         .config
         .scanner
         .performance
         .early_termination_threshold;
-    if threshold > 0.0 && findings.len() as f32 > threshold {
+    if threshold > 0.0 && medium_plus_count as f32 > threshold {
+        let skipped_phases = vec![
+            "RuleSynthesis",
+            "LlmDiscovery",
+            "LlmVerification",
+            "Validate",
+            "SecurityAgentVerification",
+            "TicketCrossRef",
+            "GitAnalysis",
+            "CrossFileAnalysis",
+            "ConfidenceScoring",
+            "AiAggregation",
+            "ThreatModeling",
+            "RootCauseDedup",
+            "MultiVerifier",
+            "AutoPatching",
+            "CveBootstrap",
+            "PocCompiler",
+            "ExploitSynth",
+            "VariantSearch",
+            "Reporting",
+        ];
         tracing::warn!(
-            "Early termination triggered after parallel phases: {} findings > threshold {}",
+            "Early termination triggered after parallel phases: {} medium+ findings > threshold {} (total findings: {}), skipping phases: {:?}",
+            medium_plus_count,
+            threshold,
             findings.len(),
-            threshold
+            skipped_phases
         );
+        let et_info = EarlyTerminationInfo {
+            triggered: true,
+            finding_count: medium_plus_count,
+            phases_skipped: skipped_phases.iter().map(|s| s.to_string()).collect(),
+        };
         if let Err(e) = save_checkpoint(
             &scanner.checkpoint_path,
             &scanner.config,
@@ -339,15 +373,15 @@ async fn run_parallel_phases(
             &analyzed_files,
             &ScanPhase::LlmStaticAnalysis,
             &scanner.metrics_tracker,
+            Some(et_info),
         )
         .await
         {
             tracing::warn!("Failed to save checkpoint before early termination: {}", e);
         }
         pb.set_message(format!(
-            "Early termination: {} findings (threshold: {})",
-            findings.len(),
-            threshold
+            "Early termination: {} medium+ findings (threshold: {})",
+            medium_plus_count, threshold
         ));
         pb.finish();
         return Ok((findings, analyzed_files));
@@ -360,6 +394,7 @@ async fn run_parallel_phases(
         &analyzed_files,
         &ScanPhase::LlmStaticAnalysis,
         &scanner.metrics_tracker,
+        None,
     )
     .await
     {
@@ -410,11 +445,11 @@ async fn run_sequential_phases(
     completed_phases: &[ScanPhase],
     start_position: u64,
 ) -> Result<(Vec<VulnerabilityFinding>, Vec<String>), String> {
-    let sequential_phases = sequential_phases();
+    let all_sequential_phases = sequential_phases();
 
     let is_phase_completed = |phase: &ScanPhase| completed_phases.contains(phase);
 
-    for (i, phase) in sequential_phases.iter().enumerate() {
+    for (i, phase) in all_sequential_phases.iter().enumerate() {
         let phase_num = 4 + i;
         pb.set_position(start_position + (i as u64) * 100);
 
@@ -430,96 +465,96 @@ async fn run_sequential_phases(
             ScanPhase::CweRouting => format!(
                 "Phase {}/{}: CWE routing (routing findings to specialized models)...",
                 phase_num,
-                sequential_phases.len() + 3
+                all_sequential_phases.len() + 3
             ),
             ScanPhase::LlmDiscovery => format!(
                 "Phase {}/{}: LLM discovery (enriching findings with context)...",
                 phase_num,
-                sequential_phases.len() + 3
+                all_sequential_phases.len() + 3
             ),
             ScanPhase::LlmVerification => format!(
                 "Phase {}/{}: LLM verification (validating findings)...",
                 phase_num,
-                sequential_phases.len() + 3
+                all_sequential_phases.len() + 3
             ),
             ScanPhase::SecurityAgentVerification => format!(
                 "Phase {}/{}: SecurityAgent verification (tool-based validation)...",
                 phase_num,
-                sequential_phases.len() + 3
+                all_sequential_phases.len() + 3
             ),
             ScanPhase::TicketCrossRef => format!(
                 "Phase {}/{}: Searching ticket systems for references...",
                 phase_num,
-                sequential_phases.len() + 3
+                all_sequential_phases.len() + 3
             ),
             ScanPhase::GitAnalysis => format!(
                 "Phase {}/{}: Analyzing Git history for related commits...",
                 phase_num,
-                sequential_phases.len() + 3
+                all_sequential_phases.len() + 3
             ),
             ScanPhase::CrossFileAnalysis => format!(
                 "Phase {}/{}: Cross-file dependency analysis...",
                 phase_num,
-                sequential_phases.len() + 3
+                all_sequential_phases.len() + 3
             ),
             ScanPhase::ConfidenceScoring => format!(
                 "Phase {}/{}: Calculating confidence scores...",
                 phase_num,
-                sequential_phases.len() + 3
+                all_sequential_phases.len() + 3
             ),
             ScanPhase::AiAggregation => format!(
                 "Phase {}/{}: AI aggregation (generating executive summary)...",
                 phase_num,
-                sequential_phases.len() + 3
+                all_sequential_phases.len() + 3
             ),
             ScanPhase::Reporting => format!(
                 "Phase {}/{}: Generating reports (JSON/HTML/SARIF)...",
                 phase_num,
-                sequential_phases.len() + 3
+                all_sequential_phases.len() + 3
             ),
             ScanPhase::ThreatModeling => format!(
                 "Phase {}/{}: Threat modeling (STRIDE analysis)...",
                 phase_num,
-                sequential_phases.len() + 3
+                all_sequential_phases.len() + 3
             ),
             ScanPhase::RootCauseDedup => format!(
                 "Phase {}/{}: Root cause deduplication...",
                 phase_num,
-                sequential_phases.len() + 3
+                all_sequential_phases.len() + 3
             ),
             ScanPhase::MultiVerifier => format!(
                 "Phase {}/{}: Multi-verifier voting...",
                 phase_num,
-                sequential_phases.len() + 3
+                all_sequential_phases.len() + 3
             ),
             ScanPhase::AutoPatching => format!(
                 "Phase {}/{}: Auto-patching with staging validation...",
                 phase_num,
-                sequential_phases.len() + 3
+                all_sequential_phases.len() + 3
             ),
             ScanPhase::CveBootstrap => {
                 format!(
                     "Phase {}/{}: CVE bootstrap...",
                     phase_num,
-                    sequential_phases.len() + 3
+                    all_sequential_phases.len() + 3
                 )
             }
             ScanPhase::PocCompiler => format!(
                 "Phase {}/{}: PoC compilation check...",
                 phase_num,
-                sequential_phases.len() + 3
+                all_sequential_phases.len() + 3
             ),
             ScanPhase::VariantSearch => {
                 format!(
                     "Phase {}/{}: Variant search...",
                     phase_num,
-                    sequential_phases.len() + 3
+                    all_sequential_phases.len() + 3
                 )
             }
             _ => format!(
                 "Phase {}/{}: {:?}",
                 phase_num,
-                sequential_phases.len() + 3,
+                all_sequential_phases.len() + 3,
                 phase
             ),
         };
@@ -548,18 +583,58 @@ async fn run_sequential_phases(
         });
 
         // Check for early termination
+        // Only count Medium-and-above findings (Critical, High, Medium) toward the threshold
+        let medium_plus_count = findings
+            .iter()
+            .filter(|f| f.severity >= Severity::Medium)
+            .count();
         let threshold = scanner
             .config
             .scanner
             .performance
             .early_termination_threshold;
-        if threshold > 0.0 && findings.len() as f32 > threshold {
+        if threshold > 0.0 && medium_plus_count as f32 > threshold {
+            let remaining_phases: Vec<&str> = all_sequential_phases
+                .iter()
+                .skip_while(|p| *p != phase)
+                .skip(1)
+                .map(|p| match p {
+                    ScanPhase::CweRouting => "CweRouting",
+                    ScanPhase::RuleSynthesis => "RuleSynthesis",
+                    ScanPhase::LlmDiscovery => "LlmDiscovery",
+                    ScanPhase::LlmVerification => "LlmVerification",
+                    ScanPhase::Validate => "Validate",
+                    ScanPhase::SecurityAgentVerification => "SecurityAgentVerification",
+                    ScanPhase::TicketCrossRef => "TicketCrossRef",
+                    ScanPhase::GitAnalysis => "GitAnalysis",
+                    ScanPhase::CrossFileAnalysis => "CrossFileAnalysis",
+                    ScanPhase::ConfidenceScoring => "ConfidenceScoring",
+                    ScanPhase::AiAggregation => "AiAggregation",
+                    ScanPhase::ThreatModeling => "ThreatModeling",
+                    ScanPhase::RootCauseDedup => "RootCauseDedup",
+                    ScanPhase::MultiVerifier => "MultiVerifier",
+                    ScanPhase::AutoPatching => "AutoPatching",
+                    ScanPhase::CveBootstrap => "CveBootstrap",
+                    ScanPhase::PocCompiler => "PocCompiler",
+                    ScanPhase::ExploitSynth => "ExploitSynth",
+                    ScanPhase::VariantSearch => "VariantSearch",
+                    ScanPhase::Reporting => "Reporting",
+                    _ => "Unknown",
+                })
+                .collect();
             tracing::warn!(
-                "Early termination triggered after phase {:?}: {} findings > threshold {}",
+                "Early termination triggered after phase {:?}: {} medium+ findings > threshold {} (total findings: {}), skipping phases: {:?}",
                 phase,
+                medium_plus_count,
+                threshold,
                 findings.len(),
-                threshold
+                remaining_phases
             );
+            let et_info = EarlyTerminationInfo {
+                triggered: true,
+                finding_count: medium_plus_count,
+                phases_skipped: remaining_phases.iter().map(|s| s.to_string()).collect(),
+            };
             if let Err(e) = save_checkpoint(
                 &scanner.checkpoint_path,
                 &scanner.config,
@@ -567,15 +642,15 @@ async fn run_sequential_phases(
                 &analyzed_files,
                 phase,
                 &scanner.metrics_tracker,
+                Some(et_info),
             )
             .await
             {
                 tracing::warn!("Failed to save checkpoint before early termination: {}", e);
             }
             pb.set_message(format!(
-                "Early termination: {} findings (threshold: {})",
-                findings.len(),
-                threshold
+                "Early termination: {} medium+ findings (threshold: {})",
+                medium_plus_count, threshold
             ));
             pb.finish();
             return Ok((findings, analyzed_files));
@@ -588,6 +663,7 @@ async fn run_sequential_phases(
             &analyzed_files,
             phase,
             &scanner.metrics_tracker,
+            None,
         )
         .await
         {
@@ -679,7 +755,7 @@ pub(super) async fn run_scanner(
     }
 
     let start_position = if enable_parallel { 300 } else { 0 };
-    let (findings, _analyzed_files) = run_sequential_phases(
+    let (findings, analyzed_files) = run_sequential_phases(
         scanner,
         &pb,
         findings,
@@ -691,6 +767,47 @@ pub(super) async fn run_scanner(
 
     pb.set_message("Scan complete!");
     pb.finish();
+
+    // Scan health: what actually ran, surfaced in the console and the final report
+    let mut health = crate::scan_health::ScanHealth::new();
+    for phase in [
+        ScanPhase::Indexing,
+        ScanPhase::Semgrep,
+        ScanPhase::LlmStaticAnalysis,
+        ScanPhase::CpgSlice,
+    ] {
+        health.record_phase_run(&phase);
+    }
+    for phase in sequential_phases() {
+        health.record_phase_run(&phase);
+    }
+    health.set_analyzed(analyzed_files.len() as u64);
+    let llm_metrics = scanner.metrics_tracker.finalize().await;
+    let (ok_calls, failed_calls) = crate::scan_health::from_llm_metrics(&llm_metrics);
+    health.set_llm_counts(ok_calls, failed_calls);
+    if ok_calls + failed_calls == 0 {
+        eprintln!(
+            "\u{1B}[33m[SCAN HEALTH] WARNING: zero LLM calls recorded — LLM phases were skipped or misconfigured (run `baco doctor`)\u{1B}[0m"
+        );
+    }
+    eprintln!("\n{}", health.summary());
+
+    // Re-write the final report with the scan_health section, preserving early-termination info
+    let et_info = crate::checkpoint::Checkpoint::load(&scanner.checkpoint_path.to_string_lossy())
+        .ok()
+        .and_then(|mut cp| cp.early_termination.take());
+    let json_path = format!("{}/findings.json", scanner.config.output.dir);
+    if let Err(e) = crate::report::json::write_findings_json(
+        &findings,
+        &[],
+        &json_path,
+        None,
+        None,
+        et_info,
+        Some(health),
+    ) {
+        tracing::warn!("Failed to write final report with scan health: {}", e);
+    }
 
     scanner.state.send_modify(|s| {
         s.current_phase = ScanPhase::Reporting;

@@ -1,7 +1,7 @@
-use crate::agent::session::AgentLlmClient;
-use crate::agent::ToolCall;
-use crate::llm::{ChatMessage, ChatResponse, ToolSchema};
 use async_trait::async_trait;
+use baco::agent::session::AgentLlmClient;
+use baco::agent::ToolCall;
+use baco::llm::{ChatMessage, ChatResponse, ToolSchema};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -46,10 +46,10 @@ impl MockLlmClient {
     }
 
     /// Get the next response from the sequence, returning error if exhausted
-    fn next_response(&self) -> Result<ChatResponse, crate::error::ScanError> {
+    fn next_response(&self) -> Result<ChatResponse, baco::error::ScanError> {
         let turn = self.turn_counter.fetch_add(1, Ordering::SeqCst);
         if turn >= self.responses.len() {
-            return Err(crate::error::ScanError::Unknown(format!(
+            return Err(baco::error::ScanError::Unknown(format!(
                 "MockLlmClient: Exhausted pre-programmed responses (turn {} >= {})",
                 turn,
                 self.responses.len()
@@ -63,7 +63,7 @@ impl MockLlmClient {
         &self,
         _messages: &[ChatMessage],
         _tools: &[ToolSchema],
-    ) -> Result<ChatResponse, crate::error::ScanError> {
+    ) -> Result<ChatResponse, baco::error::ScanError> {
         self.next_response()
     }
 
@@ -126,7 +126,7 @@ impl AgentLlmClient for MockLlmClient {
         &self,
         _messages: &[ChatMessage],
         _tools: &[ToolSchema],
-    ) -> Result<ChatResponse, crate::error::ScanError> {
+    ) -> Result<ChatResponse, baco::error::ScanError> {
         self.next_response()
     }
     fn model_name(&self) -> String {

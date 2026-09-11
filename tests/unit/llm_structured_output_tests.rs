@@ -127,6 +127,7 @@ fn test_phase_llm_config_applies_phase_overrides() {
                     models: vec![],
                     timeout_secs: Some(120),
                     temperature: Some(0.9),
+                    agent_flow: Default::default(),
                 },
                 ..Default::default()
             },
@@ -224,6 +225,7 @@ fn test_phase_llm_config_static_analysis_uses_own_slot() {
                     models: vec![],
                     timeout_secs: Some(60),
                     temperature: Some(0.8),
+                    agent_flow: Default::default(),
                 },
                 static_analysis: LlmPhaseConfig {
                     base_url: "https://static-analysis.api.com".to_string(),
@@ -232,6 +234,7 @@ fn test_phase_llm_config_static_analysis_uses_own_slot() {
                     models: vec![],
                     timeout_secs: Some(90),
                     temperature: Some(0.6),
+                    agent_flow: Default::default(),
                 },
                 ..Default::default()
             },

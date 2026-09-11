@@ -86,6 +86,8 @@ fn test_json_output_with_include_rejected_true() {
         output_path,
         None,
         Some(&config),
+        None,
+        None,
     );
 
     assert!(result.is_ok(), "Failed to write JSON: {:?}", result);
@@ -116,7 +118,15 @@ fn test_json_output_with_include_rejected_false() {
 
     let output_path = "/tmp/test_no_rejected_findings.json";
 
-    let result = write_findings_json(&[finding], &rejected_findings, output_path, None, None);
+    let result = write_findings_json(
+        &[finding],
+        &rejected_findings,
+        output_path,
+        None,
+        None,
+        None,
+        None,
+    );
 
     assert!(result.is_ok(), "Failed to write JSON: {:?}", result);
 
@@ -233,6 +243,8 @@ fn test_json_rejected_finding_structure() {
         output_path,
         None,
         Some(&config),
+        None,
+        None,
     );
 
     let content = fs::read_to_string(output_path).expect("Failed to read JSON file");

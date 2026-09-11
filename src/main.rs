@@ -1,4 +1,5 @@
 use baco::config;
+use baco::doctor;
 use baco::preset;
 use baco::validation;
 use clap::{Parser, Subcommand};
@@ -52,9 +53,28 @@ enum Commands {
         #[arg(short, long, help = "Config file path")]
         config: Option<PathBuf>,
     },
+    Eval {
+        #[arg(long, help = "Target directory to evaluate")]
+        target: PathBuf,
+        #[arg(long, help = "Path to ground truth oracle JSON")]
+        ground_truth: PathBuf,
+        #[arg(
+            long,
+            help = "Path to findings JSON to score (optional - if omitted, runs scanner first)"
+        )]
+        findings: Option<PathBuf>,
+    },
     Preset {
         #[command(subcommand)]
         action: PresetCommands,
+    },
+    Doctor {
+        #[arg(short, long, help = "Config file path")]
+        config: Option<PathBuf>,
+        #[arg(long, help = "Output directory path")]
+        output_dir: Option<PathBuf>,
+        #[arg(long, help = "Output results as JSON")]
+        json: bool,
     },
 }
 
@@ -167,7 +187,25 @@ async fn main() {
                     std::process::exit(1);
                 });
         }
+        Commands::Eval {
+            target,
+            ground_truth,
+            findings,
+        } => {
+            info!("Running eval on target: {:?}", target);
+            run_eval(&target, &ground_truth, findings, cli.quiet).unwrap_or_else(|e| {
+                tracing::error!("Eval failed: {}", e);
+                std::process::exit(1);
+            });
+        }
         Commands::Preset { action } => run_preset_command(action, cli.quiet),
+        Commands::Doctor {
+            config,
+            output_dir,
+            json,
+        } => {
+            run_doctor(config.as_deref(), output_dir.as_deref(), json, cli.quiet);
+        }
     }
 }
 
@@ -691,8 +729,16 @@ fn run_report(input: &Path, format: &str, quiet: bool) -> Result<(), Box<dyn std
         }
         "json" => {
             use baco::report::json::write_findings_json;
-            write_findings_json(&findings, &[], &output_path.to_string_lossy(), None, None)
-                .map_err(|e| format!("Failed to generate JSON report: {}", e))?;
+            write_findings_json(
+                &findings,
+                &[],
+                &output_path.to_string_lossy(),
+                None,
+                None,
+                None,
+                None, // scan_health
+            )
+            .map_err(|e| format!("Failed to generate JSON report: {}", e))?;
         }
         "sarif" => {
             use baco::report::sarif::generate_sarif_report;
@@ -897,4 +943,155 @@ fn preset_content(name: &str) -> Option<&'static str> {
         "oss-monorepo" => Some(include_str!("../presets/oss-monorepo.toml")),
         _ => None,
     }
+}
+
+fn run_eval(
+    target: &Path,
+    ground_truth: &Path,
+    findings_path: Option<PathBuf>,
+    quiet: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use baco::eval::{parse_oracle, score_findings};
+
+    // Load ground truth oracle
+    if !ground_truth.exists() {
+        return Err(format!("Ground truth file not found: {}", ground_truth.display()).into());
+    }
+
+    let oracle_json = std::fs::read_to_string(ground_truth)?;
+    let oracle = parse_oracle(&oracle_json)?;
+
+    if !quiet {
+        tracing::info!("Loaded oracle for target: {}", oracle.target);
+        tracing::info!("Expected findings: {}", oracle.expected_findings.len());
+        tracing::info!("Expected suppressed: {}", oracle.expected_suppressed.len());
+    }
+
+    // Load findings or run scanner
+    let findings = if let Some(path) = findings_path {
+        if !path.exists() {
+            return Err(format!("Findings file not found: {}", path.display()).into());
+        }
+        baco::validation::validate_findings(&path)?
+    } else {
+        // Run scanner on target
+        if !quiet {
+            tracing::info!("Running scanner on target: {}", target.display());
+        }
+
+        let mut config = baco::config::ScannerConfig::default();
+        config.project.path = target.to_string_lossy().to_string();
+        config.project.name = target
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| "target".to_string());
+
+        let output_dir = PathBuf::from(&config.output.dir);
+        std::fs::create_dir_all(&output_dir)?;
+
+        let scanner = baco::scanner::Scanner::new(config, target.to_path_buf(), false);
+        tokio::runtime::Handle::current().block_on(scanner.run())?
+    };
+
+    // Score findings against oracle
+    let report = score_findings(&oracle, &findings);
+
+    // Print report
+    if !quiet {
+        println!("\n═══════════════════════════════════════");
+        println!("EVALUATION REPORT");
+        println!("═══════════════════════════════════════");
+        println!("Target: {}", report.target);
+        println!("Expected findings: {}", report.expected);
+        println!("Matched: {}", report.matched);
+        println!("Missed: {}", report.missed.len());
+        println!("False flags: {}", report.false_flags);
+        println!();
+        println!("Metrics:");
+        println!("  Recall:  {:.2}", report.recall * 100.0);
+        println!("  Precision: {:.2}", report.precision * 100.0);
+
+        // Calculate F1
+        let f1 = if report.precision + report.recall > 0.0 {
+            2.0 * report.precision * report.recall / (report.precision + report.recall)
+        } else {
+            0.0
+        };
+        println!("  F1 Score:  {:.2}", f1 * 100.0);
+
+        if !report.missed.is_empty() {
+            println!("\nMissed findings:");
+            for missed in &report.missed {
+                println!(
+                    "  - {}:{} ({})",
+                    missed.file_path, missed.line, missed.cwe_id
+                );
+            }
+        }
+        println!("═══════════════════════════════════════\n");
+    }
+
+    Ok(())
+}
+
+fn run_doctor(
+    config_path: Option<&Path>,
+    output_dir: Option<&Path>,
+    json_output: bool,
+    quiet: bool,
+) {
+    let results = doctor::run_doctor_checks(config_path, output_dir);
+
+    if json_output {
+        // JSON output
+        let json = serde_json::to_string_pretty(&results).unwrap();
+        println!("{}", json);
+        std::process::exit(results.exit_code());
+    }
+
+    // Text output
+    if !quiet {
+        println!("\n═══════════════════════════════════════");
+        println!("       BACO DOCTOR - Pre-flight Check");
+        println!("═══════════════════════════════════════\n");
+
+        for check in &results.checks {
+            let status_marker = match check.status {
+                doctor::CheckStatus::Ok => "✓",
+                doctor::CheckStatus::Warn => "⚠",
+                doctor::CheckStatus::Fail => "✗",
+            };
+            let status_text = match check.status {
+                doctor::CheckStatus::Ok => "OK",
+                doctor::CheckStatus::Warn => "WARN",
+                doctor::CheckStatus::Fail => "FAIL",
+            };
+            println!("{} [{}] {}", status_marker, status_text, check.name);
+            println!("    {}", check.detail);
+        }
+
+        println!("\n───────────────────────────────────────────");
+        let overall_marker = match results.overall_status {
+            doctor::CheckStatus::Ok => "✓",
+            doctor::CheckStatus::Warn => "⚠",
+            doctor::CheckStatus::Fail => "✗",
+        };
+        let overall_text = match results.overall_status {
+            doctor::CheckStatus::Ok => "All checks passed",
+            doctor::CheckStatus::Warn => "Passed with warnings",
+            doctor::CheckStatus::Fail => "Failed - fix issues before scanning",
+        };
+        println!("Overall: {} {}", overall_marker, overall_text);
+        println!("═══════════════════════════════════════\n");
+    } else {
+        // Quiet mode: just summary line
+        let status = match results.overall_status {
+            doctor::CheckStatus::Ok => "passed",
+            doctor::CheckStatus::Warn => "passed with warnings",
+            doctor::CheckStatus::Fail => "failed",
+        };
+        println!("Doctor check: {}", status);
+    }
+
+    std::process::exit(results.exit_code());
 }

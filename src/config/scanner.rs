@@ -4,9 +4,23 @@ use std::collections::HashMap;
 
 use crate::config::{default_four, default_true};
 
+/// Pattern configuration for variant search
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct ScannerSettings {
+pub struct VariantSearchPattern {
+    /// Type of vulnerability (e.g., "command_injection", "sql_injection")
     #[serde(default)]
+    pub vulnerability_type: String,
+    /// Regex pattern to match in code
+    #[serde(default)]
+    pub code_pattern: String,
+    /// Context keywords that increase similarity score
+    #[serde(default)]
+    pub context_keywords: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScannerSettings {
+    #[serde(default = "default_max_file_size_kb")]
     pub max_file_size_kb: u64,
     #[serde(default)]
     pub exclude_paths: Vec<String>,
@@ -14,6 +28,21 @@ pub struct ScannerSettings {
     pub semgrep: SemgrepSettings,
     #[serde(default)]
     pub performance: PerformanceSettings,
+}
+
+fn default_max_file_size_kb() -> u64 {
+    512
+}
+
+impl Default for ScannerSettings {
+    fn default() -> Self {
+        Self {
+            max_file_size_kb: default_max_file_size_kb(),
+            exclude_paths: Vec::new(),
+            semgrep: SemgrepSettings::default(),
+            performance: PerformanceSettings::default(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -33,6 +62,9 @@ pub struct SemgrepSettings {
 pub struct PerformanceSettings {
     #[serde(default)]
     pub enable_incremental_scan: bool,
+    /// Early termination threshold: scan stops when Medium-and-above finding count exceeds this value.
+    /// Info findings are NOT counted toward the threshold (flood-resistant). Default: 1000.0.
+    /// Set to 0.0 to disable early termination.
     #[serde(default)]
     pub early_termination_threshold: f32,
     // Phantom config keys - implemented
@@ -64,6 +96,25 @@ pub struct PerformanceSettings {
     /// VulInSpec configuration
     #[serde(default)]
     pub vuln_spec: VulnSpecConfig,
+    /// Never-submit pattern filter - heavily penalizes findings matching known false-positive patterns
+    #[serde(default = "crate::config::default_never_submit_enabled")]
+    pub never_submit_enabled: bool,
+    /// Multiplier applied to confidence when never-submit pattern matches (default 0.1)
+    #[serde(default = "crate::config::default_never_submit_multiplier")]
+    pub never_submit_multiplier: f32,
+    /// Variant search patterns - code patterns to search for vulnerability variants
+    #[serde(default)]
+    pub variant_search_patterns: Vec<VariantSearchPattern>,
+}
+
+pub const DEFAULT_NEVER_SUBMIT_ENABLED: bool = true;
+pub fn default_never_submit_enabled() -> bool {
+    DEFAULT_NEVER_SUBMIT_ENABLED
+}
+
+pub const DEFAULT_NEVER_SUBMIT_MULTIPLIER: f32 = 0.1;
+pub fn default_never_submit_multiplier() -> f32 {
+    DEFAULT_NEVER_SUBMIT_MULTIPLIER
 }
 
 impl Default for PerformanceSettings {
@@ -83,6 +134,9 @@ impl Default for PerformanceSettings {
             enable_variant_search: crate::config::default_enable_variant_search(),
             enable_hunt_prompts: false,
             vuln_spec: VulnSpecConfig::default(),
+            never_submit_enabled: crate::config::default_never_submit_enabled(),
+            never_submit_multiplier: crate::config::default_never_submit_multiplier(),
+            variant_search_patterns: Vec::new(),
         }
     }
 }

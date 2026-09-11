@@ -111,7 +111,7 @@ fn test_confidence_single_source() {
     finding.confidence_score = 0.5;
     finding.sources = vec!["semgrep".to_string()];
 
-    let result = phase.refine_confidence(&finding, &Default::default());
+    let result = phase.refine_confidence(&finding, &Default::default(), true, 0.1);
 
     assert_eq!(result.original_score, 0.5);
     // Single source should not get multi-source boost
@@ -127,7 +127,7 @@ fn test_confidence_multi_source() {
     finding.confidence_score = 0.5;
     finding.sources = vec!["semgrep".to_string(), "bandit".to_string()];
 
-    let result = phase.refine_confidence(&finding, &Default::default());
+    let result = phase.refine_confidence(&finding, &Default::default(), true, 0.1);
 
     // +0.1 multi-source, then -0.05 low-confidence source (bandit)
     assert_eq!(result.refined_score, 0.55);
@@ -143,7 +143,7 @@ fn test_confidence_cross_file() {
     finding.confidence_score = 0.5;
     finding.cross_file_references = Some(vec!["other_file.rs".to_string()]);
 
-    let result = phase.refine_confidence(&finding, &Default::default());
+    let result = phase.refine_confidence(&finding, &Default::default(), true, 0.1);
 
     // Should get +0.08 for cross-file reachability
     assert_eq!(result.refined_score, 0.58);
@@ -160,7 +160,7 @@ fn test_confidence_clamped_max() {
     finding.sources = vec!["semgrep".to_string(), "bandit".to_string()]; // +0.1
     finding.verification_status = Some(VerificationStatus::Confirmed); // +0.15
 
-    let result = phase.refine_confidence(&finding, &Default::default());
+    let result = phase.refine_confidence(&finding, &Default::default(), true, 0.1);
 
     // Clamped at 1.0 by the boost factors, then -0.05 for bandit
     assert_eq!(result.refined_score, 0.95);
@@ -173,7 +173,7 @@ fn test_confidence_clamped_min() {
     finding.confidence_score = 0.1;
     finding.verification_status = Some(VerificationStatus::FalsePositive); // -0.3
 
-    let result = phase.refine_confidence(&finding, &Default::default());
+    let result = phase.refine_confidence(&finding, &Default::default(), true, 0.1);
 
     // Should be clamped to 0.0
     assert_eq!(result.refined_score, 0.0);
@@ -186,7 +186,7 @@ fn test_confidence_false_positive_lowers() {
     finding.confidence_score = 0.8;
     finding.verification_status = Some(VerificationStatus::FalsePositive);
 
-    let result = phase.refine_confidence(&finding, &Default::default());
+    let result = phase.refine_confidence(&finding, &Default::default(), true, 0.1);
 
     // -0.3 for false positive, +0.05 severity boost (high severity, base > 0.7)
     assert_eq!(result.refined_score, 0.55);
@@ -202,7 +202,7 @@ fn test_confidence_confirmed_boosts() {
     finding.confidence_score = 0.5;
     finding.verification_status = Some(VerificationStatus::Confirmed);
 
-    let result = phase.refine_confidence(&finding, &Default::default());
+    let result = phase.refine_confidence(&finding, &Default::default(), true, 0.1);
 
     // Should be increased by 0.15
     assert_eq!(result.refined_score, 0.65);
@@ -216,7 +216,7 @@ fn test_confidence_test_code_penalty() {
     finding.confidence_score = 0.7;
     finding.file_path = "src/auth_test.rs".to_string();
 
-    let result = phase.refine_confidence(&finding, &Default::default());
+    let result = phase.refine_confidence(&finding, &Default::default(), true, 0.1);
 
     // Should be reduced by 0.1 for test code
     assert!((result.refined_score - 0.6).abs() < 1e-5);
@@ -230,7 +230,7 @@ fn test_confidence_third_party_penalty() {
     finding.confidence_score = 0.7;
     finding.file_path = "node_modules/package/file.js".to_string();
 
-    let result = phase.refine_confidence(&finding, &Default::default());
+    let result = phase.refine_confidence(&finding, &Default::default(), true, 0.1);
 
     // Should be reduced by 0.15 for third-party code
     assert!((result.refined_score - 0.55).abs() < 1e-5);
@@ -244,7 +244,7 @@ fn test_confidence_low_confidence_source_penalty() {
     finding.confidence_score = 0.7;
     finding.sources = vec!["bandit".to_string()];
 
-    let result = phase.refine_confidence(&finding, &Default::default());
+    let result = phase.refine_confidence(&finding, &Default::default(), true, 0.1);
 
     // Should be reduced by 0.05 for low-confidence source
     assert_eq!(result.refined_score, 0.65);
@@ -260,7 +260,7 @@ fn test_confidence_triage_true_positive() {
     finding.confidence_score = 0.5;
     finding.verification_notes = Some("triage: true_positive confirmed".to_string());
 
-    let result = phase.refine_confidence(&finding, &Default::default());
+    let result = phase.refine_confidence(&finding, &Default::default(), true, 0.1);
 
     // Should be increased by 0.10
     assert_eq!(result.refined_score, 0.6);
@@ -276,7 +276,7 @@ fn test_confidence_triage_false_positive() {
     finding.confidence_score = 0.7;
     finding.verification_notes = Some("triage: false_positive identified".to_string());
 
-    let result = phase.refine_confidence(&finding, &Default::default());
+    let result = phase.refine_confidence(&finding, &Default::default(), true, 0.1);
 
     // Should be reduced by 0.25
     assert_eq!(result.refined_score, 0.45);
@@ -292,7 +292,7 @@ fn test_confidence_rationale_validated() {
     finding.confidence_score = 0.5;
     finding.verification_notes = Some("rationale: sound validated by LLM".to_string());
 
-    let result = phase.refine_confidence(&finding, &Default::default());
+    let result = phase.refine_confidence(&finding, &Default::default(), true, 0.1);
 
     // Should be increased by 0.10
     assert_eq!(result.refined_score, 0.6);
@@ -308,7 +308,7 @@ fn test_confidence_rationale_flawed() {
     finding.confidence_score = 0.7;
     finding.verification_notes = Some("rationale: flawed invalid analysis".to_string());
 
-    let result = phase.refine_confidence(&finding, &Default::default());
+    let result = phase.refine_confidence(&finding, &Default::default(), true, 0.1);
 
     // Should be reduced by 0.20
     assert_eq!(result.refined_score, 0.5);
@@ -326,7 +326,7 @@ fn test_confidence_never_submit_penalty() {
     finding.description = "Content-Security-Policy header not set".to_string();
     finding.cwe_id = Some("CWE-693".to_string());
 
-    let result = phase.refine_confidence(&finding, &Default::default());
+    let result = phase.refine_confidence(&finding, &Default::default(), true, 0.1);
 
     // Severity boost (+0.05) applies first, then never-submit multiplies by 0.1
     assert_eq!(result.refined_score, 0.085);
@@ -345,7 +345,7 @@ fn test_confidence_severity_downgrade() {
         adjusted_severity: Severity::Medium,
     });
 
-    let result = phase.refine_confidence(&finding, &Default::default());
+    let result = phase.refine_confidence(&finding, &Default::default(), true, 0.1);
 
     // Should be reduced by 0.15
     assert!((result.refined_score - 0.55).abs() < 1e-5);

@@ -1,0 +1,42 @@
+[
+  {
+    "id": "c-overflow-001",
+    "title": "Buffer overflow via unbounded memcpy",
+    "description": "Attacker-controlled length parameter passed to memcpy without bounds checking",
+    "severity": "critical",
+    "confidence_score": 0.92,
+    "cwe_id": "CWE-120",
+    "file_path": "vulnerable.c",
+    "line_number": 18,
+    "code_snippet": "memcpy(dest, src, len);",
+    "diff_hunk": null,
+    "recommendation": "Validate length parameter against buffer size before memcpy",
+    "code_location": null,
+    "already_reported": false,
+    "sources": ["semgrep"],
+    "commit_reference": null,
+    "ticket_reference": null,
+    "priority_score": null,
+    "cross_file_references": null,
+    "verification_status": null,
+    "verification_notes": null,
+    "verification_error": null,
+    "agent_evidence_path": null,
+    "security_issue": {
+      "category": "memory_corruption",
+      "cwe_id": "CWE-120",
+      "owasp_category": null,
+      "mitre_attack": null,
+      "custom_tags": []
+    },
+    "poc_code": null,
+    "mitigation_code": null,
+    "poc_format": null,
+    "llm_model": null,
+    "agent_mode": false,
+    "statement_range": null,
+    "triage_verdict": null,
+    "evidence": [],
+    "verification_tier": null
+  }
+]

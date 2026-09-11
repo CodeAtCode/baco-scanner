@@ -4,9 +4,12 @@
 # Copy this file to config.toml and modify values as needed.
 #
 # Environment variables can override LLM API keys:
-# - LLM_DISCOVERY_KEY    -> overrides llm.phases.discovery.api_key
-# - LLM_VERIFICATION_KEY -> overrides llm.phases.verification.api_key
-# - LLM_AGGREGATION_KEY  -> overrides llm.phases.aggregation.api_key
+# - LLM_DISCOVERY_KEY              -> overrides llm.phases.discovery.api_key
+# - LLM_VERIFICATION_KEY           -> overrides llm.phases.verification.api_key
+# - LLM_AGGREGATION_KEY            -> overrides llm.phases.aggregation.api_key
+# - LLM_STATIC_ANALYSIS_KEY        -> overrides llm.phases.static_analysis.api_key
+# - LLM_SECURITY_AGENT_VERIFICATION_KEY -> overrides llm.phases.security_agent_verification.api_key
+# - LLM_THREAT_MODELING_KEY        -> overrides llm.phases.threat_modeling.api_key
 
 # Project configuration
 [project]
@@ -36,7 +39,13 @@ exclude_paths = ["tests/", "docs/", "target/"]
 [scanner.semgrep]
 # Rulesets can be a single string or an array of strings
 # Each ruleset will be passed as a separate --config argument to semgrep
-# Empty array preserves default behavior (uses bundled/default ruleset)
+# If empty, defaults are derived from project.languages:
+#   - python -> "p/python"
+#   - javascript/js -> "p/javascript"
+#   - php -> "p/php"
+#   - c/cpp -> "p/c"
+# Explicit rulesets are never overridden by defaults.
+# Recommended: pin semgrep version with `semgrep --version` in your CI/CD.
 rulesets = [
     # "p/python",  # Example: Python security rules
     # "p/javascript",  # Example: JavaScript security rules
@@ -78,6 +87,15 @@ enable_poc_compilation = false
 # Confidence refinement (re-calibrates finding confidence based on multi-source/cross-file signals)
 # Default: true
 enable_confidence_refinement = true
+# Never-submit pattern filter - heavily penalizes findings matching known false-positive patterns
+# When enabled, findings matching patterns like "missing.*header" or "content.security.policy"
+# have their confidence multiplied by never_submit_multiplier
+# Default: true
+never_submit_enabled = true
+# Multiplier applied to confidence when never-submit pattern matches
+# A value of 0.1 reduces confidence to 10% of its original value
+# Default: 0.1
+never_submit_multiplier = 0.1
 # CVE bootstrap (enriches findings with CVE data from external sources)
 # Default: true
 enable_cve_bootstrap = true
@@ -138,6 +156,24 @@ model = "qwen35"  # single model
 base_url = "https://api.mistral.ai/v1"
 api_key = "your-aggregation-api-key"  # or set env: LLM_AGGREGATION_KEY
 model = "mistral-medium"  # stronger model for final report
+
+# Static analysis phase: LLM-based code analysis
+[llm.phases.static_analysis]
+base_url = "https://api.mistral.ai/v1"
+api_key = "your-static-analysis-api-key"  # or set env: LLM_STATIC_ANALYSIS_KEY
+model = "mistral-small"
+
+# Security agent verification phase: agent-based finding verification
+[llm.phases.security_agent_verification]
+base_url = "https://api.mistral.ai/v1"
+api_key = "your-security-agent-verification-api-key"  # or set env: LLM_SECURITY_AGENT_VERIFICATION_KEY
+model = "qwen35"
+
+# Threat modeling phase: STRIDE-based threat analysis
+[llm.phases.threat_modeling]
+base_url = "https://api.mistral.ai/v1"
+api_key = "your-threat-modeling-api-key"  # or set env: LLM_THREAT_MODELING_KEY
+model = "mistral-medium"
 
 # Ticket system configuration (search for existing reports)
 [tickets]

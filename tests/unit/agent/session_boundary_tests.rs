@@ -3,7 +3,7 @@
 //! These tests verify correct behavior at turn limit boundaries,
 //! including edge cases for max_turns=0, max_turns=1, and exact boundary conditions.
 
-use baco::agent::mock_llm::MockLlmClient;
+use crate::fixtures::mock_llm::MockLlmClient;
 use baco::agent::session::{AgentSession, ProgressCallback};
 use baco::config::AgentConfig;
 use baco::findings::Severity;

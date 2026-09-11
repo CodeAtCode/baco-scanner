@@ -50,6 +50,20 @@ pub struct Checkpoint {
     pub file_count: usize,
     #[serde(default)]
     pub analyzed_files: Vec<String>,
+    /// Early termination event details (added v1.1)
+    #[serde(default)]
+    pub early_termination: Option<EarlyTerminationInfo>,
+}
+
+/// Information about early termination event
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct EarlyTerminationInfo {
+    /// Whether early termination was triggered
+    pub triggered: bool,
+    /// Count of Medium-and-above findings that triggered termination
+    pub finding_count: usize,
+    /// List of phases that were skipped due to early termination
+    pub phases_skipped: Vec<String>,
 }
 
 impl Checkpoint {
@@ -63,6 +77,7 @@ impl Checkpoint {
             findings_so_far: Vec::new(),
             file_count: 0,
             analyzed_files: Vec::new(),
+            early_termination: None,
         }
     }
 
@@ -139,6 +154,7 @@ pub async fn save_checkpoint(
     analyzed_files: &[String],
     phase: &ScanPhase,
     metrics_tracker: &crate::llm_metrics::LlmMetricsTracker,
+    early_termination_info: Option<EarlyTerminationInfo>,
 ) -> Result<(), String> {
     let scan_id = format!("scan-{}", chrono::Utc::now().format("%Y%m%d-%H%M%S"));
     let target_path = checkpoint_path
@@ -155,10 +171,21 @@ pub async fn save_checkpoint(
     #[allow(clippy::needless_borrow)]
     let _llm_metrics = metrics_tracker.finalize().await;
     #[allow(clippy::needless_borrow)]
-    if let Err(e) =
-        crate::report::json::write_findings_json(&findings, &[], json_path.as_str(), None, None)
-    {
+    if let Err(e) = crate::report::json::write_findings_json(
+        &findings,
+        &[],
+        json_path.as_str(),
+        None,
+        None,
+        early_termination_info.clone(),
+        None, // scan_health
+    ) {
         tracing::warn!("Failed to write findings.json during {:?}: {}", phase, e);
+    }
+
+    // Store early termination info in checkpoint if present
+    if let Some(info) = early_termination_info {
+        checkpoint.early_termination = Some(info);
     }
 
     // Get completed phases (all phases up to and including current)

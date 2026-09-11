@@ -684,11 +684,13 @@ fn test_parse_llm_response_missing_required_fields() {
     assert!(result.is_ok());
     assert_eq!(result.unwrap().len(), 0);
 
-    // Missing line
+    // Missing line defaults to 1 instead of dropping the finding
     let json_response = r#"[{"severity": "high", "title": "Test", "description": "Desc"}]"#;
     let result = analyzer.parse_llm_response(json_response, "test.c", "test-model");
     assert!(result.is_ok());
-    assert_eq!(result.unwrap().len(), 0);
+    let findings = result.unwrap();
+    assert_eq!(findings.len(), 1);
+    assert_eq!(findings[0].line_number, Some(1));
 }
 
 #[test]
@@ -863,17 +865,49 @@ fn test_severity_mapping_medium() {
 }
 
 #[test]
-fn test_severity_mapping_unknown_defaults_low() {
+fn test_severity_mapping_unknown_defaults_to_medium() {
     let config = LlmConfig::default();
     let client = baco::llm::LlmClient::new(config.clone());
     let scanner_config = ScannerConfig::default();
     let analyzer = LlmAnalyzer::new(client, vec!["c".to_string()], 512, &scanner_config);
 
+    // Unknown severity strings default to Medium, not Low
     let json_response =
         "[{\"severity\":\"UNKNOWN\",\"title\":\"Test\",\"description\":\"Desc\",\"line\":1}]";
     let result = analyzer.parse_llm_response(json_response, "test.c", "test-model");
     assert!(result.is_ok());
-    assert_eq!(result.unwrap()[0].severity, baco::findings::Severity::Low);
+    assert_eq!(
+        result.unwrap()[0].severity,
+        baco::findings::Severity::Medium
+    );
+}
+
+#[test]
+fn test_severity_mapping_info_and_unknown_strings() {
+    let config = LlmConfig::default();
+    let client = baco::llm::LlmClient::new(config.clone());
+    let scanner_config = ScannerConfig::default();
+    let analyzer = LlmAnalyzer::new(client, vec!["c".to_string()], 512, &scanner_config);
+
+    // "info" severity should map to Medium
+    let json_response_info =
+        "[{\"severity\":\"info\",\"title\":\"Test\",\"description\":\"Desc\",\"line\":1}]";
+    let result_info = analyzer.parse_llm_response(json_response_info, "test.c", "test-model");
+    assert!(result_info.is_ok());
+    assert_eq!(
+        result_info.unwrap()[0].severity,
+        baco::findings::Severity::Medium
+    );
+
+    // Unknown string like "severe-ish" should also map to Medium
+    let json_response_unknown =
+        "[{\"severity\":\"severe-ish\",\"title\":\"Test\",\"description\":\"Desc\",\"line\":1}]";
+    let result_unknown = analyzer.parse_llm_response(json_response_unknown, "test.c", "test-model");
+    assert!(result_unknown.is_ok());
+    assert_eq!(
+        result_unknown.unwrap()[0].severity,
+        baco::findings::Severity::Medium
+    );
 }
 
 // ============================================================================
@@ -1116,4 +1150,38 @@ fn test_llm_analyzer_new_with_various_file_sizes() {
     let client = baco::llm::LlmClient::new(config.clone());
     let analyzer = LlmAnalyzer::new(client, vec!["c".to_string()], 10240, &scanner_config);
     assert!(analyzer.should_analyze(Path::new("test.c")));
+}
+
+#[test]
+fn test_parse_llm_response_missing_line_defaults_to_one() {
+    let scanner_config = ScannerConfig::default();
+    let client = baco::llm::LlmClient::new(LlmConfig::default());
+    let analyzer = LlmAnalyzer::new(client, vec!["c".to_string()], 512, &scanner_config);
+
+    let response = r#"[
+        {
+            "severity": "high",
+            "title": "Buffer overflow in parser",
+            "description": "Bounds check missing",
+            "line": 42,
+            "cwe_id": "CWE-120"
+        },
+        {
+            "severity": "high",
+            "title": "Missing authorization check at endpoint level",
+            "description": "Architectural finding without a unique line"
+        }
+    ]"#;
+
+    let findings = analyzer
+        .parse_llm_response(response, "src/example.c", "mock-model")
+        .expect("parse should succeed");
+
+    assert_eq!(findings.len(), 2, "line-less finding must not be dropped");
+    assert_eq!(findings[0].line_number, Some(42));
+    assert_eq!(
+        findings[1].line_number,
+        Some(1),
+        "missing line defaults to 1"
+    );
 }

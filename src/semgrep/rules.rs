@@ -7,6 +7,8 @@ pub struct SemgrepRunner {
     /// Inline rule YAML documents (preset `custom_rules`), materialized to
     /// temp .yml files at scan time.
     pub custom_rules: Vec<String>,
+    /// Project languages for deriving default rulesets
+    pub languages: Vec<String>,
 }
 
 impl SemgrepRunner {
@@ -15,13 +17,51 @@ impl SemgrepRunner {
             rulesets,
             exclude_rules,
             custom_rules: Vec::new(),
+            languages: Vec::new(),
         }
+    }
+
+    /// Builder: set project languages for default ruleset derivation
+    pub fn with_languages(mut self, languages: Vec<String>) -> Self {
+        self.languages = languages;
+        self
     }
 
     /// Builder: attach inline rule YAML documents from preset `custom_rules`.
     pub fn with_custom_rules(mut self, custom_rules: Vec<String>) -> Self {
         self.custom_rules = custom_rules;
         self
+    }
+
+    /// Derive default rulesets from project languages when rulesets is empty.
+    /// Returns a new ruleset list that may include defaults.
+    pub fn derive_default_rulesets(&self) -> Vec<String> {
+        if !self.rulesets.is_empty() {
+            // Explicit rulesets take precedence - return as-is
+            return self.rulesets.clone();
+        }
+
+        // Derive defaults from languages
+        let mut defaults = std::collections::HashSet::new();
+        for lang in &self.languages {
+            match lang.to_lowercase().as_str() {
+                "python" => {
+                    defaults.insert("p/python".to_string());
+                }
+                "javascript" | "js" => {
+                    defaults.insert("p/javascript".to_string());
+                }
+                "php" => {
+                    defaults.insert("p/php".to_string());
+                }
+                "c" | "cpp" | "cxx" => {
+                    defaults.insert("p/c".to_string());
+                }
+                _ => { /* No default for unknown languages */ }
+            }
+        }
+
+        defaults.into_iter().collect()
     }
 
     /// Check if a rule check_id should be excluded based on exclude_rules patterns.

@@ -711,6 +711,7 @@ fn create_config_without_llm_keys() -> baco::config::ScannerConfig {
                     models: vec![],
                     temperature: None,
                     timeout_secs: Some(30),
+                    agent_flow: Default::default(),
                 },
                 verification: LlmPhaseConfig {
                     base_url: "http://localhost:11434".to_string(),
@@ -719,6 +720,7 @@ fn create_config_without_llm_keys() -> baco::config::ScannerConfig {
                     models: vec![],
                     temperature: None,
                     timeout_secs: Some(30),
+                    agent_flow: Default::default(),
                 },
                 aggregation: LlmPhaseConfig {
                     base_url: "http://localhost:11434".to_string(),
@@ -727,6 +729,7 @@ fn create_config_without_llm_keys() -> baco::config::ScannerConfig {
                     models: vec![],
                     temperature: None,
                     timeout_secs: Some(30),
+                    agent_flow: Default::default(),
                 },
                 static_analysis: LlmPhaseConfig {
                     base_url: "http://localhost:11434".to_string(),
@@ -735,6 +738,7 @@ fn create_config_without_llm_keys() -> baco::config::ScannerConfig {
                     models: vec![],
                     temperature: None,
                     timeout_secs: Some(30),
+                    agent_flow: Default::default(),
                 },
                 security_agent_verification: LlmPhaseConfig {
                     base_url: "http://localhost:11434".to_string(),
@@ -743,6 +747,7 @@ fn create_config_without_llm_keys() -> baco::config::ScannerConfig {
                     models: vec![],
                     temperature: None,
                     timeout_secs: Some(30),
+                    agent_flow: Default::default(),
                 },
                 threat_modeling: LlmPhaseConfig {
                     base_url: "http://localhost:11434".to_string(),
@@ -751,6 +756,7 @@ fn create_config_without_llm_keys() -> baco::config::ScannerConfig {
                     models: vec![],
                     temperature: None,
                     timeout_secs: Some(30),
+                    agent_flow: Default::default(),
                 },
                 prompt_overrides: Default::default(),
             },

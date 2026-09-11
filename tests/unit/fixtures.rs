@@ -44,6 +44,7 @@ pub use centralized_fixtures::make_finding_phase;
 pub use centralized_fixtures::make_finding_report;
 pub use centralized_fixtures::make_finding_report_agg;
 pub use centralized_fixtures::make_finding_snippet;
+pub use centralized_fixtures::mock_llm;
 
 use baco::analysis_context::AnalysisContext;
 use baco::config::{
@@ -231,6 +232,7 @@ pub fn create_test_config() -> ScannerConfig {
                     models: vec![],
                     temperature: None,
                     timeout_secs: Some(30),
+                    agent_flow: Default::default(),
                 },
                 verification: LlmPhaseConfig {
                     base_url: "http://localhost:11434".to_string(),
@@ -239,6 +241,7 @@ pub fn create_test_config() -> ScannerConfig {
                     models: vec![],
                     temperature: None,
                     timeout_secs: Some(30),
+                    agent_flow: Default::default(),
                 },
                 aggregation: LlmPhaseConfig {
                     base_url: "http://localhost:11434".to_string(),
@@ -247,6 +250,7 @@ pub fn create_test_config() -> ScannerConfig {
                     models: vec![],
                     temperature: None,
                     timeout_secs: Some(30),
+                    agent_flow: Default::default(),
                 },
                 static_analysis: LlmPhaseConfig {
                     base_url: "http://localhost:11434".to_string(),
@@ -255,6 +259,7 @@ pub fn create_test_config() -> ScannerConfig {
                     models: vec![],
                     temperature: None,
                     timeout_secs: Some(30),
+                    agent_flow: Default::default(),
                 },
                 security_agent_verification: LlmPhaseConfig {
                     base_url: "http://localhost:11434".to_string(),
@@ -263,6 +268,7 @@ pub fn create_test_config() -> ScannerConfig {
                     models: vec![],
                     temperature: None,
                     timeout_secs: Some(30),
+                    agent_flow: Default::default(),
                 },
                 threat_modeling: LlmPhaseConfig {
                     base_url: "http://localhost:11434".to_string(),
@@ -271,6 +277,7 @@ pub fn create_test_config() -> ScannerConfig {
                     models: vec![],
                     temperature: None,
                     timeout_secs: Some(30),
+                    agent_flow: Default::default(),
                 },
                 prompt_overrides: Default::default(),
             },
@@ -679,6 +686,7 @@ pub fn make_nvd_only_cve() -> CveEntry {
         source: CveSource::NVD,
         affected_products: vec![],
         published_date: None,
+        cwe_ids: vec![],
     }
 }
 
@@ -691,6 +699,7 @@ pub fn make_kev_only_cve() -> CveEntry {
         source: CveSource::KEV,
         affected_products: vec![],
         published_date: None,
+        cwe_ids: vec![],
     }
 }
 

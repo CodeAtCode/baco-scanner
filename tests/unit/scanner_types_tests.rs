@@ -87,6 +87,7 @@ fn test_cve_entry_serialization_roundtrip() {
         source: CveSource::NVD,
         affected_products: vec!["lib1".to_string(), "lib2".to_string()],
         published_date: Some("2024-01-01".to_string()),
+        cwe_ids: vec!["CWE-89".to_string()],
     };
 
     let serialized = serde_json::to_string(&cve).unwrap();

@@ -1,8 +1,8 @@
 //! Test helper functions for security agent verification tests
 
-use crate::agent::mock_llm::MockLlmClient;
-use crate::agent::ToolCall;
-use crate::llm::ChatResponse;
+use crate::common::fixtures::mock_llm::MockLlmClient;
+use baco::agent::ToolCall;
+use baco::llm::ChatResponse;
 use serde_json::json;
 
 /// Create a mock LLM client that simulates agent tool usage

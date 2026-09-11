@@ -61,6 +61,9 @@ pub struct LlmPhaseConfig {
     pub timeout_secs: Option<u64>, // Optional per-phase timeout override
     #[serde(default)]
     pub temperature: Option<f32>, // Optional per-phase temperature override
+    /// AgentFlow gate for this phase
+    #[serde(default)]
+    pub agent_flow: AgentFlowPhaseConfig,
 }
 
 impl LlmPhaseConfig {
@@ -76,7 +79,21 @@ impl LlmPhaseConfig {
     }
 }
 
-/// Prompt override configuration
+/// AgentFlow phase configuration
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct AgentFlowPhaseConfig {
+    /// Gate: run AgentFlow harness synthesis
+    #[serde(default)]
+    pub enabled: bool,
+    /// Maximum iterations for AgentFlow loop
+    #[serde(default = "default_agent_flow_max_iterations")]
+    pub max_iterations: u32,
+}
+
+fn default_agent_flow_max_iterations() -> u32 {
+    5
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PromptOverrides {
     #[serde(default, rename = "phases")]

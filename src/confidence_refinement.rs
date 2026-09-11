@@ -288,6 +288,8 @@ impl ConfidenceRefinementPhase {
     /// # Arguments
     /// * `findings` - Findings to refine
     /// * `context` - AnalysisContext for historical data and context
+    /// * `never_submit_enabled` - Whether the never-submit filter is enabled
+    /// * `never_submit_multiplier` - Multiplier applied when pattern matches
     ///
     /// # Returns
     /// Map of finding ID to refined confidence
@@ -295,11 +297,18 @@ impl ConfidenceRefinementPhase {
         &self,
         findings: Vec<VulnerabilityFinding>,
         context: &AnalysisContext,
+        never_submit_enabled: bool,
+        never_submit_multiplier: f32,
     ) -> HashMap<String, RefinedConfidence> {
         let mut results = HashMap::new();
 
         for finding in findings {
-            let refined = self.refine_confidence(&finding, context);
+            let refined = self.refine_confidence(
+                &finding,
+                context,
+                never_submit_enabled,
+                never_submit_multiplier,
+            );
             results.insert(finding.id.clone(), refined);
         }
 
@@ -311,6 +320,8 @@ impl ConfidenceRefinementPhase {
         &self,
         finding: &VulnerabilityFinding,
         _context: &AnalysisContext,
+        never_submit_enabled: bool,
+        never_submit_multiplier: f32,
     ) -> RefinedConfidence {
         let original_score = finding.confidence_score;
         let mut refined_score = original_score;
@@ -472,10 +483,7 @@ impl ConfidenceRefinementPhase {
 
         // Factor 11: Never-submit pattern filter
         // Findings matching these patterns are heavily penalized as they should never be reported
-        // Note: config is not available in AnalysisContext, so we always enable this filter
-        let never_submit_config_enabled = true;
-
-        if never_submit_config_enabled {
+        if never_submit_enabled {
             let title = finding.title.as_str();
             let description = finding.description.as_str();
             let cwe_id = finding.cwe_id.as_ref();
@@ -484,12 +492,17 @@ impl ConfidenceRefinementPhase {
                 self.historical_data
                     .check_never_submit_pattern(title, description, cwe_id)
             {
-                refined_score = (refined_score * 0.1).max(0.0);
+                refined_score = (refined_score * never_submit_multiplier).max(0.0);
                 factors.push(ConfidenceFactor::NeverSubmitMatch {
-                    pattern: match_desc,
+                    pattern: match_desc.clone(),
                 });
                 explanations
                     .push("Never-submit pattern matched - finding heavily penalized".to_string());
+                tracing::warn!(
+                    "Never-submit pattern matched: pattern='{}', finding_title='{}'",
+                    match_desc,
+                    finding.title
+                );
             }
         }
 

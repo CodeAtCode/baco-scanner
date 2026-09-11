@@ -9,7 +9,7 @@
 //! - Error handling
 //! - Edge cases
 
-use baco::agent::mock_llm::MockLlmClient;
+use crate::fixtures::mock_llm::MockLlmClient;
 use baco::agent::session::{AgentSession, ProgressCallback};
 use baco::config::AgentConfig;
 use baco::findings::{Severity, VerificationStatus, VulnerabilityFinding};

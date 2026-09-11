@@ -2,6 +2,8 @@ use crate::config::ScannerConfig;
 use crate::evidence::classify_finding;
 use crate::findings::{Severity, VulnerabilityFinding};
 use crate::llm_metrics::LlmMetrics;
+use crate::scan_health::ScanHealth;
+use crate::scanner::checkpoint::EarlyTerminationInfo;
 use serde::Serialize;
 use std::fs;
 
@@ -14,9 +16,17 @@ pub struct ReportSummary {
     pub low: usize,
     pub info: usize,
 
+    /// Early termination details (if triggered)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub early_termination: Option<EarlyTerminationInfo>,
+
     /// Metriche LLM (se disponibili)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub llm_metrics: Option<LlmMetricsSummary>,
+
+    /// Scan health report
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scan_health: Option<ScanHealth>,
 }
 
 #[derive(Serialize)]
@@ -68,6 +78,8 @@ pub fn write_findings_json(
     output_path: &str,
     llm_metrics: Option<LlmMetrics>,
     config: Option<&ScannerConfig>,
+    early_termination_info: Option<EarlyTerminationInfo>,
+    scan_health: Option<ScanHealth>,
 ) -> Result<(), String> {
     // JSON output contains ALL findings for transparency (no filtering)
     // but ensures every finding has verification_tier set when gate is enabled
@@ -85,7 +97,7 @@ pub fn write_findings_json(
         }
     }
 
-    let _summary = ReportSummary {
+    let summary = ReportSummary {
         total_findings: findings.len(),
         critical: findings
             .iter()
@@ -107,6 +119,7 @@ pub fn write_findings_json(
             .iter()
             .filter(|f| matches!(f.severity, Severity::Info))
             .count(),
+        early_termination: early_termination_info,
         llm_metrics: llm_metrics.map(|metrics| {
             let models: Vec<ModelMetricsSummary> = metrics
                 .by_model
@@ -144,6 +157,7 @@ pub fn write_findings_json(
                 operations,
             }
         }),
+        scan_health,
     };
 
     let json = if let Some(cfg) = config {
@@ -159,16 +173,16 @@ pub fn write_findings_json(
 
             // Create a custom JSON structure with both findings and rejected
             #[derive(Serialize)]
-            struct FullReport {
+            struct FullReportWithHealth {
                 findings: Vec<VulnerabilityFinding>,
                 rejected: Vec<RejectedFindingJson>,
                 summary: ReportSummary,
             }
 
-            let full_report = FullReport {
+            let full_report = FullReportWithHealth {
                 findings: findings_with_tier,
                 rejected: rejected_json,
-                summary: _summary,
+                summary,
             };
 
             serde_json::to_string_pretty(&full_report)

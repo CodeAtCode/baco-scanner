@@ -2,7 +2,7 @@
 //!
 //! Migrated from src/agent/mock_llm.rs inline tests
 
-use baco::agent::mock_llm::MockLlmClient;
+use crate::fixtures::mock_llm::MockLlmClient;
 use baco::llm::ChatResponse;
 use serde_json::json;
 

@@ -24,6 +24,7 @@ pub async fn run_semgrep(
         config.scanner.semgrep.rulesets.clone(),
         config.scanner.semgrep.exclude_rules.clone(),
     )
+    .with_languages(config.project.languages.clone())
     .with_custom_rules(config.scanner.semgrep.custom_rules.clone());
     let phase_num = crate::scanner::pipeline::orchestrator::phase_index(&ScanPhase::Semgrep);
     let total = crate::scanner::pipeline::orchestrator::total_phases();
@@ -48,13 +49,15 @@ pub async fn run_semgrep(
             Ok((findings, analyzed_files.to_vec()))
         }
         Err(e) => {
-            tracing::warn!("Semgrep failed: {}. Skipping phase.", e);
+            // Loud failure: emit error and record that semgrep failed
+            tracing::error!("Semgrep phase failed: {}", e);
             pb.set_message(format!(
-                "Phase {}/{}: Semgrep failed - skipping phase",
+                "Phase {}/{}: Semgrep failed - see error log",
                 phase_num, total
             ));
             pb.set_position(pb.position() + 100);
 
+            // Return findings as-is (do not abort scan)
             Ok((findings, analyzed_files.to_vec()))
         }
     }

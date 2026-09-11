@@ -20,7 +20,8 @@ pub type RejectedFinding = (VulnerabilityFinding, String);
 /// Batch verification verdict item (index + verdict + reason)
 #[derive(Deserialize, Debug)]
 struct BatchVerdictItem {
-    index: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    index: Option<usize>,
     #[serde(default)]
     verification_status: String,
     verification_notes: Option<String>,
@@ -215,13 +216,23 @@ pub fn build_volatile_verification_tail(
         tail.push_str("\n---\n\n");
     }
 
-    tail.push_str("Return JSON array now.\n");
+    tail.push_str(
+        "Return JSON array now. Each element must include:\n\
+         - \"index\": <0-based position of the finding in the batch (0, 1, 2, ...)>\n\
+         - \"verification_status\": \"confirmed|false_positive|needs_review\"\n\
+         - \"verification_notes\": \"detailed reasoning\"\n\
+         Example: [{\"index\": 0, \"verification_status\": \"confirmed\", \"verification_notes\": \"...\"}, ...]\n"
+    );
     tail
 }
 
 /// Parse batch verification verdict from LLM output.
 /// Returns Vec of (status, notes) per finding index.
 /// Failed items become NeedsReview with raw text in notes.
+///
+/// Supports two modes:
+/// - Index-based: When verdicts include "index" field, match by index
+/// - Positional fallback: When index is missing, use array order (with warning)
 pub fn parse_batch_verification_verdict(
     content: &str,
     expected_count: usize,
@@ -237,8 +248,26 @@ pub fn parse_batch_verification_verdict(
             let mut results =
                 vec![(VerificationStatus::NeedsReview, String::new()); expected_count];
 
-            for item in items {
-                if item.index < expected_count {
+            // Check if any item is missing index → positional fallback
+            let has_index = items.iter().any(|item| item.index.is_some());
+            let uses_fallback = !has_index;
+
+            if uses_fallback {
+                tracing::warn!(
+                    "Batch verification response missing 'index' fields for {} items; using positional fallback",
+                    items.len()
+                );
+            }
+
+            for (pos, item) in items.into_iter().enumerate() {
+                let idx = if let Some(index) = item.index {
+                    index
+                } else {
+                    // Positional fallback
+                    pos
+                };
+
+                if idx < expected_count {
                     let status = match item.verification_status.as_str() {
                         "confirmed" => VerificationStatus::Confirmed,
                         "false_positive" => VerificationStatus::FalsePositive,
@@ -249,7 +278,7 @@ pub fn parse_batch_verification_verdict(
                     } else {
                         item.verification_notes.unwrap_or_default()
                     };
-                    results[item.index] = (status, notes);
+                    results[idx] = (status, notes);
                 }
             }
 
@@ -270,21 +299,22 @@ pub fn parse_batch_verification_verdict(
 }
 
 /// Verify findings in batches to reduce LLM API calls.
-/// Returns Vec of (status, notes) per finding.
+/// Returns tuple of (results Vec, positional_fallback_count).
 pub async fn verify_findings_batched<C: LlmChatClient>(
     client: &C,
     findings: &[VulnerabilityFinding],
     batch_size: usize,
     hunt_prompts: &HashMap<String, String>,
     required_primitives: &HashMap<String, Vec<String>>,
-) -> Vec<(VerificationStatus, String)> {
+) -> (Vec<(VerificationStatus, String)>, u64) {
     if batch_size <= 1 || findings.is_empty() {
         // Signal fallback needed by returning empty vec
-        return Vec::new();
+        return (Vec::new(), 0);
     }
 
     let mut all_results = Vec::with_capacity(findings.len());
     let mut batch_start = 0;
+    let mut total_fallback_count = 0u64;
 
     while batch_start < findings.len() {
         let batch_end = (batch_start + batch_size).min(findings.len());
@@ -307,6 +337,25 @@ pub async fn verify_findings_batched<C: LlmChatClient>(
         match client.chat(&messages).await {
             Ok(response) => {
                 let results = parse_batch_verification_verdict(&response.content, batch.len());
+
+                // Count positional fallbacks
+                let cleaned = response
+                    .content
+                    .trim_start_matches("```")
+                    .trim_end_matches("```")
+                    .trim_start_matches("json")
+                    .trim();
+                if let Ok(items) = serde_json::from_str::<Vec<BatchVerdictItem>>(cleaned) {
+                    let has_index = items.iter().any(|item| item.index.is_some());
+                    if !has_index && !items.is_empty() {
+                        total_fallback_count += items.len() as u64;
+                        tracing::warn!(
+                            "Batch verification response missing 'index' fields for {} items; using positional fallback",
+                            items.len()
+                        );
+                    }
+                }
+
                 all_results.extend(results);
             }
             Err(e) => {
@@ -324,7 +373,15 @@ pub async fn verify_findings_batched<C: LlmChatClient>(
         batch_start = batch_end;
     }
 
-    all_results
+    // Log total fallback count for this batch verification
+    if total_fallback_count > 0 {
+        tracing::info!(
+            "Total positional fallbacks in batch verification: {}",
+            total_fallback_count
+        );
+    }
+
+    (all_results, total_fallback_count)
 }
 
 /// Run LLM verification phase (phase 8 of 24).
@@ -455,6 +512,7 @@ pub async fn run_llm_verification(
                 .await;
 
                 // Apply batch results to findings
+                let (batch_results, _fallback_count) = batch_results;
                 for (i, finding) in findings.iter_mut().enumerate() {
                     let progress_pct = if total_findings > 0 {
                         ((i as f64 / total_findings as f64) * 100.0) as u64

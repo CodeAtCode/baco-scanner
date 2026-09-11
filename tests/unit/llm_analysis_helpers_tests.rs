@@ -98,13 +98,14 @@ mod tests {
             assert_eq!(findings.len(), 0);
         }
 
-        // Test 6: missing fields
+        // Test 6: missing line defaults to 1 instead of dropping the finding
         {
             let json_response = r#"[{"severity": "high", "title": "Missing line"}]"#;
             let result = analyzer.parse_llm_response(json_response, "test.c", "test-model");
             assert!(result.is_ok());
             let findings = result.unwrap();
-            assert_eq!(findings.len(), 0);
+            assert_eq!(findings.len(), 1);
+            assert_eq!(findings[0].line_number, Some(1));
         }
     }
 

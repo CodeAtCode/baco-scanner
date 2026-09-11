@@ -7,6 +7,10 @@
 //! - PatchValidationResult logic
 //! - PatchingConfig defaults
 
+mod compiler_tests;
+mod core_tests;
+mod error_tests;
+
 use baco::scanner_types::patch::PatchCandidate;
 use baco::staging::*;
 use std::fs;

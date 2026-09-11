@@ -1,7 +1,7 @@
 // Integration tests for the agent module.
 // Tests the mock LLM client and tool execution flow.
 
-use baco::agent::mock_llm::MockLlmClient;
+use crate::common::fixtures::mock_llm::MockLlmClient;
 
 #[test]
 fn test_mock_tool_call_response() {

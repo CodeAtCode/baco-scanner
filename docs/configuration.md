@@ -53,6 +53,32 @@ max_parallel_tasks = 4
 # Enable file filtering to reduce false positives
 enable_file_filtering = true
 
+# --- Semgrep configuration ---
+[scanner.semgrep]
+# Rulesets to use (array of strings). If empty, defaults are derived from project.languages:
+#   - python -> "p/python"
+#   - javascript/js -> "p/javascript"  
+#   - php -> "p/php"
+#   - c/cpp -> "p/c"
+# Explicit rulesets are never overridden. Custom rules can be inlined via custom_rules.
+# Recommended: pin semgrep version with `semgrep --version` in your CI/CD.
+rulesets = [
+    # "p/python",
+    # "p/javascript",
+]
+# Rules to exclude (supports exact match and prefix match)
+exclude_rules = ["html.security.plaintext-http-link"]
+# Inline rule YAML documents (full `rules:` blocks) - materialized to temp files at scan time
+custom_rules = ['''
+rules:
+  - id: my-custom-rule
+    languages: [python]
+    severity: ERROR
+    message: example rule
+    pattern: eval($X)
+''']
+```
+
 # --- Phase enable flags ---
 # Each flag controls whether a specific analysis phase runs during the scan.
 
@@ -70,6 +96,13 @@ enable_auto_patching = false
 enable_poc_compilation = false
 # Confidence refinement (re-calibrates finding confidence based on multi-source/cross-file signals)
 enable_confidence_refinement = true
+# Never-submit pattern filter - heavily penalizes findings matching known false-positive patterns
+# When enabled, findings matching patterns like "missing.*header" or "content.security.policy"
+# have their confidence multiplied by never_submit_multiplier
+never_submit_enabled = true
+# Multiplier applied to confidence when never-submit pattern matches
+# A value of 0.1 reduces confidence to 10% of its original value
+never_submit_multiplier = 0.1
 # CVE bootstrap (enriches findings with CVE data from external sources)
 enable_cve_bootstrap = true
 # Variant search (searches for variant instances of the same vulnerability pattern)
@@ -84,6 +117,8 @@ enable_variant_search = true
 | `enable_auto_patching` | `false` | Writes code files, runs git commands in a staging worktree |
 | `enable_poc_compilation` | `false` | Spawns external compilers |
 | `enable_confidence_refinement` | `true` | None |
+| `never_submit_enabled` | `true` | None |
+| `never_submit_multiplier` | `0.1` | None |
 | `enable_cve_bootstrap` | `true` | External network requests to NVD/CISA |
 | `enable_variant_search` | `true` | Additional LLM API calls |
 
@@ -302,6 +337,9 @@ include_rejected = false
 | `LLM_DISCOVERY_KEY` | Overrides `llm.phases.discovery.api_key` |
 | `LLM_VERIFICATION_KEY` | Overrides `llm.phases.verification.api_key` |
 | `LLM_AGGREGATION_KEY` | Overrides `llm.phases.aggregation.api_key` |
+| `LLM_STATIC_ANALYSIS_KEY` | Overrides `llm.phases.static_analysis.api_key` |
+| `LLM_SECURITY_AGENT_VERIFICATION_KEY` | Overrides `llm.phases.security_agent_verification.api_key` |
+| `LLM_THREAT_MODELING_KEY` | Overrides `llm.phases.threat_modeling.api_key` |
 | `TICKET_GITHUB_KEY` | Overrides `[[tickets.systems]]` api_key for GitHub |
 | `TICKET_GITLAB_KEY` | Overrides `[[tickets.systems]]` api_key for GitLab |
 | `LLM_CONFIG_PATH` | Path to custom LLM configuration file (overrides default prompts) |

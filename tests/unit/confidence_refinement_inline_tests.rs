@@ -22,7 +22,7 @@ mod tests {
         let mut finding = create_finding_with_params("f1", "Test finding", Severity::High);
         finding.verification_status = Some(VerificationStatus::Confirmed);
 
-        let refinements = phase.run(vec![finding], &context);
+        let refinements = phase.run(vec![finding], &context, true, 0.1);
         let refined = refinements.get("f1").unwrap();
 
         assert!(refined.refined_score > refined.original_score);
@@ -37,7 +37,7 @@ mod tests {
         let mut finding = create_finding_with_params("f1", "Test finding", Severity::High);
         finding.verification_status = Some(VerificationStatus::FalsePositive);
 
-        let refinements = phase.run(vec![finding], &context);
+        let refinements = phase.run(vec![finding], &context, true, 0.1);
         let refined = refinements.get("f1").unwrap();
 
         assert!(refined.refined_score < refined.original_score);
@@ -54,7 +54,7 @@ mod tests {
         let mut finding = create_finding_with_params("f1", "Test finding", Severity::Medium);
         finding.sources = vec!["semgrep".to_string(), "llm".to_string()];
 
-        let refinements = phase.run(vec![finding], &context);
+        let refinements = phase.run(vec![finding], &context, true, 0.1);
         let refined = refinements.get("f1").unwrap();
 
         assert!(refined
@@ -69,7 +69,7 @@ mod tests {
 
         let finding = create_finding_with_params("f1", "Test finding", Severity::High);
 
-        let refinements = phase.run(vec![finding], &context);
+        let refinements = phase.run(vec![finding], &context, true, 0.1);
         let refined = refinements.get("f1").unwrap();
 
         assert!(refined.factors.contains(&ConfidenceFactor::TestCodeRelated));
@@ -83,7 +83,7 @@ mod tests {
         let mut finding = create_finding_with_params("f1", "Test finding", Severity::High);
         finding.file_path = "vendor/some-lib/lib.rs".to_string();
 
-        let refinements = phase.run(vec![finding], &context);
+        let refinements = phase.run(vec![finding], &context, true, 0.1);
         let refined = refinements.get("f1").unwrap();
 
         assert!(refined.factors.contains(&ConfidenceFactor::ThirdPartyCode));
@@ -97,7 +97,7 @@ mod tests {
         let mut finding = create_finding_with_params("f1", "Test finding", Severity::High);
         finding.cross_file_references = Some(vec!["src/util.rs".to_string()]);
 
-        let refinements = phase.run(vec![finding], &context);
+        let refinements = phase.run(vec![finding], &context, true, 0.1);
         let refined = refinements.get("f1").unwrap();
 
         assert!(refined
@@ -127,14 +127,14 @@ mod tests {
 
         let finding = create_finding_with_params("f1", "Test finding", Severity::Critical);
 
-        let refinements = phase.run(vec![finding], &context);
+        let refinements = phase.run(vec![finding], &context, true, 0.1);
         let refined = refinements.get("f1").unwrap();
 
         assert!(refined.refined_score <= 1.0);
 
         let finding2 = create_finding_with_params("f2", "Test finding", Severity::Low);
 
-        let refinements2 = phase.run(vec![finding2], &context);
+        let refinements2 = phase.run(vec![finding2], &context, true, 0.1);
         let refined2 = refinements2.get("f2").unwrap();
 
         assert!(refined2.refined_score >= 0.0);
@@ -148,7 +148,7 @@ mod tests {
         let finding = create_finding_with_params("f1", "Test finding", Severity::High);
 
         let mut findings = vec![finding];
-        let refinements = phase.run(findings.clone(), &context);
+        let refinements = phase.run(findings.clone(), &context, true, 0.1);
 
         phase.apply_refinements(&mut findings, &refinements);
 
@@ -215,7 +215,7 @@ mod tests {
             f3,
         ];
 
-        let refinements = phase.run(findings, &context);
+        let refinements = phase.run(findings, &context, true, 0.1);
 
         assert_eq!(refinements.len(), 3);
         assert!(refinements["f3"].refined_score > refinements["f3"].original_score);
@@ -227,7 +227,7 @@ mod tests {
         let context = AnalysisContext::default();
 
         let finding = create_finding_with_params("f1", "Test finding", Severity::Medium);
-        let refinements = phase.run(vec![finding], &context);
+        let refinements = phase.run(vec![finding], &context, true, 0.1);
         let refined = refinements.get("f1").unwrap();
 
         assert!((refined.original_score - 0.8).abs() < 0.001);
@@ -242,7 +242,7 @@ mod tests {
         finding.file_path = "src/main.rs".to_string();
         finding.sources = vec!["semgrep".to_string(), "llm".to_string()];
 
-        let refinements = phase.run(vec![finding], &context);
+        let refinements = phase.run(vec![finding], &context, true, 0.1);
         let refined = refinements.get("f1").unwrap();
 
         assert!((refined.refined_score - 0.9).abs() < 0.01);
@@ -260,7 +260,7 @@ mod tests {
         finding.file_path = "src/main.rs".to_string();
         finding.cross_file_references = Some(vec!["src/util.rs".to_string()]);
 
-        let refinements = phase.run(vec![finding], &context);
+        let refinements = phase.run(vec![finding], &context, true, 0.1);
         let refined = refinements.get("f1").unwrap();
 
         assert!((refined.refined_score - 0.88).abs() < 0.001);
@@ -279,7 +279,7 @@ mod tests {
         finding.sources = vec!["semgrep".to_string(), "llm".to_string()];
         finding.cross_file_references = Some(vec!["src/util.rs".to_string()]);
 
-        let refinements = phase.run(vec![finding], &context);
+        let refinements = phase.run(vec![finding], &context, true, 0.1);
         let refined = refinements.get("f1").unwrap();
 
         assert!((refined.refined_score - 0.98).abs() < 0.001);
@@ -295,7 +295,7 @@ mod tests {
         finding.file_path = "src/main.rs".to_string();
         finding.verification_status = Some(VerificationStatus::Confirmed);
 
-        let refinements = phase.run(vec![finding], &context);
+        let refinements = phase.run(vec![finding], &context, true, 0.1);
         let refined = refinements.get("f1").unwrap();
 
         assert!((refined.refined_score - 0.95).abs() < 0.001);
@@ -311,7 +311,7 @@ mod tests {
         finding.file_path = "src/main.rs".to_string();
         finding.verification_status = Some(VerificationStatus::FalsePositive);
 
-        let refinements = phase.run(vec![finding], &context);
+        let refinements = phase.run(vec![finding], &context, true, 0.1);
         let refined = refinements.get("f1").unwrap();
 
         assert!((refined.refined_score - 0.5).abs() < 0.001);
@@ -329,7 +329,7 @@ mod tests {
         finding.file_path = "src/main.rs".to_string();
         finding.verification_status = Some(VerificationStatus::NeedsReview);
 
-        let refinements = phase.run(vec![finding], &context);
+        let refinements = phase.run(vec![finding], &context, true, 0.1);
         let refined = refinements.get("f1").unwrap();
 
         assert!((refined.refined_score - 0.8).abs() < 0.001);
@@ -345,7 +345,7 @@ mod tests {
         finding.file_path = "src/main.rs".to_string();
         finding.verification_status = Some(VerificationStatus::Failed);
 
-        let refinements = phase.run(vec![finding], &context);
+        let refinements = phase.run(vec![finding], &context, true, 0.1);
         let refined = refinements.get("f1").unwrap();
 
         assert!((refined.refined_score - 0.7).abs() < 0.001);
@@ -357,7 +357,7 @@ mod tests {
         let context = AnalysisContext::default();
 
         let findings: Vec<VulnerabilityFinding> = vec![];
-        let refinements = phase.run(findings, &context);
+        let refinements = phase.run(findings, &context, true, 0.1);
 
         assert!(refinements.is_empty());
     }
@@ -374,7 +374,7 @@ mod tests {
         finding.cross_file_references = Some(vec!["src/util.rs".to_string()]);
         finding.verification_status = Some(VerificationStatus::Confirmed);
 
-        let refinements = phase.run(vec![finding], &context);
+        let refinements = phase.run(vec![finding], &context, true, 0.1);
         let refined = refinements.get("f1").unwrap();
 
         assert!((refined.refined_score - 1.0).abs() < 0.001);
@@ -389,7 +389,7 @@ mod tests {
         finding.file_path = "src/main.rs".to_string();
         finding.sources = vec!["bandit".to_string()];
 
-        let refinements = phase.run(vec![finding], &context);
+        let refinements = phase.run(vec![finding], &context, true, 0.1);
         let refined = refinements.get("f1").unwrap();
 
         assert!((refined.refined_score - 0.75).abs() < 0.001);
@@ -407,7 +407,7 @@ mod tests {
         finding.file_path = "src/main.rs".to_string();
         finding.confidence_score = 0.85;
 
-        let refinements = phase.run(vec![finding], &context);
+        let refinements = phase.run(vec![finding], &context, true, 0.1);
         let refined = refinements.get("f1").unwrap();
 
         assert!((refined.refined_score - 0.9).abs() < 0.001);
@@ -494,7 +494,7 @@ mod tests {
         let mut finding = create_finding_with_params("f1", "Test finding", Severity::High);
         finding.file_path = "node_modules/express/lib/router.js".to_string();
 
-        let refinements = phase.run(vec![finding], &context);
+        let refinements = phase.run(vec![finding], &context, true, 0.1);
         let refined = refinements.get("f1").unwrap();
 
         assert!(refined.factors.contains(&ConfidenceFactor::ThirdPartyCode));
@@ -511,7 +511,7 @@ mod tests {
         finding.confidence_score = 0.1;
         finding.verification_status = Some(VerificationStatus::FalsePositive);
 
-        let refinements = phase.run(vec![finding], &context);
+        let refinements = phase.run(vec![finding], &context, true, 0.1);
         let refined = refinements.get("f1").unwrap();
 
         assert!((refined.refined_score - 0.0).abs() < 0.001);
@@ -528,7 +528,7 @@ mod tests {
         finding.description = "Application is missing HSTS header".to_string();
         finding.cwe_id = Some("CWE-693".to_string());
 
-        let refinements = phase.run(vec![finding], &context);
+        let refinements = phase.run(vec![finding], &context, true, 0.1);
         let refined = refinements.get("f1").unwrap();
 
         assert!((refined.refined_score - 0.08).abs() < 0.01);
@@ -549,7 +549,7 @@ mod tests {
         finding.description = "Potential open redirect without credential leak".to_string();
         finding.cwe_id = Some("CWE-601".to_string());
 
-        let refinements = phase.run(vec![finding], &context);
+        let refinements = phase.run(vec![finding], &context, true, 0.1);
         let refined = refinements.get("f2").unwrap();
 
         assert!((refined.refined_score - 0.08).abs() < 0.01);
@@ -569,7 +569,7 @@ mod tests {
         finding.description = "Reflected XSS on same origin - self-XSS".to_string();
         finding.cwe_id = Some("CWE-79".to_string());
 
-        let refinements = phase.run(vec![finding], &context);
+        let refinements = phase.run(vec![finding], &context, true, 0.1);
         let refined = refinements.get("f3").unwrap();
 
         assert!((refined.refined_score - 0.08).abs() < 0.01);
@@ -589,7 +589,7 @@ mod tests {
         finding.description = "SSRF via DNS callback without OOB confirmation".to_string();
         finding.cwe_id = Some("CWE-918".to_string());
 
-        let refinements = phase.run(vec![finding], &context);
+        let refinements = phase.run(vec![finding], &context, true, 0.1);
         let refined = refinements.get("f4").unwrap();
 
         assert!((refined.refined_score - 0.08).abs() < 0.01);
@@ -609,7 +609,7 @@ mod tests {
         finding.description = "Direct SQL concatenation with user input".to_string();
         finding.cwe_id = Some("CWE-89".to_string());
 
-        let refinements = phase.run(vec![finding], &context);
+        let refinements = phase.run(vec![finding], &context, true, 0.1);
         let refined = refinements.get("f5").unwrap();
 
         assert!(!refined

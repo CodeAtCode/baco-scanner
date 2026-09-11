@@ -2,7 +2,6 @@ use crate::config::ScannerConfig;
 use crate::evidence::{classify_finding, VerificationTier};
 use crate::findings::VulnerabilityFinding;
 
-pub mod aggregation;
 pub mod ai_aggregation;
 pub mod html;
 pub mod json;

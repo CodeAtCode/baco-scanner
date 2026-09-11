@@ -1,4 +1,4 @@
-use baco::agent::mock_llm::MockLlmClient;
+use crate::common::fixtures::mock_llm::MockLlmClient;
 use baco::config::{AgentConfig, ScannerConfig};
 use std::path::PathBuf;
 
@@ -31,11 +31,8 @@ fn test_agent_disabled_existing_behavior() {
 #[test]
 fn test_agent_enabled_with_mock() {
     let responses = vec![
-        baco::agent::mock_llm::MockLlmClient::mock_tool_call(
-            "file_read",
-            serde_json::json!({"path": "test.py"}),
-        ),
-        baco::agent::mock_llm::MockLlmClient::mock_final_response("[]"),
+        MockLlmClient::mock_tool_call("file_read", serde_json::json!({"path": "test.py"})),
+        MockLlmClient::mock_final_response("[]"),
     ];
     let _mock_client = MockLlmClient::new(responses);
     let _project_root = PathBuf::from("/tmp");

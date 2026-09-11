@@ -72,6 +72,7 @@ impl CveClient {
                         source: CveSource::KEV,
                         affected_products: vec![],
                         published_date: Some(vuln.date_added),
+                        cwe_ids: Vec::new(), // KEV doesn't provide CWE IDs
                     })
                     .collect();
 
@@ -151,13 +152,33 @@ impl CveClient {
                     .map(|m| map_nvd_severity(&m.severity))
                     .unwrap_or(CveSeverity::Medium);
 
+                // Extract CWE IDs from problemTypes
+                let cwe_ids: Vec<String> = vuln
+                    .problem_types
+                    .iter()
+                    .flat_map(|pt| {
+                        pt.descriptions
+                            .iter()
+                            .filter_map(|d| {
+                                // CWE IDs are typically in format "CWE-XXX" or just "XXX"
+                                if d.value.starts_with("CWE-") {
+                                    Some(d.value.clone())
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect::<Vec<_>>()
+                    })
+                    .collect();
+
                 CveEntry {
-                    cve_id,
+                    cve_id: cve_id.clone(),
                     description,
                     severity: map_cve_severity(severity),
                     source: CveSource::NVD,
                     affected_products: vec![],
                     published_date: vuln.published,
+                    cwe_ids,
                 }
             })
             .collect();
@@ -231,6 +252,19 @@ struct NvdVulnerability {
     descriptions: Vec<NvdDescription>,
     metrics: Option<NvdMetrics>,
     published: Option<String>,
+    #[serde(default)]
+    problem_types: Vec<NvdProblemType>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct NvdProblemType {
+    #[serde(default)]
+    descriptions: Vec<NvdProblemTypeDescription>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct NvdProblemTypeDescription {
+    value: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

@@ -154,7 +154,7 @@ fn test_multiple_patterns_same_finding() {
         "src/main.rs",
     );
 
-    let refinements = phase.run(vec![finding], &context);
+    let refinements = phase.run(vec![finding], &context, true, 0.1);
     let refined = refinements.get("f1").unwrap();
 
     // Should match false positive pattern and reduce confidence
@@ -346,7 +346,7 @@ fn test_refine_confidence_with_invalid_pattern_code() {
     let finding = make_pattern_finding("f1", "CWE-79", "let x = /[invalid/", "src/main.rs");
 
     // Should not panic
-    let result = std::panic::catch_unwind(|| phase.run(vec![finding], &context));
+    let result = std::panic::catch_unwind(|| phase.run(vec![finding], &context, true, 0.1));
 
     assert!(result.is_ok(), "Invalid regex in code should not panic");
 }
@@ -358,7 +358,7 @@ fn test_refine_confidence_unicode_handling() {
 
     let finding = make_pattern_finding("f1", "CWE-79", "html_escape(用户输入)", "src/main.rs");
 
-    let refinements = phase.run(vec![finding], &context);
+    let refinements = phase.run(vec![finding], &context, true, 0.1);
     let refined = refinements.get("f1").unwrap();
 
     // Should match false positive pattern
@@ -378,7 +378,7 @@ fn test_refine_confidence_long_code_performance() {
     let finding = make_pattern_finding("f1", "CWE-79", &long_code, "src/main.rs");
 
     let start = std::time::Instant::now();
-    let refinements = phase.run(vec![finding], &context);
+    let refinements = phase.run(vec![finding], &context, true, 0.1);
     let duration = start.elapsed();
 
     assert!(duration.as_millis() < 300, "Should be fast on long code");

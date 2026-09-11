@@ -453,21 +453,63 @@ impl CveBootstrapper {
         &self,
         findings: &[crate::findings::VulnerabilityFinding],
     ) -> Result<Vec<crate::findings::VulnerabilityFinding>> {
+        use tracing::debug;
+
         // Detect project stack
         let stack = self.detect_project_stack()?;
 
         // Fetch relevant CVEs
-        let _cves = self.fetch_relevant_cves(&stack).await?;
+        let cves = self.fetch_relevant_cves(&stack).await?;
 
-        if _cves.is_empty() {
+        if cves.is_empty() {
             tracing::info!("No CVEs found for project stack");
             return Ok(findings.to_vec());
         }
 
-        tracing::info!("Found {} CVEs for project dependencies", _cves.len());
+        tracing::info!("Found {} CVEs for project dependencies", cves.len());
 
-        // For now, just return findings (CVE enrichment requires additional fields)
-        // Future: add cve_references and threat_intelligence fields to VulnerabilityFinding
-        Ok(findings.to_vec())
+        // Build a map of CWE ID -> CVE entries for quick lookup
+        let mut cve_by_cwe: std::collections::HashMap<String, Vec<&CveEntry>> =
+            std::collections::HashMap::new();
+        for cve in &cves {
+            for cwe_id in &cve.cwe_ids {
+                cve_by_cwe.entry(cwe_id.clone()).or_default().push(cve);
+            }
+        }
+
+        // Enrich findings by matching CWE IDs
+        let mut enriched_count = 0;
+        let mut unmatched_count = 0;
+        let mut enriched_findings = findings.to_vec();
+
+        for finding in &mut enriched_findings {
+            let cwe_matches = if let Some(ref cwe_id) = finding.cwe_id {
+                cve_by_cwe.get(cwe_id).cloned()
+            } else {
+                None
+            };
+
+            if let Some(matching_cves) = cwe_matches {
+                // Add CVE references as evidence
+                for cve in matching_cves {
+                    let cwe_id = finding.cwe_id.as_deref().unwrap_or("unknown");
+                    finding.add_evidence(
+                        crate::evidence::EvidenceSource::CweSpec(cwe_id.to_string()),
+                        0.5,
+                        format!("Related CVE: {} (severity: {:?})", cve.cve_id, cve.severity),
+                    );
+                }
+                enriched_count += 1;
+            } else {
+                unmatched_count += 1;
+            }
+        }
+
+        debug!(
+            "CVE enrichment complete: {} findings enriched, {} unmatched",
+            enriched_count, unmatched_count
+        );
+
+        Ok(enriched_findings)
     }
 }

@@ -42,6 +42,8 @@ pub struct LlmMetrics {
     pub avg_latency_ms: f64,
     pub by_model: HashMap<String, ModelMetrics>,
     pub by_operation: HashMap<String, OperationMetrics>,
+    /// Batch verification verdicts mapped via positional fallback (missing index field)
+    pub positional_fallbacks: u64,
 }
 
 /// Thread-safe tracker for LLM metrics
@@ -151,6 +153,12 @@ impl LlmMetricsTracker {
         op_entry.requests += 1;
         op_entry.successful += 1;
         op_entry.tokens += tokens;
+    }
+
+    /// Record positional fallback usage in batch verification
+    pub async fn record_positional_fallback(&self, count: u64) {
+        let mut metrics = self.inner.write().await;
+        metrics.positional_fallbacks += count;
     }
 
     /// Finalize and return the metrics

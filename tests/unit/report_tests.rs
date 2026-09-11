@@ -30,7 +30,7 @@ fn test_write_findings_json_creates_file() {
     let findings = vec![make_finding("f1", Severity::High, "src/test.rs", Some(10))];
     let output_path = "/tmp/test_findings.json";
 
-    let result = write_findings_json(&findings, &[], output_path, None, None);
+    let result = write_findings_json(&findings, &[], output_path, None, None, None, None);
     assert!(result.is_ok());
 
     // Verify file exists
@@ -51,7 +51,7 @@ fn test_write_findings_json_with_llm_metrics() {
     let output_path = "/tmp/test_findings_with_metrics.json";
 
     // Use None for llm_metrics since LlmMetrics is from a different module
-    let result = write_findings_json(&findings, &[], output_path, None, None);
+    let result = write_findings_json(&findings, &[], output_path, None, None, None, None);
     assert!(result.is_ok());
     assert!(std::path::Path::new(output_path).exists());
 
@@ -67,7 +67,7 @@ fn test_write_findings_json_creates_parent_dirs() {
     // Ensure parent doesn't exist
     let _ = std::fs::remove_dir_all("/tmp/baco_test_output");
 
-    let result = write_findings_json(&findings, &[], output_path, None, None);
+    let result = write_findings_json(&findings, &[], output_path, None, None, None, None);
     assert!(result.is_ok());
     assert!(std::path::Path::new(output_path).exists());
 
@@ -80,7 +80,7 @@ fn test_write_findings_json_empty_findings() {
     let findings: Vec<VulnerabilityFinding> = vec![];
     let output_path = "/tmp/test_empty_findings.json";
 
-    let result = write_findings_json(&findings, &[], output_path, None, None);
+    let result = write_findings_json(&findings, &[], output_path, None, None, None, None);
     assert!(result.is_ok());
 
     // Verify file contains empty array

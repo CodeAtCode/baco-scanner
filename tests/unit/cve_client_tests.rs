@@ -44,6 +44,7 @@ fn test_dedup_kev_overwrites_nvd_severity() {
         source: CveSource::KEV,
         affected_products: vec![],
         published_date: None,
+        cwe_ids: vec![],
     }];
 
     let nvd = vec![CveEntry {
@@ -53,6 +54,7 @@ fn test_dedup_kev_overwrites_nvd_severity() {
         source: CveSource::NVD,
         affected_products: vec![],
         published_date: None,
+        cwe_ids: vec![],
     }];
 
     let result = CveClient::dedup_cve_entries(kev, nvd);
@@ -74,6 +76,7 @@ fn test_dedup_preserves_unique_cves() {
         source: CveSource::KEV,
         affected_products: vec![],
         published_date: None,
+        cwe_ids: vec![],
     }];
 
     let nvd = vec![CveEntry {
@@ -83,6 +86,7 @@ fn test_dedup_preserves_unique_cves() {
         source: CveSource::NVD,
         affected_products: vec![],
         published_date: None,
+        cwe_ids: vec![],
     }];
 
     let result = CveClient::dedup_cve_entries(kev, nvd);
@@ -106,6 +110,7 @@ fn test_dedup_all_overlap_kev_wins() {
             source: CveSource::KEV,
             affected_products: vec![],
             published_date: None,
+            cwe_ids: vec![],
         },
         CveEntry {
             cve_id: "CVE-2024-2222".to_string(),
@@ -114,6 +119,7 @@ fn test_dedup_all_overlap_kev_wins() {
             source: CveSource::KEV,
             affected_products: vec![],
             published_date: None,
+            cwe_ids: vec![],
         },
     ];
 
@@ -125,6 +131,7 @@ fn test_dedup_all_overlap_kev_wins() {
             source: CveSource::NVD,
             affected_products: vec![],
             published_date: None,
+            cwe_ids: vec![],
         },
         CveEntry {
             cve_id: "CVE-2024-2222".to_string(),
@@ -133,6 +140,7 @@ fn test_dedup_all_overlap_kev_wins() {
             source: CveSource::NVD,
             affected_products: vec![],
             published_date: None,
+            cwe_ids: vec![],
         },
     ];
 
@@ -155,6 +163,7 @@ fn test_dedup_larger_dataset() {
             source: CveSource::KEV,
             affected_products: vec![],
             published_date: None,
+            cwe_ids: vec![],
         },
         CveEntry {
             cve_id: "CVE-2024-1002".to_string(),
@@ -163,6 +172,7 @@ fn test_dedup_larger_dataset() {
             source: CveSource::KEV,
             affected_products: vec![],
             published_date: None,
+            cwe_ids: vec![],
         },
         CveEntry {
             cve_id: "CVE-2024-1003".to_string(),
@@ -171,6 +181,7 @@ fn test_dedup_larger_dataset() {
             source: CveSource::KEV,
             affected_products: vec![],
             published_date: None,
+            cwe_ids: vec![],
         },
     ];
 
@@ -182,6 +193,7 @@ fn test_dedup_larger_dataset() {
             source: CveSource::NVD,
             affected_products: vec![],
             published_date: None,
+            cwe_ids: vec![],
         })
         .collect();
 
@@ -247,6 +259,7 @@ fn make_test_cve(severity: V3Severity) -> Vec<CveEntry> {
         source: CveSource::KEV,
         affected_products: vec![],
         published_date: None,
+        cwe_ids: vec![],
     }]
 }
 
@@ -299,6 +312,7 @@ fn test_cve_entry_all_fields() {
         source: CveSource::KEV,
         affected_products: vec!["product1".to_string(), "product2".to_string()],
         published_date: Some("2024-01-15".to_string()),
+        cwe_ids: vec![],
     };
 
     assert_eq!(entry.cve_id, "CVE-2024-1234");
@@ -318,6 +332,7 @@ fn test_cve_entry_minimal() {
         source: CveSource::NVD,
         affected_products: vec![],
         published_date: None,
+        cwe_ids: vec![],
     };
 
     assert!(entry.description.is_empty());
@@ -389,6 +404,7 @@ fn test_nvd_parsing_no_metrics() {
         source: CveSource::NVD,
         affected_products: vec![],
         published_date: None,
+        cwe_ids: vec![],
     }];
 
     let result = CveClient::dedup_cve_entries(vec![], nvd);
@@ -404,6 +420,7 @@ fn test_nvd_parsing_multiple_descriptions() {
         source: CveSource::NVD,
         affected_products: vec![],
         published_date: None,
+        cwe_ids: vec![],
     }];
 
     let result = CveClient::dedup_cve_entries(vec![], nvd);
@@ -419,6 +436,7 @@ fn test_nvd_parsing_empty_descriptions() {
         source: CveSource::NVD,
         affected_products: vec![],
         published_date: None,
+        cwe_ids: vec![],
     }];
 
     let result = CveClient::dedup_cve_entries(vec![], nvd);
@@ -438,6 +456,7 @@ fn test_single_kev_entry() {
         source: CveSource::KEV,
         affected_products: vec![],
         published_date: Some("2024-03-01".to_string()),
+        cwe_ids: vec![],
     }];
 
     let result = CveClient::dedup_cve_entries(kev, vec![]);
@@ -454,6 +473,7 @@ fn test_single_nvd_entry() {
         source: CveSource::NVD,
         affected_products: vec!["single-product".to_string()],
         published_date: None,
+        cwe_ids: vec![],
     }];
 
     let result = CveClient::dedup_cve_entries(vec![], nvd);
@@ -474,6 +494,7 @@ fn test_missing_published_date() {
         source: CveSource::KEV,
         affected_products: vec![],
         published_date: None,
+        cwe_ids: vec![],
     };
 
     assert!(entry.published_date.is_none());
@@ -488,6 +509,7 @@ fn test_empty_affected_products() {
         source: CveSource::NVD,
         affected_products: vec![],
         published_date: None,
+        cwe_ids: vec![],
     };
 
     assert!(entry.affected_products.is_empty());
@@ -532,6 +554,7 @@ fn test_severity_roundtrip_all_values() {
             source: CveSource::KEV,
             affected_products: vec![],
             published_date: None,
+            cwe_ids: vec![],
         };
 
         assert_eq!(entry.severity, severity);
@@ -550,6 +573,7 @@ fn cve_entry(id: &str, source: CveSource, severity: V3Severity) -> CveEntry {
         source,
         affected_products: vec![],
         published_date: None,
+        cwe_ids: vec![],
     }
 }
 
@@ -710,6 +734,7 @@ async fn test_dedup_kev_priority() {
         source: CveSource::KEV,
         affected_products: vec![],
         published_date: None,
+        cwe_ids: vec![],
     }];
 
     let nvd = vec![
@@ -720,6 +745,7 @@ async fn test_dedup_kev_priority() {
             source: CveSource::NVD,
             affected_products: vec![],
             published_date: None,
+            cwe_ids: vec![],
         },
         CveEntry {
             cve_id: "CVE-2024-9999".to_string(),
@@ -728,6 +754,7 @@ async fn test_dedup_kev_priority() {
             source: CveSource::NVD,
             affected_products: vec![],
             published_date: None,
+            cwe_ids: vec![],
         },
     ];
 
@@ -770,6 +797,7 @@ async fn test_dedup_multiple_kev_entries() {
             source: CveSource::KEV,
             affected_products: vec!["product1".to_string()],
             published_date: Some("2024-01-01".to_string()),
+            cwe_ids: vec![],
         },
         CveEntry {
             cve_id: "CVE-2024-2222".to_string(),
@@ -778,6 +806,7 @@ async fn test_dedup_multiple_kev_entries() {
             source: CveSource::KEV,
             affected_products: vec![],
             published_date: None,
+            cwe_ids: vec![],
         },
     ];
 
@@ -789,6 +818,7 @@ async fn test_dedup_multiple_kev_entries() {
             source: CveSource::NVD,
             affected_products: vec![],
             published_date: None,
+            cwe_ids: vec![],
         },
         CveEntry {
             cve_id: "CVE-2024-3333".to_string(),
@@ -797,6 +827,7 @@ async fn test_dedup_multiple_kev_entries() {
             source: CveSource::NVD,
             affected_products: vec![],
             published_date: None,
+            cwe_ids: vec![],
         },
     ];
 
@@ -883,6 +914,7 @@ async fn test_dedup_only_nvd_inline() {
         source: CveSource::NVD,
         affected_products: vec![],
         published_date: None,
+        cwe_ids: vec![],
     }];
 
     let result = CveClient::dedup_cve_entries(kev, nvd);
@@ -899,6 +931,7 @@ async fn test_dedup_only_kev_inline() {
         source: CveSource::KEV,
         affected_products: vec![],
         published_date: None,
+        cwe_ids: vec![],
     }];
     let nvd = vec![];
 

@@ -90,6 +90,7 @@ fn create_test_config_with_static_analysis() -> baco::config::ScannerConfig {
                     model: "test-model".to_string(),
                     models: vec![],
                     timeout_secs: Some(30),
+                    agent_flow: Default::default(),
                     temperature: None,
                 },
                 security_agent_verification: LlmPhaseConfig {
@@ -98,6 +99,7 @@ fn create_test_config_with_static_analysis() -> baco::config::ScannerConfig {
                     model: "test-model".to_string(),
                     models: vec![],
                     timeout_secs: Some(30),
+                    agent_flow: Default::default(),
                     temperature: None,
                 },
                 ..Default::default()

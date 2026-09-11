@@ -1,8 +1,8 @@
 # BACO — Bug Analysis & Cross-reference Orchestrator
 
 A research-backed SAST scanner that augments static analysis with LLM-powered
-discovery across a 24-phase pipeline: semgrep → CWE-aware MoE routing →
-LLM verification → exploit synthesis → ticket cross-referencing → auto-patching.
+discovery across a 24-phase pipeline: semgrep → CWE-aware MoE routing (opt-in) →
+LLM verification → exploit synthesis (experimental) → ticket cross-referencing → auto-patching (opt-in).
 Grounded in 36 surveyed papers (16 integrated) from [Awesome-LLMs-for-Vulnerability-Detection](https://github.com/huhusmang/Awesome-LLMs-for-Vulnerability-Detection).
 
 [![CI](https://github.com/CodeAtCode/baco-scanner/actions/workflows/ci.yml/badge.svg)](https://github.com/CodeAtCode/baco-scanner/actions/workflows/ci.yml)
@@ -48,21 +48,21 @@ cp config.example.toml my-config.toml
 ./target/release/baco scan --config my.toml --target /path         # Override target path
 ./target/release/baco scan --config my.toml --force                # Force full rescan
 
-- **24 phases run**: 4 parallel (Indexing, Semgrep, CpgSlice, LlmStaticAnalysis) + 20 sequential — see [Architecture](docs/architecture.md)
+- **24 phases run**: 4 parallel (Indexing, Semgrep, CpgSlice, LlmStaticAnalysis) + 20 sequential — some phases disabled by default (see [Configuration](docs/configuration.md))
 - **Output in `baco-output/`**: `findings.json`, `report.html`, `report.sarif`, `checkpoint.json`
 - **Checkpoint file**: The scanner writes `checkpoint.json` after each phase. Re-running the scan auto-resumes from the checkpoint; use `./target/release/baco resume --checkpoint baco-output/checkpoint.json` for manual control.
 
 ### What happens next
 
-- **24 phases run**: 4 parallel (Indexing, Semgrep, CpgSlice, LlmStaticAnalysis) + 20 sequential — see [Architecture](docs/architecture.md)
+- **24 phases run**: 4 parallel (Indexing, Semgrep, CpgSlice, LlmStaticAnalysis) + 20 sequential — some phases disabled by default (see [Configuration](docs/configuration.md))
 - **Output in `baco-output/`**: `findings.json`, `report.html`, `report.sarif`
 - **Resume interrupted scans**: `./target/release/baco resume --checkpoint baco-output/checkpoint.json`
 
 ## Features
 
-- **24-phase pipeline**: Indexing → Semgrep → CpgSlice → LlmStaticAnalysis → CweRouting → RuleSynthesis → LlmDiscovery → LlmVerification → Validate → SecurityAgentVerification → TicketCrossRef → GitAnalysis → CrossFileAnalysis → ConfidenceScoring → AiAggregation → ThreatModeling → RootCauseDedup → MultiVerifier → AutoPatching → CveBootstrap → PocCompiler → ExploitSynth → VariantSearch → Reporting (see [Architecture](docs/architecture.md) for full phase names)
+- **24-phase pipeline**: Indexing → Semgrep → CpgSlice (`[cpg]` section, requires Joern) → LlmStaticAnalysis → CweRouting (enable with `router.enabled`) → RuleSynthesis (experimental) → LlmDiscovery → LlmVerification → Validate (opt-in) → SecurityAgentVerification (opt-in) → TicketCrossRef → GitAnalysis → CrossFileAnalysis → ConfidenceScoring → AiAggregation → ThreatModeling (`enable_threat_modeling`) → RootCauseDedup → MultiVerifier (`enable_multi_verifier`, experimental stub) → AutoPatching (`enable_auto_patching`, opt-in) → CveBootstrap → PocCompiler (`enable_poc_compilation`, opt-in) → ExploitSynth (`[exploit]` section, experimental) → VariantSearch → Reporting
 - **Parallel execution**: Indexing, Semgrep, CpgSlice, and LlmStaticAnalysis run concurrently; 20 sequential phases follow
-- **CWE-aware MoE**: BM25 RAG retrieval from CWE knowledge base, routes to specialized analysis paths
+- **CWE-aware MoE (opt-in)**: BM25 RAG retrieval from CWE knowledge base, routes to specialized analysis paths — enable with `router.enabled = true`
 - **Research-backed**: 16 academic papers integrated (VulTriage, VulIn, MoCQ, MoEVD, AgentFlow) — see [Research Integration](docs/research-integration.md)
 - **Checkpoint/resume**: Crash recovery after each phase
 - **Multiple outputs**: JSON, HTML, SARIF
@@ -72,11 +72,11 @@ cp config.example.toml my-config.toml
 ## Evidence & Verification Techniques
 
 - **Citation verification**: Deterministic file existence + line range checks in Reporting phase; failures halve confidence + add note — see [`docs/argus-analysis.md`](docs/argus-analysis.md)
-- **Cross-run prior-findings skip lists**: Confirmed/FalsePositive findings from prior scans injected into discovery prompts to reduce redundancy
+- **Cross-run prior-findings skip lists (opt-in)**: Confirmed/FalsePositive findings from prior scans injected into discovery prompts to reduce redundancy — enable with `[prior runs]` section
 - **Domain-routed hunt prompts**: Per-attack-class modules (`prompts/hunt/`) selected by target languages; verification prompt includes skeptical self-refutation gate + untrusted-content framing — see [`docs/cloudflare-security-audit-skill-analysis.md`](docs/cloudflare-security-audit-skill-analysis.md)
 - **Rejected-findings persistence**: `include_rejected = true` persists "rejected" array in JSON + "Investigated & Dismissed" appendix in HTML
-- **Requires-deployment-testing marker**: Exploit synthesis marks unverifiable findings when Docker sandbox unavailable
-- **Org-context calibration**: Organizational policy profile (stack, infra, secret_storage, data_sensitivity, severity_rules) injected into prompts to reduce false positives — see [`docs/argus-analysis.md`](docs/argus-analysis.md)
+- **Requires-deployment-testing marker (experimental)**: Exploit synthesis marks unverifiable findings when Docker sandbox unavailable — enable with `[exploit]` section
+- **Org-context calibration (opt-in)**: Organizational policy profile (stack, infra, secret_storage, data_sensitivity, severity_rules) injected into prompts to reduce false positives — enable with `[org_context]` section
 - **Eval oracles**: Known-answer harness under `eval/` with labeled vulnerable/secure fixtures; recall/precision scoring via `BACO_EVAL=1` — see [`eval/README.md`](eval/README.md)
 
 ## Supported Languages

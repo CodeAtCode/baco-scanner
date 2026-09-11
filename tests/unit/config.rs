@@ -64,8 +64,23 @@ fn test_default_config() {
     assert!(config.project.languages.is_empty());
     assert_eq!(config.output.dir, "");
 
-    assert_eq!(config.scanner.max_file_size_kb, 0);
+    assert_eq!(config.scanner.max_file_size_kb, 512);
     assert!(config.scanner.exclude_paths.is_empty());
+}
+
+#[test]
+fn test_max_file_size_kb_defaults_to_512_when_omitted() {
+    let toml_str = r#"
+        [project]
+        name = "t"
+        path = "/tmp/t"
+        [output]
+        dir = "./out"
+    "#;
+
+    let config: ScannerConfig = toml::from_str(toml_str).unwrap();
+    assert_eq!(config.scanner.max_file_size_kb, 512);
+    assert_eq!(ScannerConfig::default().scanner.max_file_size_kb, 512);
 }
 
 #[test]
@@ -1114,6 +1129,7 @@ fn test_llm_phase_config_get_models() {
                 models: vec!["multi-1".to_string(), "multi-2".to_string()],
                 temperature: None,
                 timeout_secs: None,
+                agent_flow: Default::default(),
             },
             vec!["multi-1", "multi-2"],
         ),
@@ -1126,6 +1142,7 @@ fn test_llm_phase_config_get_models() {
                 models: vec![],
                 temperature: None,
                 timeout_secs: None,
+                agent_flow: Default::default(),
             },
             vec!["single-model"],
         ),
@@ -1138,6 +1155,7 @@ fn test_llm_phase_config_get_models() {
                 models: vec![],
                 temperature: None,
                 timeout_secs: None,
+                agent_flow: Default::default(),
             },
             vec![],
         ),
@@ -1480,5 +1498,164 @@ fn test_apply_env_overrides_scan_path() {
     assert_eq!(
         config.llm.phases.discovery.api_key,
         Some("test-api-key-123".to_string())
+    );
+}
+
+// ============================================================================
+// New Phase Environment Override Tests (static_analysis, security_agent_verification, threat_modeling)
+// ============================================================================
+
+#[test]
+#[serial]
+fn test_env_overrides_new_phases() {
+    let mut guard = EnvVarGuard::new();
+    guard.set("LLM_STATIC_ANALYSIS_KEY", "env-static-analysis-key");
+    guard.set(
+        "LLM_SECURITY_AGENT_VERIFICATION_KEY",
+        "env-security-agent-key",
+    );
+    guard.set("LLM_THREAT_MODELING_KEY", "env-threat-modeling-key");
+
+    let toml_str = r#"
+        [project]
+        name = "test"
+        path = "/tmp/test"
+
+        [output]
+        dir = "./out"
+
+        [scanner]
+        max_file_size_kb = 100
+
+        [llm]
+        timeout_secs = 30
+        max_retries = 2
+        retry_backoff_ms = 1000
+
+        [llm.phases.discovery]
+        base_url = "http://test"
+        model = "test"
+
+        [llm.phases.verification]
+        base_url = "http://test"
+        model = "test"
+
+        [llm.phases.aggregation]
+        base_url = "http://test"
+        model = "test"
+
+        [llm.phases.static_analysis]
+        base_url = "http://test"
+        model = "test"
+
+        [llm.phases.security_agent_verification]
+        base_url = "http://test"
+        model = "test"
+
+        [llm.phases.threat_modeling]
+        base_url = "http://test"
+        model = "test"
+    "#;
+
+    let mut config: ScannerConfig = toml::from_str(toml_str).unwrap();
+    apply_env_overrides(&mut config);
+
+    assert_eq!(
+        config.llm.phases.static_analysis.api_key.as_deref(),
+        Some("env-static-analysis-key"),
+        "static_analysis: env override"
+    );
+    assert_eq!(
+        config
+            .llm
+            .phases
+            .security_agent_verification
+            .api_key
+            .as_deref(),
+        Some("env-security-agent-key"),
+        "security_agent_verification: env override"
+    );
+    assert_eq!(
+        config.llm.phases.threat_modeling.api_key.as_deref(),
+        Some("env-threat-modeling-key"),
+        "threat_modeling: env override"
+    );
+}
+
+#[test]
+#[serial]
+fn test_new_phase_toml_takes_precedence() {
+    let mut guard = EnvVarGuard::new();
+    guard.set("LLM_STATIC_ANALYSIS_KEY", "env-static-key");
+    guard.set("LLM_SECURITY_AGENT_VERIFICATION_KEY", "env-security-key");
+    guard.set("LLM_THREAT_MODELING_KEY", "env-threat-key");
+
+    let toml_str = r#"
+        [project]
+        name = "test"
+        path = "/tmp/test"
+
+        [output]
+        dir = "./out"
+
+        [scanner]
+        max_file_size_kb = 100
+
+        [llm]
+        timeout_secs = 30
+        max_retries = 2
+        retry_backoff_ms = 1000
+
+        [llm.phases.discovery]
+        base_url = "http://test"
+        model = "test"
+
+        [llm.phases.verification]
+        base_url = "http://test"
+        model = "test"
+
+        [llm.phases.aggregation]
+        base_url = "http://test"
+        model = "test"
+
+        [llm.phases.static_analysis]
+        base_url = "http://test"
+        api_key = "toml-static-key"
+        model = "test"
+
+        [llm.phases.security_agent_verification]
+        base_url = "http://test"
+        api_key = "toml-security-key"
+        model = "test"
+
+        [llm.phases.threat_modeling]
+        base_url = "http://test"
+        api_key = "toml-threat-key"
+        model = "test"
+    "#;
+
+    let mut config: ScannerConfig = toml::from_str(toml_str).unwrap();
+    apply_env_overrides(&mut config);
+
+    // TOML values should take precedence over env vars
+    assert_eq!(
+        config.llm.phases.static_analysis.api_key.as_deref(),
+        Some("toml-static-key"),
+        "static_analysis: TOML takes precedence"
+    );
+    assert_eq!(
+        config
+            .llm
+            .phases
+            .security_agent_verification
+            .api_key
+            .as_deref(),
+        Some("toml-security-key"),
+        "security_agent_verification: TOML takes precedence"
+    );
+    assert_eq!(
+        config.llm.phases.threat_modeling.api_key.as_deref(),
+        Some("toml-threat-key"),
+        "threat_modeling: TOML takes precedence"
     );
 }

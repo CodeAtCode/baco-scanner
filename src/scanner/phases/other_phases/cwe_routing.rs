@@ -61,7 +61,7 @@ pub async fn run_cpg_slice(
 ) -> ScanResult<(Vec<VulnerabilityFinding>, Vec<String>)> {
     let PhaseConfig {
         phase: _,
-        findings,
+        mut findings,
         pb,
         analyzed_files,
         metrics_tracker: _,
@@ -78,9 +78,8 @@ pub async fn run_cpg_slice(
 
     let engine = crate::cpg::JoernEngine::new(config.cpg.joern_path.clone());
     if !engine.is_available() {
-        tracing::warn!(
-            "CPG slice phase enabled but Joern binary not found; skipping. \
-             Install Joern or set config.cpg.joern_path"
+        tracing::debug!(
+            "CPG slice phase enabled but Joern unavailable; skipping (no engine invocation)"
         );
         pb.set_position(pb.position() + 100);
         return Ok((findings, analyzed_files.to_vec()));
@@ -113,7 +112,7 @@ pub async fn run_cpg_slice(
 
     let slicer = crate::cpg::slicer::CpgSlicer::new(&engine);
     let total = findings.len();
-    for (i, finding) in findings.iter().enumerate() {
+    for (i, finding) in findings.iter_mut().enumerate() {
         let cwe_hint = finding.cwe_id.as_deref().unwrap_or("CWE-79");
         let entry_point = finding
             .code_location
@@ -129,8 +128,8 @@ pub async fn run_cpg_slice(
                     slice.source.len(),
                     slice.related_functions.len()
                 );
-                let mut f = finding.clone();
-                f.add_evidence(
+                // Write evidence directly to the real finding (not a clone)
+                finding.add_evidence(
                     crate::evidence::EvidenceSource::CpgSlice("cpg_slice".into()),
                     0.6,
                     format!(

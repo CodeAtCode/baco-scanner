@@ -83,8 +83,18 @@ impl VariantSearcher {
         self
     }
 
+    /// Check if searcher has patterns configured
+    pub fn is_empty(&self) -> bool {
+        self.patterns.is_empty()
+    }
+
     /// Search for variants matching registered patterns
     pub fn search_variants(&self) -> Result<Vec<VariantHit>> {
+        // Early return if no patterns configured
+        if self.patterns.is_empty() {
+            return Ok(Vec::new());
+        }
+
         let mut all_hits = Vec::new();
 
         for pattern in &self.patterns {
