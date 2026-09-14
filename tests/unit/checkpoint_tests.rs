@@ -61,7 +61,7 @@ fn temp_checkpoint_path(test_name: &str) -> String {
 // ============================================================================
 
 #[test]
-fn test_sequential_phase_20_phase_table() {
+fn test_sequential_phase_19_phase_table() {
     // Test that resume_from(phase) equals the next phase in sequential_phases order
     // This pins the exact mapping verified in audit
     let sequential_phases = [
@@ -78,7 +78,6 @@ fn test_sequential_phase_20_phase_table() {
         ScanPhase::AiAggregation,
         ScanPhase::ThreatModeling,
         ScanPhase::RootCauseDedup,
-        ScanPhase::MultiVerifier,
         ScanPhase::AutoPatching,
         ScanPhase::CveBootstrap,
         ScanPhase::PocCompiler,

@@ -3,6 +3,7 @@ use crate::error::ScanError;
 use crate::evidence::classify_finding;
 pub use crate::findings::VulnerabilityFinding;
 use chrono::Utc;
+use minijinja::{context, Environment};
 use std::collections::HashMap;
 use std::fs;
 
@@ -10,6 +11,9 @@ use super::finding_renderer::render_finding_with_id;
 use super::utilities::{
     build_empty_state_message, build_filter_buttons, build_summary_cards, calculate_severity_stats,
 };
+
+/// Embedded HTML template for the report.
+const REPORT_TEMPLATE: &str = include_str!("templates/report.j2");
 
 pub fn generate_html_report(
     findings: &[VulnerabilityFinding],
@@ -34,7 +38,7 @@ pub fn generate_html_report(
         vec![]
     };
 
-    let scan_date = Utc::now().format("%Y-%m-%d %H:%M:%S UTC");
+    let scan_date = Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string();
     let total_findings = filtered_findings.len();
 
     let mut languages: std::collections::HashSet<String> = std::collections::HashSet::new();
@@ -48,25 +52,25 @@ pub fn generate_html_report(
         }
     }
 
-    let prism_core_js = include_str!("assets/prism-core.min.js");
-    let prism_css = include_str!("assets/prism-tomorrow.min.css");
+    let prism_core_js = include_str!("assets/prism-core.min.js").to_string();
+    let prism_css = include_str!("assets/prism-tomorrow.min.css").to_string();
 
-    let prism_language_scripts = languages
+    let prism_language_scripts: String = languages
         .iter()
         .filter_map(|lang| match lang.as_str() {
-            "python" => Some(include_str!("assets/prism-python.min.js")),
-            "javascript" => Some(include_str!("assets/prism-javascript.min.js")),
-            "typescript" => Some(include_str!("assets/prism-typescript.min.js")),
-            "rust" => Some(include_str!("assets/prism-rust.min.js")),
-            "go" => Some(include_str!("assets/prism-go.min.js")),
-            "java" => Some(include_str!("assets/prism-java.min.js")),
-            "c" => Some(include_str!("assets/prism-c.min.js")),
-            "cpp" => Some(include_str!("assets/prism-cpp.min.js")),
-            "sql" => Some(include_str!("assets/prism-sql.min.js")),
-            "yaml" => Some(include_str!("assets/prism-yaml.min.js")),
-            "json" => Some(include_str!("assets/prism-json.min.js")),
-            "bash" | "sh" => Some(include_str!("assets/prism-bash.min.js")),
-            "diff" => Some(include_str!("assets/prism-diff.min.js")),
+            "python" => Some(include_str!("assets/prism-python.min.js").to_string()),
+            "javascript" => Some(include_str!("assets/prism-javascript.min.js").to_string()),
+            "typescript" => Some(include_str!("assets/prism-typescript.min.js").to_string()),
+            "rust" => Some(include_str!("assets/prism-rust.min.js").to_string()),
+            "go" => Some(include_str!("assets/prism-go.min.js").to_string()),
+            "java" => Some(include_str!("assets/prism-java.min.js").to_string()),
+            "c" => Some(include_str!("assets/prism-c.min.js").to_string()),
+            "cpp" => Some(include_str!("assets/prism-cpp.min.js").to_string()),
+            "sql" => Some(include_str!("assets/prism-sql.min.js").to_string()),
+            "yaml" => Some(include_str!("assets/prism-yaml.min.js").to_string()),
+            "json" => Some(include_str!("assets/prism-json.min.js").to_string()),
+            "bash" | "sh" => Some(include_str!("assets/prism-bash.min.js").to_string()),
+            "diff" => Some(include_str!("assets/prism-diff.min.js").to_string()),
             _ => None,
         })
         .collect::<Vec<_>>()
@@ -131,343 +135,11 @@ pub fn generate_html_report(
         String::new()
     };
 
-    let mut html = format!(
-        r#"<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BACO Security Report</title>
-    <style>
-{}    </style>
-    <script>
-{}    </script>
-    <script>
-{}    </script>
-    <script>
-        function filterFindings(severity) {{{{
-            const findings = document.querySelectorAll('.finding');
-            findings.forEach(f => {{
-                if (severity === 'all' || f.classList.contains(severity)) {{
-                    f.style.display = 'block';
-                }} else {{
-                    f.style.display = 'none';
-                }}
-            }});
-            updateCounts();
-        }}
-
-        function toggleFinding(id) {{
-            const el = document.getElementById(id);
-            el.style.display = el.style.display === 'none' ? 'block' : 'none';
-        }}
-
-        function toggleAll(expand) {{
-            const details = document.querySelectorAll('.finding-details');
-            details.forEach(d => {{
-                d.style.display = expand ? 'block' : 'none';
-            }});
-        }}
-
-        function updateCounts() {{
-            const activeFilter = document.querySelector('.filter-btn.active').dataset.filter;
-            document.querySelectorAll('.finding').forEach(f => {{
-                const isVisible = activeFilter === 'all' || f.classList.contains(activeFilter);
-                f.style.display = isVisible ? 'block' : 'none';
-            }});
-        }}
-
-        function searchFindings() {{
-            const query = document.getElementById('search').value.toLowerCase();
-            document.querySelectorAll('.finding').forEach(f => {{
-                const text = f.textContent.toLowerCase();
-                f.style.display = text.includes(query) ? 'block' : 'none';
-            }});
-        }}
-    </script>
-    <style>
-        * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-        :root {{
-            --critical: #dc3545;
-            --high: #fd7e14;
-            --medium: #d39e00;
-            --low: #28a745;
-            --info: #17a2b8;
-        }}
-        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1a1a1a; background: #f0f2f5; padding: 20px; }}
-        .container {{ max-width: 1400px; margin: 0 auto; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
-        h1 {{ color: #1a1a1a; border-bottom: 3px solid #0066cc; padding-bottom: 15px; margin-bottom: 30px; font-size: 2rem; }}
-        h2 {{ color: #333; margin-top: 40px; margin-bottom: 20px; font-size: 1.5rem; }}
-        h3 {{ color: #1a1a1a; font-size: 1.1rem; margin-bottom: 12px; cursor: pointer; }}
-        
-        .at-a-glance {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }}
-        .glance-item {{ padding: 15px; border: 1px solid #dee2e6; border-radius: 8px; background: #f8f9fa; }}
-        .glance-label {{ font-size: 0.8rem; color: #6c757d; text-transform: uppercase; font-weight: 600; }}
-        .glance-value {{ font-size: 1.2rem; font-weight: 700; color: #212529; }}
-        
-        .metadata {{ background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 20px; margin: 20px 0; }}
-        .metadata-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }}
-        .metadata-item {{ background: white; padding: 12px; border-radius: 6px; border: 1px solid #dee2e6; }}
-        .metadata-label {{ font-size: 0.85rem; color: #6c757d; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }}
-        .metadata-value {{ font-size: 0.95rem; color: #212529; font-weight: 500; }}
-        
-        .stats-dashboard {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin: 30px 0; }}
-        .stat-card {{ background: white; border: 1px solid #e9ecef; border-radius: 8px; padding: 20px; text-align: center; }}
-        .stat-card .value {{ font-size: 2rem; font-weight: 700; color: #212529; }}
-        .stat-card .label {{ font-size: 0.85rem; color: #6c757d; text-transform: uppercase; margin-top: 5px; }}
-        
-        .summary {{ display: flex; gap: 20px; margin: 30px 0; flex-wrap: wrap; }}
-        .card {{ flex: 1; min-width: 150px; padding: 25px; border-radius: 10px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.08); cursor: pointer; transition: transform 0.2s; }}
-        .card:hover {{ transform: translateY(-2px); }}
-        .card.critical {{ background: linear-gradient(135deg, #dc3545, #c82333); color: white; }}
-        .card.high {{ background: linear-gradient(135deg, #fd7e14, #e8590c); color: white; }}
-        .card.medium {{ background: linear-gradient(135deg, #ffc107, #ffb700); color: #1a1a1a; }}
-        .card.low {{ background: linear-gradient(135deg, #28a745, #218838); color: white; }}
-        .card.info {{ background: linear-gradient(135deg, #17a2b8, #138496); color: white; }}
-        .card h3 {{ font-size: 2.5rem; margin-bottom: 5px; font-weight: 700; color: inherit; }}
-        .card p {{ font-size: 0.9rem; opacity: 0.9; text-transform: capitalize; }}
-        
-        .filters {{ display: flex; gap: 10px; margin: 20px 0; flex-wrap: wrap; align-items: center; }}
-        .filter-btn {{ padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem; transition: all 0.2s; font-weight: 500; }}
-        .filter-btn.active {{ box-shadow: 0 0 0 2px #0066cc; }}
-        .filter-btn.critical {{ background: #fee2e2; color: #dc3545; }}
-        .filter-btn.high {{ background: #ffebe0; color: #fd7e14; }}
-        .filter-btn.medium {{ background: #fff3cd; color: #856404; }}
-        .filter-btn.low {{ background: #d4edda; color: #155724; }}
-        .filter-btn.info {{ background: #d1ecf1; color: #0c5460; }}
-        .filter-btn.all {{ background: #e9ecef; color: #495057; }}
-        
-        .search-box {{ flex: 1; min-width: 200px; }}
-        .search-box input {{ width: 100%; padding: 10px 15px; border: 1px solid #dee2e6; border-radius: 6px; font-size: 0.95rem; }}
-        
-        .toggle-btns {{ display: flex; gap: 10px; }}
-        .toggle-btn {{ padding: 8px 12px; border: 1px solid #dee2e6; border-radius: 6px; background: white; cursor: pointer; }}
-        
-        .finding {{ background: #fff; border-left: 5px solid #0066cc; padding: 20px; margin: 20px 0; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid #e9ecef; }}
-        .finding.critical {{ border-left-color: var(--critical); background: #fff5f5; }}
-        .finding.high {{ border-left-color: var(--high); background: #fff8f0; }}
-        .finding.medium {{ border-left-color: var(--medium); background: #fffbf0; }}
-        .finding.low {{ border-left-color: var(--low); background: #f0fff4; }}
-        .finding.info {{ border-left-color: var(--info); background: #f0f9fb; }}
-        .cwe-badge {{margin:2px}}
-        
-        .finding-header {{ display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }}
-        .finding-header h3 {{ margin: 0; flex: 1; }}
-        
-        .severity {{ display: inline-block; padding: 5px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-left: 10px; white-space: nowrap; }}
-        .severity.critical {{ background: var(--critical); color: white; }}
-        .severity.high {{ background: var(--high); color: white; }}
-        .severity.medium {{ background: var(--medium); color: #1a1a1a; }}
-        .severity.low {{ background: var(--low); color: white; }}
-        .severity.info {{ background: var(--info); color: white; }}
-        .severity.unverified {{ background: #6c757d; color: white; }}
-        .unverified-appendix {{ margin-top: 40px; padding: 20px; background: #f8f9fa; border: 1px dashed #adb5bd; border-radius: 6px; }}
-        .unverified-appendix h2 {{ margin-top: 0; color: #495057; }}
-        .rejected-appendix {{ margin-top: 40px; padding: 20px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px; }}
-        .rejected-appendix h2 {{ margin-top: 0; color: #856404; }}
-        .finding.unverified {{ border-left-color: #6c757d; opacity: 0.85; }}
-        
-        .meta {{ color: #495057; font-size: 0.9rem; margin: 10px 0; background: #f8f9fa; padding: 10px; border-radius: 4px; }}
-        .meta strong {{ color: #343a40; }}
-        .meta a {{ color: #0066cc; }}
-        
-        .code-comparison {{ display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 15px 0; }}
-        @media (max-width: 768px) {{ .code-comparison {{ grid-template-columns: 1fr; }} }}
-        
-        .code-panel {{ background: #1e1e1e; border-radius: 6px; overflow: hidden; }}
-        .code-panel.before {{ border-left: 4px solid #dc3545; }}
-        .code-panel.after {{ border-left: 4px solid #28a745; }}
-        .code-panel-header {{ background: #2d2d2d; padding: 8px 15px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: #888; }}
-        .code-panel.before .code-panel-header {{ background: #3d2020; color: #f88; }}
-        .code-panel.after .code-panel-header {{ background: #203d20; color: #8f8; }}
-        .code-snippet {{ background: #1e1e1e; color: #d4d4d4; padding: 15px; font-family: Consolas, Monaco, monospace; overflow-x: auto; font-size: 0.9rem; line-height: 1.5; border: 1px solid #3c3c3c; white-space: pre-wrap; word-break: break-all; }}
-        
-        .code-snippet-single {{ background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 6px; font-family: Consolas, Monaco, monospace; overflow-x: auto; margin: 15px 0; font-size: 0.9rem; line-height: 1.5; border: 1px solid #3c3c3c; white-space: pre-wrap; word-break: break-all; }}
-        
-        .diff-hunk {{ background: #0d1117; border: 1px solid #30363d; border-radius: 6px; margin: 15px 0; overflow: hidden; }}
-        .diff-header {{ background: #161b22; color: #c9d1d9; padding: 10px 15px; font-weight: 600; border-bottom: 1px solid #30363d; font-size: 0.9rem; }}
-        .diff-code {{ background: #0d1117; color: #c9d1d9; padding: 15px; margin: 0; font-family: Consolas, Monaco, monospace; overflow-x: auto; font-size: 0.85rem; line-height: 1.5; white-space: pre; }}
-        .diff-code .diff-context {{ color: #8b949e; }}
-        .diff-code .diff-deleted {{ color: #ffeba7; background: rgba(255, 235, 167, 0.1); }}
-        .diff-code .diff-added {{ color: #7ee787; background: rgba(126, 231, 135, 0.1); }}
-        
-        .poc-section {{ margin: 15px 0; }}
-        .code-panel.poc {{ border-left: 4px solid #6f42c1; }}
-        .code-panel.poc .code-panel-header {{ background: #2d2538; color: #c9b8e0; }}
-        .code-panel.mitigation {{ border-left: 4px solid #28a745; }}
-        .code-panel.mitigation .code-panel-header {{ background: #253828; color: #b8e0c9; }}
-        
-        .recommendation {{ background: #e7f3ff; border: 1px solid #b3d7ff; border-radius: 6px; padding: 15px; margin: 15px 0; color: #004085; }}
-        .recommendation strong {{ color: #0056b3; }}
-        .recommendation ul, .recommendation ol {{ margin: 10px 0; padding-left: 25px; }}
-        .recommendation li {{ margin: 5px 0; }}
-        .recommendation p {{ margin: 10px 0; }}
-        
-        .confidence-badge {{ display: inline-block; padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }}
-        .agent-badge {{ display: inline-block; padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; background: #6f42c1; color: white; }}
-        .confidence-high {{ background: #d4edda; color: #155724; }}
-        .confidence-medium {{ background: #fff3cd; color: #856404; }}
-        .confidence-low {{ background: #f8d7da; color: #721c24; }}
-        
-        .footer {{ margin-top: 50px; padding-top: 20px; border-top: 1px solid #dee2e6; color: #6c757d; font-size: 0.85rem; text-align: center; }}
-        
-        .finding-count {{ font-size: 0.9rem; color: #6c757d; margin-bottom: 15px; }}
-        
-        .finding-details {{ margin-top: 15px; }}
-        .info-details ul, .info-details ol {{margin-left:20px}}
-        
-        .collapsible {{ cursor: pointer; user-select: none; }}
-        .collapsible::before {{ content: "▼"; margin-right: 8px; font-size: 0.8rem; }}
-        .collapsible.collapsed::before {{ content: "▶"; }}
-        
-        /* T32: File grouping styles */
-        .findings-by-file {{ margin: 20px 0; }}
-        .file-group {{ margin: 15px 0; border: 1px solid #dee2e6; border-radius: 6px; background: #f8f9fa; }}
-        .file-group-summary {{ 
-            padding: 12px 15px; 
-            font-weight: 600; 
-            color: #495057; 
-            cursor: pointer;
-            list-style: none;
-            display: flex;
-            align-items: center;
-        }}
-        .file-group-summary::-webkit-details-marker {{ display: none; }}
-        .file-group[open] .file-group-summary {{ border-bottom: 1px solid #dee2e6; background: #e9ecef; }}
-        .file-group .finding {{ margin: 10px 15px; border-left-width: 3px; }}
-        
-        .priority-section {{ margin: 30px 0; padding: 20px; background: #fff5f5; border: 2px solid #dc3545; border-radius: 12px; }}
-        .priority-section h2 {{ margin-top: 0; color: #c82333; border-bottom: 2px solid #dc3545; padding-bottom: 10px; }}
-        
-        @media print {{
-            body {{ background: white; padding: 0; color: black; }}
-            .container {{ box-shadow: none; border: none; padding: 0; width: 100%; max-width: none; }}
-            .filters, .search-box, .toggle-btns, .toggle-btn {{ display: none !important; }}
-            .severity, .confidence-badge, .agent-badge, .triage-badge, .cwe-badge {{ 
-                border: 1px solid #000; 
-                color: black !important; 
-                background: transparent !important; 
-            }}
-            .finding {{ 
-                page-break-inside: avoid; 
-                border: 1px solid #ccc; 
-                background: white !important; 
-                margin-bottom: 20px; 
-                box-shadow: none; 
-            }}
-            .stat-card, .card {{ 
-                page-break-inside: avoid; 
-                border: 1px solid #ccc; 
-                background: white !important; 
-                color: black !important; 
-            }}
-            .card h3, .card p {{ color: black !important; }}
-            .code-panel, .code-snippet, .diff-hunk {{ 
-                background: #f9f9f9 !important; 
-                color: black !important; 
-                border: 1px solid #ccc; 
-            }}
-            .code-panel-header, .diff-header {{ 
-                background: #eee !important; 
-                color: #333 !important; 
-            }}
-            a {{ color: black; text-decoration: underline; }}
-            h1, h2, h3 {{ color: black !important; border-color: #333; }}
-        }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🔒 BACO Security Vulnerability Report</h1>
-        
-        <div class="at-a-glance">
-            <div class="glance-item">
-                <div class="glance-label">Scan Date</div>
-                <div class="glance-value">{}</div>
-            </div>
-            <div class="glance-item">
-                <div class="glance-label">Total Findings</div>
-                <div class="glance-value">{}</div>
-            </div>
-            <div class="glance-item">
-                <div class="glance-label">Critical / High</div>
-                <div class="glance-value">{} / {}</div>
-            </div>
-        </div>
-
-        <details class="metadata">
-            <summary style="cursor: pointer; font-weight: 600; margin-bottom: 15px;">🔍 View Scan Details & Metadata</summary>
-            <div class="metadata-grid">
-                {}
-                <div class="metadata-item">
-                    <div class="metadata-label">Total Findings</div>
-                    <div class="metadata-value">{}</div>
-                </div>
-            </div>
-            <div class="stats-dashboard">
-                <div class="stat-card">
-                    <div class="value">{:.1}%</div>
-                    <div class="label">Avg Confidence</div>
-                </div>
-                <div class="stat-card">
-                    <div class="value">{}</div>
-                    <div class="label">Verified</div>
-                </div>
-                <div class="stat-card">
-                    <div class="value">{}</div>
-                    <div class="label">Already Reported</div>
-                </div>
-                <div class="stat-card">
-                    <div class="value">{}</div>
-                    <div class="label">Unique Files</div>
-                </div>
-            </div>
-        </details>
-        
-        <h2 style="margin-top: 30px;">Summary by Severity</h2>
-        <div class="summary">
-            {}
-        </div>
-        
-        <h2 style="margin-top: 30px;">Detailed Findings</h2>
-        {}
-        <div class="filters">
-            <button class="filter-btn all active" data-filter="all" onclick="document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); this.classList.add('active'); filterFindings('all')">All</button>
-            {}
-            <div class="search-box">
-                <input type="text" id="search" placeholder="Search findings..." onkeyup="searchFindings()">
-            </div>
-            <div class="toggle-btns">
-                <button class="toggle-btn" onclick="toggleAll(true)">Expand All</button>
-                <button class="toggle-btn" onclick="toggleAll(false)">Collapse All</button>
-            </div>
-        </div>
-        <p class="finding-count">Showing {} findings</p>
-    "#,
-        prism_css,
-        prism_core_js,
-        prism_language_scripts,
-        scan_date,
-        total_findings,
-        stats.critical,
-        stats.high,
-        models_html,
-        total_findings,
-        avg_confidence * 100.0,
-        verified,
-        already_reported,
-        filtered_findings
-            .iter()
-            .map(|f| &f.file_path)
-            .collect::<std::collections::HashSet<_>>()
-            .len(),
-        summary_cards_html,
-        empty_state,
-        filter_buttons_html,
-        total_findings
-    );
+    // Build findings HTML
+    let mut findings_html = String::new();
 
     if total_findings > 0 {
+        // Priority findings section
         let priority_findings: Vec<&VulnerabilityFinding> = filtered_findings
             .iter()
             .filter(|f| {
@@ -479,19 +151,20 @@ pub fn generate_html_report(
             .collect();
 
         if !priority_findings.is_empty() {
-            html.push_str(r#"<div class="priority-section">"#);
-            html.push_str(r#"<h2>🚨 Priority Findings (Critical & High)</h2>"#);
+            findings_html.push_str(r#"<div class="priority-section">"#);
+            findings_html.push_str(r#"<h2>🚨 Priority Findings (Critical & High)</h2>"#);
 
             let mut sorted_priority = priority_findings;
             sorted_priority.sort_by_key(|a| std::cmp::Reverse(a.severity));
 
             for (idx, finding) in sorted_priority.iter().enumerate() {
                 let global_id = format!("priority-{}", idx);
-                html.push_str(&render_finding_with_id(finding, &global_id));
+                findings_html.push_str(&render_finding_with_id(finding, &global_id));
             }
-            html.push_str("</div>");
+            findings_html.push_str("</div>");
         }
 
+        // File grouping
         let mut findings_by_file: HashMap<String, Vec<&VulnerabilityFinding>> = HashMap::new();
         for finding in &filtered_findings {
             findings_by_file
@@ -503,9 +176,9 @@ pub fn generate_html_report(
         let mut sorted_files: Vec<_> = findings_by_file.into_iter().collect();
         sorted_files.sort_by_key(|a| std::cmp::Reverse(a.1.len()));
 
-        html.push_str(r#"<div class="findings-by-file">"#);
+        findings_html.push_str(r#"<div class="findings-by-file">"#);
         for (file_path, file_findings) in sorted_files {
-            html.push_str(&format!(
+            findings_html.push_str(&format!(
                 r#"<details class="file-group"><summary class="file-group-summary">📄 {} ({}) findings</summary>"#,
                 html_escape::encode_text(&file_path),
                 file_findings.len()
@@ -520,124 +193,153 @@ pub fn generate_html_report(
                     html_escape::encode_text(&file_path).replace('/', "-"),
                     finding_id
                 );
-                html.push_str(&render_finding_with_id(finding, &global_id));
+                findings_html.push_str(&render_finding_with_id(finding, &global_id));
             }
 
-            html.push_str("</details>");
+            findings_html.push_str("</details>");
         }
-        html.push_str("</div>");
+        findings_html.push_str("</div>");
     }
+
+    // Build appendix HTML
+    let mut appendix_html = String::new();
 
     let include_rejected = config.map(|c| c.output.include_rejected).unwrap_or(false);
 
-    let appendix_html = {
-        let mut sections = Vec::new();
+    if gate_enabled && !unverified_findings.is_empty() {
+        appendix_html.push_str(r#"<section class="unverified-appendix">"#);
+        appendix_html.push_str(&format!(
+            r#"<h2>Appendix: Unverified Findings</h2>
+<p class="finding-count">{} unverified findings excluded from main report</p>"#,
+            unverified_findings.len()
+        ));
 
-        if gate_enabled && !unverified_findings.is_empty() {
-            let appendix_findings: String = unverified_findings
-                .iter()
-                .map(|f| {
-                    let evidence_detail = f
-                        .evidence
-                        .first()
-                        .map(|e| e.detail.as_str())
-                        .unwrap_or("No evidence detail available");
+        for f in &unverified_findings {
+            let evidence_detail = f
+                .evidence
+                .first()
+                .map(|e| e.detail.as_str())
+                .unwrap_or("No evidence detail available");
+            let line = f
+                .line_number
+                .map(|l| l.to_string())
+                .unwrap_or("N/A".to_string());
+            appendix_html.push_str(&format!(
+                r#"<div class="finding unverified">
+<div class="finding-header">
+<h3>{}</h3>
+<span class="severity unverified">Unverified</span>
+</div>
+<div class="meta">
+<strong>File:</strong> {} | <strong>Line:</strong> {}
+</div>
+<div class="finding-details">
+<p><strong>Reason:</strong> {}</p>
+</div>
+</div>"#,
+                html_escape::encode_text(&f.title),
+                html_escape::encode_text(&f.file_path),
+                line,
+                html_escape::encode_text(evidence_detail)
+            ));
+        }
+        appendix_html.push_str("</section>");
+    }
+
+    if include_rejected {
+        if let Some(rejected) = rejected_findings {
+            if !rejected.is_empty() {
+                appendix_html.push_str(r#"<section class="rejected-appendix">"#);
+                appendix_html.push_str(&format!(
+                    r#"<h2>Investigated & Dismissed</h2>
+<p class="finding-count">{} findings were investigated and dismissed</p>"#,
+                    rejected.len()
+                ));
+
+                for (f, reason) in rejected {
                     let line = f
                         .line_number
                         .map(|l| l.to_string())
                         .unwrap_or("N/A".to_string());
-                    format!(
-                        r#"<div class="finding unverified">
-                            <div class="finding-header">
-                                <h3>{}</h3>
-                                <span class="severity unverified">Unverified</span>
-                            </div>
-                            <div class="meta">
-                                <strong>File:</strong> {} | <strong>Line:</strong> {}
-                            </div>
-                            <div class="finding-details">
-                                <p><strong>Reason:</strong> {}</p>
-                            </div>
-                        </div>"#,
+                    appendix_html.push_str(&format!(
+                        r#"<div class="finding rejected">
+<div class="finding-header">
+<h3>{}</h3>
+<span class="severity rejected">Dismissed</span>
+</div>
+<div class="meta">
+<strong>File:</strong> {} | <strong>Line:</strong> {}
+</div>
+<div class="finding-details">
+<p><strong>Rejection Reason:</strong> {}</p>
+</div>
+</div>"#,
                         html_escape::encode_text(&f.title),
                         html_escape::encode_text(&f.file_path),
                         line,
-                        html_escape::encode_text(evidence_detail)
-                    )
-                })
-                .collect::<Vec<_>>()
-                .join("");
-
-            sections.push(format!(
-                r#"<section class="unverified-appendix">
-                    <h2>Appendix: Unverified Findings</h2>
-                    <p class="finding-count">{} unverified findings excluded from main report</p>
-                    {}</section>
-"#,
-                unverified_findings.len(),
-                appendix_findings
-            ));
-        }
-
-        if include_rejected {
-            if let Some(rejected) = rejected_findings {
-                if !rejected.is_empty() {
-                    let rejected_findings_html: String = rejected
-                        .iter()
-                        .map(|(f, reason)| {
-                            let line = f
-                                .line_number
-                                .map(|l| l.to_string())
-                                .unwrap_or("N/A".to_string());
-                            format!(
-                                r#"<div class="finding rejected">
-                                    <div class="finding-header">
-                                        <h3>{}</h3>
-                                        <span class="severity rejected">Dismissed</span>
-                                    </div>
-                                    <div class="meta">
-                                        <strong>File:</strong> {} | <strong>Line:</strong> {}
-                                    </div>
-                                    <div class="finding-details">
-                                        <p><strong>Rejection Reason:</strong> {}</p>
-                                    </div>
-                                </div>"#,
-                                html_escape::encode_text(&f.title),
-                                html_escape::encode_text(&f.file_path),
-                                line,
-                                html_escape::encode_text(reason)
-                            )
-                        })
-                        .collect::<Vec<_>>()
-                        .join("");
-
-                    sections.push(format!(
-                        r#"<section class="rejected-appendix">
-                            <h2>Investigated & Dismissed</h2>
-                            <p class="finding-count">{} findings were investigated and dismissed</p>
-                            {}</section>
-"#,
-                        rejected.len(),
-                        rejected_findings_html
+                        html_escape::encode_text(reason)
                     ));
                 }
+                appendix_html.push_str("</section>");
             }
         }
+    }
 
-        sections.join("")
-    };
+    let unique_files = filtered_findings
+        .iter()
+        .map(|f| &f.file_path)
+        .collect::<std::collections::HashSet<_>>()
+        .len();
 
-    html.push_str(&format!(
-        r#"{}<div class="footer">
-<p>Generated by BACO Security Scanner v{} | {} findings analyzed</p>
-</div>
-</div>
-    </body>
-</html>"#,
-        appendix_html,
-        env!("CARGO_PKG_VERSION"),
-        filtered_findings.len()
-    ));
+    // Create minijinja environment and render
+    let mut env = Environment::new();
+
+    // Add a custom filter to preserve HTML (similar to | safe in Jinja2)
+    fn identity_filter(value: minijinja::Value) -> minijinja::Value {
+        value
+    }
+    env.add_filter("safe", identity_filter);
+    env.add_filter("format", |value: f64, pattern: &str| match pattern {
+        "%.1" => format!("{:.1}", value),
+        _ => value.to_string(),
+    });
+
+    env.add_template("report", REPORT_TEMPLATE)
+        .map_err(|e| ScanError::Parse {
+            message: format!("Template compilation error: {}", e),
+            source: None,
+        })?;
+
+    let html = env
+        .render_named_str(
+            "report",
+            REPORT_TEMPLATE,
+            context! {
+                scan_date => scan_date,
+                total_findings => total_findings,
+                stats_critical => stats.critical,
+                stats_high => stats.high,
+                models_html => models_html,
+                avg_confidence => format!("{:.1}", avg_confidence * 100.0),
+                verified => verified,
+                already_reported => already_reported,
+                unique_files => unique_files,
+                summary_cards_html => summary_cards_html,
+                empty_state => empty_state,
+                filter_buttons_html => filter_buttons_html,
+                findings_html => findings_html,
+                appendix_html => appendix_html,
+                version => env!("CARGO_PKG_VERSION"),
+                filtered_findings_count => filtered_findings.len(),
+                prism_css => prism_css,
+                prism_core_js => prism_core_js,
+                prism_language_scripts => prism_language_scripts,
+            },
+        )
+        .map_err(|e| ScanError::Parse {
+            message: format!("Template rendering error: {}", e),
+            source: None,
+        })?;
 
     if let Some(parent) = std::path::Path::new(output_path).parent() {
         std::fs::create_dir_all(parent).map_err(ScanError::IoError)?;

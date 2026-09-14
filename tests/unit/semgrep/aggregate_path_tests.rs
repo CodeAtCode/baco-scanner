@@ -17,7 +17,7 @@ fn test_parse_semgrep_multi_hit_uses_first_path() {
 
     let runner = SemgrepRunner::new(vec![], vec![]);
     let findings =
-        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules)
+        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
 
     // Multiple findings with same check_id should be aggregated into one
@@ -60,7 +60,7 @@ fn test_parse_semgrep_multi_hit_three_locations() {
 
     let runner = SemgrepRunner::new(vec![], vec![]);
     let findings =
-        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules)
+        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
 
     assert_eq!(findings.len(), 1);
@@ -94,7 +94,7 @@ fn test_parse_semgrep_multi_hit_id_consistency() {
 
     let runner = SemgrepRunner::new(vec![], vec![]);
     let findings =
-        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules)
+        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
 
     assert_eq!(findings.len(), 1);
@@ -102,7 +102,7 @@ fn test_parse_semgrep_multi_hit_id_consistency() {
     assert_eq!(findings[0].id.len(), 64);
     // ID should be deterministic - run again and compare
     let findings2 =
-        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules)
+        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
     assert_eq!(findings[0].id, findings2[0].id);
 }

@@ -73,7 +73,18 @@ impl SemgrepRunner {
                 ));
             }
 
-            parse_json_output(&output.stdout, &self_clone.exclude_rules)
+            // Extract stems from temp file paths for normalization
+            let stems: Vec<String> = custom_rule_files
+                .iter()
+                .map(|f| {
+                    f.path()
+                        .file_stem()
+                        .map(|s| s.to_string_lossy().to_string())
+                        .unwrap_or_default()
+                })
+                .collect();
+
+            parse_json_output(&output.stdout, &self_clone.exclude_rules, &stems)
         })
         .await
         .map_err(|e| format!("Semgrep task panicked: {}", e))?

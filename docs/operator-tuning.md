@@ -11,7 +11,6 @@ Performance tuning for the Baco SAST scanner. Adjust settings based on scan spee
 enable_incremental_scan = true
 max_parallel_tasks = 2
 enable_threat_modeling = false
-enable_multi_verifier = false
 enable_confidence_refinement = false
 enable_cve_bootstrap = false
 enable_variant_search = false
@@ -33,7 +32,6 @@ enable_incremental_scan = false
 max_parallel_tasks = 8
 enable_threat_modeling = true
 enable_root_cause_dedup = true
-enable_multi_verifier = true
 enable_confidence_refinement = true
 enable_cve_bootstrap = true
 enable_variant_search = true
@@ -52,7 +50,6 @@ timeout_secs = 120
 [scanner.performance]
 enable_incremental_scan = true
 max_parallel_tasks = 2
-enable_multi_verifier = false
 enable_confidence_refinement = false
 enable_variant_search = false
 
@@ -79,7 +76,6 @@ max_concurrent = 2
 | `enable_file_filtering` | bool | true | Filters low-value files (minified, vendor) |
 | `enable_threat_modeling` | bool | false | STRIDE-based threat analysis |
 | `enable_root_cause_dedup` | bool | true | Collapses findings with same root cause |
-| `enable_multi_verifier` | bool | false | Additional LLM verification passes |
 | `enable_auto_patching` | bool | false | Generates fix patches — opt-in |
 | `enable_poc_compilation` | bool | false | Compiles PoC exploits — opt-in |
 | `enable_confidence_refinement` | bool | true | Re-calibrates confidence scores |
@@ -100,7 +96,7 @@ max_concurrent = 2
 
 ### LLM Cost vs. Recall
 
-Disabling `enable_multi_verifier`, `enable_confidence_refinement`, and `enable_variant_search` cuts LLM calls by ~60%. Expect 15-25% reduction in true positives.
+Disabling `enable_confidence_refinement` and `enable_variant_search` cuts LLM calls by ~40%. Expect 15-25% reduction in true positives.
 
 ### Incremental Scan Caveats
 

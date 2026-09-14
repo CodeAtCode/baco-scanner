@@ -91,7 +91,7 @@ impl Scanner {
 
     /// Return the number of sequential phases (for testing)
     pub fn scheduled_sequential_phases() -> usize {
-        20 // All sequential phases including Validate
+        19 // All sequential phases
     }
 
     /// Return parallel and sequential phase counts (for testing)

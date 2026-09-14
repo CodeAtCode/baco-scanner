@@ -435,7 +435,7 @@ fn test_finding_with_all_phases() {
 
 #[test]
 fn test_sequential_phases_count() {
-    assert_eq!(PhaseSpec::sequential().len(), 20);
+    assert_eq!(PhaseSpec::sequential().len(), 19);
 }
 
 #[test]
@@ -443,7 +443,7 @@ fn test_sequential_phases_order() {
     let seq = PhaseSpec::sequential();
     assert_eq!(seq[0], ScanPhase::CweRouting);
     assert_eq!(seq[1], ScanPhase::RuleSynthesis);
-    assert_eq!(seq[19], ScanPhase::Reporting);
+    assert_eq!(seq[18], ScanPhase::Reporting);
 }
 
 #[test]
@@ -451,7 +451,7 @@ fn test_sequential_phases_contains_all_v3_features() {
     let seq = PhaseSpec::sequential();
     assert!(seq.contains(&ScanPhase::ThreatModeling));
     assert!(seq.contains(&ScanPhase::RootCauseDedup));
-    assert!(seq.contains(&ScanPhase::MultiVerifier));
+    assert!(seq.contains(&ScanPhase::AutoPatching));
     assert!(seq.contains(&ScanPhase::AutoPatching));
     assert!(seq.contains(&ScanPhase::CveBootstrap));
     assert!(seq.contains(&ScanPhase::PocCompiler));

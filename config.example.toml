@@ -72,10 +72,6 @@ enable_threat_modeling = false
 # Root-cause deduplication (collapses findings that share the same root cause)
 # Default: true
 enable_root_cause_dedup = true
-# Multi-verifier cross-checking (experimental stub — hash-based placeholder,
-# not real verification; disabled by default)
-# Default: false
-enable_multi_verifier = false
 # Auto-patching (generates and validates fix patches in a staging worktree)
 # Writes code files and runs git commands — opt-in for safety
 # Default: false

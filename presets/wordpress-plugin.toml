@@ -107,7 +107,6 @@ rules:
 
 [scanner.performance]
 enable_incremental_scan = true
-enable_multi_verifier = false
 enable_variant_search = true
 enable_cve_bootstrap = true
 

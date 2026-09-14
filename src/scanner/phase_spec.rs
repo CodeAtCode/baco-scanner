@@ -1,4 +1,4 @@
-//! Single source of truth for the BACO 24-phase pipeline definition.
+//! Single source of truth for the BACO 23-phase pipeline definition.
 //!
 //! This module defines the canonical pipeline structure: 4 parallel phases
 //! followed by 20 sequential phases. All phase-related queries (order,
@@ -31,33 +31,33 @@ pub struct PhaseSlot {
     pub executor_key: &'static str,
 }
 
-/// The canonical 24-phase pipeline table.
+/// The canonical 23-phase pipeline table.
 ///
 /// Order: 4 parallel phases (Indexing, Semgrep, CpgSlice, LlmStaticAnalysis)
 /// followed by 20 sequential phases (CweRouting through Reporting).
 pub struct PhaseSpec;
 
 impl PhaseSpec {
-    /// Returns the full 24-phase slot table.
+    /// Returns the full 23-phase slot table.
     ///
     /// Order is byte-identical to the historical definition:
     /// - Parallel: Indexing, Semgrep, CpgSlice, LlmStaticAnalysis
     /// - Sequential: CweRouting, RuleSynthesis, LlmDiscovery, LlmVerification,
     ///   Validate, SecurityAgentVerification, TicketCrossRef, GitAnalysis,
     ///   CrossFileAnalysis, ConfidenceScoring, AiAggregation, ThreatModeling,
-    ///   RootCauseDedup, MultiVerifier, AutoPatching, CveBootstrap, PocCompiler,
+    ///   RootCauseDedup, AutoPatching, CveBootstrap, PocCompiler,
     ///   ExploitSynth, VariantSearch, Reporting
-    pub const fn slots() -> &'static [PhaseSlot; 24] {
+    pub const fn slots() -> &'static [PhaseSlot; 23] {
         &SLOTS
     }
 
     /// Return all phases in execution order (24 total).
-    pub fn all() -> &'static [ScanPhase; 24] {
+    pub fn all() -> &'static [ScanPhase; 23] {
         &ALL_PHASES
     }
 
-    /// Return only the sequential phases (20 total).
-    pub fn sequential() -> &'static [ScanPhase; 20] {
+    /// Return only the sequential phases (19 total).
+    pub fn sequential() -> &'static [ScanPhase; 19] {
         &SEQUENTIAL_PHASES
     }
 
@@ -66,9 +66,9 @@ impl PhaseSpec {
         &PARALLEL_PHASES
     }
 
-    /// Total phase count (24).
+    /// Total phase count (23).
     pub const fn total() -> usize {
-        24
+        23
     }
 
     /// Look up the slot for a given phase.
@@ -81,15 +81,15 @@ impl PhaseSpec {
         &CORE_PHASES
     }
 
-    /// Return experimental phases only (10 total).
-    pub fn experimental_phases() -> &'static [ScanPhase; 10] {
+    /// Return experimental phases only (9 total).
+    pub fn experimental_phases() -> &'static [ScanPhase; 9] {
         &EXPERIMENTAL_PHASES
     }
 
     /// Compute the effective phase set for a given profile.
     ///
     /// - Core: 14 phases (excludes experimental)
-    /// - All: 24 phases (all enabled)
+    /// - All: 23 phases (all enabled)
     pub fn effective(profile: &ScanPipelineProfile) -> Vec<ScanPhase> {
         match profile {
             ScanPipelineProfile::Core => CORE_PHASES.to_vec(),
@@ -120,8 +120,7 @@ impl PhaseSpec {
             ScanPhase::ConfidenceScoring => ScanPhase::AiAggregation,
             ScanPhase::AiAggregation => ScanPhase::ThreatModeling,
             ScanPhase::ThreatModeling => ScanPhase::RootCauseDedup,
-            ScanPhase::RootCauseDedup => ScanPhase::MultiVerifier,
-            ScanPhase::MultiVerifier => ScanPhase::AutoPatching,
+            ScanPhase::RootCauseDedup => ScanPhase::AutoPatching,
             ScanPhase::AutoPatching => ScanPhase::CveBootstrap,
             ScanPhase::CveBootstrap => ScanPhase::PocCompiler,
             ScanPhase::PocCompiler => ScanPhase::ExploitSynth,
@@ -129,6 +128,7 @@ impl PhaseSpec {
             ScanPhase::VariantSearch => ScanPhase::Reporting,
             ScanPhase::Reporting => ScanPhase::Complete,
             ScanPhase::Complete | ScanPhase::Error => ScanPhase::Indexing,
+            _ => ScanPhase::Indexing,
         }
     }
 
@@ -154,7 +154,6 @@ impl PhaseSpec {
             ScanPhase::AiAggregation => "AI aggregation (generating executive summary)...",
             ScanPhase::ThreatModeling => "Threat modeling (STRIDE analysis)...",
             ScanPhase::RootCauseDedup => "Root cause deduplication...",
-            ScanPhase::MultiVerifier => "Multi-verifier voting...",
             ScanPhase::AutoPatching => "Auto-patching with staging validation...",
             ScanPhase::CveBootstrap => "CVE bootstrap...",
             ScanPhase::PocCompiler => "PoC compilation check...",
@@ -167,15 +166,16 @@ impl PhaseSpec {
             ScanPhase::LlmStaticAnalysis => "LLM static analysis...",
             ScanPhase::Complete => "Scan complete!",
             ScanPhase::Error => "Error occurred...",
+            _ => "Unknown phase...",
         }
     }
 }
 
 // ============================================================================
-// Static data: the canonical 24-phase table
+// Static data: the canonical 23-phase table
 // ============================================================================
 
-const SLOTS: [PhaseSlot; 24] = [
+const SLOTS: [PhaseSlot; 23] = [
     // Parallel phases (4)
     PhaseSlot {
         phase: ScanPhase::Indexing,
@@ -298,13 +298,6 @@ const SLOTS: [PhaseSlot; 24] = [
         executor_key: "root_cause_dedup",
     },
     PhaseSlot {
-        phase: ScanPhase::MultiVerifier,
-        kind: PhaseKind::Sequential,
-        core: false, // experimental (v3 feature)
-        config_gate_key: None,
-        executor_key: "multi_verifier",
-    },
-    PhaseSlot {
         phase: ScanPhase::AutoPatching,
         kind: PhaseKind::Sequential,
         core: false, // experimental (v3 feature)
@@ -350,7 +343,7 @@ const SLOTS: [PhaseSlot; 24] = [
 
 // Derived static arrays for efficient queries
 
-const ALL_PHASES: [ScanPhase; 24] = [
+const ALL_PHASES: [ScanPhase; 23] = [
     ScanPhase::Indexing,
     ScanPhase::Semgrep,
     ScanPhase::CpgSlice,
@@ -368,7 +361,6 @@ const ALL_PHASES: [ScanPhase; 24] = [
     ScanPhase::AiAggregation,
     ScanPhase::ThreatModeling,
     ScanPhase::RootCauseDedup,
-    ScanPhase::MultiVerifier,
     ScanPhase::AutoPatching,
     ScanPhase::CveBootstrap,
     ScanPhase::PocCompiler,
@@ -384,7 +376,7 @@ const PARALLEL_PHASES: [ScanPhase; 4] = [
     ScanPhase::LlmStaticAnalysis,
 ];
 
-const SEQUENTIAL_PHASES: [ScanPhase; 20] = [
+const SEQUENTIAL_PHASES: [ScanPhase; 19] = [
     ScanPhase::CweRouting,
     ScanPhase::RuleSynthesis,
     ScanPhase::LlmDiscovery,
@@ -398,7 +390,6 @@ const SEQUENTIAL_PHASES: [ScanPhase; 20] = [
     ScanPhase::AiAggregation,
     ScanPhase::ThreatModeling,
     ScanPhase::RootCauseDedup,
-    ScanPhase::MultiVerifier,
     ScanPhase::AutoPatching,
     ScanPhase::CveBootstrap,
     ScanPhase::PocCompiler,
@@ -424,13 +415,12 @@ const CORE_PHASES: [ScanPhase; 14] = [
     ScanPhase::Reporting,
 ];
 
-const EXPERIMENTAL_PHASES: [ScanPhase; 10] = [
+const EXPERIMENTAL_PHASES: [ScanPhase; 9] = [
     ScanPhase::CpgSlice,
     ScanPhase::RuleSynthesis,
     ScanPhase::Validate,
     ScanPhase::SecurityAgentVerification,
     ScanPhase::ThreatModeling,
-    ScanPhase::MultiVerifier,
     ScanPhase::AutoPatching,
     ScanPhase::PocCompiler,
     ScanPhase::ExploitSynth,
@@ -442,8 +432,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn slots_len_is_24() {
-        assert_eq!(PhaseSpec::slots().len(), 24);
+    fn slots_len_is_23() {
+        assert_eq!(PhaseSpec::slots().len(), 23);
     }
 
     #[test]
@@ -466,7 +456,6 @@ mod tests {
             ScanPhase::AiAggregation,
             ScanPhase::ThreatModeling,
             ScanPhase::RootCauseDedup,
-            ScanPhase::MultiVerifier,
             ScanPhase::AutoPatching,
             ScanPhase::CveBootstrap,
             ScanPhase::PocCompiler,
@@ -493,7 +482,6 @@ mod tests {
             ScanPhase::AiAggregation,
             ScanPhase::ThreatModeling,
             ScanPhase::RootCauseDedup,
-            ScanPhase::MultiVerifier,
             ScanPhase::AutoPatching,
             ScanPhase::CveBootstrap,
             ScanPhase::PocCompiler,
@@ -533,7 +521,6 @@ mod tests {
             ScanPhase::Validate,
             ScanPhase::SecurityAgentVerification,
             ScanPhase::ThreatModeling,
-            ScanPhase::MultiVerifier,
             ScanPhase::AutoPatching,
             ScanPhase::PocCompiler,
             ScanPhase::ExploitSynth,
@@ -544,7 +531,7 @@ mod tests {
 
     #[test]
     fn resume_from_transitions_identical_to_checkpoint() {
-        // Test all 24 phases
+        // Test all 23 phases
         let test_cases = [
             (ScanPhase::Indexing, ScanPhase::Semgrep),
             (ScanPhase::Semgrep, ScanPhase::CpgSlice),
@@ -565,8 +552,7 @@ mod tests {
             (ScanPhase::ConfidenceScoring, ScanPhase::AiAggregation),
             (ScanPhase::AiAggregation, ScanPhase::ThreatModeling),
             (ScanPhase::ThreatModeling, ScanPhase::RootCauseDedup),
-            (ScanPhase::RootCauseDedup, ScanPhase::MultiVerifier),
-            (ScanPhase::MultiVerifier, ScanPhase::AutoPatching),
+            (ScanPhase::RootCauseDedup, ScanPhase::AutoPatching),
             (ScanPhase::AutoPatching, ScanPhase::CveBootstrap),
             (ScanPhase::CveBootstrap, ScanPhase::PocCompiler),
             (ScanPhase::PocCompiler, ScanPhase::ExploitSynth),
@@ -625,9 +611,9 @@ mod tests {
     }
 
     #[test]
-    fn effective_all_profile_yields_24() {
+    fn effective_all_profile_yields_23() {
         let effective = PhaseSpec::effective(&ScanPipelineProfile::All);
-        assert_eq!(effective.len(), 24);
+        assert_eq!(effective.len(), 23);
         assert_eq!(effective.as_slice(), PhaseSpec::all());
     }
 

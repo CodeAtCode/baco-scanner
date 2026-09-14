@@ -8,14 +8,14 @@ use baco::config::scanner::ScanPipelineProfile;
 use baco::scanner::phase_spec::PhaseSpec;
 
 #[test]
-fn slots_len_is_24() {
-    assert_eq!(PhaseSpec::slots().len(), 24);
+fn slots_len_is_23() {
+    assert_eq!(PhaseSpec::slots().len(), 23);
 }
 
 #[test]
-fn table_order_matches_24_phase_sequence() {
-    // Inline 24-phase sequence (byte-identical to historical definition)
-    let expected: [ScanPhase; 24] = [
+fn table_order_matches_23_phase_sequence() {
+    // Inline 23-phase sequence (byte-identical to historical definition)
+    let expected: [ScanPhase; 23] = [
         ScanPhase::Indexing,
         ScanPhase::Semgrep,
         ScanPhase::CpgSlice,
@@ -33,7 +33,6 @@ fn table_order_matches_24_phase_sequence() {
         ScanPhase::AiAggregation,
         ScanPhase::ThreatModeling,
         ScanPhase::RootCauseDedup,
-        ScanPhase::MultiVerifier,
         ScanPhase::AutoPatching,
         ScanPhase::CveBootstrap,
         ScanPhase::PocCompiler,
@@ -45,9 +44,9 @@ fn table_order_matches_24_phase_sequence() {
 }
 
 #[test]
-fn table_sequential_matches_20_phase_sequence() {
-    // Inline 20-sequential-phase sequence
-    let expected: [ScanPhase; 20] = [
+fn table_sequential_matches_19_phase_sequence() {
+    // Inline 19-sequential-phase sequence
+    let expected: [ScanPhase; 19] = [
         ScanPhase::CweRouting,
         ScanPhase::RuleSynthesis,
         ScanPhase::LlmDiscovery,
@@ -61,7 +60,6 @@ fn table_sequential_matches_20_phase_sequence() {
         ScanPhase::AiAggregation,
         ScanPhase::ThreatModeling,
         ScanPhase::RootCauseDedup,
-        ScanPhase::MultiVerifier,
         ScanPhase::AutoPatching,
         ScanPhase::CveBootstrap,
         ScanPhase::PocCompiler,
@@ -95,15 +93,14 @@ fn table_core_matches_14_phase_sequence() {
 }
 
 #[test]
-fn table_experimental_matches_10_phase_sequence() {
-    // Inline 10-experimental-phase sequence
-    let expected: [ScanPhase; 10] = [
+fn table_experimental_matches_9_phase_sequence() {
+    // Inline 9-experimental-phase sequence
+    let expected: [ScanPhase; 9] = [
         ScanPhase::CpgSlice,
         ScanPhase::RuleSynthesis,
         ScanPhase::Validate,
         ScanPhase::SecurityAgentVerification,
         ScanPhase::ThreatModeling,
-        ScanPhase::MultiVerifier,
         ScanPhase::AutoPatching,
         ScanPhase::PocCompiler,
         ScanPhase::ExploitSynth,
@@ -114,8 +111,8 @@ fn table_experimental_matches_10_phase_sequence() {
 
 #[test]
 fn resume_from_transitions_match_26_case_table() {
-    // Inline resume_from transition table for all 26 cases (24 phases + Complete + Error)
-    let test_cases: [(ScanPhase, ScanPhase); 26] = [
+    // Inline resume_from transition table for all 25 cases (23 phases + Complete + Error)
+    let test_cases: [(ScanPhase, ScanPhase); 25] = [
         (ScanPhase::Indexing, ScanPhase::Semgrep),
         (ScanPhase::Semgrep, ScanPhase::CpgSlice),
         (ScanPhase::CpgSlice, ScanPhase::LlmStaticAnalysis),
@@ -135,8 +132,7 @@ fn resume_from_transitions_match_26_case_table() {
         (ScanPhase::ConfidenceScoring, ScanPhase::AiAggregation),
         (ScanPhase::AiAggregation, ScanPhase::ThreatModeling),
         (ScanPhase::ThreatModeling, ScanPhase::RootCauseDedup),
-        (ScanPhase::RootCauseDedup, ScanPhase::MultiVerifier),
-        (ScanPhase::MultiVerifier, ScanPhase::AutoPatching),
+        (ScanPhase::RootCauseDedup, ScanPhase::AutoPatching),
         (ScanPhase::AutoPatching, ScanPhase::CveBootstrap),
         (ScanPhase::CveBootstrap, ScanPhase::PocCompiler),
         (ScanPhase::PocCompiler, ScanPhase::ExploitSynth),
@@ -219,10 +215,6 @@ fn progress_messages_identical() {
         "Root cause deduplication..."
     );
     assert_eq!(
-        PhaseSpec::progress_message(&ScanPhase::MultiVerifier),
-        "Multi-verifier voting..."
-    );
-    assert_eq!(
         PhaseSpec::progress_message(&ScanPhase::AutoPatching),
         "Auto-patching with staging validation..."
     );
@@ -258,9 +250,9 @@ fn effective_core_profile_yields_14() {
 }
 
 #[test]
-fn effective_all_profile_yields_24() {
+fn effective_all_profile_yields_23() {
     let effective = PhaseSpec::effective(&ScanPipelineProfile::All);
-    assert_eq!(effective.len(), 24);
+    assert_eq!(effective.len(), 23);
     assert_eq!(effective.as_slice(), PhaseSpec::all());
 }
 
@@ -318,8 +310,8 @@ fn core_plus_experimental_equals_all() {
     combined.extend_from_slice(PhaseSpec::core_phases());
     combined.extend_from_slice(PhaseSpec::experimental_phases());
 
-    // Check that combined has 24 phases and all are unique
-    assert_eq!(combined.len(), 24);
+    // Check that combined has 23 phases and all are unique
+    assert_eq!(combined.len(), 23);
 
     // Verify every phase in all() appears exactly once in combined
     for phase in PhaseSpec::all() {

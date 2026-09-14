@@ -1,6 +1,6 @@
 # BACO Documentation
 
-Documentation for baco — a 24-phase LLM-assisted code scanner.
+Documentation for baco — a 23-phase LLM-assisted code scanner.
 
 **For setup, usage, and reading order, see the root [README.md](../README.md).**
 
@@ -8,7 +8,7 @@ Documentation for baco — a 24-phase LLM-assisted code scanner.
 
 | File | Description |
 |------|-------------|
-| [architecture.md](architecture.md) | The 24-phase pipeline, PhaseGraph, data flow |
+| [architecture.md](architecture.md) | The 23-phase pipeline, PhaseGraph, data flow |
 | [configuration.md](configuration.md) | All config options, LLM setup, phase flags |
 | [research-integration.md](research-integration.md) | The 20 papers integrated into baco |
 | [ci-integration.md](ci-integration.md) | CI/CD setup with SARIF output |

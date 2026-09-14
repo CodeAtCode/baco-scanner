@@ -62,3 +62,41 @@ fn test_partition_all_described() {
     assert!(needs.is_empty());
     assert_eq!(described.len(), 2);
 }
+
+#[test]
+fn test_merge_agent_severity_raise_applied() {
+    use baco::findings::Severity;
+    use baco::scanner::phases::llm_phases::discovery::merge_agent_severity;
+
+    assert_eq!(
+        merge_agent_severity(Severity::Medium, Severity::High, "t"),
+        Severity::High
+    );
+}
+
+#[test]
+fn test_merge_agent_severity_downgrade_suppressed() {
+    use baco::findings::Severity;
+    use baco::scanner::phases::llm_phases::discovery::merge_agent_severity;
+
+    // Detector severity is authoritative: enrichment may never lower it
+    assert_eq!(
+        merge_agent_severity(Severity::High, Severity::Low, "t"),
+        Severity::High
+    );
+    assert_eq!(
+        merge_agent_severity(Severity::Critical, Severity::Medium, "t"),
+        Severity::Critical
+    );
+}
+
+#[test]
+fn test_merge_agent_severity_equal_unchanged() {
+    use baco::findings::Severity;
+    use baco::scanner::phases::llm_phases::discovery::merge_agent_severity;
+
+    assert_eq!(
+        merge_agent_severity(Severity::Low, Severity::Low, "t"),
+        Severity::Low
+    );
+}

@@ -48,9 +48,14 @@ pub mod indexer;
 pub mod init;
 pub mod llm;
 pub mod llm_analysis;
-pub mod llm_cache;
 
-pub mod llm_metrics;
+// Backward compatibility re-exports for external imports
+pub mod llm_cache {
+    pub use crate::llm::cache::*;
+}
+pub mod llm_metrics {
+    pub use crate::llm::metrics::*;
+}
 pub mod llm_verification;
 pub mod multi_verifier;
 pub mod org_context;

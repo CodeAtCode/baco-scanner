@@ -232,6 +232,60 @@ impl ScanHealth {
         })
     }
 
+    /// Detect which LLM phases were skipped due to config issues
+    /// Returns a vector of (phase, reason) pairs for phases that should have run but didn't
+    pub fn detect_llm_config_skips(
+        llm_phases_config: &crate::config::llm::LlmPhasesConfig,
+        ran_phases: &[String],
+    ) -> Vec<(ScanPhase, String)> {
+        let mut skips = Vec::new();
+
+        // Map of phase -> config key -> phase name for error messages
+        let llm_phase_checks = [
+            (
+                ScanPhase::LlmStaticAnalysis,
+                "static_analysis",
+                "llm.phases.static_analysis",
+            ),
+            (ScanPhase::LlmDiscovery, "discovery", "llm.phases.discovery"),
+            (
+                ScanPhase::LlmVerification,
+                "verification",
+                "llm.phases.verification",
+            ),
+            (
+                ScanPhase::SecurityAgentVerification,
+                "security_agent_verification",
+                "llm.phases.security_agent_verification",
+            ),
+        ];
+
+        for (phase, config_key, config_path) in llm_phase_checks {
+            // Skip if phase already ran (it's in the ran_phases list)
+            if ran_phases.contains(&phase_name(&phase)) {
+                continue;
+            }
+
+            // Check if config is incomplete (no API key)
+            let phase_config = match config_key {
+                "static_analysis" => &llm_phases_config.static_analysis,
+                "discovery" => &llm_phases_config.discovery,
+                "verification" => &llm_phases_config.verification,
+                "security_agent_verification" => &llm_phases_config.security_agent_verification,
+                _ => continue,
+            };
+
+            if phase_config.api_key.is_none() {
+                skips.push((
+                    phase,
+                    format!("no API key configured (set {}.{})", config_path, "api_key"),
+                ));
+            }
+        }
+
+        skips
+    }
+
     /// Compute per-phase spend from operation metrics and pricing table
     /// Returns a vector of PhaseSpend entries, one per unique phase
     pub fn compute_phase_spend(
@@ -287,7 +341,7 @@ impl ScanHealth {
             .count();
 
         let mut parts = Vec::new();
-        parts.push(format!("phases: {}/{} run/skipped", run_count, skip_count));
+        parts.push(format!("phases: {} run, {} skipped", run_count, skip_count));
         parts.push(format!(
             "files: {} indexed, {} analyzed",
             self.files.indexed, self.files.analyzed
@@ -305,6 +359,25 @@ impl ScanHealth {
             "llm: {}/{} ok/failed",
             self.llm_ok, self.llm_failed
         ));
+        if skip_count > 0 {
+            let skipped_list: Vec<String> = self
+                .phase_status
+                .iter()
+                .filter(|ps| matches!(ps.status, PhaseStatusKind::Skipped))
+                .map(|ps| {
+                    format!(
+                        "{}({})",
+                        ps.phase,
+                        ps.reason.as_deref().unwrap_or("unknown")
+                    )
+                })
+                .collect();
+            parts.push(format!(
+                "skipped ({}): {}",
+                skip_count,
+                skipped_list.join(", ")
+            ));
+        }
         if self.total_tokens > 0 {
             parts.push(format!("tokens: {}", self.total_tokens));
         }
@@ -331,7 +404,7 @@ impl ScanHealth {
 }
 
 /// Convert ScanPhase to string name
-fn phase_name(phase: &ScanPhase) -> String {
+pub fn phase_name(phase: &ScanPhase) -> String {
     match phase {
         ScanPhase::Indexing => "Indexing".to_string(),
         ScanPhase::Semgrep => "Semgrep".to_string(),
@@ -369,159 +442,4 @@ pub fn from_llm_metrics(
     _pricing: Option<&HashMap<String, crate::config::ModelPricing>>,
 ) -> (u64, u64) {
     (metrics.total_success, metrics.total_failed)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_scan_health_default() {
-        let health = ScanHealth::default();
-        assert!(health.phase_status.is_empty());
-        assert_eq!(health.files.indexed, 0);
-        assert_eq!(health.total_tokens, 0);
-    }
-
-    #[test]
-    fn test_record_phase_run() {
-        let mut health = ScanHealth::new();
-        health.record_phase_run(&ScanPhase::Indexing);
-        assert_eq!(health.phase_status.len(), 1);
-        assert!(matches!(
-            health.phase_status[0].status,
-            PhaseStatusKind::Run
-        ));
-        assert_eq!(health.phase_status[0].phase, "Indexing");
-    }
-
-    #[test]
-    fn test_record_phase_skipped() {
-        let mut health = ScanHealth::new();
-        health.record_phase_skipped(
-            &ScanPhase::LlmDiscovery,
-            "incomplete llm.phases.discovery config",
-        );
-        assert_eq!(health.phase_status.len(), 1);
-        assert!(matches!(
-            health.phase_status[0].status,
-            PhaseStatusKind::Skipped
-        ));
-        assert_eq!(
-            health.phase_status[0].reason,
-            Some("incomplete llm.phases.discovery config".to_string())
-        );
-    }
-
-    #[test]
-    fn test_file_counters() {
-        let mut health = ScanHealth::new();
-        health.set_indexed(100);
-        health.set_analyzed(80);
-        health.set_dropped_by_size(5);
-        health.set_chunked(10);
-        health.set_truncated(3);
-
-        assert_eq!(health.files.indexed, 100);
-        assert_eq!(health.files.analyzed, 80);
-        assert_eq!(health.files.dropped_by_size, 5);
-        assert_eq!(health.files.chunked, 10);
-        assert_eq!(health.files.truncated, 3);
-    }
-
-    #[test]
-    fn test_llm_outcomes() {
-        let mut health = ScanHealth::new();
-        health.record_llm_outcome(&LlmOutcomeClass::Ok);
-        health.record_llm_outcome(&LlmOutcomeClass::Ok);
-        health.record_llm_outcome(&LlmOutcomeClass::AuthFailure);
-
-        assert_eq!(health.llm_outcomes.get("ok"), Some(&2));
-        assert_eq!(health.llm_outcomes.get("auth_failure"), Some(&1));
-    }
-
-    #[test]
-    fn test_token_recording() {
-        let mut health = ScanHealth::new();
-        health.record_tokens(&ScanPhase::LlmDiscovery, 100, 50);
-        health.record_tokens(&ScanPhase::LlmVerification, 200, 100);
-
-        assert_eq!(health.total_tokens, 450);
-        assert_eq!(health.tokens_by_phase.len(), 2);
-        assert_eq!(health.tokens_by_phase[0].total_tokens, 150);
-        assert_eq!(health.tokens_by_phase[1].total_tokens, 300);
-    }
-
-    #[test]
-    fn test_budget_status() {
-        let mut health = ScanHealth::new();
-        health.set_budget(Some(1000), 250);
-
-        assert_eq!(health.budget.cap_maybe, Some(1000));
-        assert_eq!(health.budget.used, 250);
-        assert!((health.budget.pct_of_cap.unwrap() - 25.0).abs() < 0.01);
-    }
-
-    #[test]
-    fn test_all_llm_phases_skipped() {
-        let mut health = ScanHealth::new();
-        // Record all LLM phases as skipped
-        health.record_phase_skipped(&ScanPhase::LlmStaticAnalysis, "no API key");
-        health.record_phase_skipped(&ScanPhase::LlmDiscovery, "no API key");
-        health.record_phase_skipped(&ScanPhase::LlmVerification, "no API key");
-        health.record_phase_skipped(&ScanPhase::SecurityAgentVerification, "no API key");
-
-        assert!(health.all_llm_phases_skipped());
-    }
-
-    #[test]
-    fn test_blind_marker() {
-        let mut health = ScanHealth::new();
-        // No LLM phases skipped yet
-        assert!(health.blind_marker().is_none());
-
-        // Skip all LLM phases with no successes
-        health.record_phase_skipped(&ScanPhase::LlmStaticAnalysis, "no API key");
-        health.record_phase_skipped(&ScanPhase::LlmDiscovery, "no API key");
-        health.record_phase_skipped(&ScanPhase::LlmVerification, "no API key");
-        health.record_phase_skipped(&ScanPhase::SecurityAgentVerification, "no API key");
-        health.set_llm_counts(0, 0);
-
-        assert_eq!(
-            health.blind_marker(),
-            Some("SCAN PARTIALLY BLIND: LLM phases skipped — check config".to_string())
-        );
-    }
-
-    #[test]
-    fn test_summary() {
-        let mut health = ScanHealth::new();
-        health.record_phase_run(&ScanPhase::Indexing);
-        health.record_phase_skipped(&ScanPhase::LlmDiscovery, "no API key");
-        health.set_indexed(50);
-        health.set_analyzed(40);
-        health.set_llm_counts(0, 0);
-
-        let summary = health.summary();
-        assert!(summary.contains("phases: 1/1 run/skipped"));
-        assert!(summary.contains("files: 50 indexed, 40 analyzed"));
-        assert!(summary.contains("llm: 0/0 ok/failed"));
-    }
-
-    #[test]
-    fn test_serialization() {
-        let mut health = ScanHealth::new();
-        health.record_phase_run(&ScanPhase::Indexing);
-        health.record_phase_skipped(&ScanPhase::LlmDiscovery, "no API key");
-        health.set_indexed(100);
-        health.set_llm_counts(5, 2);
-
-        let json = serde_json::to_string(&health).unwrap();
-        let parsed: ScanHealth = serde_json::from_str(&json).unwrap();
-
-        assert_eq!(parsed.phase_status.len(), 2);
-        assert_eq!(parsed.files.indexed, 100);
-        assert_eq!(parsed.llm_ok, 5);
-        assert_eq!(parsed.llm_failed, 2);
-    }
 }

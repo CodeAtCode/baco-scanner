@@ -1,7 +1,7 @@
 # BACO — Bug Analysis & Cross-reference Orchestrator
 
 A research-backed SAST scanner that augments static analysis with LLM-powered
-discovery across a 24-phase pipeline: semgrep → CWE-aware MoE routing (opt-in) →
+discovery across a 23-phase pipeline: semgrep → CWE-aware MoE routing (opt-in) →
 LLM verification → exploit synthesis (experimental) → ticket cross-referencing → auto-patching (opt-in).
 Grounded in 36 surveyed papers (16 integrated) from [Awesome-LLMs-for-Vulnerability-Detection](https://github.com/huhusmang/Awesome-LLMs-for-Vulnerability-Detection).
 
@@ -106,7 +106,6 @@ cp config.toml my-config.toml
 | AiAggregation | Core | Always runs |
 | ThreatModeling | Experimental | `scanner.profile = "all"` + `enable_threat_modeling = true` |
 | RootCauseDedup | Core | Always runs |
-| MultiVerifier | Experimental | `scanner.profile = "all"` + `enable_multi_verifier = true` |
 | AutoPatching | Experimental | `scanner.profile = "all"` + `enable_auto_patching = true` |
 | CveBootstrap | Core | Always runs |
 | PocCompiler | Experimental | `scanner.profile = "all"` + `enable_poc_compilation = true` |
@@ -151,7 +150,7 @@ See [Research Integration](docs/research-integration.md) for per-paper details (
 
 ## Documentation
 
-- [Architecture](docs/architecture.md) — PhaseGraph pipeline, all 24 phases, data flow
+- [Architecture](docs/architecture.md) — PhaseGraph pipeline, all 23 phases, data flow
 - [Configuration](docs/configuration.md) — Config options, LLM setup, phase flags, prompt overrides
 - [Research Integration](docs/research-integration.md) — 16 integrated papers with techniques and results
 - [Paper Survey](docs/llm-vuln-detection-papers-survey.md) — Full 36-paper survey

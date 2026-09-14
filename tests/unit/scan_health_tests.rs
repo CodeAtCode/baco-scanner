@@ -143,7 +143,7 @@ fn test_summary_generation() {
     health.set_llm_counts(0, 0);
 
     let summary = health.summary();
-    assert!(summary.contains("phases: 1/1 run/skipped"));
+    assert!(summary.contains("phases: 1 run, 1 skipped"));
     assert!(summary.contains("files: 50 indexed, 40 analyzed"));
     assert!(summary.contains("llm: 0/0 ok/failed"));
 }
@@ -213,6 +213,137 @@ fn test_from_llm_metrics_helper() {
     let (ok, failed) = from_llm_metrics(&metrics, None);
     assert_eq!(ok, 10);
     assert_eq!(failed, 3);
+}
+
+#[test]
+fn test_profile_skip_entries_in_health() {
+    // Test that profile-skipped phases are recorded when profile=core
+    use baco::scan_health::PhaseStatusKind;
+
+    let mut health = ScanHealth::new();
+    health.record_phase_run(&ScanPhase::Indexing);
+    health.record_phase_skipped(
+        &ScanPhase::CpgSlice,
+        "profile=core excludes experimental phase",
+    );
+    health.record_phase_run(&ScanPhase::Semgrep);
+
+    assert_eq!(health.phase_status.len(), 3);
+
+    let cpg_entry = health
+        .phase_status
+        .iter()
+        .find(|ps| ps.phase == "CpgSlice")
+        .unwrap();
+    assert!(matches!(cpg_entry.status, PhaseStatusKind::Skipped));
+    assert_eq!(
+        cpg_entry.reason,
+        Some("profile=core excludes experimental phase".to_string())
+    );
+}
+
+#[test]
+fn test_llm_config_skip_entry_contains_phase_slot() {
+    // Test that LLM-skip entries mention the phase's config slot
+    use baco::scan_health::PhaseStatusKind;
+
+    let mut health = ScanHealth::new();
+    health.record_phase_run(&ScanPhase::Indexing);
+    health.record_phase_skipped(
+        &ScanPhase::LlmDiscovery,
+        "no API key configured (set llm.phases.discovery.api_key)",
+    );
+
+    let discovery_entry = health
+        .phase_status
+        .iter()
+        .find(|ps| ps.phase == "LlmDiscovery")
+        .unwrap();
+    assert!(matches!(discovery_entry.status, PhaseStatusKind::Skipped));
+    assert!(discovery_entry
+        .reason
+        .as_ref()
+        .unwrap()
+        .contains("llm.phases.discovery"));
+}
+
+#[test]
+fn test_no_skipped_line_when_nothing_skipped() {
+    // Test that a scan with nothing skipped has an empty list and no skipped-line
+    let mut health = ScanHealth::new();
+    health.record_phase_run(&ScanPhase::Indexing);
+    health.record_phase_run(&ScanPhase::Semgrep);
+    health.record_phase_run(&ScanPhase::LlmStaticAnalysis);
+
+    let summary = health.summary();
+    assert!(!summary.contains("skipped ("));
+    assert!(summary.contains("phases: 3 run, 0 skipped"));
+}
+
+#[test]
+fn test_json_serialization_includes_phase_status_entries() {
+    // Test that JSON serialization includes the phase status entries
+    let mut health = ScanHealth::new();
+    health.record_phase_run(&ScanPhase::Indexing);
+    health.record_phase_skipped(
+        &ScanPhase::CpgSlice,
+        "profile=core excludes experimental phase",
+    );
+    health.record_phase_skipped(
+        &ScanPhase::LlmDiscovery,
+        "no API key configured (set llm.phases.discovery.api_key)",
+    );
+    health.set_indexed(50);
+
+    let json = serde_json::to_string_pretty(&health).unwrap();
+
+    // Verify phase_status is included
+    assert!(json.contains("phase_status"));
+    assert!(json.contains("CpgSlice"));
+    assert!(json.contains("LlmDiscovery"));
+    assert!(json.contains("profile=core excludes experimental phase"));
+    assert!(json.contains("llm.phases.discovery"));
+
+    // Verify deserialization works
+    let parsed: ScanHealth = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed.phase_status.len(), 3);
+    assert_eq!(parsed.files.indexed, 50);
+}
+
+#[test]
+fn test_detect_llm_config_skips() {
+    use baco::config::llm::LlmPhasesConfig;
+
+    let mut config = LlmPhasesConfig::default();
+    // discovery has no API key
+    config.discovery.api_key = None;
+    // verification has API key
+    config.verification.api_key = Some("test-key".to_string());
+    // static_analysis has no API key
+    config.static_analysis.api_key = None;
+    // security_agent_verification has API key
+    config.security_agent_verification.api_key = Some("test-key".to_string());
+
+    // Phases that already ran
+    let ran_phases = vec!["Indexing".to_string(), "Semgrep".to_string()];
+
+    let skips = ScanHealth::detect_llm_config_skips(&config, &ran_phases);
+
+    assert_eq!(skips.len(), 2);
+
+    // Check that discovery and static_analysis are in the skips
+    let skip_phases: Vec<_> = skips.iter().map(|(p, _)| p).collect();
+    assert!(skip_phases.contains(&&ScanPhase::LlmDiscovery));
+    assert!(skip_phases.contains(&&ScanPhase::LlmStaticAnalysis));
+
+    // Check reasons mention config slots
+    for (phase, reason) in &skips {
+        if *phase == ScanPhase::LlmDiscovery {
+            assert!(reason.contains("llm.phases.discovery"));
+        } else if *phase == ScanPhase::LlmStaticAnalysis {
+            assert!(reason.contains("llm.phases.static_analysis"));
+        }
+    }
 }
 
 #[test]
@@ -424,4 +555,159 @@ fn test_simulated_pipeline_run() {
     assert_eq!(health.llm_ok, 2);
     assert_eq!(health.llm_failed, 1);
     assert_eq!(health.total_tokens, 700);
+}
+
+#[test]
+fn test_migrated_scan_health_default() {
+    let health = baco::scan_health::ScanHealth::default();
+    assert!(health.phase_status.is_empty());
+    assert_eq!(health.files.indexed, 0);
+    assert_eq!(health.total_tokens, 0);
+}
+
+#[test]
+fn test_migrated_record_phase_run() {
+    use baco::checkpoint::ScanPhase;
+    let mut health = baco::scan_health::ScanHealth::new();
+    health.record_phase_run(&ScanPhase::Indexing);
+    assert_eq!(health.phase_status.len(), 1);
+    assert!(matches!(
+        health.phase_status[0].status,
+        baco::scan_health::PhaseStatusKind::Run
+    ));
+    assert_eq!(health.phase_status[0].phase, "Indexing");
+}
+
+#[test]
+fn test_migrated_record_phase_skipped() {
+    use baco::checkpoint::ScanPhase;
+    let mut health = baco::scan_health::ScanHealth::new();
+    health.record_phase_skipped(
+        &ScanPhase::LlmDiscovery,
+        "incomplete llm.phases.discovery config",
+    );
+    assert_eq!(health.phase_status.len(), 1);
+    assert!(matches!(
+        health.phase_status[0].status,
+        baco::scan_health::PhaseStatusKind::Skipped
+    ));
+    assert_eq!(
+        health.phase_status[0].reason,
+        Some("incomplete llm.phases.discovery config".to_string())
+    );
+}
+
+#[test]
+fn test_migrated_file_counters() {
+    let mut health = baco::scan_health::ScanHealth::new();
+    health.set_indexed(100);
+    health.set_analyzed(80);
+    health.set_dropped_by_size(5);
+    health.set_chunked(10);
+    health.set_truncated(3);
+
+    assert_eq!(health.files.indexed, 100);
+    assert_eq!(health.files.analyzed, 80);
+    assert_eq!(health.files.dropped_by_size, 5);
+    assert_eq!(health.files.chunked, 10);
+    assert_eq!(health.files.truncated, 3);
+}
+
+#[test]
+fn test_migrated_llm_outcomes() {
+    use baco::scan_health::LlmOutcomeClass;
+    let mut health = baco::scan_health::ScanHealth::new();
+    health.record_llm_outcome(&LlmOutcomeClass::Ok);
+    health.record_llm_outcome(&LlmOutcomeClass::Ok);
+    health.record_llm_outcome(&LlmOutcomeClass::AuthFailure);
+
+    assert_eq!(health.llm_outcomes.get("ok"), Some(&2));
+    assert_eq!(health.llm_outcomes.get("auth_failure"), Some(&1));
+}
+
+#[test]
+fn test_migrated_token_recording() {
+    use baco::checkpoint::ScanPhase;
+    let mut health = baco::scan_health::ScanHealth::new();
+    health.record_tokens(&ScanPhase::LlmDiscovery, 100, 50);
+    health.record_tokens(&ScanPhase::LlmVerification, 200, 100);
+
+    assert_eq!(health.total_tokens, 450);
+    assert_eq!(health.tokens_by_phase.len(), 2);
+    assert_eq!(health.tokens_by_phase[0].total_tokens, 150);
+    assert_eq!(health.tokens_by_phase[1].total_tokens, 300);
+}
+
+#[test]
+fn test_migrated_budget_status() {
+    let mut health = baco::scan_health::ScanHealth::new();
+    health.set_budget(Some(1000), 250);
+
+    assert_eq!(health.budget.cap_maybe, Some(1000));
+    assert_eq!(health.budget.used, 250);
+    assert!((health.budget.pct_of_cap.unwrap() - 25.0).abs() < 0.01);
+}
+
+#[test]
+fn test_migrated_all_llm_phases_skipped() {
+    use baco::checkpoint::ScanPhase;
+    let mut health = baco::scan_health::ScanHealth::new();
+    health.record_phase_skipped(&ScanPhase::LlmStaticAnalysis, "no API key");
+    health.record_phase_skipped(&ScanPhase::LlmDiscovery, "no API key");
+    health.record_phase_skipped(&ScanPhase::LlmVerification, "no API key");
+    health.record_phase_skipped(&ScanPhase::SecurityAgentVerification, "no API key");
+
+    assert!(health.all_llm_phases_skipped());
+}
+
+#[test]
+fn test_migrated_blind_marker() {
+    use baco::checkpoint::ScanPhase;
+    let mut health = baco::scan_health::ScanHealth::new();
+    assert!(health.blind_marker().is_none());
+
+    health.record_phase_skipped(&ScanPhase::LlmStaticAnalysis, "no API key");
+    health.record_phase_skipped(&ScanPhase::LlmDiscovery, "no API key");
+    health.record_phase_skipped(&ScanPhase::LlmVerification, "no API key");
+    health.record_phase_skipped(&ScanPhase::SecurityAgentVerification, "no API key");
+    health.set_llm_counts(0, 0);
+
+    assert_eq!(
+        health.blind_marker(),
+        Some("SCAN PARTIALLY BLIND: LLM phases skipped — check config".to_string())
+    );
+}
+
+#[test]
+fn test_migrated_summary() {
+    use baco::checkpoint::ScanPhase;
+    let mut health = baco::scan_health::ScanHealth::new();
+    health.record_phase_run(&ScanPhase::Indexing);
+    health.record_phase_skipped(&ScanPhase::LlmDiscovery, "no API key");
+    health.set_indexed(50);
+    health.set_analyzed(40);
+    health.set_llm_counts(0, 0);
+
+    let summary = health.summary();
+    assert!(summary.contains("phases: 1 run, 1 skipped"));
+    assert!(summary.contains("files: 50 indexed, 40 analyzed"));
+    assert!(summary.contains("llm: 0/0 ok/failed"));
+}
+
+#[test]
+fn test_migrated_serialization() {
+    use baco::checkpoint::ScanPhase;
+    let mut health = baco::scan_health::ScanHealth::new();
+    health.record_phase_run(&ScanPhase::Indexing);
+    health.record_phase_skipped(&ScanPhase::LlmDiscovery, "no API key");
+    health.set_indexed(100);
+    health.set_llm_counts(5, 2);
+
+    let json = serde_json::to_string(&health).unwrap();
+    let parsed: baco::scan_health::ScanHealth = serde_json::from_str(&json).unwrap();
+
+    assert_eq!(parsed.phase_status.len(), 2);
+    assert_eq!(parsed.files.indexed, 100);
+    assert_eq!(parsed.llm_ok, 5);
+    assert_eq!(parsed.llm_failed, 2);
 }

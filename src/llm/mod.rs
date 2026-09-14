@@ -1,7 +1,6 @@
 use crate::agent::ToolCall;
 use crate::config::llm::ModelPricing;
-use crate::error::ScanError;
-pub use crate::llm_cache;
+pub use crate::error::ScanError;
 pub use crate::llm_metrics::LlmMetricsTracker;
 use crate::rate_limiter::RateLimiter;
 use serde::{Deserialize, Serialize};
@@ -1206,3 +1205,16 @@ fn get_phase_config(
         _ => crate::config::LlmPhaseConfig::default(),
     }
 }
+
+// ============================================================================
+// Submodules
+// ============================================================================
+
+pub mod cache;
+pub mod metrics;
+pub mod traits;
+
+// Re-exports for backward compatibility
+pub use cache::*;
+pub use metrics::*;
+pub use traits::*;

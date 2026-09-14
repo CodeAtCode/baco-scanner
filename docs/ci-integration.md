@@ -53,7 +53,6 @@ For faster CI runs, disable heavy LLM phases:
 [scanner.performance]
 enable_threat_modeling = false
 enable_root_cause_dedup = false
-enable_multi_verifier = false
 enable_cve_bootstrap = false
 enable_variant_search = false
 ```

@@ -353,7 +353,6 @@ async fn run_parallel_phases(
             "AiAggregation",
             "ThreatModeling",
             "RootCauseDedup",
-            "MultiVerifier",
             "AutoPatching",
             "CveBootstrap",
             "PocCompiler",
@@ -417,7 +416,7 @@ async fn run_parallel_phases(
 }
 
 /// Return the list of sequential scan phases
-fn sequential_phases() -> &'static [ScanPhase; 20] {
+fn sequential_phases() -> &'static [ScanPhase; 19] {
     PhaseSpec::sequential()
 }
 
@@ -529,11 +528,6 @@ async fn run_sequential_phases(
             ),
             ScanPhase::RootCauseDedup => format!(
                 "Phase {}/{}: Root cause deduplication...",
-                phase_num,
-                all_sequential_phases.len() + 3
-            ),
-            ScanPhase::MultiVerifier => format!(
-                "Phase {}/{}: Multi-verifier voting...",
                 phase_num,
                 all_sequential_phases.len() + 3
             ),
@@ -793,16 +787,58 @@ pub(super) async fn run_scanner(
 
     // Scan health: what actually ran, surfaced in the console and the final report
     let mut health = crate::scan_health::ScanHealth::new();
-    for phase in [
-        ScanPhase::Indexing,
-        ScanPhase::Semgrep,
-        ScanPhase::LlmStaticAnalysis,
-        ScanPhase::CpgSlice,
-    ] {
-        health.record_phase_run(&phase);
+
+    // Record parallel phases - track skips for profile-based exclusions
+    health.record_phase_run(&ScanPhase::Indexing);
+    health.record_phase_run(&ScanPhase::Semgrep);
+    health.record_phase_run(&ScanPhase::LlmStaticAnalysis);
+
+    // CpgSlice: skipped in core profile
+    if profile == ScanPipelineProfile::Core {
+        health.record_phase_skipped(
+            &ScanPhase::CpgSlice,
+            "profile=core excludes experimental phase",
+        );
+    } else {
+        health.record_phase_run(&ScanPhase::CpgSlice);
     }
+
+    // Record sequential phases with skip tracking
     for phase in sequential_phases() {
-        health.record_phase_run(phase);
+        // Profile-based skip: experimental phases in core profile
+        if profile == ScanPipelineProfile::Core && !PhaseSpec::core_phases().contains(phase) {
+            health.record_phase_skipped(phase, "profile=core excludes experimental phase");
+        } else {
+            health.record_phase_run(phase);
+        }
+    }
+
+    // Detect LLM-config skips: phases that ran but had no LLM calls due to missing config
+    let ran_phase_names: Vec<String> = health
+        .phase_status
+        .iter()
+        .filter(|ps| matches!(ps.status, crate::scan_health::PhaseStatusKind::Run))
+        .map(|ps| ps.phase.clone())
+        .collect();
+
+    let llm_config_skips = crate::scan_health::ScanHealth::detect_llm_config_skips(
+        &scanner.config.llm.phases,
+        &ran_phase_names,
+    );
+
+    // Record LLM-config skips (override previous "run" status if needed)
+    for (phase, reason) in llm_config_skips {
+        // Find and update the phase status if it was recorded as run
+        if let Some(entry) = health
+            .phase_status
+            .iter_mut()
+            .find(|ps| ps.phase == crate::scan_health::phase_name(&phase))
+        {
+            entry.status = crate::scan_health::PhaseStatusKind::Skipped;
+            entry.reason = Some(reason.clone());
+        } else {
+            health.record_phase_skipped(&phase, &reason);
+        }
     }
     health.set_analyzed(analyzed_files.len() as u64);
     let llm_metrics = scanner.metrics_tracker.finalize().await;

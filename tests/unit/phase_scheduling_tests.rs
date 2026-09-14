@@ -13,15 +13,15 @@ fn test_parallel_phase_count() {
 fn test_sequential_phase_count() {
     // Sequential phases: 20 (including Validate)
     let sequential_count = Scanner::scheduled_sequential_phases();
-    assert_eq!(sequential_count, 20, "Expected 20 sequential phases");
+    assert_eq!(sequential_count, 19, "Expected 19 sequential phases");
 }
 
 #[test]
 fn test_total_phase_count() {
-    // Total: 4 parallel + 20 sequential = 24
+    // Total: 4 parallel + 19 sequential = 23
     let (parallel, sequential) = Scanner::scheduled_phase_counts();
     let total = parallel + sequential;
-    assert_eq!(total, 24, "Expected 24 total phases");
+    assert_eq!(total, 23, "Expected 23 total phases");
 }
 
 #[test]

@@ -11,6 +11,9 @@ use baco::findings::Severity;
 use baco::semgrep::SemgrepRunner;
 use std::fs;
 
+// Include prefix normalization tests
+mod rule_prefix_normalization_tests;
+
 // Include edge case tests
 mod parsing_edge_cases_tests;
 

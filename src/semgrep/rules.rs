@@ -85,7 +85,7 @@ impl SemgrepRunner {
         &self,
         json: &[u8],
     ) -> Result<Vec<crate::findings::VulnerabilityFinding>, String> {
-        super::parser::parse_json_output(json, &self.exclude_rules)
+        super::parser::parse_json_output(json, &self.exclude_rules, &[])
     }
 }
 

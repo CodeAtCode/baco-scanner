@@ -94,8 +94,6 @@ Semgrep findings have their severity determined by:
 enable_threat_modeling = false
 # Root-cause deduplication (collapses findings that share the same root cause)
 enable_root_cause_dedup = true
-# Multi-verifier cross-checking (runs additional LLM verification passes)
-enable_multi_verifier = true
 # Auto-patching (generates and validates fix patches in a staging worktree)
 # Writes code files and runs git commands — opt-in for safety
 enable_auto_patching = false
@@ -121,7 +119,6 @@ enable_variant_search = true
 | --- | --- | --- |
 | `enable_threat_modeling` | `false` | None (read-only analysis) |
 | `enable_root_cause_dedup` | `true` | None |
-| `enable_multi_verifier` | `false` | Additional LLM API calls |
 | `enable_auto_patching` | `false` | Writes code files, runs git commands in a staging worktree |
 | `enable_poc_compilation` | `false` | Spawns external compilers |
 | `enable_confidence_refinement` | `true` | None |
@@ -130,7 +127,7 @@ enable_variant_search = true
 | `enable_cve_bootstrap` | `true` | External network requests to NVD/CISA |
 | `enable_variant_search` | `true` | Additional LLM API calls |
 
-See [`docs/architecture.md`](architecture.md) for the full 24-phase pipeline description.
+See [`docs/architecture.md`](architecture.md) for the full 23-phase pipeline description.
 
 ## Router Configuration (MoE)
 

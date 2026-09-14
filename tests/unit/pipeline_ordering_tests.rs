@@ -10,8 +10,8 @@ use crate::pipeline_test_helpers::{
 #[test]
 fn test_pipeline_has_expected_phase_count() {
     let phases = actual_pipeline_phases();
-    // 4 parallel + 20 sequential = 24 total
-    assert_eq!(phases.len(), 24, "Pipeline should have 24 phases");
+    // 4 parallel + 19 sequential = 23 total
+    assert_eq!(phases.len(), 23, "Pipeline should have 23 phases");
 }
 
 #[test]
@@ -94,8 +94,8 @@ fn test_pipeline_root_cause_dedup_before_reporting() {
 fn test_phase_graph_metadata_phase_count() {
     let graph = PhaseGraph::new();
     let phases = graph.phases();
-    // PhaseGraph has 24 phases (matches the runtime pipeline)
-    assert_eq!(phases.len(), 24, "PhaseGraph should have 24 phases");
+    // PhaseGraph has 23 phases (matches the runtime pipeline)
+    assert_eq!(phases.len(), 23, "PhaseGraph should have 23 phases");
 }
 
 #[test]
@@ -158,7 +158,6 @@ fn test_resume_from_covers_all_sequential_phases() {
         ScanPhase::AiAggregation,
         ScanPhase::ThreatModeling,
         ScanPhase::RootCauseDedup,
-        ScanPhase::MultiVerifier,
         ScanPhase::AutoPatching,
         ScanPhase::CveBootstrap,
         ScanPhase::PocCompiler,
@@ -243,14 +242,13 @@ fn test_experimental_phases_list() {
     assert!(exp_phases.contains(&ScanPhase::Validate));
     assert!(exp_phases.contains(&ScanPhase::SecurityAgentVerification));
     assert!(exp_phases.contains(&ScanPhase::ThreatModeling));
-    assert!(exp_phases.contains(&ScanPhase::MultiVerifier));
     assert!(exp_phases.contains(&ScanPhase::AutoPatching));
     assert!(exp_phases.contains(&ScanPhase::PocCompiler));
     assert!(exp_phases.contains(&ScanPhase::ExploitSynth));
     assert!(exp_phases.contains(&ScanPhase::VariantSearch));
 
-    // Should have exactly 10 experimental phases
-    assert_eq!(exp_phases.len(), 10);
+    // Should have exactly 9 experimental phases
+    assert_eq!(exp_phases.len(), 9);
 }
 
 #[test]

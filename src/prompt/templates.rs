@@ -87,15 +87,6 @@ impl std::fmt::Display for ProjectType {
     }
 }
 
-/// Template metadata with required variables
-#[derive(Debug, Clone)]
-pub struct TemplateMeta {
-    pub name: String,
-    pub description: String,
-    pub required_variables: Vec<String>,
-}
-
-/// Key-value pairs for template substitution
 #[derive(Debug, Clone, Default)]
 pub struct TemplateVariables(pub HashMap<String, String>);
 

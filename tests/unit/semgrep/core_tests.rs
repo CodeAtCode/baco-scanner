@@ -29,7 +29,7 @@ fn test_parse_semgrep_output() {
 
     let runner = SemgrepRunner::new(vec![], vec![]);
     let findings =
-        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules)
+        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
 
     assert_eq!(findings.len(), 1);
@@ -43,7 +43,7 @@ fn test_parse_semgrep_output_empty_results() {
     let mock_json = r#"{"results": []}"#;
     let runner = SemgrepRunner::new(vec![], vec![]);
     let findings =
-        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules)
+        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
     assert_eq!(findings.len(), 0);
 }
@@ -53,7 +53,7 @@ fn test_parse_semgrep_output_empty_array() {
     let mock_json = r#"[]"#;
     let runner = SemgrepRunner::new(vec![], vec![]);
     let result =
-        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules);
+        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[]);
     assert!(result.is_ok());
 }
 
@@ -62,7 +62,7 @@ fn test_parse_semgrep_output_no_results_key() {
     let mock_json = r#"{"data": []}"#;
     let runner = SemgrepRunner::new(vec![], vec![]);
     let findings =
-        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules)
+        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
     assert_eq!(findings.len(), 0);
 }
@@ -77,7 +77,7 @@ fn test_parse_semgrep_output_multiple_findings() {
     }"#;
     let runner = SemgrepRunner::new(vec![], vec![]);
     let findings =
-        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules)
+        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
     assert_eq!(findings.len(), 2);
 }
@@ -91,7 +91,7 @@ fn test_parse_semgrep_output_critical_severity() {
     }"#;
     let runner = SemgrepRunner::new(vec![], vec![]);
     let findings =
-        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules)
+        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
     assert_eq!(findings[0].severity, Severity::Critical);
 }
@@ -105,7 +105,7 @@ fn test_parse_semgrep_output_medium_severity() {
     }"#;
     let runner = SemgrepRunner::new(vec![], vec![]);
     let findings =
-        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules)
+        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
     assert_eq!(findings[0].severity, Severity::Medium);
 }
@@ -119,7 +119,7 @@ fn test_parse_semgrep_output_missing_cwe() {
     }"#;
     let runner = SemgrepRunner::new(vec![], vec![]);
     let findings =
-        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules)
+        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
     assert_eq!(findings[0].cwe_id, None);
 }
@@ -133,7 +133,7 @@ fn test_parse_semgrep_output_missing_snippet() {
     }"#;
     let runner = SemgrepRunner::new(vec![], vec![]);
     let findings =
-        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules)
+        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
     assert!(findings[0].code_snippet.is_some());
 }
@@ -143,7 +143,7 @@ fn test_parse_semgrep_output_json_parse_error() {
     let mock_json = r#"{"invalid json}"#;
     let runner = SemgrepRunner::new(vec![], vec![]);
     let result =
-        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules);
+        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[]);
     assert!(result.unwrap_err().contains("Failed to parse"));
 }
 
@@ -156,7 +156,7 @@ fn test_parse_semgrep_output_no_start_line() {
     }"#;
     let runner = SemgrepRunner::new(vec![], vec![]);
     let result =
-        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules);
+        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[]);
     let findings = result.unwrap();
     assert!(findings.is_empty());
 }
@@ -170,7 +170,7 @@ fn test_parse_semgrep_output_no_path() {
     }"#;
     let runner = SemgrepRunner::new(vec![], vec![]);
     let result =
-        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules);
+        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[]);
     assert!(result.is_ok());
     let findings = result.unwrap();
     assert!(findings.is_empty());
@@ -196,7 +196,7 @@ fn test_run_with_config() {
 fn test_run_invalid_json() {
     let mock_json = b"not valid json";
     let runner = SemgrepRunner::new(vec![], vec![]);
-    let result = baco::semgrep::parser::parse_json_output(mock_json, &runner.exclude_rules);
+    let result = baco::semgrep::parser::parse_json_output(mock_json, &runner.exclude_rules, &[]);
     assert!(result.is_err());
 }
 
@@ -322,7 +322,7 @@ fn test_parse_semgrep_output_low_severity() {
     }"#;
     let runner = SemgrepRunner::new(vec![], vec![]);
     let findings =
-        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules)
+        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
     assert_eq!(findings[0].severity, Severity::Low);
 }
@@ -336,7 +336,7 @@ fn test_parse_semgrep_output_info_severity() {
     }"#;
     let runner = SemgrepRunner::new(vec![], vec![]);
     let findings =
-        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules)
+        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
     assert_eq!(findings[0].severity, Severity::Info);
 }
@@ -350,7 +350,7 @@ fn test_parse_semgrep_output_missing_message() {
     }"#;
     let runner = SemgrepRunner::new(vec![], vec![]);
     let findings =
-        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules)
+        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
     // Should use fallback description
     assert!(findings[0].description.contains("test.issue"));
@@ -367,7 +367,7 @@ fn test_parse_semgrep_aggregated_multiple_locations() {
     }"#;
     let runner = SemgrepRunner::new(vec![], vec![]);
     let findings =
-        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules)
+        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
     // Multiple findings with same check_id should be aggregated
     assert_eq!(findings.len(), 1);
@@ -391,7 +391,7 @@ fn test_parse_semgrep_aggregated_single_location() {
     }"#;
     let runner = SemgrepRunner::new(vec![], vec![]);
     let findings =
-        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules)
+        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
     assert_eq!(findings.len(), 1);
     assert_eq!(findings[0].file_path, "file1.py");
@@ -406,7 +406,8 @@ fn parse_test_json_missing_fields() -> Vec<VulnerabilityFinding> {
         ]
     }"#;
     let runner = SemgrepRunner::new(vec![], vec![]);
-    baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules).unwrap()
+    baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
+        .unwrap()
 }
 
 #[test]
@@ -426,7 +427,7 @@ fn test_parse_semgrep_with_empty_check_id() {
     }"#;
     let runner = SemgrepRunner::new(vec![], vec![]);
     let findings =
-        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules)
+        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
     assert_eq!(findings.len(), 1);
     assert_eq!(findings[0].title, "");
@@ -481,7 +482,7 @@ fn test_parse_semgrep_aggregated_empty_message() {
     }"#;
     let runner = SemgrepRunner::new(vec![], vec![]);
     let findings =
-        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules)
+        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
     assert_eq!(findings.len(), 1);
     // When base_message is empty and other_count > 0, uses "detected in N locations"
@@ -497,7 +498,7 @@ fn test_parse_semgrep_aggregated_single_with_empty_message() {
     }"#;
     let runner = SemgrepRunner::new(vec![], vec![]);
     let findings =
-        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules)
+        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
     assert_eq!(findings.len(), 1);
     // For single finding with empty message, description is the empty message (not fallback)
@@ -513,7 +514,7 @@ fn test_parse_semgrep_missing_extra_metadata() {
     }"#;
     let runner = SemgrepRunner::new(vec![], vec![]);
     let findings =
-        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules)
+        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
     assert_eq!(findings.len(), 1);
     assert_eq!(findings[0].cwe_id, None);
@@ -536,7 +537,7 @@ fn test_parse_semgrep_missing_message_in_extra() {
     }"#;
     let runner = SemgrepRunner::new(vec![], vec![]);
     let findings =
-        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules)
+        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
     assert_eq!(findings.len(), 1);
     // Should use fallback description when message is missing
@@ -553,7 +554,7 @@ fn test_parse_semgrep_missing_check_id() {
     }"#;
     let runner = SemgrepRunner::new(vec![], vec![]);
     let findings =
-        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules)
+        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
     // Entry without check_id should be skipped
     assert_eq!(findings.len(), 1);
@@ -570,7 +571,7 @@ fn test_parse_semgrep_with_excluded_rule() {
     }"#;
     let runner = SemgrepRunner::new(vec![], vec!["python.lang.security".to_string()]);
     let findings =
-        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules)
+        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
     // python.lang.security.* should be excluded
     assert_eq!(findings.len(), 1);
@@ -588,7 +589,7 @@ fn test_parse_semgrep_aggregated_with_base_message_and_multiple() {
     }"#;
     let runner = SemgrepRunner::new(vec![], vec![]);
     let findings =
-        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules)
+        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
     assert_eq!(findings.len(), 1);
     // When base_message is not empty and other_count > 1: "Base issue found (and 2 other locations)"
@@ -606,7 +607,7 @@ fn test_parse_semgrep_aggregated_with_base_message_single_other() {
     }"#;
     let runner = SemgrepRunner::new(vec![], vec![]);
     let findings =
-        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules)
+        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
     assert_eq!(findings.len(), 1);
     // When base_message is not empty and other_count == 1: "Found issue (and 1 other location)" - singular
@@ -625,7 +626,7 @@ fn test_parse_semgrep_aggregated_empty_message_single_location() {
     }"#;
     let runner = SemgrepRunner::new(vec![], vec![]);
     let findings =
-        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules)
+        baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
     assert_eq!(findings.len(), 1);
     // Single location with empty message returns empty string as description
@@ -867,7 +868,8 @@ fn test_parse_json_output_with_missing_optional_fields() {
     // Missing extra.metadata
     let json = r#"{"results": [{"check_id": "test", "path": "f.py", "start": {"line": 1}, "extra": {"message": "m"}}]}"#;
     let findings =
-        baco::semgrep::parser::parse_json_output(json.as_bytes(), &runner.exclude_rules).unwrap();
+        baco::semgrep::parser::parse_json_output(json.as_bytes(), &runner.exclude_rules, &[])
+            .unwrap();
     assert_eq!(findings.len(), 1);
     assert!(findings[0].cwe_id.is_none());
 }
@@ -878,16 +880,19 @@ fn test_parse_json_output_aggregation_logic() {
 
     // Single finding - no aggregation
     let json_single = r#"{"results": [{"check_id": "single", "path": "f1.py", "start": {"line": 1}, "extra": {"message": "m"}}]}"#;
-    let findings =
-        baco::semgrep::parser::parse_json_output(json_single.as_bytes(), &runner.exclude_rules)
-            .unwrap();
+    let findings = baco::semgrep::parser::parse_json_output(
+        json_single.as_bytes(),
+        &runner.exclude_rules,
+        &[],
+    )
+    .unwrap();
     assert_eq!(findings.len(), 1);
     assert_eq!(findings[0].file_path, "f1.py");
 
     // Multiple findings with same check_id - aggregation
     let json_multi = r#"{"results": [{"check_id": "multi", "path": "f1.py", "start": {"line": 1}, "extra": {"message": "m"}}, {"check_id": "multi", "path": "f2.py", "start": {"line": 2}, "extra": {"message": "m"}}]}"#;
     let findings =
-        baco::semgrep::parser::parse_json_output(json_multi.as_bytes(), &runner.exclude_rules)
+        baco::semgrep::parser::parse_json_output(json_multi.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
     assert_eq!(findings.len(), 1);
     // Should use first finding's path

@@ -7,7 +7,7 @@ use crate::pipeline_test_helpers::{
 #[test]
 fn test_all_active_phases_exist() {
     let phases = active_phases();
-    assert_eq!(phases.len(), 24, "Should have 24 active phases");
+    assert_eq!(phases.len(), 23, "Should have 23 active phases");
 }
 
 #[test]
@@ -74,11 +74,11 @@ fn test_scan_phase_completeness() {
     all.extend(orphaned_phases());
     all.extend(terminal_phases());
 
-    // ScanPhase has 26 variants total
+    // ScanPhase has 25 variants total
     assert_eq!(
         all.len(),
-        26,
-        "All 26 ScanPhase variants must be categorized"
+        25,
+        "All 25 ScanPhase variants must be categorized"
     );
 }
 

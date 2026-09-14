@@ -286,7 +286,11 @@ pub async fn run_llm_discovery(
                         let converted: crate::findings::VulnerabilityFinding =
                             agent_finding.into_finding();
                         finding.description = converted.description;
-                        finding.severity = converted.severity;
+                        finding.severity = merge_agent_severity(
+                            finding.severity,
+                            converted.severity,
+                            &finding.title,
+                        );
                         finding.cwe_id = converted.cwe_id.or(finding.cwe_id.clone());
                         finding.line_number = converted.line_number.or(finding.line_number);
                         finding.diff_hunk = converted.diff_hunk.or(finding.diff_hunk.clone());
@@ -420,6 +424,29 @@ pub async fn run_llm_discovery(
 /// Split findings into (needs_discovery, already_described).
 /// already_described = findings carrying LlmAnalysis evidence; they must be
 /// preserved verbatim through the phase.
+/// Enrichment may raise a finding's severity but never lower it: detector-derived
+/// severity (rule metadata, curated) is authoritative; downgrades belong to the
+/// verification phase and must be visible there, not silently applied here.
+pub fn merge_agent_severity(
+    current: crate::findings::Severity,
+    suggested: crate::findings::Severity,
+    title: &str,
+) -> crate::findings::Severity {
+    if suggested > current {
+        suggested
+    } else if suggested < current {
+        tracing::warn!(
+            "Discovery suggested lowering severity of '{}' from {:?} to {:?}; keeping detector severity",
+            title,
+            current,
+            suggested
+        );
+        current
+    } else {
+        current
+    }
+}
+
 pub fn partition_for_discovery(
     findings: Vec<VulnerabilityFinding>,
 ) -> (Vec<VulnerabilityFinding>, Vec<VulnerabilityFinding>) {

@@ -6,6 +6,27 @@ use std::path::PathBuf;
 
 use super::rules::{parse_severity, RawFinding};
 
+/// Strip temp-file stem prefix from a Semgrep rule ID.
+///
+/// Semgrep prefixes rule IDs from local config files with the config file STEM,
+/// so findings arrive with check_id like `tmp.cpp-memcpy-variable-size-high` (stem
+/// "tmp.cpp..." + "-" + authored rule id). This function removes that prefix.
+///
+/// Returns the normalized check_id (with stem prefix removed if present), or the
+/// original if no matching stem is found.
+pub fn strip_rule_prefix(check_id: &str, stems: &[String]) -> String {
+    for stem in stems {
+        let prefix = format!("{}-", stem);
+        if check_id.starts_with(&prefix) {
+            let remainder = &check_id[prefix.len()..];
+            if !remainder.is_empty() {
+                return remainder.to_string();
+            }
+        }
+    }
+    check_id.to_string()
+}
+
 /// Read a file and extract lines around the target line for code snippet
 pub fn extract_code_snippet(file_path: &str, target_line: u32, context_lines: usize) -> String {
     let path = PathBuf::from(file_path);
@@ -54,6 +75,7 @@ pub fn extract_code_snippet(file_path: &str, target_line: u32, context_lines: us
 pub fn parse_json_output(
     json: &[u8],
     exclude_rules: &[String],
+    stems: &[String],
 ) -> Result<Vec<VulnerabilityFinding>, String> {
     let results: serde_json::Value =
         serde_json::from_slice(json).map_err(|e| format!("Failed to parse semgrep JSON: {}", e))?;
@@ -67,15 +89,18 @@ pub fn parse_json_output(
         .unwrap_or(&vec![])
         .iter()
     {
-        let check_id = match result.get("check_id").and_then(|v| v.as_str()) {
+        let raw_check_id = match result.get("check_id").and_then(|v| v.as_str()) {
             Some(id) => id,
             None => continue,
         };
 
+        // Normalize check_id by stripping temp-file stem prefix
+        let check_id = strip_rule_prefix(raw_check_id, stems);
+
         // Check if rule should be excluded
         let should_exclude = exclude_rules.iter().any(|pattern| {
             // Exact match
-            if check_id == pattern {
+            if check_id == *pattern {
                 return true;
             }
             // Prefix match (e.g., "python.lang" matches "python.lang.security")
@@ -115,9 +140,9 @@ pub fn parse_json_output(
             Some("ERROR") => Severity::High,
             Some("WARNING") => Severity::Medium,
             Some("INFO") | Some("INVENTORY") => Severity::Low,
-            _ => parse_severity(check_id),
+            _ => parse_severity(&check_id),
         };
-        let keyword_severity = parse_severity(check_id);
+        let keyword_severity = parse_severity(&check_id);
         let severity = if keyword_severity > base_severity {
             keyword_severity
         } else {

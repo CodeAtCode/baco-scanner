@@ -43,7 +43,6 @@ rulesets = ["p/python", "p/bandit", "p/security"]
 
 [scanner.performance]
 enable_incremental_scan = true
-enable_multi_verifier = false
 
 [llm]
 enable_llm_cache = true
