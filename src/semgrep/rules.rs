@@ -101,6 +101,7 @@ pub struct RawFinding {
 
 /// Map check_id to severity based on keyword matching
 pub fn parse_severity(check_id: &str) -> Severity {
+    // Keyword-based matching (substring), preserve raise-only semantics
     match check_id.to_lowercase().as_str() {
         s if s.contains("critical") => Severity::Critical,
         s if s.contains("high") => Severity::High,

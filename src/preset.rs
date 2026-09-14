@@ -9,6 +9,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::config::ScannerConfig;
+use crate::error::ScanError;
 
 /// Embedded preset names (bundled at compile time)
 pub const BUILTIN_PRESETS: &[&str] = &[
@@ -175,11 +176,10 @@ impl PresetOverlay {
 /// Load a preset by name, resolving from:
 /// 1. Bundled presets (via include_str! at compile time)
 /// 2. User directory: ~/.config/baco/presets/<name>.toml
-pub fn load_preset(name: &str) -> Result<PresetOverlay, String> {
+pub fn load_preset(name: &str) -> Result<PresetOverlay, ScanError> {
     // Check bundled presets first
     if let Some(content) = get_bundled_preset(name) {
-        return toml::from_str(content)
-            .map_err(|e| format!("Failed to parse bundled preset '{}': {}", name, e));
+        return toml::from_str(content).map_err(ScanError::from_toml_error);
     }
 
     // Check user directory
@@ -190,17 +190,18 @@ pub fn load_preset(name: &str) -> Result<PresetOverlay, String> {
         .join(format!("{}.toml", name));
 
     if user_preset_path.exists() {
-        let content = fs::read_to_string(&user_preset_path)
-            .map_err(|e| format!("Failed to read user preset '{}': {}", name, e))?;
-        return toml::from_str(&content)
-            .map_err(|e| format!("Failed to parse user preset '{}': {}", name, e));
+        let content = fs::read_to_string(&user_preset_path).map_err(ScanError::IoError)?;
+        return toml::from_str(&content).map_err(ScanError::from_toml_error);
     }
 
-    Err(format!(
-        "Unknown preset '{}'. Available presets: {}",
-        name,
-        list_available_presets().join(", ")
-    ))
+    Err(ScanError::Config {
+        message: format!(
+            "Unknown preset '{}'. Available presets: {}",
+            name,
+            list_available_presets().join(", ")
+        ),
+        source: None,
+    })
 }
 
 /// Get a bundled preset by name (embedded at compile time)

@@ -303,16 +303,18 @@ fn test_verification_prompt_includes_index_field_instruction() {
     let verification_path = Path::new("src/scanner/phases/llm_phases/verification.rs");
     let content =
         fs::read_to_string(verification_path).expect("Should be able to read verification.rs");
+    // The prompt lives in Rust string literals, so quotes appear escaped in the source
+    let unescaped = content.replace('\\', "");
 
     // Check that the instruction mentions the index field
     assert!(
-        content.contains("\"index\""),
+        unescaped.contains("\"index\""),
         "Verification prompt should include instruction about 'index' field"
     );
 
     // Check that it shows the example format with index
     assert!(
-        content.contains(r#""index": 0"#),
+        unescaped.contains("\"index\": 0"),
         "Verification prompt should show example with index value"
     );
 }
@@ -360,7 +362,7 @@ fn test_verification_batch_field_types() {
 
     // Test that string fields are properly handled
     let json_with_strings = r#"[
-        {"index": 1, "verification_status": "false_positive", "verification_notes": "Detailed notes here"}
+        {"index": 0, "verification_status": "false_positive", "verification_notes": "Detailed notes here"}
     ]"#;
 
     let results = parse_batch_verification_verdict(json_with_strings, 1);

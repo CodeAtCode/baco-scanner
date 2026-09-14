@@ -1,11 +1,12 @@
 use crate::config::ScannerConfig;
+use crate::error::ScanError;
 use crate::evidence::{classify_finding, VerificationTier};
 use crate::findings::{Severity, VulnerabilityFinding};
 
 pub fn generate_sarif_report(
     findings: &[VulnerabilityFinding],
     config: Option<&ScannerConfig>,
-) -> Result<String, String> {
+) -> Result<String, ScanError> {
     // Filter findings if evidence gate is enabled
     let filtered_findings = if let Some(cfg) = config {
         if cfg.output.evidence_gate {
@@ -158,6 +159,5 @@ pub fn generate_sarif_report(
             })
         ]
     });
-    serde_json::to_string_pretty(&sarif)
-        .map_err(|e| format!("Failed to serialize SARIF report: {}", e))
+    serde_json::to_string_pretty(&sarif).map_err(ScanError::from_json_error)
 }

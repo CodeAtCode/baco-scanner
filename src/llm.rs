@@ -181,7 +181,10 @@ impl Default for LlmConfig {
     }
 }
 
-/// Shared HTTP client, initialized once
+/// Shared HTTP client, initialized once.
+///
+/// Global by design; access serialized via OnceLock initialization;
+/// see test flake history for rationale.
 static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
 
 fn get_client() -> &'static reqwest::Client {

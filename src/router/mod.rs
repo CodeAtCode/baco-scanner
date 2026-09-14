@@ -89,7 +89,10 @@ impl CweRouter {
         Self::from_config(config)
     }
 
-    /// Domains shipped in registry.toml, embedded at compile time
+    /// Domains shipped in registry.toml, embedded at compile time.
+    ///
+    /// Global by design; access serialized via OnceLock initialization;
+    /// see test flake history for rationale.
     fn default_registry() -> RouterRegistry {
         static DEFAULT: std::sync::OnceLock<RouterRegistry> = std::sync::OnceLock::new();
         DEFAULT

@@ -1,0 +1,42 @@
+[
+  {
+    "id": "js-eval-001",
+    "title": "Arbitrary code execution via eval()",
+    "description": "The req.query.expr value from an Express route is passed to eval()",
+    "severity": "critical",
+    "confidence_score": 0.96,
+    "cwe_id": "CWE-95",
+    "file_path": "vulnerable.js",
+    "line_number": 13,
+    "code_snippet": "const result = eval(userExpr);",
+    "diff_hunk": null,
+    "recommendation": "Replace eval() with a fixed whitelist of operations or a safe parser",
+    "code_location": null,
+    "already_reported": false,
+    "sources": ["semgrep"],
+    "commit_reference": null,
+    "ticket_reference": null,
+    "priority_score": null,
+    "cross_file_references": null,
+    "verification_status": null,
+    "verification_notes": null,
+    "verification_error": null,
+    "agent_evidence_path": null,
+    "security_issue": {
+      "category": "injection",
+      "cwe_id": "CWE-95",
+      "owasp_category": null,
+      "mitre_attack": null,
+      "custom_tags": []
+    },
+    "poc_code": null,
+    "mitigation_code": null,
+    "poc_format": null,
+    "llm_model": null,
+    "agent_mode": false,
+    "statement_range": null,
+    "triage_verdict": null,
+    "evidence": [],
+    "verification_tier": null
+  }
+]

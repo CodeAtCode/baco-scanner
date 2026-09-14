@@ -46,6 +46,7 @@ fn create_test_config() -> config::ScannerConfig {
             include_rejected: false,
         },
         scanner: ScannerSettings {
+            profile: Default::default(),
             max_file_size_kb: 1024,
             exclude_paths: vec![],
             semgrep: baco::config::SemgrepSettings::default(),

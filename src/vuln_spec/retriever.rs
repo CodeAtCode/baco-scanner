@@ -11,6 +11,9 @@ use std::collections::HashMap;
 use std::sync::RwLock;
 
 /// Static embedding index for specifications
+/// Global by design: the spec embedding index is shared across phases within a scan.
+/// Mutations are serialized via the RwLock; tests that build or clear the index must
+/// run under #[serial] (see test flake history).
 pub static EMBEDDING_INDEX: Lazy<RwLock<SpecEmbeddingIndex>> =
     Lazy::new(|| RwLock::new(SpecEmbeddingIndex::new()));
 

@@ -1,6 +1,6 @@
 //! Unit tests for scanner/parallel.rs - parallel phase execution utilities
 //!
-//! Tests cover ParallelPhaseConfig, ParallelPhaseResult, phase execution functions,
+//! Tests cover ParallelSlot, ParallelPhaseResult, phase execution functions,
 //! and the combine_parallel_results function for parallel phase orchestration.
 
 use crate::fixtures::{
@@ -10,7 +10,7 @@ use crate::fixtures::{
 use baco::checkpoint::ScanPhase;
 use baco::findings::{Severity, VulnerabilityFinding};
 use baco::phase::helpers::create_test_finding_simple;
-use baco::scanner::{combine_parallel_results, ParallelPhaseConfig, ParallelPhaseResult};
+use baco::scanner::{combine_parallel_results, ParallelPhaseResult, ParallelSlot};
 use indicatif::ProgressBar;
 
 use std::time::Duration;
@@ -25,7 +25,7 @@ fn create_test_config() -> baco::config::ScannerConfig {
 }
 
 // ============================================================================
-// ParallelPhaseConfig Tests
+// ParallelSlot Tests
 // ============================================================================
 
 #[test]
@@ -33,7 +33,7 @@ fn test_parallel_phase_config_all_enabled() {
     let pb = ProgressBar::hidden();
     let completed_phases: [ScanPhase; 2] = [ScanPhase::Indexing, ScanPhase::Semgrep];
 
-    let config = ParallelPhaseConfig {
+    let config = ParallelSlot {
         indexing_enabled: true,
         semgrep_enabled: true,
         llm_static_enabled: true,
@@ -52,7 +52,7 @@ fn test_parallel_phase_config_all_disabled() {
     let pb = ProgressBar::hidden();
     let completed_phases: [ScanPhase; 0] = [];
 
-    let config = ParallelPhaseConfig {
+    let config = ParallelSlot {
         indexing_enabled: false,
         semgrep_enabled: false,
         llm_static_enabled: false,
@@ -71,7 +71,7 @@ fn test_parallel_phase_config_partial_enabled() {
     let pb = ProgressBar::hidden();
     let completed_phases: [ScanPhase; 1] = [ScanPhase::Indexing];
 
-    let config = ParallelPhaseConfig {
+    let config = ParallelSlot {
         indexing_enabled: true,
         semgrep_enabled: false,
         llm_static_enabled: true,
@@ -90,7 +90,7 @@ fn test_parallel_phase_config_empty_completed_phases() {
     let pb = ProgressBar::hidden();
     let completed_phases: [ScanPhase; 0] = [];
 
-    let config = ParallelPhaseConfig {
+    let config = ParallelSlot {
         indexing_enabled: true,
         semgrep_enabled: true,
         llm_static_enabled: true,
@@ -416,7 +416,7 @@ fn test_parallel_phase_config_with_single_completed_phase() {
     let pb = ProgressBar::hidden();
     let completed_phases: [ScanPhase; 1] = [ScanPhase::Complete];
 
-    let config = ParallelPhaseConfig {
+    let config = ParallelSlot {
         indexing_enabled: false,
         semgrep_enabled: false,
         llm_static_enabled: false,
@@ -601,7 +601,7 @@ async fn test_parallel_phase_config_creation_inline_migrated() {
     let pb = ProgressBar::hidden();
     let completed_phases: [ScanPhase; 2] = [ScanPhase::Indexing, ScanPhase::Semgrep];
 
-    let config = ParallelPhaseConfig {
+    let config = ParallelSlot {
         indexing_enabled: true,
         semgrep_enabled: true,
         llm_static_enabled: false,

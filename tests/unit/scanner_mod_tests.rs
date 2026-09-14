@@ -18,6 +18,7 @@ fn create_test_config() -> ScannerConfig {
         },
         scanner: ScannerSettings {
             max_file_size_kb: 1024,
+            profile: Default::default(),
             exclude_paths: vec![],
             semgrep: Default::default(),
             performance: PerformanceSettings::default(),

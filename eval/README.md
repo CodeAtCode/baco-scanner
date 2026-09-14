@@ -28,6 +28,32 @@ The eval command:
 3. Scores findings against expected/expected_suppressed
 4. Outputs precision, recall, and F1 score metrics
 
+### Suite mode (offline regression gate)
+
+```bash
+# Run every bundled target offline: no scanner, no LLM keys, no network
+baco eval            # no arguments = suite mode
+baco eval --all      # explicit
+
+cargo run --bin baco -- eval   # from a repository checkout
+```
+
+Suite mode iterates every `eval/oracles/*.json` target, scores its bundled
+findings fixture (`eval/findings/<target>.json`) against its oracle, prints a
+per-target pass-rate table plus the aggregate, and exits non-zero when the
+aggregate does not exceed the floor.
+
+**`BACO_EVAL_FLOOR` is the single knob.** It is a fraction in `0.0..=1.0`
+(default `0.70`), read from the environment. The suite passes only when the
+aggregate pass-rate (total matched / total expected across all targets) is
+*strictly greater* than the floor; an unset or empty value falls back to the
+default. **The default of 0.70 is provisional pending maintainer sign-off.**
+
+```bash
+# Fail unless the suite exceeds a stricter floor
+BACO_EVAL_FLOOR=0.9 baco eval
+```
+
 ### Environment mode (legacy)
 
 ```bash
@@ -112,8 +138,18 @@ async fn test_<target-name>_e2e() {
 
 ## Existing Targets
 
-- **py-sqli**: SQL injection via f-string (CWE-89)
-- **c-overflow**: Buffer overflow via unbounded memcpy (CWE-120/787)
+| Target | Language | Vulnerability class | CWE |
+|---|---|---|---|
+| py-sqli | Python | SQL injection via f-string | CWE-89 |
+| c-overflow | C | Buffer overflow via unbounded memcpy | CWE-120 |
+| php-sqli | PHP | SQL injection via `$_GET` concatenation | CWE-89 |
+| php-xss | PHP | Reflected XSS via unescaped `echo` | CWE-79 |
+| js-eval | JavaScript | Code injection via `eval()` of user input | CWE-95 |
+| js-path-traversal | JavaScript | Path traversal via `path.join` of user input | CWE-22 |
+| py-weak-hash | Python | Weak hash (MD5) for password storage | CWE-327 |
+| py-cmdi | Python | OS command injection via `os.system` | CWE-78 |
+| c-sprintf | C | Out-of-bounds write via unbounded `sprintf` | CWE-787 |
+| c-uaf | C | Use-after-free via dangling pointer read | CWE-416 |
 
 ## Fixture Guidelines
 

@@ -1,9 +1,16 @@
 //! Known-answer oracle scoring for evaluation fixtures.
 //!
 //! Parses oracle JSON files and scores scan findings against expected/expected-suppressed sets.
+//! Also provides the offline eval-suite runner that scores every bundled target
+//! against its oracle using its findings fixture.
 
 use crate::findings::VulnerabilityFinding;
 use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
+
+/// Default aggregate pass-rate floor for the eval suite.
+/// Overridden by the `BACO_EVAL_FLOOR` environment variable.
+pub const DEFAULT_EVAL_FLOOR: f32 = 0.70;
 
 /// Expected vulnerability location from an oracle file
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -47,6 +54,122 @@ pub struct ScoreReport {
 /// Parse an oracle JSON string into an OracleFile
 pub fn parse_oracle(json: &str) -> Result<OracleFile, String> {
     serde_json::from_str(json).map_err(|e| format!("Failed to parse oracle JSON: {}", e))
+}
+
+/// Per-target score within a suite run
+#[derive(Debug, Clone, Serialize)]
+pub struct TargetScore {
+    pub report: ScoreReport,
+    /// Fraction of expected findings matched (recall); 1.0 when nothing is expected
+    pub pass_rate: f32,
+}
+
+/// Aggregate result of scoring every target in an eval suite
+#[derive(Debug, Clone, Serialize)]
+pub struct SuiteReport {
+    pub targets: Vec<TargetScore>,
+    pub total_expected: usize,
+    pub total_matched: usize,
+    /// Micro-average pass rate: total matched / total expected
+    pub aggregate: f32,
+}
+
+/// Resolve the eval-suite floor: `BACO_EVAL_FLOOR` if set (must parse as f32 in 0.0..=1.0),
+/// otherwise [`DEFAULT_EVAL_FLOOR`].
+pub fn eval_floor() -> Result<f32, String> {
+    let Ok(raw) = std::env::var("BACO_EVAL_FLOOR") else {
+        return Ok(DEFAULT_EVAL_FLOOR);
+    };
+    let raw = raw.trim();
+    if raw.is_empty() {
+        return Ok(DEFAULT_EVAL_FLOOR);
+    }
+    let floor: f32 = raw
+        .parse()
+        .map_err(|e| format!("Invalid BACO_EVAL_FLOOR '{}': {}", raw, e))?;
+    if !(0.0..=1.0).contains(&floor) {
+        return Err(format!(
+            "BACO_EVAL_FLOOR must be between 0.0 and 1.0, got {}",
+            floor
+        ));
+    }
+    Ok(floor)
+}
+
+/// Run the offline eval suite over every target discovered under `eval_root`.
+///
+/// Targets are discovered from `<eval_root>/oracles/*.json`; each must be paired with
+/// a findings fixture `<eval_root>/findings/<target>.json`, which is scored against
+/// its oracle. Discovery is deterministic (oracles are processed in sorted order).
+pub fn run_suite(eval_root: &Path) -> Result<SuiteReport, String> {
+    let oracles_dir = eval_root.join("oracles");
+    let findings_dir = eval_root.join("findings");
+
+    if !oracles_dir.is_dir() {
+        return Err(format!(
+            "Eval oracles directory not found: {}",
+            oracles_dir.display()
+        ));
+    }
+
+    let mut oracle_paths: Vec<PathBuf> = std::fs::read_dir(&oracles_dir)
+        .map_err(|e| format!("Failed to read {}: {}", oracles_dir.display(), e))?
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.path())
+        .filter(|p| p.extension().is_some_and(|ext| ext == "json"))
+        .collect();
+    oracle_paths.sort();
+
+    if oracle_paths.is_empty() {
+        return Err(format!(
+            "No oracle files found in {}",
+            oracles_dir.display()
+        ));
+    }
+
+    let mut targets = Vec::with_capacity(oracle_paths.len());
+    for oracle_path in &oracle_paths {
+        let stem = oracle_path
+            .file_stem()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_default();
+        let oracle_json = std::fs::read_to_string(oracle_path)
+            .map_err(|e| format!("Failed to read {}: {}", oracle_path.display(), e))?;
+        let oracle =
+            parse_oracle(&oracle_json).map_err(|e| format!("{}: {}", oracle_path.display(), e))?;
+        if oracle.target != stem {
+            return Err(format!(
+                "Oracle {} declares target '{}' but the file stem is '{}'",
+                oracle_path.display(),
+                oracle.target,
+                stem
+            ));
+        }
+
+        let findings_path = findings_dir.join(format!("{}.json", stem));
+        let findings = crate::validation::validate_findings(&findings_path)
+            .map_err(|e| format!("Target {}: {}", oracle.target, e))?;
+        let report = score_findings(&oracle, &findings);
+        let pass_rate = if report.expected > 0 {
+            report.matched as f32 / report.expected as f32
+        } else {
+            1.0
+        };
+        targets.push(TargetScore { report, pass_rate });
+    }
+
+    let total_expected: usize = targets.iter().map(|t| t.report.expected).sum();
+    let total_matched: usize = targets.iter().map(|t| t.report.matched).sum();
+    if total_expected == 0 {
+        return Err("Eval suite contains no expected findings".to_string());
+    }
+
+    Ok(SuiteReport {
+        targets,
+        total_expected,
+        total_matched,
+        aggregate: total_matched as f32 / total_expected as f32,
+    })
 }
 
 /// Score findings against an oracle, returning a detailed report

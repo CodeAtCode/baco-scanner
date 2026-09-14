@@ -1,0 +1,42 @@
+[
+  {
+    "id": "c-sprintf-001",
+    "title": "Out-of-bounds write via unbounded sprintf",
+    "description": "sprintf copies an attacker-controlled name into a fixed 64-byte buffer with no length limit",
+    "severity": "critical",
+    "confidence_score": 0.93,
+    "cwe_id": "CWE-787",
+    "file_path": "vulnerable.c",
+    "line_number": 19,
+    "code_snippet": "sprintf(out, \"Hello, %s!\", name);",
+    "diff_hunk": null,
+    "recommendation": "Use snprintf with the destination buffer size",
+    "code_location": null,
+    "already_reported": false,
+    "sources": ["semgrep"],
+    "commit_reference": null,
+    "ticket_reference": null,
+    "priority_score": null,
+    "cross_file_references": null,
+    "verification_status": null,
+    "verification_notes": null,
+    "verification_error": null,
+    "agent_evidence_path": null,
+    "security_issue": {
+      "category": "memory_corruption",
+      "cwe_id": "CWE-787",
+      "owasp_category": null,
+      "mitre_attack": null,
+      "custom_tags": []
+    },
+    "poc_code": null,
+    "mitigation_code": null,
+    "poc_format": null,
+    "llm_model": null,
+    "agent_mode": false,
+    "statement_range": null,
+    "triage_verdict": null,
+    "evidence": [],
+    "verification_tier": null
+  }
+]

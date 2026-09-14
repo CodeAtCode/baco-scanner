@@ -1,4 +1,5 @@
 use crate::config::ScannerConfig;
+use crate::error::ScanError;
 use crate::evidence::classify_finding;
 use crate::findings::{Severity, VulnerabilityFinding};
 use crate::llm_metrics::LlmMetrics;
@@ -96,7 +97,7 @@ pub fn write_findings_json(
     config: Option<&ScannerConfig>,
     early_termination_info: Option<EarlyTerminationInfo>,
     scan_health: Option<ScanHealth>,
-) -> Result<(), String> {
+) -> Result<(), ScanError> {
     // JSON output contains ALL findings for transparency (no filtering)
     // but ensures every finding has verification_tier set when gate is enabled
     let mut findings_with_tier = findings.to_vec();
@@ -223,24 +224,20 @@ pub fn write_findings_json(
                 summary,
             };
 
-            serde_json::to_string_pretty(&full_report)
-                .map_err(|e| format!("Failed to serialize findings: {}", e))?
+            serde_json::to_string_pretty(&full_report).map_err(ScanError::from_json_error)?
         } else {
-            serde_json::to_string_pretty(&findings_with_tier)
-                .map_err(|e| format!("Failed to serialize findings: {}", e))?
+            serde_json::to_string_pretty(&findings_with_tier).map_err(ScanError::from_json_error)?
         }
     } else {
-        serde_json::to_string_pretty(&findings_with_tier)
-            .map_err(|e| format!("Failed to serialize findings: {}", e))?
+        serde_json::to_string_pretty(&findings_with_tier).map_err(ScanError::from_json_error)?
     };
 
     // Create parent directory if it doesn't exist
     if let Some(parent) = std::path::Path::new(output_path).parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| format!("Failed to create output directory: {}", e))?;
+        std::fs::create_dir_all(parent).map_err(ScanError::IoError)?;
     }
 
-    fs::write(output_path, json).map_err(|e| format!("Failed to write findings.json: {}", e))?;
+    fs::write(output_path, json).map_err(ScanError::IoError)?;
 
     Ok(())
 }

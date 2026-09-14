@@ -6,6 +6,7 @@ use crate::findings::{Severity, VulnerabilityFinding};
 use crate::scanner::checkpoint::EarlyTerminationInfo;
 use crate::scanner::checkpoint::{load_checkpoint_findings, save_checkpoint};
 use crate::scanner::helpers::log_and_aggregate_llm_results;
+use crate::scanner::phase_spec::PhaseSpec;
 
 use futures::future::join_all;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -416,89 +417,8 @@ async fn run_parallel_phases(
 }
 
 /// Return the list of sequential scan phases
-fn sequential_phases() -> [ScanPhase; 20] {
-    [
-        ScanPhase::CweRouting,
-        ScanPhase::RuleSynthesis,
-        ScanPhase::LlmDiscovery,
-        ScanPhase::LlmVerification,
-        ScanPhase::Validate,
-        ScanPhase::SecurityAgentVerification,
-        ScanPhase::TicketCrossRef,
-        ScanPhase::GitAnalysis,
-        ScanPhase::CrossFileAnalysis,
-        ScanPhase::ConfidenceScoring,
-        ScanPhase::AiAggregation,
-        // v3 features
-        ScanPhase::ThreatModeling,
-        ScanPhase::RootCauseDedup,
-        ScanPhase::MultiVerifier,
-        ScanPhase::AutoPatching,
-        ScanPhase::CveBootstrap,
-        ScanPhase::PocCompiler,
-        ScanPhase::ExploitSynth,
-        ScanPhase::VariantSearch,
-        ScanPhase::Reporting,
-    ]
-}
-
-/// Core phases: the set of phases that constitute a sensible default scan.
-/// These are the phases that run under profile="core".
-const CORE_PHASES: &[ScanPhase] = &[
-    ScanPhase::Indexing,
-    ScanPhase::Semgrep,
-    ScanPhase::CweRouting,
-    ScanPhase::LlmStaticAnalysis,
-    ScanPhase::LlmDiscovery,
-    ScanPhase::LlmVerification,
-    ScanPhase::TicketCrossRef,
-    ScanPhase::GitAnalysis,
-    ScanPhase::CrossFileAnalysis,
-    ScanPhase::ConfidenceScoring,
-    ScanPhase::AiAggregation,
-    ScanPhase::RootCauseDedup,
-    ScanPhase::CveBootstrap,
-    ScanPhase::Reporting,
-];
-
-/// Experimental phases: phases that are excluded from the core profile.
-/// These run only under profile="all" (and still respect individual feature flags).
-const EXPERIMENTAL_PHASES: &[ScanPhase] = &[
-    ScanPhase::CpgSlice,
-    ScanPhase::RuleSynthesis,
-    ScanPhase::Validate,
-    ScanPhase::SecurityAgentVerification,
-    ScanPhase::ThreatModeling,
-    ScanPhase::MultiVerifier,
-    ScanPhase::AutoPatching,
-    ScanPhase::PocCompiler,
-    ScanPhase::ExploitSynth,
-    ScanPhase::VariantSearch,
-];
-
-/// Check if a phase is part of the core profile
-fn is_core_phase(phase: &ScanPhase) -> bool {
-    CORE_PHASES.contains(phase)
-}
-
-/// Get the list of experimental phases as strings for logging
-fn experimental_phase_names() -> Vec<String> {
-    EXPERIMENTAL_PHASES
-        .iter()
-        .map(|p| match p {
-            ScanPhase::CpgSlice => "CpgSlice".to_string(),
-            ScanPhase::RuleSynthesis => "RuleSynthesis".to_string(),
-            ScanPhase::Validate => "Validate".to_string(),
-            ScanPhase::SecurityAgentVerification => "SecurityAgentVerification".to_string(),
-            ScanPhase::ThreatModeling => "ThreatModeling".to_string(),
-            ScanPhase::MultiVerifier => "MultiVerifier".to_string(),
-            ScanPhase::AutoPatching => "AutoPatching".to_string(),
-            ScanPhase::PocCompiler => "PocCompiler".to_string(),
-            ScanPhase::ExploitSynth => "ExploitSynth".to_string(),
-            ScanPhase::VariantSearch => "VariantSearch".to_string(),
-            _ => format!("{:?}", p),
-        })
-        .collect()
+fn sequential_phases() -> &'static [ScanPhase; 20] {
+    PhaseSpec::sequential()
 }
 
 /// Execute sequential phases
@@ -528,7 +448,7 @@ async fn run_sequential_phases(
         }
 
         // Profile-based skipping: skip experimental phases when profile=core
-        if profile == ScanPipelineProfile::Core && !is_core_phase(phase) {
+        if profile == ScanPipelineProfile::Core && !PhaseSpec::core_phases().contains(phase) {
             tracing::info!("profile=core: skipping experimental phase {:?}", phase);
             // Record as completed for checkpoint consistency
             if let Err(e) = save_checkpoint(
@@ -818,11 +738,11 @@ pub(super) async fn run_scanner(
     // Profile handling: log skipped experimental phases for core profile
     let profile = scanner.config.scanner.profile;
     if profile == ScanPipelineProfile::Core {
-        let skipped = experimental_phase_names();
+        let experimental = PhaseSpec::experimental_phases();
         tracing::info!(
             "profile=core: {} experimental phases skipped ({:?})",
-            skipped.len(),
-            skipped
+            experimental.len(),
+            experimental
         );
     } else {
         tracing::info!("profile=all: all phases enabled (individually flag-gated)");
@@ -882,7 +802,7 @@ pub(super) async fn run_scanner(
         health.record_phase_run(&phase);
     }
     for phase in sequential_phases() {
-        health.record_phase_run(&phase);
+        health.record_phase_run(phase);
     }
     health.set_analyzed(analyzed_files.len() as u64);
     let llm_metrics = scanner.metrics_tracker.finalize().await;

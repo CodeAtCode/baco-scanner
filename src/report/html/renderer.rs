@@ -1,4 +1,5 @@
 use crate::config::ScannerConfig;
+use crate::error::ScanError;
 use crate::evidence::classify_finding;
 pub use crate::findings::VulnerabilityFinding;
 use chrono::Utc;
@@ -15,7 +16,7 @@ pub fn generate_html_report(
     output_path: &str,
     config: Option<&ScannerConfig>,
     rejected_findings: Option<&[(crate::findings::VulnerabilityFinding, String)]>,
-) -> Result<(), String> {
+) -> Result<(), ScanError> {
     let gate_enabled = config.map(|c| c.output.evidence_gate).unwrap_or(false);
 
     let filtered_findings: Vec<VulnerabilityFinding> =
@@ -639,10 +640,9 @@ pub fn generate_html_report(
     ));
 
     if let Some(parent) = std::path::Path::new(output_path).parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| format!("Failed to create output directory: {}", e))?;
+        std::fs::create_dir_all(parent).map_err(ScanError::IoError)?;
     }
 
-    fs::write(output_path, html).map_err(|e| format!("Failed to write HTML report: {}", e))?;
+    fs::write(output_path, html).map_err(ScanError::IoError)?;
     Ok(())
 }

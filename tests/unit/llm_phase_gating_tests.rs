@@ -73,6 +73,7 @@ fn create_test_config_with_static_analysis() -> baco::config::ScannerConfig {
         },
         scanner: ScannerSettings {
             max_file_size_kb: 1024,
+            profile: Default::default(),
             exclude_paths: vec![],
             semgrep: baco::config::SemgrepSettings::default(),
             performance: baco::config::PerformanceSettings::default(),
@@ -82,6 +83,7 @@ fn create_test_config_with_static_analysis() -> baco::config::ScannerConfig {
             max_retries: 3,
             retry_backoff_ms: 1000,
             max_concurrent: 3,
+            pricing: Default::default(),
             temperature: 0.5,
             phases: LlmPhasesConfig {
                 static_analysis: LlmPhaseConfig {

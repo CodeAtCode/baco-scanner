@@ -25,184 +25,85 @@ pub struct PhaseGraph {
 impl PhaseGraph {
     /// Create the default phase graph with all scan phases in execution order.
     pub fn new() -> Self {
-        let phases = vec![
-            ScanPhase::Indexing,
-            ScanPhase::Semgrep,
-            ScanPhase::CpgSlice,
-            ScanPhase::LlmStaticAnalysis,
-            ScanPhase::CweRouting,
-            ScanPhase::RuleSynthesis,
-            ScanPhase::LlmDiscovery,
-            ScanPhase::LlmVerification,
-            ScanPhase::Validate,
-            ScanPhase::SecurityAgentVerification,
-            ScanPhase::TicketCrossRef,
-            ScanPhase::GitAnalysis,
-            ScanPhase::CrossFileAnalysis,
-            ScanPhase::ConfidenceScoring,
-            ScanPhase::AiAggregation,
-            ScanPhase::ThreatModeling,
-            ScanPhase::RootCauseDedup,
-            ScanPhase::MultiVerifier,
-            ScanPhase::AutoPatching,
-            ScanPhase::CveBootstrap,
-            ScanPhase::PocCompiler,
-            ScanPhase::ExploitSynth,
-            ScanPhase::VariantSearch,
-            ScanPhase::Reporting,
-        ];
+        use crate::scanner::phase_spec::PhaseSpec;
 
+        let phases: Vec<ScanPhase> = PhaseSpec::all().to_vec();
         let total = phases.len() as u8;
         let mut metadata = HashMap::new();
 
-        macro_rules! add_metadata {
-            ($phase:expr, $name:expr, $desc:expr, $num:expr) => {
-                metadata.insert(
-                    $phase.clone(),
-                    PhaseMetadata {
-                        display_name: $name.to_string(),
-                        description: $desc.to_string(),
-                        phase_number: $num,
-                        total_phases: total,
-                    },
-                );
+        // Build metadata from PhaseSpec slots
+        for (index, slot) in PhaseSpec::slots().iter().enumerate() {
+            let phase_number = (index + 1) as u8;
+            let display_name = match slot.phase {
+                ScanPhase::Indexing => "Indexing",
+                ScanPhase::Semgrep => "Semgrep",
+                ScanPhase::CpgSlice => "CPG Slice",
+                ScanPhase::LlmStaticAnalysis => "LLM Static Analysis",
+                ScanPhase::CweRouting => "CWE Routing",
+                ScanPhase::RuleSynthesis => "Rule Synthesis",
+                ScanPhase::LlmDiscovery => "LLM Discovery",
+                ScanPhase::LlmVerification => "LLM Verification",
+                ScanPhase::Validate => "Validate",
+                ScanPhase::SecurityAgentVerification => "SecurityAgent Verification",
+                ScanPhase::TicketCrossRef => "Ticket Cross-Reference",
+                ScanPhase::GitAnalysis => "Git Analysis",
+                ScanPhase::CrossFileAnalysis => "Cross-File Analysis",
+                ScanPhase::ConfidenceScoring => "Confidence Scoring",
+                ScanPhase::AiAggregation => "AI Aggregation",
+                ScanPhase::ThreatModeling => "Threat Modeling",
+                ScanPhase::RootCauseDedup => "Root Cause Deduplication",
+                ScanPhase::MultiVerifier => "Multi-Verifier",
+                ScanPhase::AutoPatching => "Auto-Patching",
+                ScanPhase::CveBootstrap => "CVE Bootstrap",
+                ScanPhase::PocCompiler => "PoC Compiler",
+                ScanPhase::ExploitSynth => "Exploit Synthesis",
+                ScanPhase::VariantSearch => "Variant Search",
+                ScanPhase::Reporting => "Reporting",
+                ScanPhase::Complete => "Complete",
+                ScanPhase::Error => "Error",
             };
-        }
 
-        add_metadata!(ScanPhase::Indexing, "Indexing", "Index project files", 1);
-        add_metadata!(
-            ScanPhase::Semgrep,
-            "Semgrep",
-            "Run Semgrep static analysis",
-            2
-        );
-        add_metadata!(
-            ScanPhase::CpgSlice,
-            "CPG Slice",
-            "Code Property Graph slicing (Joern)",
-            3
-        );
-        add_metadata!(
-            ScanPhase::LlmStaticAnalysis,
-            "LLM Static Analysis",
-            "Analyze files with LLM",
-            4
-        );
-        add_metadata!(
-            ScanPhase::CweRouting,
-            "CWE Routing",
-            "Route findings to specialized models",
-            5
-        );
-        add_metadata!(
-            ScanPhase::RuleSynthesis,
-            "Rule Synthesis",
-            "LLM-generated Semgrep rules (MoCQ)",
-            6
-        );
-        add_metadata!(
-            ScanPhase::LlmDiscovery,
-            "LLM Discovery",
-            "Enrich findings with AI context",
-            7
-        );
-        add_metadata!(
-            ScanPhase::LlmVerification,
-            "LLM Verification",
-            "Verify findings with AI",
-            8
-        );
-        add_metadata!(
-            ScanPhase::Validate,
-            "Validate",
-            "LLM-as-judge rationale check (CORRECT paper arxiv:2504.13474)",
-            9
-        );
-        add_metadata!(
-            ScanPhase::SecurityAgentVerification,
-            "SecurityAgent Verification",
-            "Tool-based verification",
-            10
-        );
-        add_metadata!(
-            ScanPhase::TicketCrossRef,
-            "Ticket Cross-Reference",
-            "Cross-reference with ticket systems",
-            11
-        );
-        add_metadata!(
-            ScanPhase::GitAnalysis,
-            "Git Analysis",
-            "Analyze Git history",
-            12
-        );
-        add_metadata!(
-            ScanPhase::CrossFileAnalysis,
-            "Cross-File Analysis",
-            "Analyze cross-file references",
-            13
-        );
-        add_metadata!(
-            ScanPhase::ConfidenceScoring,
-            "Confidence Scoring",
-            "Refine confidence scores",
-            14
-        );
-        add_metadata!(
-            ScanPhase::AiAggregation,
-            "AI Aggregation",
-            "Aggregate findings with AI",
-            15
-        );
-        add_metadata!(
-            ScanPhase::ThreatModeling,
-            "Threat Modeling",
-            "Generate threat model",
-            16
-        );
-        add_metadata!(
-            ScanPhase::RootCauseDedup,
-            "Root Cause Deduplication",
-            "Deduplicate by root cause",
-            17
-        );
-        add_metadata!(
-            ScanPhase::MultiVerifier,
-            "Multi-Verifier",
-            "Verify with multiple agents",
-            18
-        );
-        add_metadata!(
-            ScanPhase::AutoPatching,
-            "Auto-Patching",
-            "Generate patches automatically",
-            19
-        );
-        add_metadata!(
-            ScanPhase::CveBootstrap,
-            "CVE Bootstrap",
-            "Enrich with CVE data",
-            20
-        );
-        add_metadata!(
-            ScanPhase::PocCompiler,
-            "PoC Compiler",
-            "Compile and validate PoCs",
-            21
-        );
-        add_metadata!(
-            ScanPhase::ExploitSynth,
-            "Exploit Synthesis",
-            "Sandbox-verified exploit generation",
-            22
-        );
-        add_metadata!(
-            ScanPhase::VariantSearch,
-            "Variant Search",
-            "Search for code variants",
-            23
-        );
-        add_metadata!(ScanPhase::Reporting, "Reporting", "Generate reports", 24);
+            let description = match slot.phase {
+                ScanPhase::Indexing => "Index project files",
+                ScanPhase::Semgrep => "Run Semgrep static analysis",
+                ScanPhase::CpgSlice => "Code Property Graph slicing (Joern)",
+                ScanPhase::LlmStaticAnalysis => "Analyze files with LLM",
+                ScanPhase::CweRouting => "Route findings to specialized models",
+                ScanPhase::RuleSynthesis => "LLM-generated Semgrep rules (MoCQ)",
+                ScanPhase::LlmDiscovery => "Enrich findings with AI context",
+                ScanPhase::LlmVerification => "Verify findings with AI",
+                ScanPhase::Validate => {
+                    "LLM-as-judge rationale check (CORRECT paper arxiv:2504.13474)"
+                }
+                ScanPhase::SecurityAgentVerification => "Tool-based verification",
+                ScanPhase::TicketCrossRef => "Cross-reference with ticket systems",
+                ScanPhase::GitAnalysis => "Analyze Git history",
+                ScanPhase::CrossFileAnalysis => "Analyze cross-file references",
+                ScanPhase::ConfidenceScoring => "Refine confidence scores",
+                ScanPhase::AiAggregation => "Aggregate findings with AI",
+                ScanPhase::ThreatModeling => "Generate threat model",
+                ScanPhase::RootCauseDedup => "Deduplicate by root cause",
+                ScanPhase::MultiVerifier => "Verify with multiple agents",
+                ScanPhase::AutoPatching => "Generate patches automatically",
+                ScanPhase::CveBootstrap => "Enrich with CVE data",
+                ScanPhase::PocCompiler => "Compile and validate PoCs",
+                ScanPhase::ExploitSynth => "Sandbox-verified exploit generation",
+                ScanPhase::VariantSearch => "Search for code variants",
+                ScanPhase::Reporting => "Generate reports",
+                ScanPhase::Complete => "Scan complete",
+                ScanPhase::Error => "Error occurred",
+            };
+
+            metadata.insert(
+                slot.phase.clone(),
+                PhaseMetadata {
+                    display_name: display_name.to_string(),
+                    description: description.to_string(),
+                    phase_number,
+                    total_phases: total,
+                },
+            );
+        }
 
         Self { phases, metadata }
     }

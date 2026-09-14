@@ -81,7 +81,7 @@ fn test_unknown_preset_errors() {
     assert!(result.is_err(), "Unknown preset should error");
     let err = result.unwrap_err();
     assert!(
-        err.contains("Unknown preset"),
+        err.to_string().contains("Unknown preset"),
         "Error should mention unknown preset"
     );
 }

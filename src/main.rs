@@ -1,5 +1,6 @@
 use baco::config;
 use baco::doctor;
+use baco::init;
 use baco::preset;
 use baco::validation;
 use clap::{Parser, Subcommand};
@@ -55,14 +56,19 @@ enum Commands {
     },
     Eval {
         #[arg(long, help = "Target directory to evaluate")]
-        target: PathBuf,
+        target: Option<PathBuf>,
         #[arg(long, help = "Path to ground truth oracle JSON")]
-        ground_truth: PathBuf,
+        ground_truth: Option<PathBuf>,
         #[arg(
             long,
             help = "Path to findings JSON to score (optional - if omitted, runs scanner first)"
         )]
         findings: Option<PathBuf>,
+        #[arg(
+            long,
+            help = "Run the offline eval suite over all bundled targets (no arguments does the same)"
+        )]
+        all: bool,
     },
     Preset {
         #[command(subcommand)]
@@ -75,6 +81,15 @@ enum Commands {
         output_dir: Option<PathBuf>,
         #[arg(long, help = "Output results as JSON")]
         json: bool,
+    },
+    Init {
+        #[arg(
+            default_value = ".",
+            help = "Target directory to initialize (default: current directory)"
+        )]
+        path: PathBuf,
+        #[arg(long, help = "Overwrite existing baco.toml if it exists")]
+        force: bool,
     },
 }
 
@@ -191,12 +206,37 @@ async fn main() {
             target,
             ground_truth,
             findings,
+            all,
         } => {
-            info!("Running eval on target: {:?}", target);
-            run_eval(&target, &ground_truth, findings, cli.quiet).unwrap_or_else(|e| {
-                tracing::error!("Eval failed: {}", e);
+            if all && (target.is_some() || ground_truth.is_some() || findings.is_some()) {
+                tracing::error!(
+                    "--all cannot be combined with --target, --ground-truth, or --findings"
+                );
                 std::process::exit(1);
-            });
+            }
+
+            let suite_mode =
+                all || (target.is_none() && ground_truth.is_none() && findings.is_none());
+            if suite_mode {
+                let root = default_eval_root();
+                info!("Running eval suite over: {:?}", root);
+                run_eval_suite(&root, cli.quiet).unwrap_or_else(|e| {
+                    tracing::error!("Eval suite failed: {}", e);
+                    std::process::exit(1);
+                });
+            } else {
+                let (Some(target), Some(ground_truth)) = (target, ground_truth) else {
+                    tracing::error!(
+                        "eval requires both --target and --ground-truth (or no arguments / --all for suite mode)"
+                    );
+                    std::process::exit(1);
+                };
+                info!("Running eval on target: {:?}", target);
+                run_eval(&target, &ground_truth, findings, cli.quiet).unwrap_or_else(|e| {
+                    tracing::error!("Eval failed: {}", e);
+                    std::process::exit(1);
+                });
+            }
         }
         Commands::Preset { action } => run_preset_command(action, cli.quiet),
         Commands::Doctor {
@@ -205,6 +245,16 @@ async fn main() {
             json,
         } => {
             run_doctor(config.as_deref(), output_dir.as_deref(), json, cli.quiet);
+        }
+        Commands::Init { path, force } => {
+            let init_cmd = init::InitCommand { path, force };
+            match init::run_init(&init_cmd, cli.quiet) {
+                Ok(()) => {}
+                Err(e) => {
+                    tracing::error!("{}", e);
+                    std::process::exit(1);
+                }
+            }
         }
     }
 }
@@ -942,6 +992,73 @@ fn preset_content(name: &str) -> Option<&'static str> {
         "oss-python" => Some(include_str!("../presets/oss-python.toml")),
         "oss-monorepo" => Some(include_str!("../presets/oss-monorepo.toml")),
         _ => None,
+    }
+}
+
+/// Resolve the eval suite root: `./eval` when present, else the compile-time crate root.
+fn default_eval_root() -> PathBuf {
+    let local = PathBuf::from("eval");
+    if local.is_dir() {
+        return local;
+    }
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("eval")
+}
+
+/// Run the offline eval suite: score every bundled target's findings fixture against
+/// its oracle, print per-target pass-rates plus the aggregate, and fail when the
+/// aggregate does not exceed the floor (BACO_EVAL_FLOOR, default 0.70).
+fn run_eval_suite(eval_root: &Path, quiet: bool) -> Result<(), Box<dyn std::error::Error>> {
+    use baco::eval::{eval_floor, run_suite};
+
+    let suite = run_suite(eval_root)?;
+    let floor = eval_floor()?;
+
+    if !quiet {
+        println!("\n═══════════════════════════════════════");
+        println!("EVAL SUITE ({} targets)", suite.targets.len());
+        println!("═══════════════════════════════════════");
+        println!(
+            "{:<18} {:>8} {:>8} {:>7} {:>6} {:>10}",
+            "Target", "Expected", "Matched", "Missed", "Flags", "Pass-rate"
+        );
+        for t in &suite.targets {
+            println!(
+                "{:<18} {:>8} {:>8} {:>7} {:>6} {:>9.2}%",
+                t.report.target,
+                t.report.expected,
+                t.report.matched,
+                t.report.missed.len(),
+                t.report.false_flags,
+                t.pass_rate * 100.0
+            );
+        }
+        println!("───────────────────────────────────────");
+        println!(
+            "Aggregate pass-rate: {:.2}% ({}/{} findings matched)",
+            suite.aggregate * 100.0,
+            suite.total_matched,
+            suite.total_expected
+        );
+        println!("Floor: {:.2} (BACO_EVAL_FLOOR)", floor);
+        println!("═══════════════════════════════════════\n");
+    }
+
+    if suite.aggregate > floor {
+        if !quiet {
+            println!(
+                "SUITE PASS: aggregate {:.2}% exceeds floor {:.2}",
+                suite.aggregate * 100.0,
+                floor
+            );
+        }
+        Ok(())
+    } else {
+        Err(format!(
+            "SUITE FAIL: aggregate pass-rate {:.2}% does not exceed floor {:.2} (BACO_EVAL_FLOOR)",
+            suite.aggregate * 100.0,
+            floor
+        )
+        .into())
     }
 }
 

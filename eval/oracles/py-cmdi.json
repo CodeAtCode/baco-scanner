@@ -1,0 +1,18 @@
+{
+  "target": "py-cmdi",
+  "description": "OS command injection via os.system with concatenated user input",
+  "expected_findings": [
+    {
+      "file_path": "vulnerable.py",
+      "line": 16,
+      "cwe_id": "CWE-78",
+      "class": "OS Command Injection"
+    }
+  ],
+  "expected_suppressed": [
+    {
+      "file_path": "safe_twin.py",
+      "reason": "Argument-list twin - subprocess.run with shell=False and per-argument passing"
+    }
+  ]
+}

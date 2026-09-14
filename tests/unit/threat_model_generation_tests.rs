@@ -112,6 +112,7 @@ async fn test_generate_threat_model_with_llm_fallback_to_static() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
+        pricing: Default::default(),
     };
     let client = baco::llm::LlmClient::new(config);
 
@@ -151,6 +152,7 @@ async fn test_generate_threat_model_with_llm_fallback_empty_api_key() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
+        pricing: Default::default(),
     };
     let client = baco::llm::LlmClient::new(config);
 
@@ -189,6 +191,7 @@ async fn test_generate_threat_model_with_llm_fallback_architecture_aware() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
+        pricing: Default::default(),
     };
     let client = baco::llm::LlmClient::new(config);
 
@@ -232,6 +235,7 @@ async fn test_generate_threat_model_with_llm_fallback_all_stride_categories() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
+        pricing: Default::default(),
     };
     let client = baco::llm::LlmClient::new(config);
 
@@ -273,6 +277,7 @@ async fn test_generate_threat_model_with_llm_fallback_various_architectures() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
+        pricing: Default::default(),
     };
     let client = baco::llm::LlmClient::new(config);
 

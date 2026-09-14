@@ -3,22 +3,9 @@
 //! These tests read markdown files at test time and assert against facts derived from code.
 //! They fail CI if documentation becomes stale with respect to the implementation.
 
-/// Count ScanPhase variants from the checkpoint module source.
-/// Reads the source file and counts enum variants.
+/// Count ScanPhase variants from the single-source pipeline table.
 fn count_scan_phases_from_code() -> usize {
-    let source = include_str!("../../src/scanner/checkpoint.rs");
-    // Find the ScanPhase enum and count its variants
-    // Look for the all_phases array which lists all variants explicitly
-    let all_phases_start = source.find("let all_phases = [");
-    if let Some(start) = all_phases_start {
-        let rest = &source[start..];
-        let end = rest.find("];").unwrap_or(rest.len());
-        let array_content = &rest[..end];
-        // Count ScanPhase:: occurrences
-        array_content.matches("ScanPhase::").count()
-    } else {
-        0
-    }
+    baco::scanner::phase_spec::PhaseSpec::total()
 }
 
 /// Extract LLM_*_KEY environment variable names from env.rs source.

@@ -1,0 +1,18 @@
+{
+  "target": "c-sprintf",
+  "description": "Out-of-bounds write via unbounded sprintf into a fixed buffer",
+  "expected_findings": [
+    {
+      "file_path": "vulnerable.c",
+      "line": 19,
+      "cwe_id": "CWE-787",
+      "class": "Out-of-bounds Write"
+    }
+  ],
+  "expected_suppressed": [
+    {
+      "file_path": "safe_twin.c",
+      "reason": "Bounded twin - snprintf truncates output to the buffer size"
+    }
+  ]
+}

@@ -48,6 +48,7 @@ fn test_llm_config_from_env() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
+        pricing: Default::default(),
     };
 
     assert_eq!(config.base_url, "https://api.custom.com/v1");
@@ -73,6 +74,7 @@ fn test_llm_config_invalid() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
+        pricing: Default::default(),
     };
 
     // Config allows invalid values - validation happens at runtime
@@ -96,6 +98,7 @@ fn test_llm_config_get_models_priority() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
+        pricing: Default::default(),
     };
 
     let models = config.get_models();
@@ -150,6 +153,7 @@ fn test_llm_client_creation() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
+        pricing: Default::default(),
     };
 
     let client = LlmClient::new(config);
@@ -171,6 +175,7 @@ fn test_llm_client_with_multiple_models() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
+        pricing: Default::default(),
     };
 
     let client = LlmClient::new(config);
@@ -560,16 +565,15 @@ fn test_pricing_config_with_models() {
         api_key: "test-key".to_string(),
         model: "test-model".to_string(),
         models: vec![],
-        timeout_secs: 30,
+        timeout: 30,
         max_retries: 3,
         retry_backoff_ms: 1000,
         temperature: 0.5,
-        max_concurrent: 4,
-        phases: Default::default(),
+        max_concurrent: 3,
         max_reasoning_tokens: None,
         enable_llm_cache: false,
         cache_dir: None,
-        pricing,
+        pricing: pricing.clone(),
     };
 
     assert_eq!(config.pricing.len(), 2);
@@ -622,16 +626,15 @@ fn test_pricing_serialization() {
         api_key: "test-key".to_string(),
         model: "test-model".to_string(),
         models: vec![],
-        timeout_secs: 30,
+        timeout: 30,
         max_retries: 3,
         retry_backoff_ms: 1000,
         temperature: 0.5,
-        max_concurrent: 4,
-        phases: Default::default(),
+        max_concurrent: 3,
         max_reasoning_tokens: None,
         enable_llm_cache: false,
         cache_dir: None,
-        pricing,
+        pricing: pricing.clone(),
     };
 
     let json = serde_json::to_string(&config).unwrap();

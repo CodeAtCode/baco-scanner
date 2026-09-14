@@ -15,29 +15,11 @@ use std::fs;
 use std::path::PathBuf;
 use tempfile::TempDir;
 
-use crate::fixtures::make_finding_report_agg;
+use crate::fixtures::{create_test_config, make_finding_report_agg};
 
 // ============================================================================
 // Test Fixtures
 // ============================================================================
-
-fn create_test_config() -> baco::config::ScannerConfig {
-    baco::config::ScannerConfig {
-        output: OutputConfig {
-            dir: "/tmp/baco_test_output".to_string(),
-            evidence_gate: false,
-            include_rejected: false,
-        },
-        scanner: ScannerSettings {
-            performance: PerformanceSettings {
-                early_termination_threshold: 100.0,
-                ..Default::default()
-            },
-            ..Default::default()
-        },
-        ..Default::default()
-    }
-}
 
 fn create_test_finding() -> VulnerabilityFinding {
     let mut finding = make_finding_report_agg(
@@ -956,6 +938,7 @@ fn create_test_config_core_migrated() -> ScannerConfig {
         },
         scanner: ScannerSettings {
             max_file_size_kb: 1024,
+            profile: Default::default(),
             exclude_paths: vec![],
             semgrep: SemgrepSettings::default(),
             performance: PerformanceSettings::default(),
@@ -964,7 +947,8 @@ fn create_test_config_core_migrated() -> ScannerConfig {
             timeout_secs: 30,
             max_retries: 3,
             retry_backoff_ms: 1000,
-            max_concurrent: 4,
+            max_concurrent: 3,
+            pricing: Default::default(),
             phases: LlmPhasesConfig::default(),
             temperature: 0.5,
             max_reasoning_tokens: None,

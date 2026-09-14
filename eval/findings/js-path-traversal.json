@@ -1,0 +1,42 @@
+[
+  {
+    "id": "js-path-traversal-001",
+    "title": "Path traversal via path.join with user input",
+    "description": "The req.query.file value is joined to the base directory without a containment check",
+    "severity": "high",
+    "confidence_score": 0.94,
+    "cwe_id": "CWE-22",
+    "file_path": "vulnerable.js",
+    "line_number": 14,
+    "code_snippet": "const requested = path.join(BASE_DIR, req.query.file);",
+    "diff_hunk": null,
+    "recommendation": "Resolve the path and verify it stays inside the base directory before serving",
+    "code_location": null,
+    "already_reported": false,
+    "sources": ["semgrep"],
+    "commit_reference": null,
+    "ticket_reference": null,
+    "priority_score": null,
+    "cross_file_references": null,
+    "verification_status": null,
+    "verification_notes": null,
+    "verification_error": null,
+    "agent_evidence_path": null,
+    "security_issue": {
+      "category": "injection",
+      "cwe_id": "CWE-22",
+      "owasp_category": null,
+      "mitre_attack": null,
+      "custom_tags": []
+    },
+    "poc_code": null,
+    "mitigation_code": null,
+    "poc_format": null,
+    "llm_model": null,
+    "agent_mode": false,
+    "statement_range": null,
+    "triage_verdict": null,
+    "evidence": [],
+    "verification_tier": null
+  }
+]

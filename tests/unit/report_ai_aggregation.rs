@@ -33,6 +33,7 @@ fn make_config() -> LlmConfig {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
+        pricing: Default::default(),
     }
 }
 
@@ -50,6 +51,7 @@ fn make_config_empty() -> LlmConfig {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
+        pricing: Default::default(),
     }
 }
 

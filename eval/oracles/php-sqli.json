@@ -1,0 +1,18 @@
+{
+  "target": "php-sqli",
+  "description": "SQL injection via PHP string concatenation of $_GET into a query",
+  "expected_findings": [
+    {
+      "file_path": "vulnerable.php",
+      "line": 16,
+      "cwe_id": "CWE-89",
+      "class": "SQL Injection"
+    }
+  ],
+  "expected_suppressed": [
+    {
+      "file_path": "safe_twin.php",
+      "reason": "Prepared statement twin - binds the user value as a parameter instead of concatenation"
+    }
+  ]
+}

@@ -466,20 +466,16 @@ impl LlmAnalyzer {
     }
 
     /// Get file extensions for configured languages
+    /// Uses the unified LANGUAGE_EXTENSION_MAP from indexer.
     fn get_extensions(&self) -> HashMap<String, Vec<&str>> {
+        use std::collections::HashMap;
+
         let mut map = HashMap::new();
-        map.insert("c".to_string(), vec!["c", "h"]);
-        map.insert(
-            "cpp".to_string(),
-            vec!["cpp", "hpp", "cc", "hh", "cxx", "hxx"],
-        );
-        map.insert("python".to_string(), vec!["py", "pyw"]);
-        map.insert("javascript".to_string(), vec!["js", "jsx"]);
-        map.insert("typescript".to_string(), vec!["ts", "tsx"]);
-        map.insert("rust".to_string(), vec!["rs"]);
-        map.insert("go".to_string(), vec!["go"]);
-        map.insert("java".to_string(), vec!["java"]);
-        map.insert("php".to_string(), vec!["php", "phtml"]);
+        for &(ext, lang) in crate::indexer::LANGUAGE_EXTENSION_MAP {
+            map.entry(lang.to_string())
+                .or_insert_with(Vec::new)
+                .push(ext);
+        }
         map
     }
 
@@ -997,17 +993,12 @@ impl LlmAnalyzer {
     }
 
     /// Tree-sitter language name for a file extension, if a chunker exists.
+    /// Uses the unified LANGUAGE_EXTENSION_MAP from indexer.
     pub fn language_for_extension(ext: &str) -> Option<&'static str> {
-        match ext.to_lowercase().as_str() {
-            "php" | "phtml" => Some("php"),
-            "rs" => Some("rust"),
-            "py" | "pyw" => Some("python"),
-            "js" | "jsx" => Some("javascript"),
-            "ts" | "tsx" => Some("typescript"),
-            "c" | "h" => Some("c"),
-            "cpp" | "hpp" | "cc" | "hh" | "cxx" | "hxx" => Some("cpp"),
-            _ => None,
-        }
+        // Unified indexing map is the source, but this helper answers "can the
+        // chunker parse it" — only languages with a bundled tree-sitter grammar.
+        let lang = crate::indexer::language_for_extension(ext)?;
+        tree_sitter_language(lang).map(|_| lang)
     }
 
     /// Split `content` into line-exact chunks, each within `max_bytes`.

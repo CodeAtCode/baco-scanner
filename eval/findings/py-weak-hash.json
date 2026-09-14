@@ -1,0 +1,42 @@
+[
+  {
+    "id": "py-weak-hash-001",
+    "title": "Weak hash (MD5) for password storage",
+    "description": "Passwords are hashed with hashlib.md5, which is broken and fast to brute-force",
+    "severity": "high",
+    "confidence_score": 0.9,
+    "cwe_id": "CWE-327",
+    "file_path": "vulnerable.py",
+    "line_number": 15,
+    "code_snippet": "digest = hashlib.md5(password.encode()).hexdigest()",
+    "diff_hunk": null,
+    "recommendation": "Use a salted KDF such as PBKDF2-HMAC-SHA256, scrypt, or argon2",
+    "code_location": null,
+    "already_reported": false,
+    "sources": ["semgrep"],
+    "commit_reference": null,
+    "ticket_reference": null,
+    "priority_score": null,
+    "cross_file_references": null,
+    "verification_status": null,
+    "verification_notes": null,
+    "verification_error": null,
+    "agent_evidence_path": null,
+    "security_issue": {
+      "category": "cryptographic_misuse",
+      "cwe_id": "CWE-327",
+      "owasp_category": null,
+      "mitre_attack": null,
+      "custom_tags": []
+    },
+    "poc_code": null,
+    "mitigation_code": null,
+    "poc_format": null,
+    "llm_model": null,
+    "agent_mode": false,
+    "statement_range": null,
+    "triage_verdict": null,
+    "evidence": [],
+    "verification_tier": null
+  }
+]

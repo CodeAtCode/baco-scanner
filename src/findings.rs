@@ -32,6 +32,19 @@ pub enum Severity {
 }
 
 impl Severity {
+    /// Convert string label to Severity (case-insensitive).
+    /// Returns None for unrecognized labels.
+    pub fn from_label(label: &str) -> Option<Severity> {
+        match label.to_lowercase().as_str() {
+            "critical" => Some(Severity::Critical),
+            "high" => Some(Severity::High),
+            "medium" => Some(Severity::Medium),
+            "low" => Some(Severity::Low),
+            "info" | "informational" => Some(Severity::Info),
+            _ => None,
+        }
+    }
+
     /// Private helper for custom ordering: Critical > High > Medium > Low > Info
     const fn rank(&self) -> u8 {
         match self {

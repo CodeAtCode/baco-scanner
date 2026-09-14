@@ -11,6 +11,7 @@ pub mod enrichment;
 pub mod models;
 
 use crate::analysis_context::AnalysisContext;
+use crate::error::ScanError;
 use crate::findings::{VerificationStatus, VulnerabilityFinding};
 use crate::llm::LlmConfig;
 
@@ -37,7 +38,7 @@ impl AiAggregation {
     pub async fn generate_executive_summary(
         &self,
         findings: &[VulnerabilityFinding],
-    ) -> Result<String, String> {
+    ) -> Result<String, ScanError> {
         if findings.is_empty() {
             return Ok("No vulnerabilities found.".to_string());
         }
@@ -52,7 +53,7 @@ impl AiAggregation {
     pub async fn generate_risk_assessment(
         &self,
         findings: &[VulnerabilityFinding],
-    ) -> Result<String, String> {
+    ) -> Result<String, ScanError> {
         let avg_confidence = if !findings.is_empty() {
             findings.iter().map(|f| f.confidence_score).sum::<f32>() / findings.len() as f32
         } else {

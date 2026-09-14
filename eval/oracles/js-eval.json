@@ -1,0 +1,18 @@
+{
+  "target": "js-eval",
+  "description": "Arbitrary code execution via eval() of an Express query parameter",
+  "expected_findings": [
+    {
+      "file_path": "vulnerable.js",
+      "line": 13,
+      "cwe_id": "CWE-95",
+      "class": "Code Injection"
+    }
+  ],
+  "expected_suppressed": [
+    {
+      "file_path": "safe_twin.js",
+      "reason": "Whitelist dispatch twin - user input selects a fixed operation, never reaches eval()"
+    }
+  ]
+}

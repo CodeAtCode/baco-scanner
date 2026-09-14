@@ -1,0 +1,18 @@
+{
+  "target": "py-weak-hash",
+  "description": "Weak cryptographic hash (MD5) used for password storage",
+  "expected_findings": [
+    {
+      "file_path": "vulnerable.py",
+      "line": 15,
+      "cwe_id": "CWE-327",
+      "class": "Use of a Broken or Risky Cryptographic Algorithm"
+    }
+  ],
+  "expected_suppressed": [
+    {
+      "file_path": "safe_twin.py",
+      "reason": "KDF twin - salted PBKDF2-HMAC-SHA256 with high iteration count"
+    }
+  ]
+}

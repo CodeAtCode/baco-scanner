@@ -1,0 +1,18 @@
+{
+  "target": "php-xss",
+  "description": "Reflected XSS via unescaped echo of $_GET into HTML",
+  "expected_findings": [
+    {
+      "file_path": "vulnerable.php",
+      "line": 15,
+      "cwe_id": "CWE-79",
+      "class": "Cross-site Scripting"
+    }
+  ],
+  "expected_suppressed": [
+    {
+      "file_path": "safe_twin.php",
+      "reason": "Escaping twin - passes the user value through htmlspecialchars before echo"
+    }
+  ]
+}

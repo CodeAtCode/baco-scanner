@@ -28,7 +28,7 @@ pub struct VariantSearchPattern {
     pub context_keywords: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScannerSettings {
     #[serde(default = "default_max_file_size_kb")]
     pub max_file_size_kb: u64,
@@ -41,6 +41,18 @@ pub struct ScannerSettings {
     pub semgrep: SemgrepSettings,
     #[serde(default)]
     pub performance: PerformanceSettings,
+}
+
+impl Default for ScannerSettings {
+    fn default() -> Self {
+        Self {
+            max_file_size_kb: default_max_file_size_kb(),
+            exclude_paths: Vec::new(),
+            profile: ScanPipelineProfile::default(),
+            semgrep: SemgrepSettings::default(),
+            performance: PerformanceSettings::default(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

@@ -35,6 +35,7 @@
 #[path = "../fixtures/mod.rs"]
 mod centralized_fixtures;
 
+pub use centralized_fixtures::create_test_config as create_test_config_central;
 pub use centralized_fixtures::create_test_finding;
 pub use centralized_fixtures::create_test_finding as create_test_finding_central;
 pub use centralized_fixtures::make_finding_confidence;
@@ -216,7 +217,7 @@ pub fn create_test_config() -> ScannerConfig {
             },
             performance: PerformanceSettings {
                 enable_confidence_refinement: false,
-                early_termination_threshold: 0.0,
+                early_termination_threshold: 100.0,
                 ..Default::default()
             },
         },

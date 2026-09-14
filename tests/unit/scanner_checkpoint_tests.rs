@@ -4,7 +4,7 @@
 //! save_checkpoint/load_checkpoint_findings functions.
 
 use baco::checkpoint::{Checkpoint, ScanPhase};
-use baco::findings::{Severity, VulnerabilityFinding};
+use baco::findings::Severity;
 use std::fs;
 use std::path::Path;
 
@@ -54,7 +54,7 @@ fn create_test_checkpoint() -> Checkpoint {
     Checkpoint::new("test-scan-123", "/tmp/test-project", chrono::Utc::now())
 }
 
-fn create_test_finding() -> VulnerabilityFinding {
+fn create_test_finding() -> baco::findings::VulnerabilityFinding {
     let mut finding = make_finding_html(
         "test-finding-id",
         Severity::High,

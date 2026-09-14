@@ -1,0 +1,18 @@
+{
+  "target": "c-uaf",
+  "description": "Use-after-free via printf read of a heap pointer after free",
+  "expected_findings": [
+    {
+      "file_path": "vulnerable.c",
+      "line": 27,
+      "cwe_id": "CWE-416",
+      "class": "Use After Free"
+    }
+  ],
+  "expected_suppressed": [
+    {
+      "file_path": "safe_twin.c",
+      "reason": "Ordered twin - logs before free and clears the pointer immediately after"
+    }
+  ]
+}

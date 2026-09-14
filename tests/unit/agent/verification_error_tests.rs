@@ -8,7 +8,7 @@
 use crate::fixtures::mock_llm::MockLlmClient;
 use baco::agent::session::{AgentSession, ProgressCallback};
 use baco::config::AgentConfig;
-use baco::findings::{Severity, VerificationStatus, VulnerabilityFinding};
+use baco::findings::{VerificationStatus, VulnerabilityFinding};
 use baco::llm::ChatResponse;
 use serde_json::json;
 use std::sync::Arc;
@@ -41,7 +41,7 @@ fn create_test_finding() -> VulnerabilityFinding {
         "test.rs",
         Some(42),
         Some("CWE-120"),
-        Severity::High,
+        baco::findings::Severity::High,
     );
     finding.description = "A buffer overflow vulnerability in string handling".to_string();
     finding.code_snippet = Some("unsafe { strcpy(...) }".to_string());

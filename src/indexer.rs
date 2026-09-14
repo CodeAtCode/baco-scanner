@@ -272,31 +272,69 @@ impl FileIndex {
     }
 }
 
+/// Unified extension → language map.
+///
+/// This is the single source of truth for file extension to language mapping.
+/// All callers should use this instead of maintaining their own maps.
+pub const LANGUAGE_EXTENSION_MAP: &[(&str, &str)] = &[
+    // C
+    ("c", "c"),
+    ("h", "c"),
+    // C++
+    ("cpp", "cpp"),
+    ("hpp", "cpp"),
+    ("cc", "cpp"),
+    ("hh", "cpp"),
+    ("cxx", "cpp"),
+    ("hxx", "cpp"),
+    // Rust
+    ("rs", "rust"),
+    // Python
+    ("py", "python"),
+    ("pyw", "python"),
+    // JavaScript
+    ("js", "javascript"),
+    ("jsx", "javascript"),
+    // TypeScript
+    ("ts", "typescript"),
+    ("tsx", "typescript"),
+    // Go
+    ("go", "go"),
+    // Java
+    ("java", "java"),
+    // C#
+    ("cs", "csharp"),
+    // Ruby
+    ("rb", "ruby"),
+    // PHP
+    ("php", "php"),
+    ("phtml", "php"),
+];
+
+/// Get language extensions for the specified languages.
+///
+/// Returns a HashMap mapping file extensions to language names.
+/// Only includes extensions for languages specified in the input.
 pub fn get_language_extensions(languages: &[String]) -> std::collections::HashMap<String, String> {
     let mut map = std::collections::HashMap::new();
 
-    for lang in languages {
-        let exts = match lang.to_lowercase().as_str() {
-            "c" => vec!["c", "h"],
-            "cpp" | "c++" => vec!["cpp", "hpp", "cc", "hh", "cxx", "hxx"],
-            "rust" => vec!["rs"],
-            "python" => vec!["py"],
-            "javascript" => vec!["js", "jsx"],
-            "typescript" => vec!["ts", "tsx"],
-            "go" => vec!["go"],
-            "java" => vec!["java"],
-            "csharp" | "c#" => vec!["cs"],
-            "ruby" => vec!["rb"],
-            "php" => vec!["php"],
-            _ => continue,
-        };
-
-        for ext in exts {
-            map.insert(ext.to_string(), lang.clone());
+    for &(ext, lang) in LANGUAGE_EXTENSION_MAP {
+        if languages.iter().any(|l| l.to_lowercase().as_str() == lang) {
+            map.insert(ext.to_string(), lang.to_string());
         }
     }
 
     map
+}
+
+/// Get language name for a file extension.
+///
+/// Returns the tree-sitter language name if a chunker exists for this extension.
+pub fn language_for_extension(ext: &str) -> Option<&'static str> {
+    LANGUAGE_EXTENSION_MAP
+        .iter()
+        .find(|&(e, _)| e == &ext.to_lowercase())
+        .map(|(_, lang)| *lang)
 }
 
 /// Glob-based path exclusion matcher.

@@ -221,6 +221,8 @@ fn test_write_findings_json_with_llm_metrics() {
                 successful: 8,
                 failed: 2,
                 tokens: 5000,
+                prompt_tokens: 0,
+                completion_tokens: 0,
             },
         )]),
         positional_fallbacks: 0,

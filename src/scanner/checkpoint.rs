@@ -147,36 +147,9 @@ impl Checkpoint {
 
     pub fn resume_from(path: &str) -> Result<ScanPhase, String> {
         let checkpoint = Self::load(path)?;
-
-        Ok(match checkpoint.current_phase {
-            // Parallel phases (run concurrently: Indexing, Semgrep, CpgSlice, LlmStaticAnalysis)
-            ScanPhase::Indexing => ScanPhase::Semgrep,
-            ScanPhase::Semgrep => ScanPhase::CpgSlice,
-            ScanPhase::CpgSlice => ScanPhase::LlmStaticAnalysis,
-            ScanPhase::LlmStaticAnalysis => ScanPhase::CweRouting,
-            // Sequential phases (match sequential_phases array in orchestrator.rs)
-            ScanPhase::CweRouting => ScanPhase::RuleSynthesis,
-            ScanPhase::RuleSynthesis => ScanPhase::LlmDiscovery,
-            ScanPhase::LlmDiscovery => ScanPhase::LlmVerification,
-            ScanPhase::LlmVerification => ScanPhase::Validate,
-            ScanPhase::Validate => ScanPhase::SecurityAgentVerification,
-            ScanPhase::SecurityAgentVerification => ScanPhase::TicketCrossRef,
-            ScanPhase::TicketCrossRef => ScanPhase::GitAnalysis,
-            ScanPhase::GitAnalysis => ScanPhase::CrossFileAnalysis,
-            ScanPhase::CrossFileAnalysis => ScanPhase::ConfidenceScoring,
-            ScanPhase::ConfidenceScoring => ScanPhase::AiAggregation,
-            ScanPhase::AiAggregation => ScanPhase::ThreatModeling,
-            ScanPhase::ThreatModeling => ScanPhase::RootCauseDedup,
-            ScanPhase::RootCauseDedup => ScanPhase::MultiVerifier,
-            ScanPhase::MultiVerifier => ScanPhase::AutoPatching,
-            ScanPhase::AutoPatching => ScanPhase::CveBootstrap,
-            ScanPhase::CveBootstrap => ScanPhase::PocCompiler,
-            ScanPhase::PocCompiler => ScanPhase::ExploitSynth,
-            ScanPhase::ExploitSynth => ScanPhase::VariantSearch,
-            ScanPhase::VariantSearch => ScanPhase::Reporting,
-            ScanPhase::Reporting => ScanPhase::Complete,
-            ScanPhase::Complete | ScanPhase::Error => ScanPhase::Indexing,
-        })
+        Ok(crate::scanner::phase_spec::PhaseSpec::resume_from(
+            &checkpoint.current_phase,
+        ))
     }
 }
 

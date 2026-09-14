@@ -21,7 +21,7 @@ type FullPhaseResult = Result<
 
 /// Configuration for parallel phase execution
 #[allow(dead_code)]
-pub struct ParallelPhaseConfig<'a> {
+pub struct ParallelSlot<'a> {
     pub indexing_enabled: bool,
     pub semgrep_enabled: bool,
     pub llm_static_enabled: bool,

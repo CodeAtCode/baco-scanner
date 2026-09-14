@@ -47,6 +47,7 @@ fn test_llm_config_custom_values() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
+        pricing: Default::default(),
     };
     assert_eq!(config.base_url, "https://custom.api.com/v1");
     assert_eq!(config.api_key, "secret-key");
@@ -68,6 +69,7 @@ fn test_llm_config_get_models_with_models_vec() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
+        pricing: Default::default(),
     };
     let models = config.get_models();
     assert_eq!(models.len(), 2);
@@ -90,6 +92,7 @@ fn test_llm_config_get_models_with_single_model() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
+        pricing: Default::default(),
     };
     let models = config.get_models();
     assert_eq!(models.len(), 1);
@@ -111,6 +114,7 @@ fn test_llm_config_get_models_empty() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
+        pricing: Default::default(),
     };
     let models = config.get_models();
     assert!(models.is_empty());
@@ -131,6 +135,7 @@ fn test_llm_config_get_models_models_vec_takes_priority() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
+        pricing: Default::default(),
     };
     let models = config.get_models();
     assert_eq!(models.len(), 1);
@@ -156,6 +161,7 @@ fn test_llm_client_new_basic() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
+        pricing: Default::default(),
     };
     let client = LlmClient::new(config);
     assert_eq!(client.model_name(), "test-model");
@@ -176,6 +182,7 @@ fn test_llm_client_with_metrics_none() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
+        pricing: Default::default(),
     };
     let client = LlmClient::with_metrics(config, None);
     assert_eq!(client.model_name(), "test-model");
@@ -196,6 +203,7 @@ fn test_llm_client_with_multiple_models_creates_selector() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
+        pricing: Default::default(),
     };
     let client = LlmClient::new(config);
     // With multiple models, an AtomicModelSelector should be created
@@ -219,6 +227,7 @@ fn test_llm_client_get_all_models_single() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
+        pricing: Default::default(),
     };
     let client = LlmClient::new(config);
     let models = client.get_all_models();
@@ -241,6 +250,7 @@ fn test_llm_client_model_name_with_models_vec() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
+        pricing: Default::default(),
     };
     let client = LlmClient::new(config);
     // First call should return first model
@@ -472,6 +482,7 @@ fn test_llm_config_clone() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
+        pricing: Default::default(),
     };
     let cloned = config.clone();
     assert_eq!(cloned.base_url, config.base_url);
@@ -501,6 +512,7 @@ fn test_llm_config_full_serialization_roundtrip() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
+        pricing: Default::default(),
     };
     let serialized = serde_json::to_string(&config).unwrap();
     let deserialized: LlmConfig = serde_json::from_str(&serialized).unwrap();

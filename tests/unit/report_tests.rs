@@ -367,6 +367,7 @@ fn make_llm_config(models: Vec<&str>) -> LlmConfig {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
+        pricing: Default::default(),
     }
 }
 

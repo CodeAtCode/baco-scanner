@@ -1,0 +1,18 @@
+{
+  "target": "js-path-traversal",
+  "description": "Path traversal via path.join of an Express query parameter with a base directory",
+  "expected_findings": [
+    {
+      "file_path": "vulnerable.js",
+      "line": 14,
+      "cwe_id": "CWE-22",
+      "class": "Path Traversal"
+    }
+  ],
+  "expected_suppressed": [
+    {
+      "file_path": "safe_twin.js",
+      "reason": "Containment twin - resolves the path and rejects anything outside the base directory"
+    }
+  ]
+}

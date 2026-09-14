@@ -296,7 +296,7 @@ fn test_static_analysis_field_types_in_prompt() {
         if let Some(arr) = value.as_array() {
             if let Some(first_obj) = arr.first().and_then(|v| v.as_object()) {
                 for (field_name, expected_type, _) in STATIC_ANALYSIS_FIELDS.iter() {
-                    if let Some(field_value) = first_obj.get(field_name) {
+                    if let Some(field_value) = first_obj.get(*field_name) {
                         let actual_type = match field_value {
                             serde_json::Value::String(_) => "string",
                             serde_json::Value::Number(_) => "integer",
@@ -319,7 +319,7 @@ fn test_static_analysis_field_types_in_prompt() {
 
                         // For this test, we're lenient - just log if types don't match
                         // The important thing is the field exists
-                        if actual_type != expected_type {
+                        if actual_type != *expected_type {
                             tracing::debug!(
                                 "Field '{}' has type '{}' in example, expected '{}'",
                                 field_name,
