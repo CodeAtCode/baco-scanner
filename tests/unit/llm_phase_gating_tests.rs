@@ -12,7 +12,7 @@
 use baco::checkpoint::ScanPhase;
 use baco::config::{AgentConfig, LlmPhaseConfig, LlmPhasesConfig, ScannerSettings};
 use baco::findings::{Severity, VerificationStatus, VulnerabilityFinding};
-use baco::llm_metrics::LlmMetricsTracker;
+use baco::llm::metrics::LlmMetricsTracker;
 use baco::scanner::phases::{run_phase, PhaseConfig};
 use baco::scanner::Scanner;
 use indicatif::ProgressBar;
@@ -61,6 +61,7 @@ fn create_test_finding(id: &str, severity: Severity) -> VulnerabilityFinding {
 
 fn create_test_config_with_static_analysis() -> baco::config::ScannerConfig {
     baco::config::ScannerConfig {
+        eval: Default::default(),
         project: baco::config::ProjectConfig {
             name: "test-project".to_string(),
             path: ".".to_string(),

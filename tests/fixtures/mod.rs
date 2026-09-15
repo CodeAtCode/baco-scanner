@@ -36,6 +36,7 @@ pub mod mock_llm;
 pub fn create_test_config() -> ScannerConfig {
     eprintln!("DEBUG: create_test_config called from fixtures/mod.rs");
     ScannerConfig {
+        eval: Default::default(),
         project: ProjectConfig {
             name: "test-project".to_string(),
             path: ".".to_string(),

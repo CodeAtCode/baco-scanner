@@ -24,7 +24,6 @@ pub enum ScanPhase {
     // v3 features
     ThreatModeling,
     RootCauseDedup,
-    MultiVerifier,
     AutoPatching,
     CveBootstrap,
     PocCompiler,
@@ -58,7 +57,6 @@ impl fmt::Display for ScanPhase {
             ScanPhase::Reporting => write!(f, "Reporting"),
             ScanPhase::ThreatModeling => write!(f, "ThreatModeling"),
             ScanPhase::RootCauseDedup => write!(f, "RootCauseDedup"),
-            ScanPhase::MultiVerifier => write!(f, "MultiVerifier"),
             ScanPhase::AutoPatching => write!(f, "AutoPatching"),
             ScanPhase::CveBootstrap => write!(f, "CveBootstrap"),
             ScanPhase::PocCompiler => write!(f, "PocCompiler"),
@@ -160,7 +158,7 @@ pub async fn save_checkpoint(
     findings: &[VulnerabilityFinding],
     analyzed_files: &[String],
     phase: &ScanPhase,
-    metrics_tracker: &crate::llm_metrics::LlmMetricsTracker,
+    metrics_tracker: &crate::llm::metrics::LlmMetricsTracker,
     early_termination_info: Option<EarlyTerminationInfo>,
 ) -> Result<(), String> {
     let scan_id = format!("scan-{}", chrono::Utc::now().format("%Y%m%d-%H%M%S"));
@@ -215,7 +213,6 @@ pub async fn save_checkpoint(
         ScanPhase::AiAggregation,
         ScanPhase::ThreatModeling,
         ScanPhase::RootCauseDedup,
-        ScanPhase::MultiVerifier,
         ScanPhase::AutoPatching,
         ScanPhase::CveBootstrap,
         ScanPhase::PocCompiler,

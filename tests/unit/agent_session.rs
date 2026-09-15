@@ -15,7 +15,6 @@ use baco::config::AgentConfig;
 use baco::findings::{Severity, VerificationStatus, VulnerabilityFinding};
 use baco::llm::ChatResponse;
 use serde_json::json;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 
 /// Helper to create a minimal AgentConfig for tests
@@ -156,80 +155,6 @@ fn test_session_has_tool_registry() {
 // ============================================================================
 // Progress Callback Tests
 // ============================================================================
-
-#[test]
-fn test_progress_callback_basic() {
-    let called = Arc::new(AtomicBool::new(false));
-    let called_clone = called.clone();
-
-    let progress_cb: ProgressCallback = Arc::new(move |_msg| {
-        called_clone.store(true, Ordering::SeqCst);
-    });
-
-    progress_cb("test message".to_string());
-
-    assert!(called.load(Ordering::SeqCst));
-}
-
-#[test]
-fn test_progress_callback_with_counter() {
-    let count = Arc::new(AtomicUsize::new(0));
-    let count_clone = count.clone();
-
-    let progress_cb: ProgressCallback = Arc::new(move |_msg| {
-        count_clone.fetch_add(1, Ordering::SeqCst);
-    });
-
-    progress_cb("msg1".to_string());
-    progress_cb("msg2".to_string());
-    progress_cb("msg3".to_string());
-
-    assert_eq!(count.load(Ordering::SeqCst), 3);
-}
-
-#[test]
-fn test_progress_callback_thread_safe() {
-    let called = Arc::new(AtomicBool::new(false));
-    let called_clone = called.clone();
-    let progress_cb: ProgressCallback = Arc::new(move |_msg| {
-        called_clone.store(true, Ordering::SeqCst);
-    });
-
-    // Clone and call from "another thread" (simulated)
-    let progress_cb_clone = progress_cb.clone();
-    progress_cb_clone("from clone".to_string());
-
-    assert!(called.load(Ordering::SeqCst));
-}
-
-#[test]
-fn test_progress_callback_empty_message() {
-    let called = Arc::new(AtomicBool::new(false));
-    let called_clone = called.clone();
-
-    let progress_cb: ProgressCallback = Arc::new(move |_msg| {
-        called_clone.store(true, Ordering::SeqCst);
-    });
-
-    progress_cb("".to_string());
-
-    assert!(called.load(Ordering::SeqCst));
-}
-
-#[test]
-fn test_progress_callback_long_message() {
-    let called = Arc::new(AtomicBool::new(false));
-    let called_clone = called.clone();
-
-    let progress_cb: ProgressCallback = Arc::new(move |_msg| {
-        called_clone.store(true, Ordering::SeqCst);
-    });
-
-    let long_msg = "a".repeat(10000);
-    progress_cb(long_msg);
-
-    assert!(called.load(Ordering::SeqCst));
-}
 
 // ============================================================================
 // analyze_file Tests - Basic Scenarios

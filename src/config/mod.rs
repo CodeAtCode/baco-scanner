@@ -21,6 +21,26 @@ use std::fmt;
 use std::fs;
 use std::path::PathBuf;
 
+/// Eval-suite settings (`[eval]` section).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EvalConfig {
+    /// Minimum aggregate pass-rate for `baco eval` (0.0..=1.0).
+    #[serde(default = "default_eval_floor")]
+    pub floor: f32,
+}
+
+fn default_eval_floor() -> f32 {
+    0.70
+}
+
+impl Default for EvalConfig {
+    fn default() -> Self {
+        Self {
+            floor: default_eval_floor(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ScannerConfig {
     #[serde(default)]
@@ -63,6 +83,8 @@ pub struct ScannerConfig {
     pub agent_scaffold: AgentScaffoldConfig,
     #[serde(default)]
     pub pacvd: PacvdConfig,
+    #[serde(default)]
+    pub eval: EvalConfig,
     #[serde(default)]
     pub agent_flow: AgentFlowConfig,
     #[serde(default)]

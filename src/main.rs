@@ -69,6 +69,8 @@ enum Commands {
             help = "Run the offline eval suite over all bundled targets (no arguments does the same)"
         )]
         all: bool,
+        #[arg(long, help = "Path to config file (reads the [eval] section)")]
+        config: Option<PathBuf>,
     },
     Preset {
         #[command(subcommand)]
@@ -207,6 +209,7 @@ async fn main() {
             ground_truth,
             findings,
             all,
+            config,
         } => {
             if all && (target.is_some() || ground_truth.is_some() || findings.is_some()) {
                 tracing::error!(
@@ -215,12 +218,23 @@ async fn main() {
                 std::process::exit(1);
             }
 
+            let app_config = match config.as_deref() {
+                Some(p) => match baco::config::ScannerConfig::from_file(&p.to_string_lossy()) {
+                    Ok(c) => c,
+                    Err(e) => {
+                        tracing::error!("Failed to load config {}: {}", p.display(), e);
+                        std::process::exit(1);
+                    }
+                },
+                None => baco::config::ScannerConfig::default(),
+            };
+
             let suite_mode =
                 all || (target.is_none() && ground_truth.is_none() && findings.is_none());
             if suite_mode {
                 let root = default_eval_root();
                 info!("Running eval suite over: {:?}", root);
-                run_eval_suite(&root, cli.quiet).unwrap_or_else(|e| {
+                run_eval_suite(&root, cli.quiet, app_config.eval.floor).unwrap_or_else(|e| {
                     tracing::error!("Eval suite failed: {}", e);
                     std::process::exit(1);
                 });
@@ -1007,11 +1021,15 @@ fn default_eval_root() -> PathBuf {
 /// Run the offline eval suite: score every bundled target's findings fixture against
 /// its oracle, print per-target pass-rates plus the aggregate, and fail when the
 /// aggregate does not exceed the floor (BACO_EVAL_FLOOR, default 0.70).
-fn run_eval_suite(eval_root: &Path, quiet: bool) -> Result<(), Box<dyn std::error::Error>> {
+fn run_eval_suite(
+    eval_root: &Path,
+    quiet: bool,
+    config_floor: f32,
+) -> Result<(), Box<dyn std::error::Error>> {
     use baco::eval::{eval_floor, run_suite};
 
     let suite = run_suite(eval_root)?;
-    let floor = eval_floor()?;
+    let (floor, source) = eval_floor(config_floor)?;
 
     if !quiet {
         println!("\n═══════════════════════════════════════");
@@ -1039,7 +1057,7 @@ fn run_eval_suite(eval_root: &Path, quiet: bool) -> Result<(), Box<dyn std::erro
             suite.total_matched,
             suite.total_expected
         );
-        println!("Floor: {:.2} (BACO_EVAL_FLOOR)", floor);
+        println!("Floor: {:.2} ({})", floor, source);
         println!("═══════════════════════════════════════\n");
     }
 
@@ -1054,9 +1072,10 @@ fn run_eval_suite(eval_root: &Path, quiet: bool) -> Result<(), Box<dyn std::erro
         Ok(())
     } else {
         Err(format!(
-            "SUITE FAIL: aggregate pass-rate {:.2}% does not exceed floor {:.2} (BACO_EVAL_FLOOR)",
+            "SUITE FAIL: aggregate pass-rate {:.2}% does not exceed floor {:.2} ({})",
             suite.aggregate * 100.0,
-            floor
+            floor,
+            source
         )
         .into())
     }

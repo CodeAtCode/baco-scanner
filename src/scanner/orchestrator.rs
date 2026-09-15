@@ -616,7 +616,6 @@ async fn run_sequential_phases(
                     ScanPhase::AiAggregation => "AiAggregation",
                     ScanPhase::ThreatModeling => "ThreatModeling",
                     ScanPhase::RootCauseDedup => "RootCauseDedup",
-                    ScanPhase::MultiVerifier => "MultiVerifier",
                     ScanPhase::AutoPatching => "AutoPatching",
                     ScanPhase::CveBootstrap => "CveBootstrap",
                     ScanPhase::PocCompiler => "PocCompiler",

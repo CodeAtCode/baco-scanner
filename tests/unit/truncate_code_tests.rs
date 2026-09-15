@@ -3,10 +3,10 @@
 //! These tests verify that truncate_code correctly handles multi-byte UTF-8
 //! characters without panicking when the byte limit falls mid-character.
 
+use baco::llm::metrics::LlmMetricsTracker;
 use baco::llm::LlmClient;
 use baco::llm::LlmConfig;
 use baco::llm_analysis::LlmAnalyzer;
-use baco::llm_metrics::LlmMetricsTracker;
 use std::sync::Arc;
 
 fn create_analyzer() -> LlmAnalyzer {

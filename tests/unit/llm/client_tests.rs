@@ -147,27 +147,6 @@ fn test_llm_config_get_models_models_vec_takes_priority() {
 // ============================================================================
 
 #[test]
-fn test_llm_client_new_basic() {
-    let config = LlmConfig {
-        base_url: "https://api.test.com/v1".to_string(),
-        api_key: "test-key".to_string(),
-        model: "test-model".to_string(),
-        models: vec![],
-        timeout: 30,
-        max_retries: 3,
-        retry_backoff_ms: 1000,
-        temperature: 0.7,
-        max_reasoning_tokens: None,
-        enable_llm_cache: false,
-        cache_dir: None,
-        max_concurrent: 3,
-        pricing: Default::default(),
-    };
-    let client = LlmClient::new(config);
-    assert_eq!(client.model_name(), "test-model");
-}
-
-#[test]
 fn test_llm_client_with_metrics_none() {
     let config = LlmConfig {
         base_url: "https://api.test.com/v1".to_string(),
@@ -601,4 +580,109 @@ fn test_chat_with_empty_tools_payload() {
 
     assert!(payload.get("tools").is_none());
     assert_eq!(payload["model"], "gpt-4");
+}
+
+// ============================================================================
+// Endpoint URL Construction Tests (the /v1 doubling regression class)
+// ============================================================================
+
+#[test]
+fn test_chat_endpoint_strips_existing_v1() {
+    // Base URL already has /v1 - should not double it
+    assert_eq!(
+        baco::llm::chat_endpoint("https://api.mistral.ai/v1"),
+        "https://api.mistral.ai/v1/chat/completions"
+    );
+}
+
+#[test]
+fn test_chat_endpoint_adds_v1_when_missing() {
+    // Base URL without /v1 - should add it
+    assert_eq!(
+        baco::llm::chat_endpoint("https://llm.example.com"),
+        "https://llm.example.com/v1/chat/completions"
+    );
+}
+
+#[test]
+fn test_chat_endpoint_handles_trailing_slash_with_v1() {
+    // Trailing slash with /v1 - should normalize correctly
+    assert_eq!(
+        baco::llm::chat_endpoint("https://api.openai.com/v1/"),
+        "https://api.openai.com/v1/chat/completions"
+    );
+}
+
+#[test]
+fn test_chat_endpoint_handles_trailing_slash_without_v1() {
+    // Trailing slash without /v1 - should add /v1
+    assert_eq!(
+        baco::llm::chat_endpoint("http://localhost:8080/"),
+        "http://localhost:8080/v1/chat/completions"
+    );
+}
+
+// ============================================================================
+// Retry Classification Tests
+// ============================================================================
+
+#[test]
+fn test_classify_retryable_400_fail_fast() {
+    // 400 should not retry - malformed request
+    let (should_retry, retry_after) = LlmClient::classify_retryable(400, None);
+    assert!(!should_retry);
+    assert!(retry_after.is_none());
+}
+
+#[test]
+fn test_classify_retryable_401_403_auth_errors() {
+    // 401/403 should not retry - authentication errors
+    let (should_retry, _) = LlmClient::classify_retryable(401, None);
+    assert!(!should_retry);
+
+    let (should_retry, _) = LlmClient::classify_retryable(403, None);
+    assert!(!should_retry);
+}
+
+#[test]
+fn test_classify_retryable_408_timeout_retryable() {
+    // 408 should retry - timeout
+    let (should_retry, _) = LlmClient::classify_retryable(408, None);
+    assert!(should_retry);
+}
+
+#[test]
+fn test_classify_retryable_429_rate_limit_with_retry_after() {
+    // 429 should retry and honor Retry-After header
+    let (should_retry, retry_after) = LlmClient::classify_retryable(429, Some(30));
+    assert!(should_retry);
+    assert_eq!(retry_after, Some(30));
+}
+
+#[test]
+fn test_classify_retryable_500_server_errors() {
+    // 5xx should retry - server errors
+    let (should_retry, _) = LlmClient::classify_retryable(500, None);
+    assert!(should_retry);
+
+    let (should_retry, _) = LlmClient::classify_retryable(503, None);
+    assert!(should_retry);
+
+    let (should_retry, _) = LlmClient::classify_retryable(599, None);
+    assert!(should_retry);
+}
+
+#[test]
+fn test_classify_retryable_200_success_not_retryable() {
+    // 200 should not retry - success
+    let (should_retry, _) = LlmClient::classify_retryable(200, None);
+    assert!(!should_retry);
+}
+
+#[test]
+fn test_classify_retryable_429_without_retry_after() {
+    // 429 without Retry-After should still retry but with backoff
+    let (should_retry, retry_after) = LlmClient::classify_retryable(429, None);
+    assert!(should_retry);
+    assert!(retry_after.is_none());
 }

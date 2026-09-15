@@ -1194,3 +1194,82 @@ fn test_reciprocal_rank_fusion_rank_calculation() {
     let expected_score = 1.0 / 61.0;
     assert!((result[0].1 - expected_score).abs() < 1e-10);
 }
+// ============================================================================
+// extract_domain_from_patch tests (0 refs - pure function coverage)
+// ============================================================================
+
+#[test]
+fn test_extract_domain_from_patch_sql_injection() {
+    use baco::vuln_spec::extractor::extract_domain_from_patch;
+
+    let patch = r#"
+--- a/src/database.rs
++++ b/src/database.rs
+@@ -15,5 +15,6 @@
+-    let query = format!("SELECT * FROM users WHERE id = {}", user_id);
+-    db.execute(&query);
++    let query = "SELECT * FROM users WHERE id = ?";
++    let stmt = db.prepare(query).unwrap();
++    stmt.execute(&[user_id]).unwrap();
+"#;
+
+    let domain = extract_domain_from_patch(patch);
+    assert_eq!(domain, "database");
+}
+
+#[test]
+fn test_extract_domain_from_patch_xss() {
+    use baco::vuln_spec::extractor::extract_domain_from_patch;
+
+    let patch = r#"
+--- a/src/web/handler.js
++++ b/src/web/handler.js
+@@ -22,3 +22,4 @@
+-    element.innerHTML = userInput;
++    element.textContent = escapeHtml(userInput);
+"#;
+
+    let domain = extract_domain_from_patch(patch);
+    assert_eq!(domain, "web-server");
+}
+
+#[test]
+fn test_extract_domain_from_patch_memory_safety() {
+    use baco::vuln_spec::extractor::extract_domain_from_patch;
+
+    let patch = r#"
+--- a/src/memory.c
++++ b/src/memory.c
+@@ -10,3 +10,4 @@
+-    strcpy(dest, src);
++    strncpy(dest, src, sizeof(dest) - 1);
+"#;
+
+    let domain = extract_domain_from_patch(patch);
+    assert_eq!(domain, "general");
+}
+
+#[test]
+fn test_extract_domain_from_patch_empty_patch() {
+    use baco::vuln_spec::extractor::extract_domain_from_patch;
+
+    let patch = "";
+    let domain = extract_domain_from_patch(patch);
+
+    assert_eq!(domain, "general");
+}
+
+#[test]
+fn test_extract_domain_from_patch_unknown_domain() {
+    use baco::vuln_spec::extractor::extract_domain_from_patch;
+
+    let patch = r#"
+--- a/src/unknown/file.rs
++++ b/src/unknown/file.rs
+@@ -1,3 +1,4 @@
+ let x = 1;
+"#;
+
+    let domain = extract_domain_from_patch(patch);
+    assert_eq!(domain, "general");
+}

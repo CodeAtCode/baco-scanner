@@ -646,3 +646,116 @@ fn test_pricing_serialization() {
         0.025
     );
 }
+
+// ============================================================================
+// Cache Module Tests
+// ============================================================================
+
+#[test]
+fn test_cache_key_computation_deterministic() {
+    use baco::llm::cache::compute_cache_key;
+
+    let messages = serde_json::json!([{"role": "user", "content": "test"}]);
+    let messages_json = serde_json::to_vec(&messages).unwrap();
+
+    let key1 = compute_cache_key(
+        "gpt-4",
+        "https://api.openai.com/v1",
+        0.5,
+        None,
+        &messages_json,
+    );
+    let key2 = compute_cache_key(
+        "gpt-4",
+        "https://api.openai.com/v1",
+        0.5,
+        None,
+        &messages_json,
+    );
+
+    // Same inputs must produce same cache key
+    assert_eq!(key1, key2);
+    assert_eq!(key1.len(), 64); // SHA256 hex is 64 chars
+}
+
+#[test]
+fn test_cache_key_changes_with_temperature() {
+    use baco::llm::cache::compute_cache_key;
+
+    let messages = serde_json::json!([{"role": "user", "content": "test"}]);
+    let messages_json = serde_json::to_vec(&messages).unwrap();
+
+    let key_low_temp = compute_cache_key(
+        "gpt-4",
+        "https://api.openai.com/v1",
+        0.2,
+        None,
+        &messages_json,
+    );
+    let key_high_temp = compute_cache_key(
+        "gpt-4",
+        "https://api.openai.com/v1",
+        0.9,
+        None,
+        &messages_json,
+    );
+
+    // Different temperatures must produce different cache keys
+    assert_ne!(key_low_temp, key_high_temp);
+}
+
+#[test]
+fn test_cache_key_changes_with_model() {
+    use baco::llm::cache::compute_cache_key;
+
+    let messages = serde_json::json!([{"role": "user", "content": "test"}]);
+    let messages_json = serde_json::to_vec(&messages).unwrap();
+
+    let key_gpt4 = compute_cache_key(
+        "gpt-4",
+        "https://api.openai.com/v1",
+        0.5,
+        None,
+        &messages_json,
+    );
+    let key_claude = compute_cache_key(
+        "claude-3",
+        "https://api.anthropic.com/v1",
+        0.5,
+        None,
+        &messages_json,
+    );
+
+    // Different models must produce different cache keys
+    assert_ne!(key_gpt4, key_claude);
+}
+
+#[test]
+fn test_cache_file_path_construction() {
+    use baco::llm::cache::cache_file_path;
+    use std::path::Path;
+
+    let cache_dir = Path::new("/tmp/llm-cache");
+    let cache_key = "abc123";
+
+    let path = cache_file_path(cache_dir, cache_key);
+
+    assert_eq!(path.to_str().unwrap(), "/tmp/llm-cache/abc123.json");
+}
+
+#[test]
+fn test_get_effective_cache_dir_default() {
+    use baco::llm::cache::get_effective_cache_dir;
+
+    let default_dir = get_effective_cache_dir(None);
+    assert_eq!(default_dir.to_str().unwrap(), "baco-output/llm-cache");
+}
+
+#[test]
+fn test_get_effective_cache_dir_custom() {
+    use baco::llm::cache::get_effective_cache_dir;
+
+    let custom_dir = "/custom/cache/path";
+    let result = get_effective_cache_dir(Some(&custom_dir.to_string()));
+    assert_eq!(result.to_str().unwrap(), "/custom/cache/path");
+}

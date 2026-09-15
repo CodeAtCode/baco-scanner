@@ -835,7 +835,6 @@ fn test_index_project_with_incremental_with_previous() {
     assert_eq!(index.files.len(), 1);
     // Note: the hash is taken from previous store if path matches
     // Since our temp path differs, it will be None
-    assert!(index.files[0].hash.is_none() || index.files[0].hash.is_some());
 }
 
 #[test]
@@ -871,21 +870,6 @@ fn test_index_project_incremental_nonexistent_path() {
     );
 
     assert!(result.is_err());
-}
-
-#[test]
-fn test_file_info_default_values() {
-    let info = FileInfo {
-        path: PathBuf::from("test.rs"),
-        size: 100,
-        language: "rust".to_string(),
-        hash: Some("abc123".to_string()),
-    };
-
-    assert_eq!(info.path, PathBuf::from("test.rs"));
-    assert_eq!(info.size, 100);
-    assert_eq!(info.language, "rust");
-    assert_eq!(info.hash, Some("abc123".to_string()));
 }
 
 #[test]

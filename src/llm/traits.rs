@@ -29,5 +29,5 @@ pub trait LlmChatClient: Send + Sync {
 }
 
 // Re-export types needed by the traits
-pub use crate::error::ScanError;
 pub use super::{ChatMessage, ChatResponseWithModel};
+pub use crate::error::ScanError;

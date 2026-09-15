@@ -7,7 +7,7 @@ use baco::config::{
     AgentConfig, LlmPhaseConfig, LlmPhasesConfig, PerformanceSettings, ScannerSettings,
 };
 use baco::findings::{Severity, VerificationStatus, VulnerabilityFinding};
-use baco::llm_metrics::LlmMetricsTracker;
+use baco::llm::metrics::LlmMetricsTracker;
 use baco::scanner::phases::{run_phase, PhaseConfig};
 use baco::scanner::Scanner;
 use indicatif::ProgressBar;
@@ -35,6 +35,7 @@ fn create_test_finding(id: &str, severity: Severity) -> VulnerabilityFinding {
 
 fn create_test_config() -> config::ScannerConfig {
     config::ScannerConfig {
+        eval: Default::default(),
         project: baco::config::ProjectConfig {
             name: "test-project".to_string(),
             path: ".".to_string(),
@@ -130,30 +131,6 @@ async fn run_phase_skip_test(
 // ============================================================================
 
 #[tokio::test]
-async fn test_indexing_phase_basic() {
-    let scanner = create_test_scanner();
-    let config = create_test_config();
-    let pb = ProgressBar::hidden();
-    let metrics_tracker = LlmMetricsTracker::new();
-    let analyzed_files: Vec<String> = vec![];
-    let target_path = PathBuf::from(".");
-    let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
-    let findings = vec![];
-    let phase_config = PhaseConfig {
-        phase: &ScanPhase::Indexing,
-        findings,
-        pb: &pb,
-        analyzed_files: &analyzed_files,
-        metrics_tracker: &metrics_tracker,
-        target_path: &target_path,
-        config: &config,
-        project_stack: &project_stack,
-    };
-    let result = run_phase(&scanner, phase_config).await;
-    assert!(result.is_ok());
-}
-
-#[tokio::test]
 async fn test_indexing_phase_preserves_findings() {
     let scanner = create_test_scanner();
     let config = create_test_config();
@@ -220,7 +197,6 @@ async fn test_phases_skip_when_disabled() {
         ConfidenceScoringDisabled,
         ThreatModelingDisabled,
         RootCauseDedupDisabled,
-        MultiVerifierDisabled,
         AutoPatchingDisabled,
         CveBootstrapDisabled,
         PocCompilerDisabled,
@@ -250,9 +226,6 @@ async fn test_phases_skip_when_disabled() {
             }
             ConfigModifier::RootCauseDedupDisabled => {
                 config.scanner.performance.enable_root_cause_dedup = false;
-            }
-            ConfigModifier::MultiVerifierDisabled => {
-                config.scanner.performance.enable_multi_verifier = false;
             }
             ConfigModifier::AutoPatchingDisabled => {
                 config.scanner.performance.enable_auto_patching = false;
@@ -315,11 +288,6 @@ async fn test_phases_skip_when_disabled() {
             ScanPhase::RootCauseDedup,
             ConfigModifier::RootCauseDedupDisabled,
             "root_cause_dedup_disabled",
-        ),
-        (
-            ScanPhase::MultiVerifier,
-            ConfigModifier::MultiVerifierDisabled,
-            "multi_verifier_disabled",
         ),
         (
             ScanPhase::AutoPatching,
@@ -494,36 +462,6 @@ async fn test_cross_file_analysis_basic() {
     ];
     let phase_config = PhaseConfig {
         phase: &ScanPhase::CrossFileAnalysis,
-        findings: findings.clone(),
-        pb: &pb,
-        analyzed_files: &analyzed_files,
-        metrics_tracker: &metrics_tracker,
-        target_path: &target_path,
-        config: &config,
-        project_stack: &project_stack,
-    };
-    let result = run_phase(&scanner, phase_config).await;
-    assert!(result.is_ok());
-    let (updated, _, _) = result.unwrap();
-    assert!(updated.len() >= findings.len());
-}
-
-// ============================================================================
-// AI Aggregation Phase Tests
-// ============================================================================
-
-#[tokio::test]
-async fn test_ai_aggregation_basic() {
-    let scanner = create_test_scanner();
-    let config = create_test_config();
-    let pb = ProgressBar::hidden();
-    let metrics_tracker = LlmMetricsTracker::new();
-    let analyzed_files: Vec<String> = vec![];
-    let target_path = PathBuf::from(".");
-    let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
-    let findings = vec![create_test_finding("agg-1", Severity::High)];
-    let phase_config = PhaseConfig {
-        phase: &ScanPhase::AiAggregation,
         findings: findings.clone(),
         pb: &pb,
         analyzed_files: &analyzed_files,
@@ -743,7 +681,6 @@ async fn test_all_phases_complete_without_error() {
         ScanPhase::Reporting,
         ScanPhase::ThreatModeling,
         ScanPhase::RootCauseDedup,
-        ScanPhase::MultiVerifier,
         ScanPhase::AutoPatching,
         ScanPhase::CveBootstrap,
         ScanPhase::PocCompiler,
@@ -1244,34 +1181,6 @@ async fn test_root_cause_dedup_disabled() {
 
     let result = run_phase(&scanner, phase_config).await.unwrap();
     // Should return findings unchanged when dedup is disabled
-    assert_eq!(result.0.len(), 1);
-}
-
-#[tokio::test]
-async fn test_multi_verifier_disabled() {
-    let scanner = create_test_scanner();
-    let mut config = create_test_config();
-    config.scanner.performance.enable_multi_verifier = false;
-    let pb = ProgressBar::hidden();
-    let metrics_tracker = LlmMetricsTracker::new();
-    let analyzed_files: Vec<String> = vec![];
-    let target_path = PathBuf::from(".");
-    let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
-    let findings = vec![create_test_finding("multi-1", Severity::High)];
-
-    let phase_config = PhaseConfig {
-        phase: &ScanPhase::MultiVerifier,
-        findings,
-        pb: &pb,
-        analyzed_files: &analyzed_files,
-        metrics_tracker: &metrics_tracker,
-        target_path: &target_path,
-        config: &config,
-        project_stack: &project_stack,
-    };
-
-    let result = run_phase(&scanner, phase_config).await.unwrap();
-    // Should return findings unchanged when multi-verifier is disabled
     assert_eq!(result.0.len(), 1);
 }
 

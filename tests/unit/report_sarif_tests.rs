@@ -178,3 +178,198 @@ fn test_sarif_poc_related_locations() {
         .unwrap()
         .contains("Mitigation"));
 }
+
+#[test]
+fn test_sarif_cwe_in_properties() {
+    let mut finding = make_finding(Severity::High, "test-1");
+    finding.cwe_id = Some("CWE-89".to_string());
+    let findings = vec![finding];
+
+    let result = generate_sarif_report(&findings, None).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+    let rule = &parsed["runs"][0]["tool"]["driver"]["rules"][0];
+
+    // CWE should be in properties or helpUri
+    assert!(
+        rule["helpUri"].as_str().unwrap().contains("89.html"),
+        "CWE should appear in helpUri"
+    );
+}
+
+#[test]
+fn test_sarif_rule_id_stability() {
+    let finding1 = make_finding(Severity::High, "stable-id-1");
+    let finding2 = make_finding(Severity::Medium, "stable-id-2");
+    let findings = vec![finding1, finding2];
+
+    let result = generate_sarif_report(&findings, None).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+    let rules = parsed["runs"][0]["tool"]["driver"]["rules"]
+        .as_array()
+        .unwrap();
+
+    // Rule IDs should match finding IDs exactly
+    assert_eq!(rules[0]["id"], "stable-id-1");
+    assert_eq!(rules[1]["id"], "stable-id-2");
+}
+
+#[test]
+fn test_sarif_severity_critical_to_error() {
+    let finding = make_finding(Severity::Critical, "crit-test");
+    let findings = vec![finding];
+
+    let result = generate_sarif_report(&findings, None).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+    let result_obj = &parsed["runs"][0]["results"][0];
+
+    assert_eq!(result_obj["level"], "error");
+}
+
+#[test]
+fn test_sarif_severity_high_to_error() {
+    let finding = make_finding(Severity::High, "high-test");
+    let findings = vec![finding];
+
+    let result = generate_sarif_report(&findings, None).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+    let result_obj = &parsed["runs"][0]["results"][0];
+
+    assert_eq!(result_obj["level"], "error");
+}
+
+#[test]
+fn test_sarif_severity_medium_to_warning() {
+    let finding = make_finding(Severity::Medium, "med-test");
+    let findings = vec![finding];
+
+    let result = generate_sarif_report(&findings, None).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+    let result_obj = &parsed["runs"][0]["results"][0];
+
+    assert_eq!(result_obj["level"], "warning");
+}
+
+#[test]
+fn test_sarif_severity_low_to_note() {
+    let finding = make_finding(Severity::Low, "low-test");
+    let findings = vec![finding];
+
+    let result = generate_sarif_report(&findings, None).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+    let result_obj = &parsed["runs"][0]["results"][0];
+
+    assert_eq!(result_obj["level"], "note");
+}
+
+#[test]
+fn test_sarif_severity_info_to_note() {
+    let finding = make_finding(Severity::Info, "info-test");
+    let findings = vec![finding];
+
+    let result = generate_sarif_report(&findings, None).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+    let result_obj = &parsed["runs"][0]["results"][0];
+
+    assert_eq!(result_obj["level"], "note");
+}
+
+#[test]
+fn test_sarif_tool_version_present() {
+    let findings = vec![make_finding(Severity::High, "test-1")];
+    let result = generate_sarif_report(&findings, None).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+    let driver = &parsed["runs"][0]["tool"]["driver"];
+
+    assert!(driver["version"].is_string());
+    assert!(!driver["version"].as_str().unwrap().is_empty());
+}
+
+#[test]
+fn test_sarif_uri_base_id() {
+    let finding = make_finding(Severity::High, "test-1");
+    let findings = vec![finding];
+
+    let result = generate_sarif_report(&findings, None).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+
+    // Structure: locations[0].physicalLocation.artifactLocation.uriBaseId
+    assert_eq!(
+        parsed["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["artifactLocation"]
+            ["uriBaseId"],
+        "file://"
+    );
+}
+
+#[test]
+fn test_sarif_empty_file_path_handling() {
+    let mut finding = make_finding(Severity::High, "test-1");
+    finding.file_path = String::new();
+    let findings = vec![finding];
+
+    let result = generate_sarif_report(&findings, None).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+    let location = &parsed["runs"][0]["results"][0]["locations"][0];
+
+    // Empty file path should result in empty location object
+    assert!(location["physicalLocation"].is_object());
+    assert!(location["physicalLocation"]["artifactLocation"].is_null());
+}
+
+#[test]
+fn test_sarif_description_in_short_description() {
+    let mut finding = make_finding(Severity::High, "test-1");
+    finding.description = "Detailed vulnerability description".to_string();
+    let findings = vec![finding];
+
+    let result = generate_sarif_report(&findings, None).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+    let rule = &parsed["runs"][0]["tool"]["driver"]["rules"][0];
+
+    assert_eq!(
+        rule["shortDescription"]["text"],
+        "Detailed vulnerability description"
+    );
+    assert_eq!(
+        rule["fullDescription"]["text"],
+        "Detailed vulnerability description"
+    );
+}
+
+#[test]
+fn test_sarif_properties_severity_field() {
+    let finding = make_finding(Severity::High, "test-1");
+    let findings = vec![finding];
+
+    let result = generate_sarif_report(&findings, None).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+    let rule = &parsed["runs"][0]["tool"]["driver"]["rules"][0];
+
+    // Severity should be preserved as-is (capitalized)
+    assert_eq!(rule["properties"]["severity"], "High");
+}
+
+#[test]
+fn test_sarif_region_with_line_number() {
+    let finding = make_finding(Severity::High, "test-1");
+    let findings = vec![finding];
+
+    let result = generate_sarif_report(&findings, None).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+    let region = &parsed["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["region"];
+
+    assert_eq!(region["startLine"], 42);
+}
+
+#[test]
+fn test_sarif_region_without_line_number() {
+    let mut finding = make_finding(Severity::High, "test-1");
+    finding.line_number = None;
+    let findings = vec![finding];
+
+    let result = generate_sarif_report(&findings, None).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+    let region = &parsed["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["region"];
+
+    // Should be empty object when no line number
+    assert!(region.as_object().unwrap().is_empty());
+}

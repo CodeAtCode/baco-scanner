@@ -776,3 +776,91 @@ baco scan --config my.toml --preset my-project
 | `knowledge`  | `fp_patterns` (map of CWE → list of false-positive indicator strings), `required_security_primitives` (map of language → list of required primitives), `hook_registry` (map of language → HookRegistryLanguageConfig with `hook_label`, `registrations` regexes with optional `(?P<hook>)` capture, `handler_patterns` override) |
 
 Unset fields keep the base `ScannerConfig` default; CLI flags still override the preset.
+
+## Eval suite
+
+The `[eval]` section configures the detection-regression suite run by `baco eval`.
+
+| Key    | Type  | Default | Description                                                                                     |
+| ------ | ----- | ------- | ----------------------------------------------------------------------------------------------- |
+| `floor` | f32  | `0.70`  | Minimum aggregate pass-rate (0.0-1.0). The suite fails when the aggregate does not strictly exceed it. `BACO_EVAL_FLOOR` overrides it per invocation. |
+
+```toml
+[eval]
+floor = 0.9
+```
+
+
+## Agent scaffold
+
+The `[agent_scaffold]` section configures the call-graph-guided agent scaffold used during security-agent verification.
+
+| Key                 | Type | Default | Description                                          |
+| ------------------- | ---- | ------- | ---------------------------------------------------- |
+| `enabled`           | bool | `false` | Enables the agent scaffold modules                   |
+| `max_rounds`        | u8   | built-in | Maximum interaction rounds per target function      |
+| `paths_per_target`  | u8   | built-in | Number of call-graph paths to sample per target     |
+
+```toml
+[agent_scaffold]
+enabled = false
+```
+
+## Citation verification
+
+The `[citation_verification]` section controls verification that finding citations (file + line) actually resolve in the target source, downgrading unverifiable findings.
+
+| Key       | Type | Default | Description                                          |
+| --------- | ---- | ------- | ---------------------------------------------------- |
+| `enabled` | bool | `false` | Verify finding citations against source files        |
+
+```toml
+[citation_verification]
+enabled = false
+```
+
+## Prior runs
+
+The `[prior_runs]` section configures the cross-run findings history used for skip directives and coverage-gap targeting on subsequent scans.
+
+| Key       | Type  | Default | Description                                              |
+| --------- | ----- | ------- | -------------------------------------------------------- |
+| `enabled` | bool  | `false` | Enable the prior-runs store                              |
+| `max_runs`| usize | built-in | Maximum number of prior runs retained                    |
+
+```toml
+[prior_runs]
+enabled = false
+```
+
+## Policy sampling
+
+The `[policy_sampling]` section configures policy-based sampling rounds (VulnLLM-R style generation).
+
+| Key       | Type | Default | Description                                       |
+| --------- | ---- | ------- | ------------------------------------------------- |
+| `enabled` | bool | `false` | Enable policy-based generation                    |
+| `samples` | u8   | `4`     | Number of sampling rounds used to build the policy |
+
+```toml
+[policy_sampling]
+enabled = false
+```
+
+## Tickets
+
+The `[tickets]` section configures cross-referencing findings against external ticket systems.
+
+Each entry in `systems` describes one ticket backend:
+
+| Key           | Type            | Description                                        |
+| ------------- | --------------- | -------------------------------------------------- |
+| `system_type` | string          | `"github"` or `"gitlab"`                           |
+| `url`         | string          | Base URL of the system                             |
+| `api_key`     | string (option) | API token; `TICKET_GITHUB_KEY` / `TICKET_GITLAB_KEY` environment variables override it |
+
+```toml
+[[tickets.systems]]
+system_type = "github"
+url = "https://github.com/org/repo"
+```

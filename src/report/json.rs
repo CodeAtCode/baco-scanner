@@ -2,7 +2,7 @@ use crate::config::ScannerConfig;
 use crate::error::ScanError;
 use crate::evidence::classify_finding;
 use crate::findings::{Severity, VulnerabilityFinding};
-use crate::llm_metrics::LlmMetrics;
+use crate::llm::metrics::LlmMetrics;
 use crate::scan_health::ScanHealth;
 use crate::scanner::checkpoint::EarlyTerminationInfo;
 use serde::Serialize;

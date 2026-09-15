@@ -14,7 +14,6 @@
 //! }
 //! ```
 
-use baco::findings::Severity;
 use baco::root_cause_dedup::GlobalFpStore;
 use tempfile::tempdir;
 
@@ -31,28 +30,4 @@ pub fn create_test_fp_store() -> GlobalFpStore {
     let temp_dir = create_temp_scan_dir();
     let fp_path = temp_dir.path().join("fp_store.json");
     GlobalFpStore::with_path(&fp_path)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_make_finding_basic() {
-        let finding = make_finding("test-1", Severity::High, "src/test.rs", Some(42));
-
-        assert_eq!(finding.id, "test-1");
-        assert_eq!(finding.title, "Finding test-1");
-        assert_eq!(finding.file_path, "src/test.rs");
-        assert_eq!(finding.line_number, Some(42));
-        assert_eq!(finding.severity, Severity::High);
-    }
-
-    #[test]
-    fn test_make_finding_without_line() {
-        let finding = make_finding("test-2", Severity::Critical, "src/main.rs", None);
-
-        assert_eq!(finding.id, "test-2");
-        assert!(finding.line_number.is_none());
-    }
 }

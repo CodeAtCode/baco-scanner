@@ -1,6 +1,6 @@
 //! Unit tests for llm_cache module
 
-use baco::llm_cache::{
+use baco::llm::cache::{
     cache_file_path, compute_cache_key, get_effective_cache_dir, read_cached_response,
     write_cached_response,
 };

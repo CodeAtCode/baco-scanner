@@ -1,5 +1,5 @@
 use baco::findings::{Severity, VulnerabilityFinding};
-use baco::llm_metrics::{LlmMetrics, ModelMetrics, OperationMetrics};
+use baco::llm::metrics::{LlmMetrics, ModelMetrics, OperationMetrics};
 use baco::report::json::write_findings_json;
 use std::fs;
 use std::path::Path;
@@ -426,6 +426,414 @@ fn test_write_findings_json_with_agent_mode() {
 
     assert!(findings_array[0]["agent_mode"].as_bool().unwrap());
     assert_eq!(findings_array[0]["llm_model"].as_str().unwrap(), "claude-3");
+
+    let _ = fs::remove_file(output_path);
+}
+#[test]
+fn test_write_findings_json_with_tier_field() {
+    use baco::evidence::{Evidence, EvidenceSource};
+    use chrono::Utc;
+
+    let mut finding = make_finding(Severity::High, "src/test.rs", Some(10));
+    finding.evidence = vec![
+        Evidence {
+            source: EvidenceSource::LlmAnalysis("test".to_string()),
+            weight: 0.8,
+            detail: "test".to_string(),
+            timestamp: Utc::now(),
+        },
+        Evidence {
+            source: EvidenceSource::IndependentVerifier("test".to_string()),
+            weight: 0.9,
+            detail: "test".to_string(),
+            timestamp: Utc::now(),
+        },
+    ];
+    finding.confidence_score = 0.9;
+    let findings = vec![finding];
+    let output_path = "/tmp/test_tier_field.json";
+
+    let _ = fs::remove_file(output_path);
+
+    // Pass a config with evidence_gate enabled
+    let mut config = crate::fixtures::create_minimal_config();
+    config.output.evidence_gate = true;
+    let result = write_findings_json(&findings, &[], output_path, None, Some(&config), None, None);
+
+    assert!(result.is_ok());
+
+    let content = fs::read_to_string(output_path).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
+    let findings_array = parsed.as_array().unwrap();
+
+    // Tier should be set when evidence gate is enabled
+    assert!(findings_array[0]["verification_tier"].is_string());
+
+    let _ = fs::remove_file(output_path);
+}
+
+#[test]
+fn test_write_findings_json_include_rejected_true_object_shape() {
+    let findings = vec![make_finding(Severity::High, "src/test.rs", Some(10))];
+    let rejected = vec![(
+        make_finding(Severity::Low, "src/rejected.rs", Some(5)),
+        "Insufficient evidence".to_string(),
+    )];
+    let output_path = "/tmp/test_rejected_object.json";
+
+    let _ = fs::remove_file(output_path);
+
+    // Pass a config with include_rejected enabled
+    let mut config = crate::fixtures::create_minimal_config();
+    config.output.include_rejected = true;
+    let result = write_findings_json(
+        &findings,
+        &rejected,
+        output_path,
+        None,
+        Some(&config),
+        None,
+        None,
+    );
+
+    assert!(result.is_ok());
+
+    let content = fs::read_to_string(output_path).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
+
+    // Should have findings, rejected, and summary keys
+    assert!(parsed["findings"].is_array());
+    assert!(parsed["rejected"].is_array());
+    assert!(parsed["summary"].is_object());
+
+    // Rejected should have rejection_reason field
+    assert!(!parsed["rejected"][0]["rejection_reason"].is_null());
+    assert_eq!(
+        parsed["rejected"][0]["rejection_reason"],
+        "Insufficient evidence"
+    );
+
+    // Summary should have scan health keys
+    assert!(parsed["summary"]["total_findings"].is_number());
+    assert!(parsed["summary"]["critical"].is_number());
+
+    let _ = fs::remove_file(output_path);
+}
+
+#[test]
+fn test_write_findings_json_include_rejected_false_plain_array() {
+    let findings = vec![make_finding(Severity::High, "src/test.rs", Some(10))];
+    let output_path = "/tmp/test_no_rejected_array.json";
+
+    let _ = fs::remove_file(output_path);
+
+    // When include_rejected is false (no config), output is plain array
+    let result = write_findings_json(&findings, &[], output_path, None, None, None, None);
+
+    assert!(result.is_ok());
+
+    let content = fs::read_to_string(output_path).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
+
+    // Should be a plain array, not an object
+    assert!(parsed.is_array());
+    assert_eq!(parsed.as_array().unwrap().len(), 1);
+
+    let _ = fs::remove_file(output_path);
+}
+
+#[test]
+fn test_write_findings_json_summary_total_findings() {
+    let findings = vec![
+        make_finding(Severity::Critical, "src/c.rs", Some(1)),
+        make_finding(Severity::High, "src/h.rs", Some(2)),
+        make_finding(Severity::Medium, "src/m.rs", Some(3)),
+    ];
+    let output_path = "/tmp/test_summary_totals.json";
+
+    let _ = fs::remove_file(output_path);
+
+    // Pass a config with include_rejected to get summary
+    let mut config = crate::fixtures::create_minimal_config();
+    config.output.include_rejected = true;
+    let result = write_findings_json(&findings, &[], output_path, None, Some(&config), None, None);
+
+    assert!(result.is_ok());
+
+    let content = fs::read_to_string(output_path).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
+
+    // Summary should have correct total
+    assert_eq!(parsed["summary"]["total_findings"], 3);
+    assert_eq!(parsed["summary"]["critical"], 1);
+    assert_eq!(parsed["summary"]["high"], 1);
+    assert_eq!(parsed["summary"]["medium"], 1);
+
+    let _ = fs::remove_file(output_path);
+}
+
+#[test]
+fn test_write_findings_json_poc_format_field() {
+    let mut finding = make_finding(Severity::Critical, "src/vuln.rs", Some(25));
+    finding.poc_code = Some("exploit()".to_string());
+    finding.poc_format = Some("python".to_string());
+    let findings = vec![finding];
+    let output_path = "/tmp/test_poc_format.json";
+
+    let _ = fs::remove_file(output_path);
+
+    let result = write_findings_json(&findings, &[], output_path, None, None, None, None);
+
+    assert!(result.is_ok());
+
+    let content = fs::read_to_string(output_path).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
+    let findings_array = parsed.as_array().unwrap();
+
+    assert_eq!(findings_array[0]["poc_format"], "python");
+
+    let _ = fs::remove_file(output_path);
+}
+
+#[test]
+fn test_write_findings_json_diff_hunk_field() {
+    let mut finding = make_finding(Severity::High, "src/test.rs", Some(10));
+    finding.diff_hunk = Some("-old_code()\n+new_code()".to_string());
+    let findings = vec![finding];
+    let output_path = "/tmp/test_diff_hunk.json";
+
+    let _ = fs::remove_file(output_path);
+
+    let result = write_findings_json(&findings, &[], output_path, None, None, None, None);
+
+    assert!(result.is_ok());
+
+    let content = fs::read_to_string(output_path).unwrap();
+    assert!(content.contains("-old_code()"));
+    assert!(content.contains("+new_code()"));
+
+    let _ = fs::remove_file(output_path);
+}
+
+#[test]
+fn test_write_findings_json_commit_reference_field() {
+    let mut finding = make_finding(Severity::Medium, "src/test.rs", Some(10));
+    finding.commit_reference = Some("abc123def".to_string());
+    let findings = vec![finding];
+    let output_path = "/tmp/test_commit_ref.json";
+
+    let _ = fs::remove_file(output_path);
+
+    let result = write_findings_json(&findings, &[], output_path, None, None, None, None);
+
+    assert!(result.is_ok());
+
+    let content = fs::read_to_string(output_path).unwrap();
+    assert!(content.contains("abc123def"));
+
+    let _ = fs::remove_file(output_path);
+}
+
+#[test]
+fn test_write_findings_json_ticket_reference_field() {
+    let mut finding = make_finding(Severity::Low, "src/test.rs", Some(10));
+    finding.ticket_reference = Some("SEC-123".to_string());
+    let findings = vec![finding];
+    let output_path = "/tmp/test_ticket_ref.json";
+
+    let _ = fs::remove_file(output_path);
+
+    let result = write_findings_json(&findings, &[], output_path, None, None, None, None);
+
+    assert!(result.is_ok());
+
+    let content = fs::read_to_string(output_path).unwrap();
+    assert!(content.contains("SEC-123"));
+
+    let _ = fs::remove_file(output_path);
+}
+
+#[test]
+fn test_write_findings_json_priority_score_field() {
+    let mut finding = make_finding(Severity::High, "src/test.rs", Some(10));
+    finding.priority_score = Some(0.85);
+    let findings = vec![finding];
+    let output_path = "/tmp/test_priority.json";
+
+    let _ = fs::remove_file(output_path);
+
+    let result = write_findings_json(&findings, &[], output_path, None, None, None, None);
+
+    assert!(result.is_ok());
+
+    let content = fs::read_to_string(output_path).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
+    let findings_array = parsed.as_array().unwrap();
+
+    let priority = findings_array[0]["priority_score"].as_f64().unwrap();
+    assert!((priority - 0.85).abs() < 0.001);
+
+    let _ = fs::remove_file(output_path);
+}
+
+#[test]
+fn test_write_findings_json_cross_file_references_field() {
+    let mut finding = make_finding(Severity::High, "src/test.rs", Some(10));
+    finding.cross_file_references = Some(vec!["related_file.rs".to_string()]);
+    let findings = vec![finding];
+    let output_path = "/tmp/test_cross_file.json";
+
+    let _ = fs::remove_file(output_path);
+
+    let result = write_findings_json(&findings, &[], output_path, None, None, None, None);
+
+    assert!(result.is_ok());
+
+    let content = fs::read_to_string(output_path).unwrap();
+    assert!(content.contains("related_file.rs"));
+
+    let _ = fs::remove_file(output_path);
+}
+
+#[test]
+fn test_write_findings_json_verification_status_field() {
+    use baco::findings::VerificationStatus;
+
+    let mut finding = make_finding(Severity::High, "src/test.rs", Some(10));
+    finding.verification_status = Some(VerificationStatus::Confirmed);
+    let findings = vec![finding];
+    let output_path = "/tmp/test_verification_status.json";
+
+    let _ = fs::remove_file(output_path);
+
+    let result = write_findings_json(&findings, &[], output_path, None, None, None, None);
+
+    assert!(result.is_ok());
+
+    let content = fs::read_to_string(output_path).unwrap();
+    assert!(content.contains("confirmed"));
+
+    let _ = fs::remove_file(output_path);
+}
+
+#[test]
+fn test_write_findings_json_verification_notes_field() {
+    let mut finding = make_finding(Severity::High, "src/test.rs", Some(10));
+    finding.verification_notes = Some("Manual review confirmed".to_string());
+    let findings = vec![finding];
+    let output_path = "/tmp/test_verification_notes.json";
+
+    let _ = fs::remove_file(output_path);
+
+    let result = write_findings_json(&findings, &[], output_path, None, None, None, None);
+
+    assert!(result.is_ok());
+
+    let content = fs::read_to_string(output_path).unwrap();
+    assert!(content.contains("Manual review confirmed"));
+
+    let _ = fs::remove_file(output_path);
+}
+
+#[test]
+fn test_write_findings_json_agent_mode_true() {
+    let mut finding = make_finding(Severity::High, "src/test.rs", Some(10));
+    finding.agent_mode = true;
+    finding.llm_model = Some("claude-3-sonnet".to_string());
+    let findings = vec![finding];
+    let output_path = "/tmp/test_agent_true.json";
+
+    let _ = fs::remove_file(output_path);
+
+    let result = write_findings_json(&findings, &[], output_path, None, None, None, None);
+
+    assert!(result.is_ok());
+
+    let content = fs::read_to_string(output_path).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
+    let findings_array = parsed.as_array().unwrap();
+
+    assert!(findings_array[0]["agent_mode"].as_bool().unwrap());
+    assert_eq!(findings_array[0]["llm_model"], "claude-3-sonnet");
+
+    let _ = fs::remove_file(output_path);
+}
+
+#[test]
+fn test_write_findings_json_statement_range_field() {
+    let mut finding = make_finding(Severity::Medium, "src/test.rs", Some(10));
+    finding.statement_range = Some((10, 15));
+    let findings = vec![finding];
+    let output_path = "/tmp/test_statement_range.json";
+
+    let _ = fs::remove_file(output_path);
+
+    let result = write_findings_json(&findings, &[], output_path, None, None, None, None);
+
+    assert!(result.is_ok());
+
+    let content = fs::read_to_string(output_path).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
+    let findings_array = parsed.as_array().unwrap();
+
+    assert!(findings_array[0]["statement_range"].is_array());
+
+    let _ = fs::remove_file(output_path);
+}
+
+#[test]
+fn test_write_findings_json_triage_verdict_field() {
+    use baco::findings::TriageVerdict;
+
+    let mut finding = make_finding(Severity::Low, "src/test.rs", Some(10));
+    finding.triage_verdict = Some(TriageVerdict::Kill);
+    let findings = vec![finding];
+    let output_path = "/tmp/test_triage_verdict.json";
+
+    let _ = fs::remove_file(output_path);
+
+    let result = write_findings_json(&findings, &[], output_path, None, None, None, None);
+
+    assert!(result.is_ok());
+
+    let content = fs::read_to_string(output_path).unwrap();
+    assert!(content.contains("kill"));
+
+    let _ = fs::remove_file(output_path);
+}
+
+#[test]
+fn test_write_findings_json_evidence_array() {
+    use baco::evidence::{Evidence, EvidenceSource};
+    use chrono::Utc;
+
+    let mut finding = make_finding(Severity::High, "src/test.rs", Some(10));
+    finding.evidence = vec![
+        Evidence {
+            source: EvidenceSource::LlmAnalysis("static-analysis".to_string()),
+            weight: 0.8,
+            detail: "LLM identified vulnerability pattern".to_string(),
+            timestamp: Utc::now(),
+        },
+        Evidence {
+            source: EvidenceSource::IndependentVerifier("reproducer".to_string()),
+            weight: 0.95,
+            detail: "Reproducer confirmed exploit".to_string(),
+            timestamp: Utc::now(),
+        },
+    ];
+    let findings = vec![finding];
+    let output_path = "/tmp/test_evidence.json";
+
+    let _ = fs::remove_file(output_path);
+
+    let result = write_findings_json(&findings, &[], output_path, None, None, None, None);
+
+    assert!(result.is_ok());
+
+    let content = fs::read_to_string(output_path).unwrap();
+    assert!(content.contains("static-analysis"));
+    assert!(content.contains("reproducer"));
 
     let _ = fs::remove_file(output_path);
 }

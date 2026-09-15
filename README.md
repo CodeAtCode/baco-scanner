@@ -60,6 +60,15 @@ cp config.toml my-config.toml
 # Verify findings
 ./target/release/baco verify --input findings.json
 
+# Scaffold a starter config (detects languages, suggests a preset)
+./target/release/baco init /path/to/project
+
+# List built-in presets
+./target/release/baco preset list
+
+# Resume an interrupted scan from its checkpoint
+./target/release/baco resume --checkpoint baco-output/checkpoint.json
+
 # Scan options
 ./target/release/baco scan --config my.toml --dry-run   # Print estimate and exit
 ./target/release/baco scan --config my.toml --target /path  # Override target path

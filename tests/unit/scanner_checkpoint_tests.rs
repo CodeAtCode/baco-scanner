@@ -3,8 +3,8 @@
 //! Tests cover checkpoint creation, serialization, validation, and the
 //! save_checkpoint/load_checkpoint_findings functions.
 
-use baco::checkpoint::{Checkpoint, ScanPhase};
 use baco::findings::Severity;
+use baco::scanner::checkpoint::{Checkpoint, ScanPhase};
 use std::fs;
 use std::path::Path;
 
@@ -499,7 +499,6 @@ fn test_scan_phase_all_variants_exist() {
     let _ = ScanPhase::Reporting;
     let _ = ScanPhase::ThreatModeling;
     let _ = ScanPhase::RootCauseDedup;
-    let _ = ScanPhase::MultiVerifier;
     let _ = ScanPhase::AutoPatching;
     let _ = ScanPhase::CveBootstrap;
     let _ = ScanPhase::PocCompiler;
@@ -903,4 +902,165 @@ fn test_checkpoint_nonexistent_file_inline_migrated() {
     let result = Checkpoint::load("/nonexistent/path/checkpoint.json");
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("read"));
+}
+// ============================================================================
+// Additional Checkpoint Tests: Phase Display, All Phase Resume Chains
+// ============================================================================
+
+#[test]
+fn test_scan_phase_display_all_variants() {
+    assert_eq!(format!("{}", ScanPhase::Indexing), "Indexing");
+    assert_eq!(format!("{}", ScanPhase::Semgrep), "Semgrep");
+    assert_eq!(format!("{}", ScanPhase::CweRouting), "CweRouting");
+    assert_eq!(format!("{}", ScanPhase::CpgSlice), "CpgSlice");
+    assert_eq!(
+        format!("{}", ScanPhase::LlmStaticAnalysis),
+        "LlmStaticAnalysis"
+    );
+    assert_eq!(format!("{}", ScanPhase::LlmDiscovery), "LlmDiscovery");
+    assert_eq!(format!("{}", ScanPhase::LlmVerification), "LlmVerification");
+    assert_eq!(format!("{}", ScanPhase::Validate), "Validate");
+    assert_eq!(
+        format!("{}", ScanPhase::SecurityAgentVerification),
+        "SecurityAgentVerification"
+    );
+    assert_eq!(format!("{}", ScanPhase::TicketCrossRef), "TicketCrossRef");
+    assert_eq!(format!("{}", ScanPhase::GitAnalysis), "GitAnalysis");
+    assert_eq!(
+        format!("{}", ScanPhase::CrossFileAnalysis),
+        "CrossFileAnalysis"
+    );
+    assert_eq!(
+        format!("{}", ScanPhase::ConfidenceScoring),
+        "ConfidenceScoring"
+    );
+    assert_eq!(format!("{}", ScanPhase::AiAggregation), "AiAggregation");
+    assert_eq!(format!("{}", ScanPhase::ThreatModeling), "ThreatModeling");
+    assert_eq!(format!("{}", ScanPhase::RootCauseDedup), "RootCauseDedup");
+    assert_eq!(format!("{}", ScanPhase::AutoPatching), "AutoPatching");
+    assert_eq!(format!("{}", ScanPhase::CveBootstrap), "CveBootstrap");
+    assert_eq!(format!("{}", ScanPhase::PocCompiler), "PocCompiler");
+    assert_eq!(format!("{}", ScanPhase::ExploitSynth), "ExploitSynth");
+    assert_eq!(format!("{}", ScanPhase::VariantSearch), "VariantSearch");
+    assert_eq!(format!("{}", ScanPhase::Reporting), "Reporting");
+    assert_eq!(format!("{}", ScanPhase::RuleSynthesis), "RuleSynthesis");
+    assert_eq!(format!("{}", ScanPhase::Complete), "Complete");
+    assert_eq!(format!("{}", ScanPhase::Error), "Error");
+}
+
+#[test]
+fn test_checkpoint_resume_from_all_23_phases() {
+    // Test every phase in the 23-phase pipeline
+    let all_phases = vec![
+        (ScanPhase::Indexing, ScanPhase::Semgrep),
+        (ScanPhase::Semgrep, ScanPhase::CpgSlice),
+        (ScanPhase::CpgSlice, ScanPhase::LlmStaticAnalysis),
+        (ScanPhase::LlmStaticAnalysis, ScanPhase::CweRouting),
+        (ScanPhase::CweRouting, ScanPhase::RuleSynthesis),
+        (ScanPhase::RuleSynthesis, ScanPhase::LlmDiscovery),
+        (ScanPhase::LlmDiscovery, ScanPhase::LlmVerification),
+        (ScanPhase::LlmVerification, ScanPhase::Validate),
+        (ScanPhase::Validate, ScanPhase::SecurityAgentVerification),
+        (
+            ScanPhase::SecurityAgentVerification,
+            ScanPhase::TicketCrossRef,
+        ),
+        (ScanPhase::TicketCrossRef, ScanPhase::GitAnalysis),
+        (ScanPhase::GitAnalysis, ScanPhase::CrossFileAnalysis),
+        (ScanPhase::CrossFileAnalysis, ScanPhase::ConfidenceScoring),
+        (ScanPhase::ConfidenceScoring, ScanPhase::AiAggregation),
+        (ScanPhase::AiAggregation, ScanPhase::ThreatModeling),
+        (ScanPhase::ThreatModeling, ScanPhase::RootCauseDedup),
+        (ScanPhase::RootCauseDedup, ScanPhase::AutoPatching),
+        (ScanPhase::AutoPatching, ScanPhase::CveBootstrap),
+        (ScanPhase::CveBootstrap, ScanPhase::PocCompiler),
+        (ScanPhase::PocCompiler, ScanPhase::ExploitSynth),
+        (ScanPhase::ExploitSynth, ScanPhase::VariantSearch),
+        (ScanPhase::VariantSearch, ScanPhase::Reporting),
+        (ScanPhase::Reporting, ScanPhase::Complete),
+        (ScanPhase::Complete, ScanPhase::Indexing),
+        (ScanPhase::Error, ScanPhase::Indexing),
+    ];
+
+    for (current, expected_next) in all_phases {
+        let mut checkpoint = create_test_checkpoint();
+        checkpoint.current_phase = current.clone();
+
+        let temp_path = get_temp_path(&format!("resume_all_{}", current));
+        checkpoint.save(&temp_path).unwrap();
+
+        let next = Checkpoint::resume_from(&temp_path).unwrap();
+        assert_eq!(
+            next, expected_next,
+            "Resume from {:?} should return {:?}",
+            current, expected_next
+        );
+
+        let _ = fs::remove_file(&temp_path);
+    }
+}
+
+#[test]
+fn test_checkpoint_early_termination_field() {
+    use baco::scanner::checkpoint::EarlyTerminationInfo;
+
+    let mut checkpoint = create_test_checkpoint();
+    checkpoint.early_termination = Some(EarlyTerminationInfo {
+        triggered: true,
+        finding_count: 5,
+        phases_skipped: vec!["LlmDiscovery".to_string(), "LlmVerification".to_string()],
+    });
+
+    let temp_path = get_temp_path("early_term");
+    checkpoint.save(&temp_path).unwrap();
+
+    let loaded = Checkpoint::load(&temp_path).unwrap();
+    assert!(loaded.early_termination.is_some());
+    let et = loaded.early_termination.unwrap();
+    assert!(et.triggered);
+    assert_eq!(et.finding_count, 5);
+    assert_eq!(et.phases_skipped.len(), 2);
+
+    let _ = fs::remove_file(&temp_path);
+}
+
+#[test]
+fn test_checkpoint_early_termination_default_none() {
+    let checkpoint = create_test_checkpoint();
+    assert!(checkpoint.early_termination.is_none());
+}
+
+#[test]
+fn test_checkpoint_analyzed_files_roundtrip() {
+    let mut checkpoint = create_test_checkpoint();
+    checkpoint.analyzed_files = vec![
+        "src/main.rs".to_string(),
+        "src/lib.rs".to_string(),
+        "src/utils/mod.rs".to_string(),
+    ];
+
+    let temp_path = get_temp_path("analyzed_files");
+    checkpoint.save(&temp_path).unwrap();
+
+    let loaded = Checkpoint::load(&temp_path).unwrap();
+    assert_eq!(loaded.analyzed_files.len(), 3);
+    assert_eq!(loaded.analyzed_files[0], "src/main.rs");
+
+    let _ = fs::remove_file(&temp_path);
+}
+
+#[test]
+fn test_checkpoint_file_count_various_values() {
+    let temp_path = get_temp_path("file_count");
+
+    for count in [0, 1, 100, 1000, 10000] {
+        let mut checkpoint = create_test_checkpoint();
+        checkpoint.file_count = count;
+        checkpoint.save(&temp_path).unwrap();
+
+        let loaded = Checkpoint::load(&temp_path).unwrap();
+        assert_eq!(loaded.file_count, count);
+    }
+
+    let _ = fs::remove_file(&temp_path);
 }

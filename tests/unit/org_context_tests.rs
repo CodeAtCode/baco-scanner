@@ -280,3 +280,151 @@ fn test_render_stack_inline_migrated() {
     assert!(result.contains("php"));
     assert!(result.contains("javascript"));
 }
+#[test]
+fn test_org_context_render_all_fields_set() {
+    let mut rules = HashMap::new();
+    rules.insert("XSS".to_string(), "Critical".to_string());
+    rules.insert("SQLi".to_string(), "High".to_string());
+
+    let cfg = OrgContextConfig {
+        enabled: true,
+        stack: vec!["rust".to_string(), "javascript".to_string()],
+        infra: vec!["gcp".to_string(), "kubernetes".to_string()],
+        data_sensitivity: Some("pii".to_string()),
+        secret_storage: Some("vault".to_string()),
+        risk_tolerance: Some("low".to_string()),
+        severity_rules: rules,
+    };
+
+    let result = render(&cfg).unwrap();
+
+    // All sections should be present
+    assert!(result.contains("The target is"));
+    assert!(result.contains("rust"));
+    assert!(result.contains("javascript"));
+    assert!(result.contains("gcp"));
+    assert!(result.contains("kubernetes"));
+    assert!(result.contains("at least High"));
+    assert!(result.contains("placeholders, NOT leaked secrets"));
+    assert!(result.contains("Risk tolerance:"));
+    assert!(result.contains("does NOT mean only report criticals"));
+    assert!(result.contains("OVERRIDE: XSS → Critical"));
+    assert!(result.contains("OVERRIDE: SQLi → High"));
+}
+
+#[test]
+fn test_org_context_render_default_when_disabled() {
+    let cfg = OrgContextConfig::default();
+
+    // Default should have enabled = false
+    assert!(!cfg.enabled);
+    assert!(render(&cfg).is_none());
+}
+
+#[test]
+fn test_org_context_render_only_stack() {
+    let cfg = OrgContextConfig {
+        enabled: true,
+        stack: vec!["python".to_string()],
+        ..Default::default()
+    };
+
+    let result = render(&cfg).unwrap();
+    assert!(result.contains("The target is python"));
+    assert!(result.contains("apply checks idiomatic to this stack"));
+}
+
+#[test]
+fn test_org_context_render_only_infra() {
+    let cfg = OrgContextConfig {
+        enabled: true,
+        infra: vec!["azure".to_string()],
+        ..Default::default()
+    };
+
+    let result = render(&cfg).unwrap();
+    assert!(result.contains("The target is azure"));
+}
+
+#[test]
+fn test_org_context_render_data_sensitivity_other() {
+    let cfg = OrgContextConfig {
+        enabled: true,
+        data_sensitivity: Some("financial".to_string()),
+        ..Default::default()
+    };
+
+    let result = render(&cfg).unwrap();
+    assert!(result.contains("Data sensitivity level: financial"));
+    assert!(result.contains("Apply appropriate handling guidance"));
+}
+
+#[test]
+fn test_org_context_render_secret_storage_other() {
+    let cfg = OrgContextConfig {
+        enabled: true,
+        secret_storage: Some("aws-secrets-manager".to_string()),
+        ..Default::default()
+    };
+
+    let result = render(&cfg).unwrap();
+    assert!(result.contains("Secret storage: aws-secrets-manager"));
+}
+
+#[test]
+fn test_org_context_render_risk_tolerance_high() {
+    let cfg = OrgContextConfig {
+        enabled: true,
+        risk_tolerance: Some("high".to_string()),
+        ..Default::default()
+    };
+
+    let result = render(&cfg).unwrap();
+    assert!(result.contains("Risk tolerance: 'high'"));
+    assert!(result.contains("does NOT mean only report criticals"));
+}
+
+#[test]
+fn test_org_context_render_severity_rules_multiple() {
+    let mut rules = HashMap::new();
+    rules.insert("RCE".to_string(), "Critical".to_string());
+    rules.insert("IDOR".to_string(), "High".to_string());
+    rules.insert("SSRF".to_string(), "Critical".to_string());
+
+    let cfg = OrgContextConfig {
+        enabled: true,
+        severity_rules: rules,
+        ..Default::default()
+    };
+
+    let result = render(&cfg).unwrap();
+    assert!(result.contains("OVERRIDE: RCE → Critical"));
+    assert!(result.contains("OVERRIDE: IDOR → High"));
+    assert!(result.contains("OVERRIDE: SSRF → Critical"));
+}
+
+#[test]
+fn test_org_context_render_empty_stack_and_infra() {
+    let cfg = OrgContextConfig {
+        enabled: true,
+        stack: vec![],
+        infra: vec![],
+        ..Default::default()
+    };
+
+    // Should return None when all fields are empty
+    assert!(render(&cfg).is_none());
+}
+
+#[test]
+fn test_org_context_render_header_present() {
+    let cfg = OrgContextConfig {
+        enabled: true,
+        stack: vec!["go".to_string()],
+        ..Default::default()
+    };
+
+    let result = render(&cfg).unwrap();
+    assert!(result.contains("=== ORG CONTEXT ==="));
+    assert!(result.contains("Organizational policy profile"));
+}

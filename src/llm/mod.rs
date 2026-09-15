@@ -1,7 +1,7 @@
 use crate::agent::ToolCall;
 use crate::config::llm::ModelPricing;
 pub use crate::error::ScanError;
-pub use crate::llm_metrics::LlmMetricsTracker;
+use crate::llm::metrics::LlmMetricsTracker;
 use crate::rate_limiter::RateLimiter;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -713,12 +713,12 @@ impl LlmClient {
         // Check cache if enabled
         if self.config.enable_llm_cache {
             let cache_dir =
-                crate::llm_cache::get_effective_cache_dir(self.config.cache_dir.as_ref());
+                crate::llm::cache::get_effective_cache_dir(self.config.cache_dir.as_ref());
 
             // Compute cache key
             let messages_json = serde_json::to_vec(messages)
                 .map_err(|e| format!("Failed to serialize messages: {}", e))?;
-            let cache_key = crate::llm_cache::compute_cache_key(
+            let cache_key = crate::llm::cache::compute_cache_key(
                 &model,
                 &self.config.base_url,
                 self.config.temperature,
@@ -727,7 +727,7 @@ impl LlmClient {
             );
 
             // Try to read from cache
-            match crate::llm_cache::read_cached_response(&cache_dir, &cache_key) {
+            match crate::llm::cache::read_cached_response(&cache_dir, &cache_key) {
                 Ok(Some(cached_content)) => {
                     tracing::info!("Cache hit for key {}", cache_key);
                     // Record cached request metric
@@ -766,10 +766,10 @@ impl LlmClient {
                 // Best-effort write to cache if enabled
                 if self.config.enable_llm_cache {
                     let cache_dir =
-                        crate::llm_cache::get_effective_cache_dir(self.config.cache_dir.as_ref());
+                        crate::llm::cache::get_effective_cache_dir(self.config.cache_dir.as_ref());
                     let messages_json = serde_json::to_vec(messages)
                         .map_err(|e| format!("Failed to serialize messages: {}", e))?;
-                    let cache_key = crate::llm_cache::compute_cache_key(
+                    let cache_key = crate::llm::cache::compute_cache_key(
                         &model,
                         &self.config.base_url,
                         self.config.temperature,
@@ -782,7 +782,7 @@ impl LlmClient {
                         "timestamp": chrono::Utc::now().to_rfc3339()
                     })
                     .to_string();
-                    if let Err(e) = crate::llm_cache::write_cached_response(
+                    if let Err(e) = crate::llm::cache::write_cached_response(
                         &cache_dir,
                         &cache_key,
                         &cache_content,
@@ -868,12 +868,12 @@ impl LlmClient {
         // Check cache if enabled
         if self.config.enable_llm_cache {
             let cache_dir =
-                crate::llm_cache::get_effective_cache_dir(self.config.cache_dir.as_ref());
+                crate::llm::cache::get_effective_cache_dir(self.config.cache_dir.as_ref());
 
             // Compute cache key (include tools in the key)
             let payload_for_cache = serde_json::to_vec(&payload)
                 .map_err(|e| format!("Failed to serialize payload: {}", e))?;
-            let cache_key = crate::llm_cache::compute_cache_key(
+            let cache_key = crate::llm::cache::compute_cache_key(
                 &model,
                 &self.config.base_url,
                 self.config.temperature,
@@ -882,7 +882,7 @@ impl LlmClient {
             );
 
             // Try to read from cache
-            match crate::llm_cache::read_cached_response(&cache_dir, &cache_key) {
+            match crate::llm::cache::read_cached_response(&cache_dir, &cache_key) {
                 Ok(Some(cached_content)) => {
                     tracing::info!("Cache hit for key {}", cache_key);
                     // Record cached request metric
@@ -926,10 +926,10 @@ impl LlmClient {
                 // Best-effort write to cache if enabled
                 if self.config.enable_llm_cache {
                     let cache_dir =
-                        crate::llm_cache::get_effective_cache_dir(self.config.cache_dir.as_ref());
+                        crate::llm::cache::get_effective_cache_dir(self.config.cache_dir.as_ref());
                     let payload_for_cache = serde_json::to_vec(&payload)
                         .map_err(|e| format!("Failed to serialize payload: {}", e))?;
-                    let cache_key = crate::llm_cache::compute_cache_key(
+                    let cache_key = crate::llm::cache::compute_cache_key(
                         &model,
                         &self.config.base_url,
                         self.config.temperature,
@@ -942,7 +942,7 @@ impl LlmClient {
                         "timestamp": chrono::Utc::now().to_rfc3339()
                     })
                     .to_string();
-                    if let Err(e) = crate::llm_cache::write_cached_response(
+                    if let Err(e) = crate::llm::cache::write_cached_response(
                         &cache_dir,
                         &cache_key,
                         &cache_content,
@@ -1006,6 +1006,13 @@ impl LlmChatClient for LlmClient {
     }
 }
 
+/// Implement AsyncLlmClient for LlmClient
+impl AsyncLlmClient for LlmClient {
+    async fn chat(&self, messages: &[ChatMessage]) -> Result<ChatResponseWithModel, ScanError> {
+        self.chat(messages).await
+    }
+}
+
 pub trait LlmProvider {
     fn chat(&self, messages: &[ChatMessage]) -> Result<String, ScanError>;
 }
@@ -1021,9 +1028,9 @@ pub struct RecordMetricsParams {
     success: bool,
 }
 
-impl From<RecordMetricsParams> for crate::llm_metrics::RecordRequestParams {
+impl From<RecordMetricsParams> for crate::llm::metrics::RecordRequestParams {
     fn from(p: RecordMetricsParams) -> Self {
-        crate::llm_metrics::RecordRequestParams {
+        crate::llm::metrics::RecordRequestParams {
             model_name: p.model,
             operation: p.operation,
             phase: p.phase,
@@ -1214,7 +1221,4 @@ pub mod cache;
 pub mod metrics;
 pub mod traits;
 
-// Re-exports for backward compatibility
-pub use cache::*;
-pub use metrics::*;
 pub use traits::*;

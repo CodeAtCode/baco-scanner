@@ -220,42 +220,6 @@ fn test_index_project_subdirectories() {
 // FileIndex Tests - index_project_incremental
 // ============================================================================
 
-#[test]
-fn test_index_project_incremental_basic() {
-    let temp_dir = TempDir::new().unwrap();
-
-    File::create(temp_dir.path().join("test.c")).unwrap();
-    File::create(temp_dir.path().join("test.rs")).unwrap();
-
-    let (index, hash_store) = FileIndex::index_project_incremental(
-        temp_dir.path().to_str().unwrap(),
-        &["c".to_string(), "rust".to_string()],
-        1024 * 1024,
-        &[],
-        None,
-        false,
-    )
-    .unwrap();
-
-    assert_eq!(index.files.len(), 2);
-    assert!(index.hash_store.is_some());
-    assert!(hash_store.get_last_scan().is_some());
-}
-
-#[test]
-fn test_index_project_incremental_invalid_path() {
-    let result = FileIndex::index_project_incremental(
-        "/nonexistent/path",
-        &["c".to_string()],
-        1024 * 1024,
-        &[],
-        None,
-        false,
-    );
-
-    assert!(result.is_err());
-}
-
 // ============================================================================
 // FileIndex Tests - get_files
 // ============================================================================

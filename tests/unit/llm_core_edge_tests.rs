@@ -186,7 +186,7 @@ fn test_create_llm_client_with_metrics_none_on_missing_api_key() {
     };
 
     // Create a minimal scanner for testing
-    use baco::llm_metrics::LlmMetricsTracker;
+    use baco::llm::metrics::LlmMetricsTracker;
     use baco::scanner::core::Scanner;
 
     let metrics = LlmMetricsTracker::new();
@@ -219,7 +219,7 @@ fn test_create_llm_client_with_metrics_none_on_missing_base_url() {
         ..Default::default()
     };
 
-    use baco::llm_metrics::LlmMetricsTracker;
+    use baco::llm::metrics::LlmMetricsTracker;
     use baco::scanner::core::Scanner;
 
     let mut config = ScannerConfig::default();
@@ -257,7 +257,7 @@ fn test_create_llm_client_with_metrics_none_on_empty_models() {
         ..Default::default()
     };
 
-    use baco::llm_metrics::LlmMetricsTracker;
+    use baco::llm::metrics::LlmMetricsTracker;
     use baco::scanner::core::Scanner;
 
     let mut config = ScannerConfig::default();
@@ -296,7 +296,7 @@ fn test_create_llm_client_with_metrics_some_on_valid_config() {
         ..Default::default()
     };
 
-    use baco::llm_metrics::LlmMetricsTracker;
+    use baco::llm::metrics::LlmMetricsTracker;
     use baco::scanner::core::Scanner;
 
     let metrics = LlmMetricsTracker::new();

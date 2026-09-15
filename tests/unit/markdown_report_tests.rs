@@ -438,3 +438,193 @@ fn test_language_detection_for_mitigation() {
     // Should have go code fence
     assert!(report.contains("```go"), "Should detect Go language");
 }
+
+#[test]
+fn test_empty_report_structure() {
+    let findings: Vec<baco::findings::VulnerabilityFinding> = vec![];
+    let report = generate_markdown_report(&findings, "empty-project");
+
+    // Should have all structural elements even with no findings
+    assert!(report.contains("# 🔒 BACO Security Vulnerability Report"));
+    assert!(report.contains("**Project:** empty-project"));
+    assert!(report.contains("**Total Findings:** 0"));
+    assert!(report.contains("## Executive Summary"));
+    assert!(report.contains("## No Findings"));
+    assert!(report.contains("No security issues detected."));
+}
+
+#[test]
+fn test_severity_order_critical_to_info() {
+    let findings = vec![
+        make_finding("1", "Info", "a.rs", Some(1), Severity::Info),
+        make_finding("2", "Low", "b.rs", Some(2), Severity::Low),
+        make_finding("3", "Medium", "c.rs", Some(3), Severity::Medium),
+        make_finding("4", "High", "d.rs", Some(4), Severity::High),
+        make_finding("5", "Critical", "e.rs", Some(5), Severity::Critical),
+    ];
+    let report = generate_markdown_report(&findings, "test");
+
+    // Check order: Critical < High < Medium < Low < Info
+    let crit_pos = report.find("## Critical Findings").unwrap();
+    let high_pos = report.find("## High Findings").unwrap();
+    let med_pos = report.find("## Medium Findings").unwrap();
+    let low_pos = report.find("## Low Findings").unwrap();
+    let info_pos = report.find("## Info Findings").unwrap();
+
+    assert!(crit_pos < high_pos);
+    assert!(high_pos < med_pos);
+    assert!(med_pos < low_pos);
+    assert!(low_pos < info_pos);
+}
+
+#[test]
+fn test_location_format_with_line_number() {
+    let finding = make_finding("1", "Test", "src/app.rs", Some(123), Severity::High);
+    let findings = vec![finding];
+    let report = generate_markdown_report(&findings, "test");
+
+    assert!(report.contains("**Location:** `src/app.rs`:123"));
+}
+
+#[test]
+fn test_location_format_without_line_number() {
+    let finding = make_finding("1", "Test", "src/unknown.rs", None, Severity::Medium);
+    let findings = vec![finding];
+    let report = generate_markdown_report(&findings, "test");
+
+    assert!(report.contains("**Location:** `src/unknown.rs`"));
+    assert!(!report.contains(":None"));
+}
+
+#[test]
+fn test_evidence_tier_classification() {
+    use baco::evidence::{Evidence, EvidenceSource};
+    use chrono::Utc;
+
+    let mut verified_finding = make_finding("1", "Verified", "a.rs", Some(1), Severity::High);
+    verified_finding.evidence = vec![
+        Evidence {
+            source: EvidenceSource::LlmAnalysis("test".to_string()),
+            weight: 0.8,
+            detail: "test".to_string(),
+            timestamp: Utc::now(),
+        },
+        Evidence {
+            source: EvidenceSource::IndependentVerifier("test".to_string()),
+            weight: 0.9,
+            detail: "test".to_string(),
+            timestamp: Utc::now(),
+        },
+    ];
+    verified_finding.confidence_score = 0.9;
+
+    let findings = vec![verified_finding];
+    let report = generate_markdown_report(&findings, "test");
+
+    // Should show Verified tier
+    assert!(report.contains("**Evidence Tier:** Verified"));
+}
+
+#[test]
+fn test_recommendation_section_present() {
+    let mut finding = make_finding("1", "Test", "src/app.rs", Some(1), Severity::High);
+    finding.recommendation = Some("Use parameterized queries to prevent SQL injection".to_string());
+
+    let findings = vec![finding];
+    let report = generate_markdown_report(&findings, "test");
+
+    assert!(report.contains("**Recommendation:**"));
+    assert!(report.contains("Use parameterized queries"));
+}
+
+#[test]
+fn test_code_snippet_rendering() {
+    let mut finding = make_finding("1", "Test", "src/app.rs", Some(1), Severity::High);
+    finding.code_snippet = Some("let x = user_input;".to_string());
+
+    let findings = vec![finding];
+    let report = generate_markdown_report(&findings, "test");
+    eprintln!("report: {}", report);
+
+    assert!(report.contains("**Code:**"));
+    assert!(report.contains("let x = user_input;"));
+}
+
+#[test]
+fn test_sources_display() {
+    let mut finding = make_finding("1", "Test", "src/app.rs", Some(1), Severity::High);
+    finding.sources = vec!["semgrep".to_string(), "llm".to_string()];
+
+    let findings = vec![finding];
+    let report = generate_markdown_report(&findings, "test");
+
+    assert!(report.contains("**Sources:** semgrep, llm"));
+}
+
+#[test]
+fn test_already_reported_status() {
+    let mut finding = make_finding("1", "Test", "src/app.rs", Some(1), Severity::High);
+    finding.already_reported = true;
+
+    let findings = vec![finding];
+    let report = generate_markdown_report(&findings, "test");
+
+    assert!(report.contains("**Status:** Already reported in existing tracker"));
+}
+
+#[test]
+fn test_tier_split_verified_vs_unverified() {
+    use baco::evidence::{Evidence, EvidenceSource};
+    use chrono::Utc;
+
+    let mut verified = make_finding("1", "Verified", "a.rs", Some(1), Severity::Critical);
+    verified.evidence = vec![
+        Evidence {
+            source: EvidenceSource::LlmAnalysis("test".to_string()),
+            weight: 0.8,
+            detail: "test".to_string(),
+            timestamp: Utc::now(),
+        },
+        Evidence {
+            source: EvidenceSource::IndependentVerifier("test".to_string()),
+            weight: 0.9,
+            detail: "test".to_string(),
+            timestamp: Utc::now(),
+        },
+    ];
+    verified.confidence_score = 0.9;
+
+    let mut unverified = make_finding("2", "Unverified", "b.rs", Some(2), Severity::Medium);
+    unverified.evidence = vec![Evidence {
+        source: EvidenceSource::LlmAnalysis("test".to_string()),
+        weight: 0.3,
+        detail: "test".to_string(),
+        timestamp: Utc::now(),
+    }];
+    unverified.confidence_score = 0.4;
+
+    let findings = vec![verified, unverified];
+    let report = generate_markdown_report(&findings, "test");
+
+    // Main section should have verified finding
+    assert!(report.contains("## Critical Findings"));
+    assert!(report.contains("Verified"));
+
+    // Appendix should have unverified finding
+    assert!(report.contains("## Appendix: Unverified Findings"));
+    assert!(report.contains("lack sufficient evidence"));
+}
+
+#[test]
+fn test_overall_totals_calculation() {
+    let findings = vec![
+        make_finding("1", "Test1", "a.rs", Some(1), Severity::Critical),
+        make_finding("2", "Test2", "b.rs", Some(2), Severity::High),
+        make_finding("3", "Test3", "c.rs", Some(3), Severity::Medium),
+    ];
+    let report = generate_markdown_report(&findings, "test");
+    eprintln!("report: {}", report);
+
+    // All should be supported (no evidence but default confidence)
+    assert!(report.contains("**Totals:** 0 verified | 3 supported | 0 unverified"));
+}

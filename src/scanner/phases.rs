@@ -2,7 +2,7 @@ use crate::checkpoint::ScanPhase;
 use crate::config;
 use crate::error::ScanResult;
 use crate::findings::VulnerabilityFinding;
-use crate::llm_metrics::LlmMetricsTracker;
+use crate::llm::metrics::LlmMetricsTracker;
 use indicatif::ProgressBar;
 
 pub mod llm_phases;
@@ -63,7 +63,6 @@ pub async fn run_phase(
         }
         ThreatModeling => dispatch_phase!(scanner, other_phases::run_threat_modeling, cfg),
         RootCauseDedup => dispatch_phase!(scanner, other_phases::run_root_cause_dedup, cfg),
-        MultiVerifier => dispatch_phase!(scanner, other_phases::run_multi_verifier, cfg),
         AutoPatching => dispatch_phase!(scanner, other_phases::run_auto_patching, cfg),
         CveBootstrap => dispatch_phase!(scanner, other_phases::run_cve_bootstrap, cfg),
         PocCompiler => dispatch_phase!(scanner, other_phases::run_poc_compiler, cfg),

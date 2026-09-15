@@ -22,6 +22,7 @@ use crate::fixtures::make_finding_report_agg;
 
 fn create_test_scanner_config() -> ScannerConfig {
     ScannerConfig {
+        eval: Default::default(),
         project: ProjectConfig {
             name: "test-project".to_string(),
             path: "/tmp".to_string(),

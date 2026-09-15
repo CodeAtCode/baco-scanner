@@ -14,16 +14,6 @@ use tempfile::TempDir;
 // ============================================================================
 
 #[test]
-fn test_cve_bootstrap_basic() {
-    let temp_dir = TempDir::new().unwrap();
-    let bootstrapper = CveBootstrapper::new(temp_dir.path().to_string_lossy().to_string());
-
-    // Should initialize without error
-    assert!(temp_dir.path().exists());
-    drop(bootstrapper);
-}
-
-#[test]
 fn test_cve_bootstrap_empty() {
     let temp_dir = TempDir::new().unwrap();
     let bootstrapper = CveBootstrapper::new(temp_dir.path().to_string_lossy().to_string());

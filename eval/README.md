@@ -43,14 +43,20 @@ findings fixture (`eval/findings/<target>.json`) against its oracle, prints a
 per-target pass-rate table plus the aggregate, and exits non-zero when the
 aggregate does not exceed the floor.
 
-**`BACO_EVAL_FLOOR` is the single knob.** It is a fraction in `0.0..=1.0`
-(default `0.70`), read from the environment. The suite passes only when the
-aggregate pass-rate (total matched / total expected across all targets) is
-*strictly greater* than the floor; an unset or empty value falls back to the
-default. **The default of 0.70 is provisional pending maintainer sign-off.**
+**`[eval] floor` in the config is the knob.** Set a fraction in `0.0..=1.0`
+(default `0.70`) in your `baco.toml`; the suite passes only when the aggregate
+pass-rate (total matched / total expected across all targets) is *strictly
+greater* than the floor. The `BACO_EVAL_FLOOR` environment variable overrides
+the config value (unset or empty falls back to config).
+
+```toml
+[eval]
+# Fail unless the suite exceeds a stricter floor
+floor = 0.9
+```
 
 ```bash
-# Fail unless the suite exceeds a stricter floor
+# Or override per invocation via the environment
 BACO_EVAL_FLOOR=0.9 baco eval
 ```
 

@@ -1,11 +1,11 @@
 #[cfg(test)]
 mod tests {
+    use baco::llm::metrics::LlmMetricsTracker;
     use baco::llm::LlmClient;
     use baco::llm::LlmConfig;
     use baco::llm_analysis::{
         extract_cwe_id, format_cwe_specs, generate_recommendation, LlmAnalyzer,
     };
-    use baco::llm_metrics::LlmMetricsTracker;
     use baco::retrieval::CweDocument;
     use std::sync::Arc;
 

@@ -47,6 +47,18 @@ pub fn verify_citations(
 
         let file_path = project_path.join(&finding.file_path);
 
+        // Reject absolute paths and path traversal attempts
+        if finding.file_path.starts_with('/') || finding.file_path.contains("..") {
+            finding.confidence_score *= 0.5;
+            let note = format!(
+                "citation verification failed: path traversal rejected: {}",
+                finding.file_path
+            );
+            append_verification_note(&mut finding.verification_notes, &note);
+            report.failed += 1;
+            continue;
+        }
+
         // Check if file exists and is readable
         let file_content = match fs::read_to_string(&file_path) {
             Ok(content) => content,
@@ -64,6 +76,18 @@ pub fn verify_citations(
 
         // Check line number if present
         if let Some(line_num) = finding.line_number {
+            // Line 0 is invalid (lines are 1-indexed)
+            if line_num == 0 {
+                finding.confidence_score *= 0.5;
+                let note = format!(
+                    "citation verification failed: line 0 is invalid (1-indexed): {}",
+                    finding.file_path
+                );
+                append_verification_note(&mut finding.verification_notes, &note);
+                report.failed += 1;
+                continue;
+            }
+
             let line_count = file_content.lines().count();
 
             if line_num as usize > line_count {

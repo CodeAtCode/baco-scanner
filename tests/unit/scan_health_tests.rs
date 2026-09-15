@@ -1,7 +1,7 @@
 //! Tests for scan health reporting
 
 use baco::checkpoint::ScanPhase;
-use baco::llm_metrics::LlmMetrics;
+use baco::llm::metrics::LlmMetrics;
 use baco::report::json::write_findings_json;
 use baco::scan_health::{from_llm_metrics, LlmOutcomeClass, PhaseStatusKind, ScanHealth};
 
@@ -348,7 +348,7 @@ fn test_detect_llm_config_skips() {
 
 #[test]
 fn test_per_phase_token_aggregation() {
-    use baco::llm_metrics::OperationMetrics;
+    use baco::llm::metrics::OperationMetrics;
     use std::collections::HashMap;
 
     let mut operation_metrics: HashMap<String, OperationMetrics> = HashMap::new();
@@ -411,7 +411,7 @@ fn test_per_phase_token_aggregation() {
 #[test]
 fn test_cost_math_with_pricing() {
     use baco::config::ModelPricing;
-    use baco::llm_metrics::OperationMetrics;
+    use baco::llm::metrics::OperationMetrics;
     use std::collections::HashMap;
 
     let mut operation_metrics: HashMap<String, OperationMetrics> = HashMap::new();
@@ -450,7 +450,7 @@ fn test_cost_math_with_pricing() {
 
 #[test]
 fn test_empty_pricing_no_cost() {
-    use baco::llm_metrics::OperationMetrics;
+    use baco::llm::metrics::OperationMetrics;
     use std::collections::HashMap;
 
     let mut operation_metrics: HashMap<String, OperationMetrics> = HashMap::new();
@@ -476,7 +476,7 @@ fn test_empty_pricing_no_cost() {
 
 #[test]
 fn test_summary_method_output_contains_per_phase_lines() {
-    use baco::llm_metrics::OperationMetrics;
+    use baco::llm::metrics::OperationMetrics;
     use std::collections::HashMap;
 
     let mut operation_metrics: HashMap<String, OperationMetrics> = HashMap::new();
@@ -710,4 +710,58 @@ fn test_migrated_serialization() {
     assert_eq!(parsed.files.indexed, 100);
     assert_eq!(parsed.llm_ok, 5);
     assert_eq!(parsed.llm_failed, 2);
+}
+// ============================================================================
+// phase_name function tests (0 refs - pure function coverage)
+// ============================================================================
+
+#[test]
+fn test_phase_name_indexing() {
+    use baco::scan_health::phase_name;
+    assert_eq!(phase_name(&ScanPhase::Indexing), "Indexing");
+}
+
+#[test]
+fn test_phase_name_semgrep() {
+    use baco::scan_health::phase_name;
+    assert_eq!(phase_name(&ScanPhase::Semgrep), "Semgrep");
+}
+
+#[test]
+fn test_phase_name_llm_phases() {
+    use baco::scan_health::phase_name;
+    assert_eq!(
+        phase_name(&ScanPhase::LlmStaticAnalysis),
+        "LlmStaticAnalysis"
+    );
+    assert_eq!(phase_name(&ScanPhase::LlmDiscovery), "LlmDiscovery");
+    assert_eq!(phase_name(&ScanPhase::LlmVerification), "LlmVerification");
+    assert_eq!(
+        phase_name(&ScanPhase::SecurityAgentVerification),
+        "SecurityAgentVerification"
+    );
+}
+
+// ============================================================================
+// blind_marker edge case tests
+// ============================================================================
+
+#[test]
+fn test_blind_marker_partial_skip_llm_ok_gt_zero() {
+    // Edge case: some LLM phases skipped but llm_ok > 0 → no marker
+    let mut health = ScanHealth::new();
+    health.record_phase_skipped(&ScanPhase::LlmStaticAnalysis, "no API key");
+    health.record_phase_run(&ScanPhase::LlmDiscovery);
+    health.record_phase_skipped(&ScanPhase::LlmVerification, "no API key");
+    health.record_phase_skipped(&ScanPhase::SecurityAgentVerification, "no API key");
+    health.set_llm_counts(5, 0);
+
+    assert!(health.blind_marker().is_none());
+}
+
+#[test]
+fn test_blind_marker_empty_health() {
+    // Edge case: completely empty health report
+    let health = ScanHealth::new();
+    assert!(health.blind_marker().is_none());
 }

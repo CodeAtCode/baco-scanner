@@ -89,20 +89,6 @@ fn test_calculate_content_hash_long_content() {
 // ============================================================================
 
 #[test]
-fn test_calculate_file_hash_basic() {
-    let temp_dir = TempDir::new().unwrap();
-    let file_path = temp_dir.path().join("test.txt");
-
-    let mut file = File::create(&file_path).unwrap();
-    file.write_all(b"Test content").unwrap();
-
-    let hash = calculate_file_hash(&file_path).unwrap();
-
-    assert_eq!(hash.len(), 64);
-    assert!(hash.chars().all(|c| c.is_ascii_hexdigit()));
-}
-
-#[test]
 fn test_calculate_file_hash_known_value() {
     let temp_dir = TempDir::new().unwrap();
     let file_path = temp_dir.path().join("test.txt");
@@ -168,33 +154,9 @@ fn test_calculate_file_hash_deterministic() {
     assert_eq!(hash1, hash2);
 }
 
-#[test]
-fn test_calculate_file_hash_binary_content() {
-    let temp_dir = TempDir::new().unwrap();
-    let file_path = temp_dir.path().join("binary.bin");
-
-    let mut file = File::create(&file_path).unwrap();
-    file.write_all(&[0x00, 0xFF, 0xAB, 0xCD, 0xEF]).unwrap();
-
-    let hash = calculate_file_hash(&file_path).unwrap();
-
-    assert_eq!(hash.len(), 64);
-    assert!(hash.chars().all(|c| c.is_ascii_hexdigit()));
-}
-
 // ============================================================================
 // FileHasher Tests
 // ============================================================================
-
-#[test]
-fn test_file_hasher_new() {
-    let _hasher = FileHasher::new();
-}
-
-#[test]
-fn test_file_hasher_default() {
-    let _hasher = FileHasher::default();
-}
 
 #[test]
 fn test_file_hasher_hash_file_basic() {

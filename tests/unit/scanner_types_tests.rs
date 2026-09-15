@@ -836,3 +836,270 @@ fn test_serialization_roundtrip_inline_migrated() {
 
     assert_eq!(rubric, deserialized);
 }
+// ============================================================================
+// Additional Tests: Severity Conversion Completeness, Status Round-Trips
+// ============================================================================
+
+#[test]
+fn test_severity_mapping_table_completeness() {
+    // Verify all score thresholds map correctly
+    let dimensions = RubricDimensions::from(SeverityRubric::default());
+
+    // Test boundary values for each severity level
+    let test_cases = vec![
+        (0.0, V3Severity::Low),
+        (0.25, V3Severity::Low),
+        (0.30, V3Severity::Medium),
+        (0.50, V3Severity::Medium),
+        (0.60, V3Severity::High),
+        (0.75, V3Severity::High),
+        (0.85, V3Severity::Critical),
+        (1.0, V3Severity::Critical),
+    ];
+
+    for (score, expected_severity) in test_cases {
+        let score_obj = RubricScore::new(score, dimensions.clone(), None);
+        assert_eq!(
+            score_obj.severity(),
+            expected_severity,
+            "Score {} should map to {:?}",
+            score,
+            expected_severity
+        );
+    }
+}
+
+#[test]
+fn test_poc_status_enum_roundtrip() {
+    use serde_json;
+
+    let test_cases = vec![
+        PoCCompileResult::success("rust"),
+        PoCCompileResult::failure("python", vec!["error1".to_string()]),
+        PoCCompileResult::default(),
+    ];
+
+    for poc in test_cases {
+        let serialized = serde_json::to_string(&poc).unwrap();
+        let deserialized: PoCCompileResult = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(poc.compiles, deserialized.compiles);
+        assert_eq!(poc.language, deserialized.language);
+    }
+}
+
+#[test]
+fn test_verifier_verdict_enum_roundtrip() {
+    use serde_json;
+
+    let verdicts = vec![
+        VerifierVerdict::Confirmed,
+        VerifierVerdict::Rejected,
+        VerifierVerdict::Inconclusive,
+    ];
+
+    for verdict in verdicts {
+        let serialized = serde_json::to_string(&verdict).unwrap();
+        let deserialized: VerifierVerdict = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(verdict, deserialized);
+    }
+}
+
+#[test]
+fn test_cve_source_enum_variants() {
+    use serde_json;
+
+    let sources = vec![CveSource::NVD, CveSource::KEV];
+
+    for source in sources {
+        let serialized = serde_json::to_string(&source).unwrap();
+        let deserialized: CveSource = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(source, deserialized);
+    }
+}
+
+#[test]
+fn test_dependency_ecosystem_enum_variants() {
+    use serde_json;
+
+    let ecosystems = vec![
+        DependencyEcosystem::CratesIo,
+        DependencyEcosystem::Npm,
+        DependencyEcosystem::PyPi,
+        DependencyEcosystem::Maven,
+        DependencyEcosystem::GoModules,
+    ];
+
+    for ecosystem in ecosystems {
+        let serialized = serde_json::to_string(&ecosystem).unwrap();
+        let deserialized: DependencyEcosystem = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(ecosystem, deserialized);
+    }
+}
+
+#[test]
+fn test_access_type_enum_variants() {
+    use serde_json;
+
+    let access_types = vec![AccessType::Read, AccessType::Write, AccessType::Both];
+
+    for access in access_types {
+        let serialized = serde_json::to_string(&access).unwrap();
+        let deserialized: AccessType = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(access, deserialized);
+    }
+}
+
+#[test]
+fn test_blast_radius_enum_variants() {
+    use serde_json;
+
+    let radii = vec![
+        BlastRadius::Low,
+        BlastRadius::Medium,
+        BlastRadius::High,
+        BlastRadius::Critical,
+    ];
+
+    for radius in radii {
+        let serialized = serde_json::to_string(&radius).unwrap();
+        let deserialized: BlastRadius = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(radius, deserialized);
+    }
+}
+
+#[test]
+fn test_v3_severity_enum_variants() {
+    use serde_json;
+
+    let severities = vec![
+        V3Severity::Low,
+        V3Severity::Medium,
+        V3Severity::High,
+        V3Severity::Critical,
+    ];
+
+    for severity in severities {
+        let serialized = serde_json::to_string(&severity).unwrap();
+        let deserialized: V3Severity = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(severity, deserialized);
+    }
+}
+
+#[test]
+fn test_root_cause_group_multiple_findings_same_file() {
+    let mut group = RootCauseGroup::new("hash123", "Test root cause", V3Severity::High);
+
+    group.add_finding("finding-1", "src/main.rs", 10);
+    group.add_finding("finding-2", "src/main.rs", 20);
+    group.add_finding("finding-3", "src/main.rs", 30);
+
+    assert_eq!(group.findings.len(), 3);
+    assert_eq!(group.all_locations.len(), 3);
+
+    // All locations should be from the same file
+    for loc in &group.all_locations {
+        assert_eq!(loc.0, "src/main.rs");
+    }
+}
+
+#[test]
+fn test_root_cause_group_findings_across_multiple_files() {
+    let mut group = RootCauseGroup::new("hash456", "Cross-file issue", V3Severity::Critical);
+
+    group.add_finding("f1", "src/a.rs", 5);
+    group.add_finding("f2", "src/b.rs", 15);
+    group.add_finding("f3", "src/c.rs", 25);
+
+    assert_eq!(group.all_locations[0], ("src/a.rs".to_string(), 5));
+    assert_eq!(group.all_locations[1], ("src/b.rs".to_string(), 15));
+    assert_eq!(group.all_locations[2], ("src/c.rs".to_string(), 25));
+}
+
+#[test]
+fn test_cve_cluster_affected_dependencies() {
+    let mut cluster = CveCluster {
+        pattern_name: "sql-injection".to_string(),
+        cve_count: 10,
+        ..Default::default()
+    };
+    cluster.cve_count = 10;
+    cluster.affected_dependencies.push("sqlx".to_string());
+    cluster.affected_dependencies.push("diesel".to_string());
+
+    assert_eq!(cluster.affected_dependencies.len(), 2);
+    assert!(cluster.affected_dependencies.contains(&"sqlx".to_string()));
+}
+
+#[test]
+fn test_majority_verdict_tie_breaking() {
+    // Equal votes should use the final_verdict parameter
+    let verdicts = vec![VerifierVerdict::Confirmed, VerifierVerdict::Rejected];
+
+    let majority = MajorityVerdict::new(VerifierVerdict::Confirmed, 0.5, verdicts);
+
+    assert_eq!(majority.final_verdict, VerifierVerdict::Confirmed);
+    assert_eq!(
+        majority
+            .vote_count
+            .get(&VerifierVerdict::Confirmed)
+            .unwrap(),
+        &1
+    );
+    assert_eq!(
+        majority.vote_count.get(&VerifierVerdict::Rejected).unwrap(),
+        &1
+    );
+}
+
+#[test]
+fn test_majority_verdict_single_vote() {
+    let verdicts = vec![VerifierVerdict::Rejected];
+
+    let majority = MajorityVerdict::new(VerifierVerdict::Rejected, 1.0, verdicts);
+
+    assert_eq!(majority.final_verdict, VerifierVerdict::Rejected);
+    assert_eq!(majority.confidence, 1.0);
+    assert_eq!(majority.vote_count.len(), 1);
+}
+
+#[test]
+fn test_rubric_score_severity_override_preserved() {
+    let dimensions = RubricDimensions::from(SeverityRubric::default());
+
+    // Low score with Critical override
+    let score = RubricScore::new(0.1, dimensions.clone(), Some(V3Severity::Critical));
+    assert_eq!(score.severity(), V3Severity::Critical);
+    assert_eq!(score.severity_override, Some(V3Severity::Critical));
+
+    // High score with Low override
+    let score2 = RubricScore::new(0.9, dimensions.clone(), Some(V3Severity::Low));
+    assert_eq!(score2.severity(), V3Severity::Low);
+}
+
+#[test]
+fn test_rubric_score_dimensions_immutability() {
+    let rubric = SeverityRubric::new(0.8, 0.9, 0.7, true, AccessType::Both, BlastRadius::Critical);
+    let dimensions = RubricDimensions::from(rubric);
+
+    // Dimensions should be cloned, not referenced
+    let score = RubricScore::new(0.75, dimensions.clone(), None);
+
+    assert_eq!(score.dimensions.reachability, 0.8);
+    assert_eq!(score.dimensions.attacker_control, 0.9);
+    assert!(score.dimensions.auth_required);
+}
+
+#[test]
+fn test_patch_candidate_validation_result_serialization() {
+    use serde_json;
+
+    let mut candidate = PatchCandidate::new("diff content", "src/test.rs");
+    candidate.validation_result = Some(PatchValidationResult::failure("test error"));
+
+    let serialized = serde_json::to_string(&candidate).unwrap();
+    let deserialized: PatchCandidate = serde_json::from_str(&serialized).unwrap();
+
+    assert_eq!(candidate.diff, deserialized.diff);
+    assert_eq!(candidate.file_path, deserialized.file_path);
+    assert!(deserialized.validation_result.is_some());
+}

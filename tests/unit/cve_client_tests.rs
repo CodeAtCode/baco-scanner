@@ -939,8 +939,3 @@ async fn test_dedup_only_kev_inline() {
     assert_eq!(result.len(), 1);
     assert_eq!(result[0].source, CveSource::KEV);
 }
-
-#[test]
-fn test_new_client() {
-    let _client = CveClient::new();
-}

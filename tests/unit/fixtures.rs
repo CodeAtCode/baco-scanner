@@ -198,6 +198,7 @@ pub fn create_test_findings(count: usize) -> Vec<VulnerabilityFinding> {
 /// ```
 pub fn create_test_config() -> ScannerConfig {
     ScannerConfig {
+        eval: Default::default(),
         project: ProjectConfig {
             name: "test-project".to_string(),
             path: ".".to_string(),
@@ -322,6 +323,7 @@ pub fn create_test_config() -> ScannerConfig {
 /// Simpler version for tests that only need basic config structure.
 pub fn create_minimal_config() -> ScannerConfig {
     ScannerConfig {
+        eval: Default::default(),
         project: ProjectConfig {
             name: "test".to_string(),
             path: ".".to_string(),

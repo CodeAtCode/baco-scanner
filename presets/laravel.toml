@@ -198,7 +198,7 @@ sink_patterns = [
 ]
 
 [knowledge.hook_registry.php]
-hook_label = ""
+hook_label = "rest_route"
 registrations = [
   '''(?si)\bRoute::\s*(?:get|post|put|patch|delete|options|any)\s*\(\s*[\x27\x22](?P<hook>[^\x27\x22]*)[\x27\x22]\s*,\s*''',
 ]

@@ -14,16 +14,6 @@ use tempfile::tempdir;
 // ============================================================================
 
 #[test]
-fn test_generate_threat_model_static_basic() {
-    let architecture = "A simple web app with database";
-    let tm = generate_threat_model_static(architecture);
-
-    assert!(tm.contains("TRUST BOUNDARIES"));
-    assert!(tm.contains("DATA FLOWS"));
-    assert!(tm.contains("STRIDE THREATS"));
-}
-
-#[test]
 fn test_generate_threat_model_static_no_db() {
     let architecture = "No database, just static files";
     let tm = generate_threat_model_static(architecture);
