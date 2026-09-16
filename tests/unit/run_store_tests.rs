@@ -1,9 +1,11 @@
 //! Unit tests for the cross-run prior-findings store.
 
-use baco::findings::{Severity, VerificationStatus, VulnerabilityFinding};
+use baco::findings::{VerificationStatus, VulnerabilityFinding};
 use baco::run_store;
 use std::fs::File;
 use std::io::Write;
+
+use crate::fixtures::create_test_finding;
 
 fn make_finding(
     id: &str,
@@ -12,40 +14,12 @@ fn make_finding(
     code_snippet: Option<&str>,
     verification_status: Option<VerificationStatus>,
 ) -> VulnerabilityFinding {
-    VulnerabilityFinding {
-        id: id.to_string(),
-        title: "Test finding".to_string(),
-        description: "Test description".to_string(),
-        severity: Severity::Medium,
-        confidence_score: 0.7,
-        cwe_id: Some("CWE-79".to_string()),
-        file_path: file_path.to_string(),
-        line_number,
-        code_snippet: code_snippet.map(String::from),
-        diff_hunk: None,
-        recommendation: None,
-        code_location: None,
-        already_reported: false,
-        sources: vec![],
-        commit_reference: None,
-        ticket_reference: None,
-        priority_score: None,
-        cross_file_references: None,
-        verification_status,
-        verification_notes: None,
-        verification_error: None,
-        agent_evidence_path: None,
-        security_issue: None,
-        poc_code: None,
-        mitigation_code: None,
-        poc_format: None,
-        llm_model: None,
-        agent_mode: false,
-        statement_range: None,
-        triage_verdict: None,
-        evidence: vec![],
-        verification_tier: None,
-    }
+    let mut f = create_test_finding(id, "Test finding", file_path, line_number.unwrap_or(1));
+    f.description = "Test description".to_string();
+    f.line_number = line_number;
+    f.code_snippet = code_snippet.map(String::from);
+    f.verification_status = verification_status;
+    f
 }
 
 fn make_finding_with_cwe(
@@ -56,40 +30,13 @@ fn make_finding_with_cwe(
     cwe_id: Option<&str>,
     verification_status: Option<VerificationStatus>,
 ) -> VulnerabilityFinding {
-    VulnerabilityFinding {
-        id: id.to_string(),
-        title: "Test finding".to_string(),
-        description: "Test description".to_string(),
-        severity: Severity::Medium,
-        confidence_score: 0.7,
-        cwe_id: cwe_id.map(String::from),
-        file_path: file_path.to_string(),
-        line_number,
-        code_snippet: code_snippet.map(String::from),
-        diff_hunk: None,
-        recommendation: None,
-        code_location: None,
-        already_reported: false,
-        sources: vec![],
-        commit_reference: None,
-        ticket_reference: None,
-        priority_score: None,
-        cross_file_references: None,
-        verification_status,
-        verification_notes: None,
-        verification_error: None,
-        agent_evidence_path: None,
-        security_issue: None,
-        poc_code: None,
-        mitigation_code: None,
-        poc_format: None,
-        llm_model: None,
-        agent_mode: false,
-        statement_range: None,
-        triage_verdict: None,
-        evidence: vec![],
-        verification_tier: None,
-    }
+    let mut f = create_test_finding(id, "Test finding", file_path, line_number.unwrap_or(1));
+    f.description = "Test description".to_string();
+    f.line_number = line_number;
+    f.code_snippet = code_snippet.map(String::from);
+    f.cwe_id = cwe_id.map(String::from);
+    f.verification_status = verification_status;
+    f
 }
 
 #[test]

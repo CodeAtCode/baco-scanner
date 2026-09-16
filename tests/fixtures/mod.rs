@@ -198,10 +198,20 @@ pub fn create_subdir_in_shared(parent: &TempDir, name: &str) -> PathBuf {
     subdir
 }
 
-/// Helper to create a VulnerabilityFinding for unit tests (multi_verifier/root_cause_dedup style)
-///
-/// This matches the signature used in tests/unit/multi_verifier_phase_tests.rs
-/// and tests/unit/root_cause_dedup_phase_tests.rs.
+/// Minimal finding builder for report/renderer tests (title, file, line, severity).
+pub fn make_finding(
+    title: &str,
+    file: &str,
+    line: u32,
+    severity: baco::findings::Severity,
+) -> baco::findings::VulnerabilityFinding {
+    let mut f = create_test_finding(&format!("finding-{}", line), title, file, line);
+    f.severity = severity;
+    f.confidence_score = 0.5;
+    f.verification_status = Some(baco::findings::VerificationStatus::NeedsReview);
+    f
+}
+
 pub fn make_finding_phase(
     id: &str,
     title: &str,

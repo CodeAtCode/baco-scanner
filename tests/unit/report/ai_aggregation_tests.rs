@@ -55,20 +55,7 @@ fn make_config_empty() -> LlmConfig {
     }
 }
 
-/// Helper to create a test finding with specific parameters.
-/// This is a local test helper specific to ai_aggregation tests.
-fn make_finding(
-    id: &str,
-    severity: Severity,
-    confidence: f32,
-    file: &str,
-    line: Option<u32>,
-    cwe: Option<&str>,
-    verification: Option<VerificationStatus>,
-) -> VulnerabilityFinding {
-    make_aggregation_finding(id, severity, confidence, file, line, cwe, verification)
-}
-
+/// Helper to create a test finding with cross-file references.
 fn make_finding_with_cross_file(
     id: &str,
     severity: Severity,
@@ -79,7 +66,8 @@ fn make_finding_with_cross_file(
     verification: Option<VerificationStatus>,
     has_cross_file: bool,
 ) -> VulnerabilityFinding {
-    let mut finding = make_finding(id, severity, confidence, file, line, cwe, verification);
+    let mut finding =
+        make_aggregation_finding(id, severity, confidence, file, line, cwe, verification);
     if has_cross_file {
         finding.cross_file_references = Some(vec!["src/lib.rs".to_string()]);
     }
@@ -101,7 +89,7 @@ async fn test_ai_aggregation_generate_executive_summary_empty() {
 #[tokio::test]
 async fn test_ai_aggregation_generate_executive_summary() {
     let ai_agg = AiAggregation::new(make_config());
-    let findings = vec![make_finding(
+    let findings = vec![make_aggregation_finding(
         "f1",
         Severity::Critical,
         0.9,
@@ -197,7 +185,7 @@ async fn test_async_compatible() {
 #[test]
 fn test_conflict_resolver_resolve_severity_conflict() {
     let findings = [
-        make_finding(
+        make_aggregation_finding(
             "f1",
             Severity::Critical,
             0.5,
@@ -206,7 +194,7 @@ fn test_conflict_resolver_resolve_severity_conflict() {
             Some("CWE-79"),
             None,
         ),
-        make_finding(
+        make_aggregation_finding(
             "f2",
             Severity::Low,
             0.9,
@@ -234,7 +222,7 @@ fn test_conflict_resolver_resolve_severity_conflict() {
 #[test]
 fn test_conflict_resolver_resolve_cwe_conflict() {
     let findings = [
-        make_finding(
+        make_aggregation_finding(
             "f1",
             Severity::High,
             0.8,
@@ -243,7 +231,7 @@ fn test_conflict_resolver_resolve_cwe_conflict() {
             Some("CWE-79"),
             None,
         ),
-        make_finding(
+        make_aggregation_finding(
             "f2",
             Severity::High,
             0.8,
@@ -267,7 +255,7 @@ fn test_conflict_resolver_resolve_cwe_conflict() {
 #[test]
 fn test_conflict_resolver_resolve_verification_conflict_verified() {
     let findings = [
-        make_finding(
+        make_aggregation_finding(
             "f1",
             Severity::High,
             0.9,
@@ -276,7 +264,7 @@ fn test_conflict_resolver_resolve_verification_conflict_verified() {
             Some("CWE-79"),
             Some(VerificationStatus::Confirmed),
         ),
-        make_finding(
+        make_aggregation_finding(
             "f2",
             Severity::High,
             0.8,
@@ -303,7 +291,7 @@ fn test_conflict_resolver_resolve_verification_conflict_verified() {
 #[test]
 fn test_conflict_resolver_resolve_confidence_conflict() {
     let findings = [
-        make_finding(
+        make_aggregation_finding(
             "f1",
             Severity::High,
             0.9,
@@ -312,7 +300,7 @@ fn test_conflict_resolver_resolve_confidence_conflict() {
             Some("CWE-79"),
             None,
         ),
-        make_finding(
+        make_aggregation_finding(
             "f2",
             Severity::High,
             0.5,
@@ -362,7 +350,7 @@ async fn test_generate_executive_summary_critical_risk() {
     let context = AnalysisContext::default();
 
     let findings = vec![
-        make_finding(
+        make_aggregation_finding(
             "f1",
             Severity::Critical,
             0.9,
@@ -371,7 +359,7 @@ async fn test_generate_executive_summary_critical_risk() {
             Some("CWE-79"),
             Some(VerificationStatus::Confirmed),
         ),
-        make_finding(
+        make_aggregation_finding(
             "f2",
             Severity::Critical,
             0.95,
@@ -380,7 +368,7 @@ async fn test_generate_executive_summary_critical_risk() {
             Some("CWE-89"),
             Some(VerificationStatus::Confirmed),
         ),
-        make_finding(
+        make_aggregation_finding(
             "f3",
             Severity::Critical,
             0.9,
@@ -389,7 +377,7 @@ async fn test_generate_executive_summary_critical_risk() {
             Some("CWE-22"),
             Some(VerificationStatus::Confirmed),
         ),
-        make_finding(
+        make_aggregation_finding(
             "f4",
             Severity::High,
             0.85,
@@ -398,7 +386,7 @@ async fn test_generate_executive_summary_critical_risk() {
             Some("CWE-79"),
             None,
         ),
-        make_finding(
+        make_aggregation_finding(
             "f5",
             Severity::High,
             0.8,
@@ -407,7 +395,7 @@ async fn test_generate_executive_summary_critical_risk() {
             Some("CWE-89"),
             None,
         ),
-        make_finding(
+        make_aggregation_finding(
             "f6",
             Severity::High,
             0.85,
@@ -433,7 +421,7 @@ async fn test_generate_executive_summary_low_risk() {
     let context = AnalysisContext::default();
 
     let findings = vec![
-        make_finding(
+        make_aggregation_finding(
             "f1",
             Severity::Medium,
             0.3,
@@ -442,7 +430,7 @@ async fn test_generate_executive_summary_low_risk() {
             Some("CWE-79"),
             Some(VerificationStatus::FalsePositive),
         ),
-        make_finding(
+        make_aggregation_finding(
             "f2",
             Severity::Low,
             0.2,
@@ -451,7 +439,7 @@ async fn test_generate_executive_summary_low_risk() {
             Some("CWE-89"),
             Some(VerificationStatus::FalsePositive),
         ),
-        make_finding(
+        make_aggregation_finding(
             "f3",
             Severity::Low,
             0.25,
@@ -460,7 +448,7 @@ async fn test_generate_executive_summary_low_risk() {
             Some("CWE-22"),
             Some(VerificationStatus::FalsePositive),
         ),
-        make_finding(
+        make_aggregation_finding(
             "f4",
             Severity::Low,
             0.3,
@@ -483,7 +471,7 @@ async fn test_generate_executive_summary_high_risk() {
     let context = AnalysisContext::default();
 
     let findings = vec![
-        make_finding(
+        make_aggregation_finding(
             "f1",
             Severity::High,
             0.9,
@@ -492,7 +480,7 @@ async fn test_generate_executive_summary_high_risk() {
             Some("CWE-79"),
             None,
         ),
-        make_finding(
+        make_aggregation_finding(
             "f2",
             Severity::High,
             0.85,
@@ -501,7 +489,7 @@ async fn test_generate_executive_summary_high_risk() {
             Some("CWE-89"),
             None,
         ),
-        make_finding(
+        make_aggregation_finding(
             "f3",
             Severity::Medium,
             0.8,
@@ -526,7 +514,7 @@ async fn test_generate_executive_summary_moderate_risk() {
     let context = AnalysisContext::default();
 
     let findings = vec![
-        make_finding(
+        make_aggregation_finding(
             "f1",
             Severity::Medium,
             0.5,
@@ -535,7 +523,7 @@ async fn test_generate_executive_summary_moderate_risk() {
             Some("CWE-79"),
             None,
         ),
-        make_finding(
+        make_aggregation_finding(
             "f2",
             Severity::Medium,
             0.55,
@@ -544,7 +532,7 @@ async fn test_generate_executive_summary_moderate_risk() {
             Some("CWE-89"),
             None,
         ),
-        make_finding(
+        make_aggregation_finding(
             "f3",
             Severity::Low,
             0.4,
@@ -553,7 +541,7 @@ async fn test_generate_executive_summary_moderate_risk() {
             Some("CWE-22"),
             None,
         ),
-        make_finding(
+        make_aggregation_finding(
             "f4",
             Severity::Low,
             0.45,
@@ -579,7 +567,7 @@ async fn test_update_context_with_findings() {
     let phase = AiAggregationPhase::new(config);
     let mut context = AnalysisContext::default();
 
-    let findings = vec![make_finding(
+    let findings = vec![make_aggregation_finding(
         "f1",
         Severity::Critical,
         0.9,
@@ -621,7 +609,7 @@ async fn test_run_aggregation_single_finding() {
     let phase = AiAggregationPhase::new(config);
     let context = AnalysisContext::default();
 
-    let findings = vec![make_finding(
+    let findings = vec![make_aggregation_finding(
         "f1",
         Severity::Critical,
         0.9,
@@ -645,7 +633,7 @@ async fn test_run_aggregation_multiple_findings_with_conflicts() {
     let context = AnalysisContext::default();
 
     let findings = vec![
-        make_finding(
+        make_aggregation_finding(
             "f1",
             Severity::Critical,
             0.9,
@@ -654,7 +642,7 @@ async fn test_run_aggregation_multiple_findings_with_conflicts() {
             Some("CWE-79"),
             None,
         ),
-        make_finding(
+        make_aggregation_finding(
             "f2",
             Severity::Low,
             0.8,
@@ -663,7 +651,7 @@ async fn test_run_aggregation_multiple_findings_with_conflicts() {
             Some("CWE-79"),
             None,
         ), // Severity conflict
-        make_finding(
+        make_aggregation_finding(
             "f3",
             Severity::High,
             0.85,
@@ -688,7 +676,7 @@ async fn test_run_aggregation_false_positive_detection() {
     let context = AnalysisContext::default();
 
     let findings = vec![
-        make_finding(
+        make_aggregation_finding(
             "f1",
             Severity::Medium,
             0.4,
@@ -697,7 +685,7 @@ async fn test_run_aggregation_false_positive_detection() {
             Some("CWE-79"),
             Some(VerificationStatus::FalsePositive),
         ),
-        make_finding(
+        make_aggregation_finding(
             "f2",
             Severity::High,
             0.9,
@@ -720,7 +708,7 @@ async fn test_run_aggregation_with_empty_config() {
     let phase = AiAggregationPhase::new(config);
     let context = AnalysisContext::default();
 
-    let findings = vec![make_finding(
+    let findings = vec![make_aggregation_finding(
         "f1",
         Severity::High,
         0.8,
@@ -744,7 +732,7 @@ async fn test_run_aggregation_multiple_files() {
     let context = AnalysisContext::default();
 
     let findings = vec![
-        make_finding(
+        make_aggregation_finding(
             "f1",
             Severity::High,
             0.8,
@@ -753,7 +741,7 @@ async fn test_run_aggregation_multiple_files() {
             Some("CWE-79"),
             None,
         ),
-        make_finding(
+        make_aggregation_finding(
             "f2",
             Severity::High,
             0.85,
@@ -762,7 +750,7 @@ async fn test_run_aggregation_multiple_files() {
             Some("CWE-89"),
             None,
         ),
-        make_finding(
+        make_aggregation_finding(
             "f3",
             Severity::Critical,
             0.9,
@@ -771,7 +759,7 @@ async fn test_run_aggregation_multiple_files() {
             Some("CWE-22"),
             None,
         ),
-        make_finding(
+        make_aggregation_finding(
             "f4",
             Severity::Medium,
             0.6,
@@ -841,7 +829,7 @@ async fn test_enrich_findings_with_empty_config() {
     let config = make_config_empty();
     let phase = AiAggregationPhase::new(config);
 
-    let findings = vec![make_finding(
+    let findings = vec![make_aggregation_finding(
         "f1",
         Severity::High,
         0.8,
@@ -863,7 +851,7 @@ async fn test_enrich_findings_preserves_existing_description() {
     let config = make_config_empty();
     let phase = AiAggregationPhase::new(config);
 
-    let mut finding = make_finding(
+    let mut finding = make_aggregation_finding(
         "f1",
         Severity::High,
         0.8,
@@ -891,7 +879,7 @@ async fn test_aggregation_with_findings_without_line_numbers() {
     let context = AnalysisContext::default();
 
     let findings = vec![
-        make_finding(
+        make_aggregation_finding(
             "f1",
             Severity::High,
             0.8,
@@ -900,7 +888,7 @@ async fn test_aggregation_with_findings_without_line_numbers() {
             Some("CWE-79"),
             None,
         ),
-        make_finding(
+        make_aggregation_finding(
             "f2",
             Severity::High,
             0.85,
@@ -923,7 +911,7 @@ async fn test_aggregation_with_findings_without_cwe() {
     let context = AnalysisContext::default();
 
     let findings = vec![
-        make_finding(
+        make_aggregation_finding(
             "f1",
             Severity::High,
             0.8,
@@ -932,7 +920,7 @@ async fn test_aggregation_with_findings_without_cwe() {
             None,
             None,
         ),
-        make_finding(
+        make_aggregation_finding(
             "f2",
             Severity::High,
             0.85,
@@ -955,7 +943,7 @@ async fn test_aggregation_with_all_severity_levels() {
     let context = AnalysisContext::default();
 
     let findings = vec![
-        make_finding(
+        make_aggregation_finding(
             "f1",
             Severity::Critical,
             0.9,
@@ -964,7 +952,7 @@ async fn test_aggregation_with_all_severity_levels() {
             Some("CWE-79"),
             None,
         ),
-        make_finding(
+        make_aggregation_finding(
             "f2",
             Severity::High,
             0.8,
@@ -973,7 +961,7 @@ async fn test_aggregation_with_all_severity_levels() {
             Some("CWE-89"),
             None,
         ),
-        make_finding(
+        make_aggregation_finding(
             "f3",
             Severity::Medium,
             0.6,
@@ -982,7 +970,7 @@ async fn test_aggregation_with_all_severity_levels() {
             Some("CWE-22"),
             None,
         ),
-        make_finding(
+        make_aggregation_finding(
             "f4",
             Severity::Low,
             0.4,
@@ -991,7 +979,7 @@ async fn test_aggregation_with_all_severity_levels() {
             Some("CWE-287"),
             None,
         ),
-        make_finding(
+        make_aggregation_finding(
             "f5",
             Severity::Info,
             0.3,
@@ -1014,7 +1002,7 @@ async fn test_aggregation_with_mixed_verification_status() {
     let context = AnalysisContext::default();
 
     let findings = vec![
-        make_finding(
+        make_aggregation_finding(
             "f1",
             Severity::High,
             0.9,
@@ -1023,7 +1011,7 @@ async fn test_aggregation_with_mixed_verification_status() {
             Some("CWE-79"),
             Some(VerificationStatus::Confirmed),
         ),
-        make_finding(
+        make_aggregation_finding(
             "f2",
             Severity::High,
             0.3,
@@ -1032,7 +1020,7 @@ async fn test_aggregation_with_mixed_verification_status() {
             Some("CWE-89"),
             Some(VerificationStatus::FalsePositive),
         ),
-        make_finding(
+        make_aggregation_finding(
             "f3",
             Severity::Medium,
             0.5,
@@ -1041,7 +1029,7 @@ async fn test_aggregation_with_mixed_verification_status() {
             Some("CWE-22"),
             Some(VerificationStatus::NeedsReview),
         ),
-        make_finding(
+        make_aggregation_finding(
             "f4",
             Severity::Medium,
             0.6,
@@ -1064,7 +1052,7 @@ async fn test_aggregation_statistics_accuracy() {
     let context = AnalysisContext::default();
 
     let findings = vec![
-        make_finding(
+        make_aggregation_finding(
             "f1",
             Severity::Critical,
             0.9,
@@ -1073,7 +1061,7 @@ async fn test_aggregation_statistics_accuracy() {
             Some("CWE-79"),
             Some(VerificationStatus::Confirmed),
         ),
-        make_finding(
+        make_aggregation_finding(
             "f2",
             Severity::High,
             0.8,
@@ -1082,7 +1070,7 @@ async fn test_aggregation_statistics_accuracy() {
             Some("CWE-89"),
             None,
         ),
-        make_finding(
+        make_aggregation_finding(
             "f3",
             Severity::Medium,
             0.4,
@@ -1107,7 +1095,7 @@ async fn test_aggregation_preserves_finding_ids() {
     let context = AnalysisContext::default();
 
     let findings = vec![
-        make_finding(
+        make_aggregation_finding(
             "custom-id-1",
             Severity::High,
             0.8,
@@ -1116,7 +1104,7 @@ async fn test_aggregation_preserves_finding_ids() {
             Some("CWE-79"),
             None,
         ),
-        make_finding(
+        make_aggregation_finding(
             "custom-id-2",
             Severity::Critical,
             0.9,
@@ -1144,7 +1132,7 @@ async fn test_aggregation_with_large_number_of_findings() {
     // Minimal test case - just verify aggregation works
     let findings: Vec<VulnerabilityFinding> = (0..3)
         .map(|i| {
-            make_finding(
+            make_aggregation_finding(
                 &format!("f{}", i),
                 Severity::High,
                 0.8 + (i as f32 * 0.01),
@@ -1168,7 +1156,7 @@ async fn test_aggregation_executive_summary_contains_recommendation() {
     let phase = AiAggregationPhase::new(config);
     let context = AnalysisContext::default();
 
-    let findings = vec![make_finding(
+    let findings = vec![make_aggregation_finding(
         "f1",
         Severity::Critical,
         0.9,
@@ -1201,7 +1189,7 @@ async fn test_aggregation_unified_reports_have_confidence() {
     let context = AnalysisContext::default();
 
     let findings = vec![
-        make_finding(
+        make_aggregation_finding(
             "f1",
             Severity::High,
             0.8,
@@ -1210,7 +1198,7 @@ async fn test_aggregation_unified_reports_have_confidence() {
             Some("CWE-79"),
             None,
         ),
-        make_finding(
+        make_aggregation_finding(
             "f2",
             Severity::Critical,
             0.9,
@@ -1240,7 +1228,7 @@ async fn test_aggregation_consensus_recommendations() {
     let context = AnalysisContext::default();
 
     let findings = vec![
-        make_finding(
+        make_aggregation_finding(
             "f1",
             Severity::High,
             0.9,
@@ -1249,7 +1237,7 @@ async fn test_aggregation_consensus_recommendations() {
             Some("CWE-79"),
             Some(VerificationStatus::Confirmed),
         ),
-        make_finding(
+        make_aggregation_finding(
             "f2",
             Severity::Medium,
             0.3,
@@ -1258,7 +1246,7 @@ async fn test_aggregation_consensus_recommendations() {
             Some("CWE-89"),
             Some(VerificationStatus::FalsePositive),
         ),
-        make_finding(
+        make_aggregation_finding(
             "f3",
             Severity::Medium,
             0.5,
@@ -1324,7 +1312,7 @@ async fn test_enrich_findings_with_empty_description_and_recommendation() {
     let config = make_config_empty();
     let phase = AiAggregationPhase::new(config);
 
-    let mut finding = make_finding(
+    let mut finding = make_aggregation_finding(
         "f1",
         Severity::High,
         0.8,
@@ -1425,7 +1413,7 @@ async fn test_deduplicate_no_duplicates() {
     let service = DeduplicationService::new(&config);
 
     let findings = vec![
-        make_finding(
+        make_aggregation_finding(
             "f1",
             Severity::High,
             0.8,
@@ -1434,7 +1422,7 @@ async fn test_deduplicate_no_duplicates() {
             Some("CWE-79"),
             None,
         ),
-        make_finding(
+        make_aggregation_finding(
             "f2",
             Severity::High,
             0.8,
@@ -1443,7 +1431,7 @@ async fn test_deduplicate_no_duplicates() {
             Some("CWE-89"),
             None,
         ),
-        make_finding(
+        make_aggregation_finding(
             "f3",
             Severity::Medium,
             0.6,
@@ -1466,7 +1454,7 @@ async fn test_deduplicate_same_file_different_lines() {
     let service = DeduplicationService::new(&config);
 
     let findings = vec![
-        make_finding(
+        make_aggregation_finding(
             "f1",
             Severity::High,
             0.8,
@@ -1475,7 +1463,7 @@ async fn test_deduplicate_same_file_different_lines() {
             Some("CWE-79"),
             None,
         ),
-        make_finding(
+        make_aggregation_finding(
             "f2",
             Severity::High,
             0.8,
@@ -1484,7 +1472,7 @@ async fn test_deduplicate_same_file_different_lines() {
             Some("CWE-79"),
             None,
         ),
-        make_finding(
+        make_aggregation_finding(
             "f3",
             Severity::High,
             0.8,
@@ -1507,7 +1495,7 @@ async fn test_deduplicate_findings_without_line_numbers() {
     let service = DeduplicationService::new(&config);
 
     let findings = vec![
-        make_finding(
+        make_aggregation_finding(
             "f1",
             Severity::High,
             0.8,
@@ -1516,7 +1504,7 @@ async fn test_deduplicate_findings_without_line_numbers() {
             Some("CWE-79"),
             None,
         ),
-        make_finding(
+        make_aggregation_finding(
             "f2",
             Severity::High,
             0.8,
@@ -1545,7 +1533,7 @@ fn test_group_findings_by_location() {
     let phase = AiAggregationPhase::new(config);
 
     let findings = vec![
-        make_finding(
+        make_aggregation_finding(
             "f1",
             Severity::High,
             0.8,
@@ -1554,7 +1542,7 @@ fn test_group_findings_by_location() {
             Some("CWE-79"),
             None,
         ),
-        make_finding(
+        make_aggregation_finding(
             "f2",
             Severity::High,
             0.9,
@@ -1563,7 +1551,7 @@ fn test_group_findings_by_location() {
             Some("CWE-79"),
             None,
         ),
-        make_finding(
+        make_aggregation_finding(
             "f3",
             Severity::Critical,
             0.95,
@@ -1586,7 +1574,7 @@ fn test_conflict_detection_severity() {
     let phase = AiAggregationPhase::new(config);
 
     let findings = vec![
-        make_finding(
+        make_aggregation_finding(
             "f1",
             Severity::Critical,
             0.9,
@@ -1595,7 +1583,7 @@ fn test_conflict_detection_severity() {
             Some("CWE-79"),
             None,
         ),
-        make_finding(
+        make_aggregation_finding(
             "f2",
             Severity::Low,
             0.8,
@@ -1622,7 +1610,7 @@ fn test_consensus_algorithms() {
     let phase = AiAggregationPhase::new(config);
 
     let findings = vec![
-        make_finding(
+        make_aggregation_finding(
             "f1",
             Severity::Critical,
             0.9,
@@ -1631,7 +1619,7 @@ fn test_consensus_algorithms() {
             Some("CWE-79"),
             Some(VerificationStatus::Confirmed),
         ),
-        make_finding(
+        make_aggregation_finding(
             "f2",
             Severity::Critical,
             0.3,
@@ -1653,7 +1641,7 @@ fn test_ai_confidence_calculation() {
     let config = make_config();
     let phase = AiAggregationPhase::new(config);
 
-    let finding = make_finding(
+    let finding = make_aggregation_finding(
         "f1",
         Severity::Critical,
         0.9,

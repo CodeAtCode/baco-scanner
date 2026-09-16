@@ -19,15 +19,9 @@ use std::time::Duration;
 // Test Fixtures
 // ============================================================================
 
-#[expect(dead_code)]
-fn create_test_config() -> baco::config::ScannerConfig {
-    baco::config::ScannerConfig::default()
-}
-
 // ============================================================================
 // ParallelSlot Tests
 // ============================================================================
-
 #[test]
 fn test_parallel_phase_config_all_enabled() {
     let pb = ProgressBar::hidden();

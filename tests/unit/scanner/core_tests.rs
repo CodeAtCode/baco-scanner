@@ -18,28 +18,6 @@ use tempfile::TempDir;
 use crate::fixtures::{create_test_config, make_finding_report_agg};
 
 // ============================================================================
-// Test Fixtures
-// ============================================================================
-
-fn create_test_finding() -> VulnerabilityFinding {
-    let mut finding = make_finding_report_agg(
-        "test-finding-001",
-        "Test Vulnerability",
-        "src/test.c",
-        Some(42),
-        Some("CWE-79"),
-        Severity::High,
-    );
-    finding.description = "A test vulnerability for unit testing".to_string();
-    finding.code_snippet = Some("printf(user_input)".to_string());
-    finding.recommendation = Some("Use sanitized input".to_string());
-    finding.code_location = Some("src/test.c:42".to_string());
-    finding.sources = vec!["test".to_string()];
-    finding.priority_score = Some(0.9);
-    finding
-}
-
-// ============================================================================
 // Scanner::new() Tests
 // ============================================================================
 
@@ -80,7 +58,24 @@ fn test_scanner_new_sets_checkpoint_path() {
 fn test_scanner_with_initial_findings() {
     let config = create_test_config();
     let target_path = PathBuf::from("/tmp/test-project");
-    let initial_findings = vec![create_test_finding(), create_test_finding()];
+    let initial_findings = vec![
+        make_finding_report_agg(
+            "test-finding-001",
+            "Test Vulnerability",
+            "src/test.c",
+            Some(42),
+            Some("CWE-79"),
+            Severity::High,
+        ),
+        make_finding_report_agg(
+            "test-finding-002",
+            "Test Vulnerability",
+            "src/test.c",
+            Some(42),
+            Some("CWE-79"),
+            Severity::High,
+        ),
+    ];
 
     let scanner =
         Scanner::with_initial_findings(config, target_path, initial_findings.clone(), false);
@@ -127,7 +122,14 @@ fn test_scanner_update_findings() {
     let target_path = PathBuf::from("/tmp/test-project");
     let scanner = Scanner::new(config, target_path, false);
 
-    let new_findings = vec![create_test_finding()];
+    let new_findings = vec![make_finding_report_agg(
+        "test-finding-001",
+        "Test Vulnerability",
+        "src/test.c",
+        Some(42),
+        Some("CWE-79"),
+        Severity::High,
+    )];
     scanner.update_findings(new_findings.clone());
 
     let findings = scanner.findings();
@@ -142,11 +144,35 @@ fn test_scanner_update_findings_replaces_all() {
     let scanner = Scanner::new(config, target_path, false);
 
     // Add initial findings
-    scanner.update_findings(vec![create_test_finding(), create_test_finding()]);
+    scanner.update_findings(vec![
+        make_finding_report_agg(
+            "test-finding-001",
+            "Test Vulnerability",
+            "src/test.c",
+            Some(42),
+            Some("CWE-79"),
+            Severity::High,
+        ),
+        make_finding_report_agg(
+            "test-finding-002",
+            "Test Vulnerability",
+            "src/test.c",
+            Some(42),
+            Some("CWE-79"),
+            Severity::High,
+        ),
+    ]);
     assert_eq!(scanner.findings().len(), 2);
 
     // Replace with different findings
-    let mut new_finding = create_test_finding();
+    let mut new_finding = make_finding_report_agg(
+        "test-finding-001",
+        "Test Vulnerability",
+        "src/test.c",
+        Some(42),
+        Some("CWE-79"),
+        Severity::High,
+    );
     new_finding.id = "new-finding-002".to_string();
     scanner.update_findings(vec![new_finding]);
 
@@ -165,7 +191,14 @@ fn test_scanner_add_finding() {
     let target_path = PathBuf::from("/tmp/test-project");
     let scanner = Scanner::new(config, target_path, false);
 
-    let finding = create_test_finding();
+    let finding = make_finding_report_agg(
+        "test-finding-001",
+        "Test Vulnerability",
+        "src/test.c",
+        Some(42),
+        Some("CWE-79"),
+        Severity::High,
+    );
     scanner.add_finding(finding);
 
     let findings = scanner.findings();
@@ -179,9 +212,30 @@ fn test_scanner_add_finding_multiple() {
     let target_path = PathBuf::from("/tmp/test-project");
     let scanner = Scanner::new(config, target_path, false);
 
-    scanner.add_finding(create_test_finding());
-    scanner.add_finding(create_test_finding());
-    scanner.add_finding(create_test_finding());
+    scanner.add_finding(make_finding_report_agg(
+        "test-finding-001",
+        "Test Vulnerability",
+        "src/test.c",
+        Some(42),
+        Some("CWE-79"),
+        Severity::High,
+    ));
+    scanner.add_finding(make_finding_report_agg(
+        "test-finding-001",
+        "Test Vulnerability",
+        "src/test.c",
+        Some(42),
+        Some("CWE-79"),
+        Severity::High,
+    ));
+    scanner.add_finding(make_finding_report_agg(
+        "test-finding-001",
+        "Test Vulnerability",
+        "src/test.c",
+        Some(42),
+        Some("CWE-79"),
+        Severity::High,
+    ));
 
     let findings = scanner.findings();
     assert_eq!(findings.len(), 3);
@@ -243,7 +297,14 @@ fn test_scanner_state_updates_with_findings() {
     let target_path = PathBuf::from("/tmp/test-project");
     let scanner = Scanner::new(config, target_path, false);
 
-    scanner.add_finding(create_test_finding());
+    scanner.add_finding(make_finding_report_agg(
+        "test-finding-001",
+        "Test Vulnerability",
+        "src/test.c",
+        Some(42),
+        Some("CWE-79"),
+        Severity::High,
+    ));
 
     let state = scanner.state.borrow();
     assert_eq!(state.findings.len(), 1);
@@ -505,7 +566,14 @@ fn test_multiple_scanner_instances_independent() {
     let scanner1 = Scanner::new(config1, PathBuf::from("/tmp/project1"), false);
     let scanner2 = Scanner::new(config2, PathBuf::from("/tmp/project2"), false);
 
-    scanner1.add_finding(create_test_finding());
+    scanner1.add_finding(make_finding_report_agg(
+        "test-finding-001",
+        "Test Vulnerability",
+        "src/test.c",
+        Some(42),
+        Some("CWE-79"),
+        Severity::High,
+    ));
 
     // scanner2 should have no findings
     assert!(scanner2.findings().is_empty());
@@ -589,7 +657,14 @@ fn test_scanner_update_findings_empty_vector() {
     let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), false);
 
     // Add some findings first
-    scanner.add_finding(create_test_finding());
+    scanner.add_finding(make_finding_report_agg(
+        "test-finding-001",
+        "Test Vulnerability",
+        "src/test.c",
+        Some(42),
+        Some("CWE-79"),
+        Severity::High,
+    ));
     assert_eq!(scanner.findings().len(), 1);
 
     // Update with empty vector (should clear)
@@ -607,7 +682,14 @@ fn test_scanner_full_workflow_simulation() {
     let scanner = Scanner::new(config, PathBuf::from("/tmp/test-project"), false);
 
     // Simulate finding discovery
-    scanner.add_finding(create_test_finding());
+    scanner.add_finding(make_finding_report_agg(
+        "test-finding-001",
+        "Test Vulnerability",
+        "src/test.c",
+        Some(42),
+        Some("CWE-79"),
+        Severity::High,
+    ));
 
     // Simulate state updates
     scanner.state.send_modify(|s| {
@@ -1361,7 +1443,14 @@ fn test_scanner_add_multiple_findings_same_id() {
     let config = create_test_config();
     let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), false);
 
-    let finding = create_test_finding();
+    let finding = make_finding_report_agg(
+        "test-finding-001",
+        "Test Vulnerability",
+        "src/test.c",
+        Some(42),
+        Some("CWE-79"),
+        Severity::High,
+    );
     scanner.add_finding(finding.clone());
     scanner.add_finding(finding.clone());
     scanner.add_finding(finding);
@@ -1376,7 +1465,24 @@ fn test_scanner_update_findings_with_duplicates() {
     let config = create_test_config();
     let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), false);
 
-    let findings = vec![create_test_finding(), create_test_finding()];
+    let findings = vec![
+        make_finding_report_agg(
+            "test-finding-001",
+            "Test Vulnerability",
+            "src/test.c",
+            Some(42),
+            Some("CWE-79"),
+            Severity::High,
+        ),
+        make_finding_report_agg(
+            "test-finding-002",
+            "Test Vulnerability",
+            "src/test.c",
+            Some(42),
+            Some("CWE-79"),
+            Severity::High,
+        ),
+    ];
     scanner.update_findings(findings);
 
     let result = scanner.findings();
@@ -1467,7 +1573,14 @@ fn test_scanner_findings_empty_after_update() {
     let config = create_test_config();
     let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), false);
 
-    scanner.add_finding(create_test_finding());
+    scanner.add_finding(make_finding_report_agg(
+        "test-finding-001",
+        "Test Vulnerability",
+        "src/test.c",
+        Some(42),
+        Some("CWE-79"),
+        Severity::High,
+    ));
     assert_eq!(scanner.findings().len(), 1);
 
     scanner.update_findings(Vec::new());

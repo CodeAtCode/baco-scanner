@@ -10,4 +10,5 @@
 //! - Special regex characters
 //! - Overlapping patterns
 
+mod inline_migrated_tests;
 mod pattern_edge_cases_tests;

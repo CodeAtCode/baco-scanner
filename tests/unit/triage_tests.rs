@@ -8,7 +8,10 @@ fn test_triage_default_disabled() {
     let config = TriageConfig::default();
 
     assert!(!config.enabled, "Triage should be disabled by default");
-    assert_eq!(config.model, "mistral-small", "Default model should be mistral-small");
+    assert_eq!(
+        config.model, "mistral-small",
+        "Default model should be mistral-small"
+    );
     assert_eq!(config.batch_size, 8, "Default batch_size should be 8");
     assert!(
         (config.suspicion_threshold - 0.35).abs() < 0.001,
@@ -27,7 +30,7 @@ fn test_triage_suspicion_threshold_scoring() {
     };
 
     // Simulate triage scores
-    let scores = vec![0.2, 0.4, 0.5, 0.6, 0.8];
+    let scores = [0.2, 0.4, 0.5, 0.6, 0.8];
     let deep_analysis_count = scores
         .iter()
         .filter(|&&s| s >= config.suspicion_threshold)
@@ -50,7 +53,10 @@ fn test_triage_batch_size_limit() {
     let files_passing_triage = 10;
     let batches_needed = (files_passing_triage as f32 / config.batch_size as f32).ceil() as usize;
 
-    assert_eq!(batches_needed, 3, "10 files with batch_size 4 needs 3 batches");
+    assert_eq!(
+        batches_needed, 3,
+        "10 files with batch_size 4 needs 3 batches"
+    );
 }
 
 #[test]

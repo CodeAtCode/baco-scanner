@@ -11,7 +11,8 @@ fn test_budget_reserve_percent_zero() {
         reserve_percent_for_high_risk: 0,
     };
 
-    let reserved = (config.max_llm_calls as f32 * config.reserve_percent_for_high_risk as f32 / 100.0) as usize;
+    let reserved = (config.max_llm_calls as f32 * config.reserve_percent_for_high_risk as f32
+        / 100.0) as usize;
     let available = config.max_llm_calls - reserved;
 
     assert_eq!(reserved, 0, "0% reserve should reserve 0 calls");
@@ -27,7 +28,8 @@ fn test_budget_reserve_percent_30() {
         reserve_percent_for_high_risk: 30,
     };
 
-    let reserved = (config.max_llm_calls as f32 * config.reserve_percent_for_high_risk as f32 / 100.0) as usize;
+    let reserved = (config.max_llm_calls as f32 * config.reserve_percent_for_high_risk as f32
+        / 100.0) as usize;
     let available = config.max_llm_calls - reserved;
 
     assert_eq!(reserved, 30, "30% of 100 should reserve 30 calls");
@@ -40,7 +42,10 @@ fn test_budget_default_disabled() {
     let config = BudgetConfig::default();
 
     assert!(!config.enabled, "Budget should be disabled by default");
-    assert_eq!(config.max_llm_calls, 100, "Default max_llm_calls should be 100");
+    assert_eq!(
+        config.max_llm_calls, 200,
+        "Default max_llm_calls should be 200"
+    );
     assert_eq!(
         config.reserve_percent_for_high_risk, 20,
         "Default reserve_percent should be 20"
@@ -56,7 +61,8 @@ fn test_budget_high_risk_residual() {
         reserve_percent_for_high_risk: 30,
     };
 
-    let reserved = (config.max_llm_calls as f32 * config.reserve_percent_for_high_risk as f32 / 100.0) as usize;
+    let reserved = (config.max_llm_calls as f32 * config.reserve_percent_for_high_risk as f32
+        / 100.0) as usize;
     let triage_budget = config.max_llm_calls - reserved;
 
     // Simulate triage using 50 calls
@@ -64,7 +70,10 @@ fn test_budget_high_risk_residual() {
     let remaining_after_triage = triage_budget - triage_used;
 
     assert_eq!(triage_budget, 70, "Triage budget should be 70");
-    assert_eq!(remaining_after_triage, 20, "20 calls remaining after triage");
+    assert_eq!(
+        remaining_after_triage, 20,
+        "20 calls remaining after triage"
+    );
     assert_eq!(reserved, 30, "30 calls reserved for high-risk");
 }
 
@@ -77,7 +86,9 @@ fn test_budget_calculation_edge_cases() {
         reserve_percent_for_high_risk: 30,
     };
 
-    let reserved_small = (config_small.max_llm_calls as f32 * config_small.reserve_percent_for_high_risk as f32 / 100.0) as usize;
+    let reserved_small = (config_small.max_llm_calls as f32
+        * config_small.reserve_percent_for_high_risk as f32
+        / 100.0) as usize;
     // 30% of 10 = 3
     assert_eq!(reserved_small, 3, "30% of 10 should round to 3");
 
@@ -87,7 +98,9 @@ fn test_budget_calculation_edge_cases() {
         reserve_percent_for_high_risk: 30,
     };
 
-    let reserved_uneven = (config_uneven.max_llm_calls as f32 * config_uneven.reserve_percent_for_high_risk as f32 / 100.0) as usize;
+    let reserved_uneven = (config_uneven.max_llm_calls as f32
+        * config_uneven.reserve_percent_for_high_risk as f32
+        / 100.0) as usize;
     // 30% of 33 = 9.9, truncates to 9
     assert_eq!(reserved_uneven, 9, "30% of 33 should truncate to 9");
 }

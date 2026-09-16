@@ -9,22 +9,18 @@ use tempfile::TempDir;
 
 use crate::fixtures::make_finding_html;
 
-fn make_finding(
-    id: &str,
-    severity: Severity,
-    file: &str,
-    line: Option<u32>,
-) -> VulnerabilityFinding {
-    make_finding_html(id, severity, file, line)
-}
-
 // ============================================================================
 // generate_html_report Tests - Basic Functionality
 // ============================================================================
 
 #[test]
 fn test_generate_html_report_creates_valid_html() {
-    let findings = vec![make_finding("f1", Severity::High, "src/test.rs", Some(10))];
+    let findings = vec![make_finding_html(
+        "f1",
+        Severity::High,
+        "src/test.rs",
+        Some(10),
+    )];
     let output_path = "/tmp/test_html_renderer_basic.html";
 
     let _ = fs::remove_file(output_path);
@@ -63,7 +59,12 @@ fn test_generate_html_report_empty_findings() {
 
 #[test]
 fn test_generate_html_report_contains_doctype_and_head() {
-    let findings = vec![make_finding("f1", Severity::Low, "src/lib.rs", Some(5))];
+    let findings = vec![make_finding_html(
+        "f1",
+        Severity::Low,
+        "src/lib.rs",
+        Some(5),
+    )];
     let output_path = "/tmp/test_html_doctype.html";
 
     let _ = fs::remove_file(output_path);
@@ -88,11 +89,11 @@ fn test_generate_html_report_contains_doctype_and_head() {
 #[test]
 fn test_generate_html_report_all_severity_levels() {
     let findings = vec![
-        make_finding("c1", Severity::Critical, "src/crit.rs", Some(1)),
-        make_finding("h1", Severity::High, "src/high.rs", Some(2)),
-        make_finding("m1", Severity::Medium, "src/med.rs", Some(3)),
-        make_finding("l1", Severity::Low, "src/low.rs", Some(4)),
-        make_finding("i1", Severity::Info, "src/info.rs", Some(5)),
+        make_finding_html("c1", Severity::Critical, "src/crit.rs", Some(1)),
+        make_finding_html("h1", Severity::High, "src/high.rs", Some(2)),
+        make_finding_html("m1", Severity::Medium, "src/med.rs", Some(3)),
+        make_finding_html("l1", Severity::Low, "src/low.rs", Some(4)),
+        make_finding_html("i1", Severity::Info, "src/info.rs", Some(5)),
     ];
     let output_path = "/tmp/test_all_severities.html";
 
@@ -114,7 +115,7 @@ fn test_generate_html_report_all_severity_levels() {
 
 #[test]
 fn test_generate_html_report_single_critical_finding() {
-    let findings = vec![make_finding(
+    let findings = vec![make_finding_html(
         "c1",
         Severity::Critical,
         "src/urgent.rs",
@@ -141,7 +142,7 @@ fn test_generate_html_report_single_critical_finding() {
 
 #[test]
 fn test_generate_html_report_contains_scan_metadata() {
-    let findings = vec![make_finding(
+    let findings = vec![make_finding_html(
         "f1",
         Severity::Medium,
         "src/test.rs",
@@ -166,9 +167,9 @@ fn test_generate_html_report_contains_scan_metadata() {
 
 #[test]
 fn test_generate_html_report_contains_avg_confidence() {
-    let mut finding1 = make_finding("f1", Severity::High, "src/test1.rs", Some(10));
+    let mut finding1 = make_finding_html("f1", Severity::High, "src/test1.rs", Some(10));
     finding1.confidence_score = 0.9;
-    let mut finding2 = make_finding("f2", Severity::Medium, "src/test2.rs", Some(20));
+    let mut finding2 = make_finding_html("f2", Severity::Medium, "src/test2.rs", Some(20));
     finding2.confidence_score = 0.7;
     let findings = vec![finding1, finding2];
     let output_path = "/tmp/test_confidence.html";
@@ -211,9 +212,9 @@ fn test_generate_html_report_empty_findings_zero_confidence() {
 #[test]
 fn test_generate_html_report_filter_buttons() {
     let findings = vec![
-        make_finding("c1", Severity::Critical, "src/a.rs", Some(1)),
-        make_finding("c2", Severity::Critical, "src/b.rs", Some(2)),
-        make_finding("h1", Severity::High, "src/c.rs", Some(3)),
+        make_finding_html("c1", Severity::Critical, "src/a.rs", Some(1)),
+        make_finding_html("c2", Severity::Critical, "src/b.rs", Some(2)),
+        make_finding_html("h1", Severity::High, "src/c.rs", Some(3)),
     ];
     let output_path = "/tmp/test_filter_buttons.html";
 
@@ -235,10 +236,10 @@ fn test_generate_html_report_filter_buttons() {
 #[test]
 fn test_generate_html_report_summary_cards() {
     let findings = vec![
-        make_finding("c1", Severity::Critical, "src/a.rs", Some(1)),
-        make_finding("h1", Severity::High, "src/b.rs", Some(2)),
-        make_finding("m1", Severity::Medium, "src/c.rs", Some(3)),
-        make_finding("l1", Severity::Low, "src/d.rs", Some(4)),
+        make_finding_html("c1", Severity::Critical, "src/a.rs", Some(1)),
+        make_finding_html("h1", Severity::High, "src/b.rs", Some(2)),
+        make_finding_html("m1", Severity::Medium, "src/c.rs", Some(3)),
+        make_finding_html("l1", Severity::Low, "src/d.rs", Some(4)),
     ];
     let output_path = "/tmp/test_summary_cards.html";
 
@@ -282,7 +283,7 @@ fn test_generate_html_report_summary_cards_empty() {
 
 #[test]
 fn test_generate_html_report_contains_finding_details() {
-    let mut finding = make_finding("f1", Severity::High, "src/vuln.rs", Some(42));
+    let mut finding = make_finding_html("f1", Severity::High, "src/vuln.rs", Some(42));
     finding.title = "SQL Injection".to_string();
     finding.cwe_id = Some("CWE-89".to_string());
     let findings = vec![finding];
@@ -307,9 +308,9 @@ fn test_generate_html_report_contains_finding_details() {
 #[test]
 fn test_generate_html_report_multiple_findings_unique_ids() {
     let findings = vec![
-        make_finding("f1", Severity::High, "src/a.rs", Some(1)),
-        make_finding("f2", Severity::Medium, "src/b.rs", Some(2)),
-        make_finding("f3", Severity::Low, "src/c.rs", Some(3)),
+        make_finding_html("f1", Severity::High, "src/a.rs", Some(1)),
+        make_finding_html("f2", Severity::Medium, "src/b.rs", Some(2)),
+        make_finding_html("f3", Severity::Low, "src/c.rs", Some(3)),
     ];
     let output_path = "/tmp/test_unique_ids.html";
 
@@ -334,7 +335,12 @@ fn test_generate_html_report_multiple_findings_unique_ids() {
 
 #[test]
 fn test_generate_html_report_creates_nested_directories() {
-    let findings = vec![make_finding("f1", Severity::Low, "src/lib.rs", Some(5))];
+    let findings = vec![make_finding_html(
+        "f1",
+        Severity::Low,
+        "src/lib.rs",
+        Some(5),
+    )];
     let temp_dir = TempDir::new().unwrap();
     let output_path = temp_dir
         .path()
@@ -357,7 +363,7 @@ fn test_generate_html_report_creates_nested_directories() {
 
 #[test]
 fn test_generate_html_report_creates_parent_directory() {
-    let findings = vec![make_finding(
+    let findings = vec![make_finding_html(
         "f1",
         Severity::Medium,
         "src/test.rs",
@@ -385,7 +391,7 @@ fn test_generate_html_report_creates_parent_directory() {
 
 #[test]
 fn test_generate_html_report_python_file_loads_python_prism() {
-    let mut finding = make_finding("f1", Severity::High, "src/vuln.py", Some(42));
+    let mut finding = make_finding_html("f1", Severity::High, "src/vuln.py", Some(42));
     finding.diff_hunk = Some("-old code\n+new code".to_string());
     let findings = vec![finding];
     let output_path = "/tmp/test_python_prism.html";
@@ -405,7 +411,7 @@ fn test_generate_html_report_python_file_loads_python_prism() {
 
 #[test]
 fn test_generate_html_report_rust_file_loads_rust_prism() {
-    let mut finding = make_finding("f1", Severity::Medium, "src/lib.rs", Some(100));
+    let mut finding = make_finding_html("f1", Severity::Medium, "src/lib.rs", Some(100));
     finding.diff_hunk = Some("-unsafe block\n+safe code".to_string());
     let findings = vec![finding];
     let output_path = "/tmp/test_rust_prism.html";
@@ -425,7 +431,7 @@ fn test_generate_html_report_rust_file_loads_rust_prism() {
 
 #[test]
 fn test_generate_html_report_diff_hunk_loads_diff_prism() {
-    let mut finding = make_finding("f1", Severity::High, "src/test.rs", Some(10));
+    let mut finding = make_finding_html("f1", Severity::High, "src/test.rs", Some(10));
     finding.diff_hunk = Some("@@ -1,3 +1,4 @@\n-old\n+new\n+added".to_string());
     let findings = vec![finding];
     let output_path = "/tmp/test_diff_prism.html";
@@ -447,12 +453,12 @@ fn test_generate_html_report_diff_hunk_loads_diff_prism() {
 fn test_generate_html_report_multiple_languages_multiple_scripts() {
     let findings = vec![
         {
-            let mut f = make_finding("f1", Severity::High, "src/app.py", Some(10));
+            let mut f = make_finding_html("f1", Severity::High, "src/app.py", Some(10));
             f.diff_hunk = Some("-old\n+new".to_string());
             f
         },
         {
-            let mut f = make_finding("f2", Severity::Medium, "src/lib.rs", Some(20));
+            let mut f = make_finding_html("f2", Severity::Medium, "src/lib.rs", Some(20));
             f.diff_hunk = Some("-unsafe\n+safe".to_string());
             f
         },
@@ -482,7 +488,7 @@ fn test_generate_html_report_very_large_number_of_findings() {
     // Test with 1000 findings to ensure no panic
     let findings: Vec<VulnerabilityFinding> = (0..1000)
         .map(|i| {
-            let f = make_finding(
+            let f = make_finding_html(
                 &format!("f{}", i),
                 Severity::Low,
                 "src/test.rs",
@@ -507,7 +513,7 @@ fn test_generate_html_report_very_large_number_of_findings() {
 
 #[test]
 fn test_generate_html_report_special_characters_in_title() {
-    let mut finding = make_finding("f1", Severity::High, "src/test.rs", Some(10));
+    let mut finding = make_finding_html("f1", Severity::High, "src/test.rs", Some(10));
     finding.title = "XSS <script>alert('xss')</script>".to_string();
     let findings = vec![finding];
     let output_path = "/tmp/test_special_chars.html";
@@ -528,7 +534,7 @@ fn test_generate_html_report_special_characters_in_title() {
 
 #[test]
 fn test_generate_html_report_unicode_characters() {
-    let mut finding = make_finding("f1", Severity::Medium, "src/test.rs", Some(10));
+    let mut finding = make_finding_html("f1", Severity::Medium, "src/test.rs", Some(10));
     finding.title = "Vulnerabilità in 日本語".to_string();
     let findings = vec![finding];
     let output_path = "/tmp/test_unicode.html";
@@ -548,7 +554,7 @@ fn test_generate_html_report_unicode_characters() {
 
 #[test]
 fn test_generate_html_report_empty_file_path() {
-    let finding = make_finding("f1", Severity::Low, "", Some(1));
+    let finding = make_finding_html("f1", Severity::Low, "", Some(1));
     let findings = vec![finding];
     let output_path = "/tmp/test_empty_path.html";
 
@@ -572,11 +578,11 @@ fn test_generate_html_report_empty_file_path() {
 #[test]
 fn test_generate_html_report_statistics_correct_counts() {
     let findings = vec![
-        make_finding("c1", Severity::Critical, "src/a.rs", Some(1)),
-        make_finding("c2", Severity::Critical, "src/b.rs", Some(2)),
-        make_finding("c3", Severity::Critical, "src/c.rs", Some(3)),
-        make_finding("h1", Severity::High, "src/d.rs", Some(4)),
-        make_finding("h2", Severity::High, "src/e.rs", Some(5)),
+        make_finding_html("c1", Severity::Critical, "src/a.rs", Some(1)),
+        make_finding_html("c2", Severity::Critical, "src/b.rs", Some(2)),
+        make_finding_html("c3", Severity::Critical, "src/c.rs", Some(3)),
+        make_finding_html("h1", Severity::High, "src/d.rs", Some(4)),
+        make_finding_html("h2", Severity::High, "src/e.rs", Some(5)),
     ];
     let output_path = "/tmp/test_stats_counts.html";
 
@@ -597,9 +603,9 @@ fn test_generate_html_report_statistics_correct_counts() {
 #[test]
 fn test_generate_html_report_unique_files_count() {
     let findings = vec![
-        make_finding("f1", Severity::High, "src/a.rs", Some(1)),
-        make_finding("f2", Severity::Medium, "src/a.rs", Some(2)), // Same file
-        make_finding("f3", Severity::Low, "src/b.rs", Some(1)),    // Different file
+        make_finding_html("f1", Severity::High, "src/a.rs", Some(1)),
+        make_finding_html("f2", Severity::Medium, "src/a.rs", Some(2)), // Same file
+        make_finding_html("f3", Severity::Low, "src/b.rs", Some(1)),    // Different file
     ];
     let output_path = "/tmp/test_unique_files.html";
 
@@ -622,7 +628,12 @@ fn test_generate_html_report_unique_files_count() {
 
 #[test]
 fn test_generate_html_report_contains_filter_function() {
-    let findings = vec![make_finding("f1", Severity::High, "src/test.rs", Some(10))];
+    let findings = vec![make_finding_html(
+        "f1",
+        Severity::High,
+        "src/test.rs",
+        Some(10),
+    )];
     let output_path = "/tmp/test_js_functions.html";
 
     let _ = fs::remove_file(output_path);
@@ -642,7 +653,7 @@ fn test_generate_html_report_contains_filter_function() {
 
 #[test]
 fn test_generate_html_report_contains_collapsible_details() {
-    let findings = vec![make_finding(
+    let findings = vec![make_finding_html(
         "f1",
         Severity::Medium,
         "src/test.rs",
@@ -685,8 +696,8 @@ fn assert_tag_balance(html: &str) {
 #[test]
 fn test_html_report_tags_balanced_with_findings() {
     let findings = vec![
-        make_finding("f1", Severity::High, "src/a.rs", Some(10)),
-        make_finding("f2", Severity::Low, "src/b.rs", Some(20)),
+        make_finding_html("f1", Severity::High, "src/a.rs", Some(10)),
+        make_finding_html("f2", Severity::Low, "src/b.rs", Some(20)),
     ];
     let output_path = "/tmp/test_html_tag_balance.html";
     let _ = fs::remove_file(output_path);
@@ -705,7 +716,7 @@ fn test_html_report_tags_balanced_with_gate_and_appendix() {
     use baco::config::ScannerConfig;
     use baco::evidence::{Evidence, EvidenceSource};
 
-    let mut verified = make_finding("f1", Severity::High, "src/a.rs", Some(10));
+    let mut verified = make_finding_html("f1", Severity::High, "src/a.rs", Some(10));
     verified.evidence = vec![
         Evidence {
             source: EvidenceSource::Semgrep("rule.x".to_string()),
@@ -721,7 +732,7 @@ fn test_html_report_tags_balanced_with_gate_and_appendix() {
         },
     ];
 
-    let mut unverified = make_finding("f2", Severity::Medium, "src/b.rs", Some(20));
+    let mut unverified = make_finding_html("f2", Severity::Medium, "src/b.rs", Some(20));
     unverified.evidence = vec![Evidence {
         source: EvidenceSource::LlmAnalysis("model".to_string()),
         weight: 0.7,
@@ -784,7 +795,7 @@ fn test_html_zero_unverified_appendix_pinned_behavior() {
     use baco::config::ScannerConfig;
     use baco::evidence::{Evidence, EvidenceSource};
 
-    let mut verified = make_finding("f1", Severity::High, "src/a.rs", Some(10));
+    let mut verified = make_finding_html("f1", Severity::High, "src/a.rs", Some(10));
     verified.evidence = vec![
         Evidence {
             source: EvidenceSource::Semgrep("rule.x".to_string()),
@@ -824,7 +835,7 @@ fn test_html_gate_on_all_verified_no_appendix() {
     use baco::config::ScannerConfig;
     use baco::evidence::{Evidence, EvidenceSource};
 
-    let mut f1 = make_finding("v1", Severity::High, "src/a.rs", Some(10));
+    let mut f1 = make_finding_html("v1", Severity::High, "src/a.rs", Some(10));
     f1.evidence = vec![
         Evidence {
             source: EvidenceSource::Semgrep("r1".to_string()),
@@ -840,7 +851,7 @@ fn test_html_gate_on_all_verified_no_appendix() {
         },
     ];
 
-    let mut f2 = make_finding("v2", Severity::Medium, "src/b.rs", Some(20));
+    let mut f2 = make_finding_html("v2", Severity::Medium, "src/b.rs", Some(20));
     f2.evidence = vec![
         Evidence {
             source: EvidenceSource::Semgrep("r2".to_string()),
@@ -879,7 +890,7 @@ fn test_html_gate_on_mixed_tiers_appendix_unverified_only() {
     use baco::config::ScannerConfig;
     use baco::evidence::{Evidence, EvidenceSource};
 
-    let mut verified = make_finding("verified", Severity::High, "src/a.rs", Some(10));
+    let mut verified = make_finding_html("verified", Severity::High, "src/a.rs", Some(10));
     verified.evidence = vec![
         Evidence {
             source: EvidenceSource::Semgrep("r1".to_string()),
@@ -895,7 +906,7 @@ fn test_html_gate_on_mixed_tiers_appendix_unverified_only() {
         },
     ];
 
-    let mut unverified = make_finding("unverified", Severity::Medium, "src/b.rs", Some(20));
+    let mut unverified = make_finding_html("unverified", Severity::Medium, "src/b.rs", Some(20));
     unverified.evidence = vec![Evidence {
         source: EvidenceSource::LlmAnalysis("model".to_string()),
         weight: 0.7,
@@ -933,7 +944,7 @@ fn test_html_gate_off_all_findings_rendered() {
     use baco::config::ScannerConfig;
     use baco::evidence::{Evidence, EvidenceSource};
 
-    let mut verified = make_finding("verified", Severity::High, "src/a.rs", Some(10));
+    let mut verified = make_finding_html("verified", Severity::High, "src/a.rs", Some(10));
     verified.evidence = vec![
         Evidence {
             source: EvidenceSource::Semgrep("r1".to_string()),
@@ -949,7 +960,7 @@ fn test_html_gate_off_all_findings_rendered() {
         },
     ];
 
-    let mut unverified = make_finding("unverified", Severity::Medium, "src/b.rs", Some(20));
+    let mut unverified = make_finding_html("unverified", Severity::Medium, "src/b.rs", Some(20));
     unverified.evidence = vec![Evidence {
         source: EvidenceSource::LlmAnalysis("model".to_string()),
         weight: 0.7,

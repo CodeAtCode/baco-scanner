@@ -19,7 +19,7 @@ use baco::report::json::write_findings_json;
 use baco::report::presenter;
 use std::collections::HashMap;
 
-use super::report_fixtures::make_finding;
+use crate::report_fixtures::make_finding;
 
 // ============================================================================
 // JSON Report Tests

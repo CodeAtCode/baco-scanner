@@ -11,53 +11,18 @@
 
 use baco::checkpoint::ScanPhase;
 use baco::config::{AgentConfig, LlmPhaseConfig, LlmPhasesConfig, ScannerSettings};
-use baco::findings::{Severity, VerificationStatus, VulnerabilityFinding};
+use baco::findings::{Severity, VerificationStatus};
 use baco::llm::metrics::LlmMetricsTracker;
 use baco::scanner::phases::{run_phase, PhaseConfig};
 use baco::scanner::Scanner;
 use indicatif::ProgressBar;
 use std::path::PathBuf;
 
+use crate::fixtures::make_finding_report_agg;
+
 // ============================================================================
 // Test Fixtures
 // ============================================================================
-
-fn create_test_finding(id: &str, severity: Severity) -> VulnerabilityFinding {
-    VulnerabilityFinding {
-        id: id.to_string(),
-        title: "Test Vulnerability".to_string(),
-        description: "A test vulnerability for gating tests".to_string(),
-        severity,
-        confidence_score: 0.8,
-        cwe_id: Some("CWE-89".to_string()),
-        file_path: "/tmp/test/test.py".to_string(),
-        line_number: Some(42),
-        code_snippet: Some("execute(user_input)".to_string()),
-        diff_hunk: None,
-        recommendation: None,
-        code_location: None,
-        already_reported: false,
-        sources: vec!["test".to_string()],
-        commit_reference: None,
-        ticket_reference: None,
-        priority_score: Some(0.7),
-        cross_file_references: None,
-        verification_status: None,
-        verification_notes: None,
-        verification_error: None,
-        agent_evidence_path: None,
-        security_issue: None,
-        poc_code: None,
-        mitigation_code: None,
-        poc_format: None,
-        llm_model: None,
-        agent_mode: false,
-        statement_range: None,
-        triage_verdict: None,
-        evidence: vec![],
-        verification_tier: None,
-    }
-}
 
 fn create_test_config_with_static_analysis() -> baco::config::ScannerConfig {
     baco::config::ScannerConfig {
@@ -155,7 +120,14 @@ async fn test_llm_static_analysis_skips_without_api_key() {
     let analyzed_files: Vec<String> = vec![];
     let target_path = PathBuf::from(".");
     let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
-    let findings = vec![create_test_finding("test-1", Severity::High)];
+    let findings = vec![make_finding_report_agg(
+        "test-1",
+        "Test Vulnerability",
+        "/tmp/test/test.py",
+        Some(42),
+        Some("CWE-89"),
+        Severity::High,
+    )];
 
     let phase_config = PhaseConfig {
         phase: &ScanPhase::LlmStaticAnalysis,
@@ -189,7 +161,14 @@ async fn test_llm_static_analysis_skips_without_base_url() {
     let analyzed_files: Vec<String> = vec![];
     let target_path = PathBuf::from(".");
     let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
-    let findings = vec![create_test_finding("test-1", Severity::High)];
+    let findings = vec![make_finding_report_agg(
+        "test-1",
+        "Test Vulnerability",
+        "/tmp/test/test.py",
+        Some(42),
+        Some("CWE-89"),
+        Severity::High,
+    )];
 
     let phase_config = PhaseConfig {
         phase: &ScanPhase::LlmStaticAnalysis,
@@ -227,7 +206,14 @@ async fn test_llm_static_analysis_skips_without_models() {
     let analyzed_files: Vec<String> = vec![];
     let target_path = PathBuf::from(".");
     let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
-    let findings = vec![create_test_finding("test-1", Severity::High)];
+    let findings = vec![make_finding_report_agg(
+        "test-1",
+        "Test Vulnerability",
+        "/tmp/test/test.py",
+        Some(42),
+        Some("CWE-89"),
+        Severity::High,
+    )];
 
     let phase_config = PhaseConfig {
         phase: &ScanPhase::LlmStaticAnalysis,
@@ -264,7 +250,14 @@ async fn test_security_agent_verification_skips_when_agent_disabled() {
     let analyzed_files: Vec<String> = vec![];
     let target_path = PathBuf::from(".");
     let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
-    let findings = vec![create_test_finding("test-1", Severity::High)];
+    let findings = vec![make_finding_report_agg(
+        "test-1",
+        "Test Vulnerability",
+        "/tmp/test/test.py",
+        Some(42),
+        Some("CWE-89"),
+        Severity::High,
+    )];
 
     let phase_config = PhaseConfig {
         phase: &ScanPhase::SecurityAgentVerification,
@@ -299,7 +292,14 @@ async fn test_security_agent_verification_skips_without_api_key() {
     let analyzed_files: Vec<String> = vec![];
     let target_path = PathBuf::from(".");
     let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
-    let findings = vec![create_test_finding("test-1", Severity::High)];
+    let findings = vec![make_finding_report_agg(
+        "test-1",
+        "Test Vulnerability",
+        "/tmp/test/test.py",
+        Some(42),
+        Some("CWE-89"),
+        Severity::High,
+    )];
 
     let phase_config = PhaseConfig {
         phase: &ScanPhase::SecurityAgentVerification,
@@ -328,7 +328,14 @@ async fn test_security_agent_verification_skips_without_api_key() {
 
 #[test]
 fn test_build_stable_verification_prefix_includes_seven_question_gate() {
-    let findings = vec![create_test_finding("test-1", Severity::High)];
+    let findings = vec![make_finding_report_agg(
+        "test-1",
+        "Test Vulnerability",
+        "/tmp/test/test.py",
+        Some(42),
+        Some("CWE-89"),
+        Severity::High,
+    )];
     let hunt_prompts: std::collections::HashMap<String, String> = std::collections::HashMap::new();
     let required_primitives: std::collections::HashMap<String, Vec<String>> =
         std::collections::HashMap::new();
@@ -361,7 +368,16 @@ fn test_build_stable_verification_prefix_includes_seven_question_gate() {
 fn test_build_volatile_verification_tail_includes_file_path_and_snippet() {
     use std::collections::HashMap;
 
-    let findings = vec![create_test_finding("test-1", Severity::High)];
+    let mut finding = make_finding_report_agg(
+        "test-1",
+        "Test Vulnerability",
+        "/tmp/test/test.py",
+        Some(42),
+        Some("CWE-89"),
+        Severity::High,
+    );
+    finding.code_snippet = Some("execute(user_input)".to_string());
+    let findings = vec![finding];
     let hunt_prompts: HashMap<String, String> = HashMap::new();
 
     let tail = baco::scanner::phases::llm_phases::verification::build_volatile_verification_tail(

@@ -10,6 +10,8 @@ use std::path::Path;
 
 use crate::fixtures::make_finding_html;
 
+// Note: create_test_finding() kept local due to custom modifications specific to checkpoint tests
+
 // Shared test data for phase transition tests (mirrors src/scanner/checkpoint.rs)
 const PHASE_TRANSITION_TEST_CASES: &[(ScanPhase, ScanPhase)] = &[
     // Parallel phases (Indexing, Semgrep, CpgSlice, LlmStaticAnalysis run concurrently)

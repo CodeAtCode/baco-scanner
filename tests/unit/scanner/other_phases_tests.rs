@@ -3,17 +3,15 @@
 
 use baco::checkpoint::ScanPhase;
 use baco::config;
-use baco::config::{
-    AgentConfig, LlmPhaseConfig, LlmPhasesConfig, PerformanceSettings, ScannerSettings,
-};
 use baco::findings::{Severity, VerificationStatus, VulnerabilityFinding};
 use baco::llm::metrics::LlmMetricsTracker;
+
 use baco::scanner::phases::{run_phase, PhaseConfig};
 use baco::scanner::Scanner;
 use indicatif::ProgressBar;
 use std::path::PathBuf;
 
-use crate::fixtures::make_aggregation_finding;
+use crate::fixtures::{create_test_config, make_aggregation_finding};
 
 fn create_test_finding(id: &str, severity: Severity) -> VulnerabilityFinding {
     let mut finding = make_aggregation_finding(
@@ -31,65 +29,6 @@ fn create_test_finding(id: &str, severity: Severity) -> VulnerabilityFinding {
     finding.sources = vec!["test".to_string()];
     finding.priority_score = Some(0.8);
     finding
-}
-
-fn create_test_config() -> config::ScannerConfig {
-    config::ScannerConfig {
-        eval: Default::default(),
-        project: baco::config::ProjectConfig {
-            name: "test-project".to_string(),
-            path: ".".to_string(),
-            languages: vec![],
-        },
-        output: baco::config::OutputConfig {
-            dir: "/tmp/test_output".to_string(),
-            evidence_gate: false,
-            include_rejected: false,
-        },
-        scanner: ScannerSettings {
-            profile: Default::default(),
-            max_file_size_kb: 1024,
-            exclude_paths: vec![],
-            semgrep: baco::config::SemgrepSettings::default(),
-            performance: PerformanceSettings::default(),
-        },
-        llm: baco::config::LlmConfig {
-            phases: LlmPhasesConfig {
-                aggregation: LlmPhaseConfig {
-                    base_url: "http://localhost:11434".to_string(),
-                    model: "test-model".to_string(),
-                    ..Default::default()
-                },
-                ..Default::default()
-            },
-            timeout_secs: 30,
-            max_retries: 3,
-            retry_backoff_ms: 1000,
-            ..Default::default()
-        },
-        tickets: baco::config::TicketConfig { systems: vec![] },
-        agent: AgentConfig::default(),
-        router: baco::config::RouterConfig::default(),
-        aggregation: baco::config::AggregationConfig::default(),
-        rulesynth: baco::config::RuleSynthConfig::default(),
-        normalization: baco::config::NormalizationConfig::default(),
-        cpg: baco::config::CpgConfig::default(),
-        exploit: baco::config::ExploitConfig::default(),
-        validate: Default::default(),
-        vultriage: Default::default(),
-        policy_sampling: Default::default(),
-        agent_scaffold: Default::default(),
-        pacvd: Default::default(),
-        agent_flow: Default::default(),
-        vuln_spec: Default::default(),
-        citation_verification: Default::default(),
-        prior_runs: Default::default(),
-        triage: Default::default(),
-        priority: Default::default(),
-        budget: Default::default(),
-        org_context: Default::default(),
-        knowledge: Default::default(),
-    }
 }
 
 fn create_test_scanner() -> Scanner {

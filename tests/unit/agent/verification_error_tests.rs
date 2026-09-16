@@ -8,7 +8,7 @@
 use crate::fixtures::mock_llm::MockLlmClient;
 use baco::agent::session::{AgentSession, ProgressCallback};
 use baco::config::AgentConfig;
-use baco::findings::{VerificationStatus, VulnerabilityFinding};
+use baco::findings::VerificationStatus;
 use baco::llm::ChatResponse;
 use serde_json::json;
 use std::sync::Arc;
@@ -31,23 +31,6 @@ fn create_session(
     let progress_cb: ProgressCallback = Arc::new(|_| {});
     let session = AgentSession::new(mock_client, &config, tmpdir.path(), progress_cb);
     (session, tmpdir)
-}
-
-/// Helper to create a test finding
-fn create_test_finding() -> VulnerabilityFinding {
-    let mut finding = make_finding_report_agg(
-        "error-test-1",
-        "Test Buffer Overflow",
-        "test.rs",
-        Some(42),
-        Some("CWE-120"),
-        baco::findings::Severity::High,
-    );
-    finding.description = "A buffer overflow vulnerability in string handling".to_string();
-    finding.code_snippet = Some("unsafe { strcpy(...) }".to_string());
-    finding.sources = vec![];
-    finding.agent_mode = true;
-    finding
 }
 
 // ============================================================================
@@ -76,7 +59,18 @@ async fn test_verify_finding_file_write_permission_denied() {
     let mock_client = MockLlmClient::new(responses);
     let (session, _tmpdir) = create_session(mock_client, 5, 30);
 
-    let finding = create_test_finding();
+    let mut finding = make_finding_report_agg(
+        "error-test-1",
+        "Test Buffer Overflow",
+        "test.rs",
+        Some(42),
+        Some("CWE-120"),
+        baco::findings::Severity::High,
+    );
+    finding.description = "A buffer overflow vulnerability in string handling".to_string();
+    finding.code_snippet = Some("unsafe { strcpy(...) }".to_string());
+    finding.sources = vec![];
+    finding.agent_mode = true;
     let result = session.verify_finding("test.rs", &finding).await;
 
     assert!(result.is_ok());
@@ -121,7 +115,18 @@ async fn test_verify_finding_test_compile_invalid_language() {
     let mock_client = MockLlmClient::new(responses);
     let (session, _tmpdir) = create_session(mock_client, 5, 30);
 
-    let finding = create_test_finding();
+    let mut finding = make_finding_report_agg(
+        "error-test-1",
+        "Test Buffer Overflow",
+        "test.rs",
+        Some(42),
+        Some("CWE-120"),
+        baco::findings::Severity::High,
+    );
+    finding.description = "A buffer overflow vulnerability in string handling".to_string();
+    finding.code_snippet = Some("unsafe { strcpy(...) }".to_string());
+    finding.sources = vec![];
+    finding.agent_mode = true;
     let result = session.verify_finding("test.rs", &finding).await;
 
     assert!(result.is_ok());
@@ -166,7 +171,18 @@ async fn test_verify_finding_test_run_timeout() {
     let mock_client = MockLlmClient::new(responses);
     let (session, _tmpdir) = create_session(mock_client, 5, 30);
 
-    let finding = create_test_finding();
+    let mut finding = make_finding_report_agg(
+        "error-test-1",
+        "Test Buffer Overflow",
+        "test.rs",
+        Some(42),
+        Some("CWE-120"),
+        baco::findings::Severity::High,
+    );
+    finding.description = "A buffer overflow vulnerability in string handling".to_string();
+    finding.code_snippet = Some("unsafe { strcpy(...) }".to_string());
+    finding.sources = vec![];
+    finding.agent_mode = true;
     let result = session.verify_finding("test.rs", &finding).await;
 
     assert!(result.is_ok());
@@ -204,7 +220,18 @@ async fn test_verify_finding_tool_execution_crash() {
     let mock_client = MockLlmClient::new(responses);
     let (session, _tmpdir) = create_session(mock_client, 5, 30);
 
-    let finding = create_test_finding();
+    let mut finding = make_finding_report_agg(
+        "error-test-1",
+        "Test Buffer Overflow",
+        "test.rs",
+        Some(42),
+        Some("CWE-120"),
+        baco::findings::Severity::High,
+    );
+    finding.description = "A buffer overflow vulnerability in string handling".to_string();
+    finding.code_snippet = Some("unsafe { strcpy(...) }".to_string());
+    finding.sources = vec![];
+    finding.agent_mode = true;
     let result = session.verify_finding("test.rs", &finding).await;
 
     assert!(result.is_ok());
@@ -244,7 +271,18 @@ async fn test_verify_finding_network_error_during_tool_call() {
     let mock_client = MockLlmClient::new(responses);
     let (session, _tmpdir) = create_session(mock_client, 5, 30);
 
-    let finding = create_test_finding();
+    let mut finding = make_finding_report_agg(
+        "error-test-1",
+        "Test Buffer Overflow",
+        "test.rs",
+        Some(42),
+        Some("CWE-120"),
+        baco::findings::Severity::High,
+    );
+    finding.description = "A buffer overflow vulnerability in string handling".to_string();
+    finding.code_snippet = Some("unsafe { strcpy(...) }".to_string());
+    finding.sources = vec![];
+    finding.agent_mode = true;
     let result = session.verify_finding("test.rs", &finding).await;
 
     assert!(result.is_ok());
@@ -284,7 +322,18 @@ async fn test_verify_finding_malformed_tool_response() {
     let mock_client = MockLlmClient::new(responses);
     let (session, _tmpdir) = create_session(mock_client, 5, 30);
 
-    let finding = create_test_finding();
+    let mut finding = make_finding_report_agg(
+        "error-test-1",
+        "Test Buffer Overflow",
+        "test.rs",
+        Some(42),
+        Some("CWE-120"),
+        baco::findings::Severity::High,
+    );
+    finding.description = "A buffer overflow vulnerability in string handling".to_string();
+    finding.code_snippet = Some("unsafe { strcpy(...) }".to_string());
+    finding.sources = vec![];
+    finding.agent_mode = true;
     let result = session.verify_finding("test.rs", &finding).await;
 
     assert!(result.is_ok());
@@ -336,7 +385,18 @@ async fn test_verify_finding_retry_logic_on_transient_errors() {
     let mock_client = MockLlmClient::new(responses);
     let (session, _tmpdir) = create_session(mock_client, 10, 30);
 
-    let finding = create_test_finding();
+    let mut finding = make_finding_report_agg(
+        "error-test-1",
+        "Test Buffer Overflow",
+        "test.rs",
+        Some(42),
+        Some("CWE-120"),
+        baco::findings::Severity::High,
+    );
+    finding.description = "A buffer overflow vulnerability in string handling".to_string();
+    finding.code_snippet = Some("unsafe { strcpy(...) }".to_string());
+    finding.sources = vec![];
+    finding.agent_mode = true;
     let result = session.verify_finding("test.rs", &finding).await;
 
     assert!(result.is_ok());
@@ -403,7 +463,18 @@ async fn test_verify_finding_error_accumulation_multiple_tools() {
     let mock_client = MockLlmClient::new(responses);
     let (session, _tmpdir) = create_session(mock_client, 10, 30);
 
-    let finding = create_test_finding();
+    let mut finding = make_finding_report_agg(
+        "error-test-1",
+        "Test Buffer Overflow",
+        "test.rs",
+        Some(42),
+        Some("CWE-120"),
+        baco::findings::Severity::High,
+    );
+    finding.description = "A buffer overflow vulnerability in string handling".to_string();
+    finding.code_snippet = Some("unsafe { strcpy(...) }".to_string());
+    finding.sources = vec![];
+    finding.agent_mode = true;
     let result = session.verify_finding("test.rs", &finding).await;
 
     assert!(result.is_ok());
@@ -445,7 +516,18 @@ async fn test_verify_finding_error_messages_propagated_correctly() {
     let mock_client = MockLlmClient::new(responses);
     let (session, _tmpdir) = create_session(mock_client, 5, 30);
 
-    let finding = create_test_finding();
+    let mut finding = make_finding_report_agg(
+        "error-test-1",
+        "Test Buffer Overflow",
+        "test.rs",
+        Some(42),
+        Some("CWE-120"),
+        baco::findings::Severity::High,
+    );
+    finding.description = "A buffer overflow vulnerability in string handling".to_string();
+    finding.code_snippet = Some("unsafe { strcpy(...) }".to_string());
+    finding.sources = vec![];
+    finding.agent_mode = true;
     let result = session.verify_finding("test.rs", &finding).await;
 
     assert!(result.is_ok());
@@ -481,7 +563,18 @@ async fn test_verify_finding_missing_file_guard() {
     let mock_client = MockLlmClient::new(responses);
     let (session, _tmpdir) = create_session(mock_client, 5, 30);
 
-    let finding = create_test_finding();
+    let mut finding = make_finding_report_agg(
+        "error-test-1",
+        "Test Buffer Overflow",
+        "test.rs",
+        Some(42),
+        Some("CWE-120"),
+        baco::findings::Severity::High,
+    );
+    finding.description = "A buffer overflow vulnerability in string handling".to_string();
+    finding.code_snippet = Some("unsafe { strcpy(...) }".to_string());
+    finding.sources = vec![];
+    finding.agent_mode = true;
     let result = session.verify_finding("test.rs", &finding).await;
 
     assert!(result.is_ok());
@@ -526,7 +619,18 @@ async fn test_verify_finding_invalid_json_arguments() {
     let mock_client = MockLlmClient::new(responses);
     let (session, _tmpdir) = create_session(mock_client, 5, 30);
 
-    let finding = create_test_finding();
+    let mut finding = make_finding_report_agg(
+        "error-test-1",
+        "Test Buffer Overflow",
+        "test.rs",
+        Some(42),
+        Some("CWE-120"),
+        baco::findings::Severity::High,
+    );
+    finding.description = "A buffer overflow vulnerability in string handling".to_string();
+    finding.code_snippet = Some("unsafe { strcpy(...) }".to_string());
+    finding.sources = vec![];
+    finding.agent_mode = true;
     let result = session.verify_finding("test.rs", &finding).await;
 
     assert!(result.is_ok());
@@ -563,7 +667,18 @@ async fn test_verify_finding_sandbox_escape_blocked() {
     let mock_client = MockLlmClient::new(responses);
     let (session, _tmpdir) = create_session(mock_client, 5, 30);
 
-    let finding = create_test_finding();
+    let mut finding = make_finding_report_agg(
+        "error-test-1",
+        "Test Buffer Overflow",
+        "test.rs",
+        Some(42),
+        Some("CWE-120"),
+        baco::findings::Severity::High,
+    );
+    finding.description = "A buffer overflow vulnerability in string handling".to_string();
+    finding.code_snippet = Some("unsafe { strcpy(...) }".to_string());
+    finding.sources = vec![];
+    finding.agent_mode = true;
     let result = session.verify_finding("test.rs", &finding).await;
 
     assert!(result.is_ok());
@@ -604,7 +719,18 @@ async fn test_verify_finding_compilation_timeout() {
     let mock_client = MockLlmClient::new(responses);
     let (session, _tmpdir) = create_session(mock_client, 5, 30);
 
-    let finding = create_test_finding();
+    let mut finding = make_finding_report_agg(
+        "error-test-1",
+        "Test Buffer Overflow",
+        "test.rs",
+        Some(42),
+        Some("CWE-120"),
+        baco::findings::Severity::High,
+    );
+    finding.description = "A buffer overflow vulnerability in string handling".to_string();
+    finding.code_snippet = Some("unsafe { strcpy(...) }".to_string());
+    finding.sources = vec![];
+    finding.agent_mode = true;
     let result = session.verify_finding("test.rs", &finding).await;
 
     assert!(result.is_ok());
@@ -646,7 +772,18 @@ async fn test_verify_finding_test_crash_with_core_dump() {
     let mock_client = MockLlmClient::new(responses);
     let (session, _tmpdir) = create_session(mock_client, 5, 30);
 
-    let finding = create_test_finding();
+    let mut finding = make_finding_report_agg(
+        "error-test-1",
+        "Test Buffer Overflow",
+        "test.rs",
+        Some(42),
+        Some("CWE-120"),
+        baco::findings::Severity::High,
+    );
+    finding.description = "A buffer overflow vulnerability in string handling".to_string();
+    finding.code_snippet = Some("unsafe { strcpy(...) }".to_string());
+    finding.sources = vec![];
+    finding.agent_mode = true;
     let result = session.verify_finding("test.rs", &finding).await;
 
     assert!(result.is_ok());

@@ -16,7 +16,7 @@ use std::fs;
 use std::path::Path;
 use tempfile::TempDir;
 
-use super::report_fixtures::make_finding;
+use crate::report_fixtures::make_finding;
 
 // ============================================================================
 // render_finding Tests

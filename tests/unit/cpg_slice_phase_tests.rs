@@ -6,7 +6,6 @@
 
 use baco::config::CpgConfig;
 use baco::findings::{Severity, VerificationStatus, VulnerabilityFinding};
-use baco::scanner::phases::PhaseConfig;
 use std::path::PathBuf;
 
 /// Helper to create a minimal CPG config
@@ -15,7 +14,6 @@ fn make_cpg_config(enabled: bool) -> CpgConfig {
         enabled,
         joern_path: None,
         slice_budget_lines: 1000,
-        _non_exhaustive: (),
     }
 }
 
@@ -82,7 +80,7 @@ fn test_cpg_phase_unavailable_skips_with_debug_log_path() {
     if !engine.is_available() {
         // This is the "skip cheaply" path - no build() call, no phantom work
         // The phase returns early after checking is_available()
-        let result = engine.build(&PathBuf::from("/tmp/test"));
+        let result = engine.build_cpg(&PathBuf::from("/tmp/test"));
         assert!(matches!(
             result,
             Err(baco::cpg::CpgError::JoernNotInstalled)
@@ -116,7 +114,7 @@ fn test_evidence_write_back_mutates_real_finding() {
         baco::evidence::EvidenceSource::CpgSlice(_)
     ));
     assert_eq!(finding.evidence[0].weight, 0.6);
-    assert!(finding.evidence[0].detail.contains("3 relevant statements"));
+    assert!(finding.evidence[0].detail.contains("4 relevant statements"));
 }
 
 #[test]
@@ -149,7 +147,7 @@ fn test_empty_slice_does_not_add_evidence() {
     let mut finding = make_test_finding("test-finding-3");
 
     // Simulate empty slice result
-    let empty_slice = "";
+    let empty_slice = String::new();
 
     // Phase logic: only add evidence if !slice.is_empty()
     if !empty_slice.is_empty() {

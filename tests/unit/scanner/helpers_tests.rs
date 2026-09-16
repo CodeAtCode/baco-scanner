@@ -5,44 +5,22 @@
 use baco::findings::{Severity, VulnerabilityFinding};
 use baco::scanner::helpers::log_and_aggregate_llm_results;
 
+use crate::fixtures::make_finding_report_agg;
+
 type RejectedFinding = (VulnerabilityFinding, String);
 
 // Test fixture
 fn create_test_finding(title: &str) -> VulnerabilityFinding {
-    VulnerabilityFinding {
-        id: format!("test-{}", title),
-        title: title.to_string(),
-        description: format!("Test finding: {}", title),
-        severity: Severity::Medium,
-        confidence_score: 0.8,
-        cwe_id: None,
-        file_path: "test.rs".to_string(),
-        line_number: Some(1),
-        code_snippet: None,
-        diff_hunk: None,
-        recommendation: None,
-        code_location: None,
-        already_reported: false,
-        sources: vec![],
-        commit_reference: None,
-        ticket_reference: None,
-        priority_score: None,
-        cross_file_references: None,
-        verification_status: None,
-        verification_notes: None,
-        verification_error: None,
-        agent_evidence_path: None,
-        security_issue: None,
-        poc_code: None,
-        mitigation_code: None,
-        poc_format: None,
-        llm_model: None,
-        agent_mode: false,
-        statement_range: None,
-        triage_verdict: None,
-        evidence: vec![],
-        verification_tier: None,
-    }
+    let mut f = make_finding_report_agg(
+        &format!("test-{}", title),
+        title,
+        "test.rs",
+        Some(1),
+        None,
+        Severity::Medium,
+    );
+    f.description = format!("Test finding: {}", title);
+    f
 }
 
 #[test]

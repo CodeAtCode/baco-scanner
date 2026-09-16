@@ -9,6 +9,7 @@
 //! - Error handling
 //! - Edge cases
 
+use crate::fixtures::create_test_finding;
 use crate::fixtures::mock_llm::MockLlmClient;
 use baco::agent::session::{AgentSession, ProgressCallback};
 use baco::config::AgentConfig;
@@ -41,44 +42,6 @@ fn create_test_file(
     let file_path = temp_dir.path().join(filename);
     std::fs::write(&file_path, content).expect("Failed to write test file");
     file_path
-}
-
-/// Helper to create a basic VulnerabilityFinding for tests
-fn create_test_finding(title: &str, severity: Severity) -> VulnerabilityFinding {
-    VulnerabilityFinding {
-        id: "test-finding-1".to_string(),
-        title: title.to_string(),
-        description: "Test vulnerability description".to_string(),
-        severity,
-        confidence_score: 0.8,
-        cwe_id: Some("CWE-79".to_string()),
-        file_path: "test.rs".to_string(),
-        line_number: Some(42),
-        code_snippet: Some("let x = unsafe { ... }".to_string()),
-        diff_hunk: None,
-        recommendation: Some("Add input validation".to_string()),
-        code_location: None,
-        already_reported: false,
-        sources: vec![],
-        commit_reference: None,
-        ticket_reference: None,
-        priority_score: None,
-        cross_file_references: None,
-        verification_status: None,
-        verification_notes: None,
-        verification_error: None,
-        agent_evidence_path: None,
-        security_issue: None,
-        poc_code: None,
-        mitigation_code: None,
-        poc_format: None,
-        llm_model: None,
-        agent_mode: true,
-        statement_range: None,
-        triage_verdict: None,
-        evidence: vec![],
-        verification_tier: None,
-    }
 }
 
 // ============================================================================
@@ -584,7 +547,10 @@ async fn test_verify_finding_confirmed() {
     let progress_cb: ProgressCallback = Arc::new(|_| {});
 
     let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
-    let finding = create_test_finding("Test Vuln", Severity::High);
+    let finding = create_test_finding("test-finding", "Test Vuln", "test.rs", 42);
+    let mut finding = finding;
+    finding.agent_mode = true;
+    finding.severity = Severity::High;
 
     let result = session.verify_finding("test.rs", &finding).await;
 
@@ -608,7 +574,7 @@ async fn test_verify_finding_unconfirmed() {
     let progress_cb: ProgressCallback = Arc::new(|_| {});
 
     let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
-    let finding = create_test_finding("Test Vuln", Severity::Medium);
+    let finding = create_test_finding("test-finding-2", "Test Vuln", "test.rs", 42);
 
     let result = session.verify_finding("test.rs", &finding).await;
 
@@ -639,7 +605,9 @@ async fn test_verify_finding_with_tool_calls() {
     let progress_cb: ProgressCallback = Arc::new(|_| {});
 
     let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
-    let finding = create_test_finding("Test Vuln", Severity::High);
+    let finding = create_test_finding("test-finding-3", "Test Vuln", "test.rs", 42);
+    let mut finding = finding;
+    finding.agent_mode = true;
 
     let result = session.verify_finding("test.rs", &finding).await;
 
@@ -667,7 +635,7 @@ async fn test_verify_finding_max_turns_reached() {
     let progress_cb: ProgressCallback = Arc::new(|_| {});
 
     let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
-    let finding = create_test_finding("Test Vuln", Severity::Medium);
+    let finding = create_test_finding("test-finding-4", "Test Vuln", "test.rs", 42);
 
     let result = session.verify_finding("test.rs", &finding).await;
 
@@ -696,7 +664,9 @@ async fn test_verify_finding_llm_error() {
     let progress_cb: ProgressCallback = Arc::new(|_| {});
 
     let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
-    let finding = create_test_finding("Test Vuln", Severity::High);
+    let finding = create_test_finding("test-finding-5", "Test Vuln", "test.rs", 42);
+    let mut finding = finding;
+    finding.agent_mode = true;
 
     let result = session.verify_finding("test.rs", &finding).await;
 
@@ -725,7 +695,9 @@ async fn test_verify_finding_empty_response() {
     let progress_cb: ProgressCallback = Arc::new(|_| {});
 
     let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
-    let finding = create_test_finding("Test Vuln", Severity::Medium);
+    let finding = create_test_finding("test-finding-6", "Test Vuln", "test.rs", 42);
+    let mut finding = finding;
+    finding.severity = Severity::Medium;
 
     let result = session.verify_finding("test.rs", &finding).await;
 
@@ -754,7 +726,7 @@ async fn test_verify_finding_preserves_title() {
     let progress_cb: ProgressCallback = Arc::new(|_| {});
 
     let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
-    let finding = create_test_finding("Original Title", Severity::High);
+    let finding = create_test_finding("test-finding-7", "Original Title", "test.rs", 42);
 
     let result = session.verify_finding("test.rs", &finding).await;
 
@@ -775,7 +747,9 @@ async fn test_verify_finding_preserves_severity() {
     let progress_cb: ProgressCallback = Arc::new(|_| {});
 
     let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
-    let finding = create_test_finding("Test", Severity::Low);
+    let finding = create_test_finding("test-finding-8", "Test", "test.rs", 42);
+    let mut finding = finding;
+    finding.severity = Severity::Low;
 
     let result = session.verify_finding("test.rs", &finding).await;
 
@@ -796,7 +770,7 @@ async fn test_verify_finding_preserves_file_path() {
     let progress_cb: ProgressCallback = Arc::new(|_| {});
 
     let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
-    let mut finding = create_test_finding("Test", Severity::Medium);
+    let mut finding = create_test_finding("test-finding-10", "Test", "test.rs", 42);
     finding.file_path = "src/vulnerable.rs".to_string();
 
     let result = session.verify_finding("src/vulnerable.rs", &finding).await;
@@ -818,7 +792,8 @@ async fn test_verify_finding_preserves_cwe_id() {
     let progress_cb: ProgressCallback = Arc::new(|_| {});
 
     let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
-    let mut finding = create_test_finding("Test", Severity::High);
+    let mut finding = create_test_finding("test-finding-9", "Test", "test.rs", 42);
+    finding.agent_mode = true;
     finding.cwe_id = Some("CWE-119".to_string());
 
     let result = session.verify_finding("test.rs", &finding).await;

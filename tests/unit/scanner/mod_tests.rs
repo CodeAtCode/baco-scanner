@@ -1,64 +1,14 @@
 // Tests migrated from src/scanner/mod.rs inline #[cfg(test)] block
 
 use baco::checkpoint::ScanPhase;
-use baco::config::{
-    AgentConfig, LlmPhasesConfig, PerformanceSettings, ScannerConfig, ScannerSettings,
-};
+
 use baco::findings::Severity;
 use baco::phase::helpers::create_test_finding_simple;
 use baco::scanner::Scanner;
 use indicatif::ProgressBar;
 use std::path::PathBuf;
 
-fn create_test_config() -> ScannerConfig {
-    ScannerConfig {
-        eval: Default::default(),
-        project: baco::config::ProjectConfig {
-            languages: vec!["rust".to_string()],
-            ..Default::default()
-        },
-        scanner: ScannerSettings {
-            max_file_size_kb: 1024,
-            profile: Default::default(),
-            exclude_paths: vec![],
-            semgrep: Default::default(),
-            performance: PerformanceSettings::default(),
-        },
-        llm: baco::config::LlmConfig {
-            phases: LlmPhasesConfig::default(),
-            timeout_secs: 30,
-            max_retries: 3,
-            retry_backoff_ms: 1000,
-            ..Default::default()
-        },
-        output: baco::config::OutputConfig {
-            dir: "/tmp/test_output".to_string(),
-            ..Default::default()
-        },
-        agent: AgentConfig::default(),
-        tickets: baco::config::TicketConfig { systems: vec![] },
-        router: Default::default(),
-        aggregation: Default::default(),
-        rulesynth: Default::default(),
-        normalization: Default::default(),
-        cpg: Default::default(),
-        exploit: Default::default(),
-        validate: Default::default(),
-        vultriage: Default::default(),
-        policy_sampling: Default::default(),
-        agent_scaffold: Default::default(),
-        pacvd: Default::default(),
-        agent_flow: Default::default(),
-        vuln_spec: Default::default(),
-        citation_verification: Default::default(),
-        triage: Default::default(),
-        priority: Default::default(),
-        budget: Default::default(),
-        prior_runs: Default::default(),
-        org_context: Default::default(),
-        knowledge: Default::default(),
-    }
-}
+use crate::fixtures::create_test_config;
 
 #[test]
 fn test_scan_phase_all_variants_exist() {

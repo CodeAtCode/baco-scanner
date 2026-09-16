@@ -1,9 +1,10 @@
 //! Tests for structural deduplication in scanner orchestrator
 
-use baco::findings::{Severity, VulnerabilityFinding};
+use baco::findings::VulnerabilityFinding;
 use baco::scanner::structural_dedup;
 
-/// Helper to create a test finding
+use crate::fixtures::make_aggregation_finding;
+
 fn make_finding(
     id: &str,
     file: &str,
@@ -12,40 +13,17 @@ fn make_finding(
     sources: Vec<&str>,
     confidence: f32,
 ) -> VulnerabilityFinding {
-    VulnerabilityFinding {
-        id: id.to_string(),
-        title: "Test finding".to_string(),
-        description: "Test description".to_string(),
-        severity: Severity::High,
-        confidence_score: confidence,
-        cwe_id: cwe.map(String::from),
-        file_path: file.to_string(),
-        line_number: line,
-        code_snippet: None,
-        diff_hunk: None,
-        recommendation: None,
-        code_location: None,
-        already_reported: false,
-        sources: sources.into_iter().map(String::from).collect(),
-        commit_reference: None,
-        ticket_reference: None,
-        priority_score: None,
-        cross_file_references: None,
-        verification_status: None,
-        verification_notes: None,
-        verification_error: None,
-        agent_evidence_path: None,
-        security_issue: None,
-        poc_code: None,
-        mitigation_code: None,
-        poc_format: None,
-        llm_model: None,
-        agent_mode: false,
-        statement_range: None,
-        triage_verdict: None,
-        evidence: vec![],
-        verification_tier: None,
-    }
+    let mut f = make_aggregation_finding(
+        id,
+        baco::findings::Severity::High,
+        confidence,
+        file,
+        line,
+        cwe,
+        None,
+    );
+    f.sources = sources.into_iter().map(String::from).collect();
+    f
 }
 
 #[test]

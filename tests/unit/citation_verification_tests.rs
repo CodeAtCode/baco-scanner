@@ -1,48 +1,19 @@
 //! Citation verification unit tests.
 
 use baco::citation_verification::verify_citations;
-use baco::findings::{Severity, VulnerabilityFinding};
+use baco::findings::VulnerabilityFinding;
 use std::fs;
 use std::fs::File;
 use std::io::Write;
 use tempfile::TempDir;
 
-/// Helper to create a VulnerabilityFinding with all required fields.
+use crate::fixtures::create_test_finding;
+
 fn make_finding(file_path: String, line_number: Option<u32>) -> VulnerabilityFinding {
-    VulnerabilityFinding {
-        id: "test-finding-001".to_string(),
-        title: "Test Finding".to_string(),
-        description: "A test vulnerability".to_string(),
-        severity: Severity::High,
-        confidence_score: 0.8,
-        cwe_id: Some("CWE-79".to_string()),
-        file_path,
-        line_number,
-        code_snippet: None,
-        diff_hunk: None,
-        recommendation: None,
-        code_location: None,
-        already_reported: false,
-        sources: vec![],
-        commit_reference: None,
-        ticket_reference: None,
-        priority_score: None,
-        cross_file_references: None,
-        verification_status: None,
-        verification_notes: None,
-        verification_error: None,
-        agent_evidence_path: None,
-        security_issue: None,
-        poc_code: None,
-        mitigation_code: None,
-        poc_format: None,
-        llm_model: None,
-        agent_mode: false,
-        statement_range: None,
-        triage_verdict: None,
-        evidence: vec![],
-        verification_tier: None,
-    }
+    let mut f = create_test_finding("test-finding-001", "Test Finding", &file_path, 1);
+    f.description = "A test vulnerability".to_string();
+    f.line_number = line_number;
+    f
 }
 
 #[test]
