@@ -30,7 +30,7 @@ pub fn generate_sarif_report(
 
     let mut results = Vec::new();
     for finding in &filtered_findings {
-        let driver_location = if finding.file_path.is_empty() {
+        let location = if finding.file_path.is_empty() {
             serde_json::json!({})
         } else {
             serde_json::json!({
@@ -52,7 +52,7 @@ pub fn generate_sarif_report(
             "locations": [
                 serde_json::json!({
                     "physicalLocation": {
-                        "artifactLocation": driver_location,
+                        "artifactLocation": location["artifactLocation"].clone(),
                         "region": region
                     }
                 })

@@ -121,6 +121,7 @@ impl AgentSession {
         loop {
             turn += 1;
             if turn > self.max_turns {
+                turn -= 1;
                 tracing::warn!("Max turns ({}) reached", self.max_turns);
                 break;
             }
@@ -370,6 +371,7 @@ impl AgentSession {
         loop {
             turn += 1;
             if turn > self.max_turns {
+                turn -= 1;
                 tracing::warn!("Max turns ({}) during verification", self.max_turns);
                 break;
             }

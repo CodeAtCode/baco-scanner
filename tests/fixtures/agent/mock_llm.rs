@@ -64,7 +64,10 @@ impl MockLlmClient {
         _messages: &[ChatMessage],
         _tools: &[ToolSchema],
     ) -> Result<ChatResponse, baco::error::ScanError> {
-        self.next_response()
+        let mut resp = self.next_response()?;
+        // Ensure the response uses our configured model name
+        resp.model_used = self.model_name.clone();
+        Ok(resp)
     }
 
     /// Helper to create a ChatResponse with tool_calls
@@ -131,5 +134,79 @@ impl AgentLlmClient for MockLlmClient {
     }
     fn model_name(&self) -> String {
         self.model_name.clone()
+    }
+}
+
+// ============================================================================
+// Unit tests for MockLlmClient itself
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[tokio::test]
+    async fn test_mock_llm_exhausts_responses() {
+        let responses = vec![
+            MockLlmClient::mock_final_response("first"),
+            MockLlmClient::mock_final_response("second"),
+        ];
+        let client = MockLlmClient::new(responses);
+
+        // First two calls should succeed
+        let r1 = client.chat_with_tools(&[], &[]).await;
+        assert!(r1.is_ok());
+        assert_eq!(r1.unwrap().content, "first");
+
+        let r2 = client.chat_with_tools(&[], &[]).await;
+        assert!(r2.is_ok());
+        assert_eq!(r2.unwrap().content, "second");
+
+        // Third call should fail
+        let r3 = client.chat_with_tools(&[], &[]).await;
+        assert!(r3.is_err());
+        assert!(r3.unwrap_err().to_string().contains("Exhausted"));
+    }
+
+    #[tokio::test]
+    async fn test_mock_llm_custom_model_name() {
+        let responses = vec![MockLlmClient::mock_final_response("test")];
+        let client = MockLlmClient::with_model(responses, "custom-v2".to_string());
+
+        assert_eq!(client.model_name(), "custom-v2");
+
+        let r = client.chat_with_tools(&[], &[]).await;
+        assert!(r.is_ok());
+        assert_eq!(r.unwrap().model_used, "custom-v2");
+    }
+
+    #[test]
+    fn test_mock_tool_call_structure() {
+        let response = MockLlmClient::mock_tool_call("file_read", json!({ "path": "test.rs" }));
+
+        assert_eq!(response.tool_calls.len(), 1);
+        assert_eq!(response.tool_calls[0].name, "file_read");
+        assert!(response.content.contains("file_read"));
+    }
+
+    #[test]
+    fn test_mock_final_response_structure() {
+        let response = MockLlmClient::mock_final_response("all clear");
+
+        assert!(response.tool_calls.is_empty());
+        assert_eq!(response.content, "all clear");
+    }
+
+    #[tokio::test]
+    async fn test_mock_llm_response_count() {
+        let responses = vec![
+            MockLlmClient::mock_final_response("1"),
+            MockLlmClient::mock_final_response("2"),
+            MockLlmClient::mock_final_response("3"),
+        ];
+        let client = MockLlmClient::new(responses);
+
+        assert_eq!(client.response_count(), 3);
     }
 }

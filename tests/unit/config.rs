@@ -715,6 +715,185 @@ fn test_ticket_env_overrides_unknown_system_type() {
     assert!(config.tickets.systems[0].api_key.is_none());
 }
 
+#[test]
+#[serial]
+fn test_ticket_env_overrides_multiple_systems() {
+    // Test multiple ticket systems with different env vars
+    let mut guard = EnvVarGuard::new();
+    guard.set("TICKET_GITHUB_KEY", "github-token");
+    guard.set("TICKET_GITLAB_KEY", "gitlab-token");
+
+    let toml_str = r#"
+        [project]
+        name = "test"
+        path = "/tmp/test"
+
+        [output]
+        dir = "./out"
+
+        [scanner]
+        max_file_size_kb = 100
+
+        [llm]
+        timeout_secs = 30
+        max_retries = 2
+        retry_backoff_ms = 1000
+
+        [llm.phases.discovery]
+        base_url = "http://test"
+        model = "test"
+
+        [llm.phases.verification]
+        base_url = "http://test"
+        model = "test"
+
+        [llm.phases.aggregation]
+        base_url = "http://test"
+        model = "test"
+
+        [tickets]
+        [[tickets.systems]]
+        system_type = "github"
+        url = "https://github.com/org/repo"
+        project = "github-project"
+
+        [[tickets.systems]]
+        system_type = "gitlab"
+        url = "https://gitlab.com/group/project"
+        project = "gitlab-project"
+    "#;
+
+    let mut config: ScannerConfig = toml::from_str(toml_str).unwrap();
+    apply_env_overrides(&mut config);
+
+    assert_eq!(config.tickets.systems.len(), 2);
+    assert_eq!(
+        config.tickets.systems[0].api_key,
+        Some("github-token".to_string())
+    );
+    assert_eq!(
+        config.tickets.systems[1].api_key,
+        Some("gitlab-token".to_string())
+    );
+}
+
+#[test]
+#[serial]
+fn test_ticket_env_overrides_mixed_explicit_and_env() {
+    // One system has explicit key, another relies on env
+    let mut guard = EnvVarGuard::new();
+    guard.set("TICKET_GITLAB_KEY", "env-gitlab-token");
+
+    let toml_str = r#"
+        [project]
+        name = "test"
+        path = "/tmp/test"
+
+        [output]
+        dir = "./out"
+
+        [scanner]
+        max_file_size_kb = 100
+
+        [llm]
+        timeout_secs = 30
+        max_retries = 2
+        retry_backoff_ms = 1000
+
+        [llm.phases.discovery]
+        base_url = "http://test"
+        model = "test"
+
+        [llm.phases.verification]
+        base_url = "http://test"
+        model = "test"
+
+        [llm.phases.aggregation]
+        base_url = "http://test"
+        model = "test"
+
+        [tickets]
+        [[tickets.systems]]
+        system_type = "github"
+        url = "https://github.com/org/repo"
+        api_key = "explicit-github-token"
+        project = "github-project"
+
+        [[tickets.systems]]
+        system_type = "gitlab"
+        url = "https://gitlab.com/group/project"
+        project = "gitlab-project"
+    "#;
+
+    let mut config: ScannerConfig = toml::from_str(toml_str).unwrap();
+    apply_env_overrides(&mut config);
+
+    assert_eq!(config.tickets.systems.len(), 2);
+    // GitHub has explicit key - env should not override
+    assert_eq!(
+        config.tickets.systems[0].api_key,
+        Some("explicit-github-token".to_string())
+    );
+    // GitLab has no explicit key - env should apply
+    assert_eq!(
+        config.tickets.systems[1].api_key,
+        Some("env-gitlab-token".to_string())
+    );
+}
+
+#[test]
+#[serial]
+fn test_ticket_env_overrides_invalid_system_type_ignored() {
+    // Unknown system types should not get env var applied
+    let mut guard = EnvVarGuard::new();
+    guard.set("TICKET_GITHUB_KEY", "github-token");
+    guard.set("TICKET_GITLAB_KEY", "gitlab-token");
+
+    let toml_str = r#"
+        [project]
+        name = "test"
+        path = "/tmp/test"
+
+        [output]
+        dir = "./out"
+
+        [scanner]
+        max_file_size_kb = 100
+
+        [llm]
+        timeout_secs = 30
+        max_retries = 2
+        retry_backoff_ms = 1000
+
+        [llm.phases.discovery]
+        base_url = "http://test"
+        model = "test"
+
+        [llm.phases.verification]
+        base_url = "http://test"
+        model = "test"
+
+        [llm.phases.aggregation]
+        base_url = "http://test"
+        model = "test"
+
+        [tickets]
+        [[tickets.systems]]
+        system_type = "unknown_system"
+        url = "https://unknown.example.com"
+        project = "unknown-project"
+    "#;
+
+    let mut config: ScannerConfig = toml::from_str(toml_str).unwrap();
+    apply_env_overrides(&mut config);
+
+    assert_eq!(config.tickets.systems.len(), 1);
+    assert!(
+        config.tickets.systems[0].api_key.is_none(),
+        "Unknown system type should not get env var applied"
+    );
+}
+
 fn base_config_toml() -> String {
     r#"
         [project]
@@ -742,6 +921,59 @@ fn base_config_toml() -> String {
         base_url = "http://test"
     "#
     .to_string()
+}
+
+// ============================================================================
+// Invalid Values Left Alone Tests
+// ============================================================================
+
+#[test]
+fn test_invalid_values_left_alone() {
+    // Invalid TOML values should fail at parse time, not be silently ignored
+    // This test verifies that the config parser rejects invalid types
+    let toml_str = r#"
+        [project]
+        name = "test"
+        path = "/tmp/test"
+
+        [output]
+        dir = "./out"
+
+        [scanner]
+        max_file_size_kb = "not-a-number"
+
+        [llm]
+        timeout_secs = 30
+        max_retries = 2
+        retry_backoff_ms = 1000
+
+        [llm.phases.discovery]
+        base_url = "http://test"
+        model = "test"
+    "#;
+
+    let result: Result<ScannerConfig, _> = toml::from_str(toml_str);
+    assert!(result.is_err(), "Invalid max_file_size_kb type should fail");
+}
+
+#[test]
+fn test_eval_floor_default() {
+    let config = ScannerConfig::default();
+    assert!(
+        (config.eval.floor - 0.70).abs() < f32::EPSILON,
+        "default [eval] floor must be 0.70, got {}",
+        config.eval.floor
+    );
+}
+
+#[test]
+fn test_eval_floor_custom() {
+    let config: ScannerConfig =
+        toml::from_str("[eval]\nfloor = 0.85\n").expect("[eval] floor must parse");
+    assert!((config.eval.floor - 0.85).abs() < f32::EPSILON);
+    // Omitted key falls back to the default
+    let config: ScannerConfig = toml::from_str("[eval]\n").expect("empty [eval] must parse");
+    assert!((config.eval.floor - 0.70).abs() < f32::EPSILON);
 }
 
 // ============================================================================
@@ -1340,6 +1572,27 @@ fn test_example_toml_tickets_section() {
     );
 }
 
+// Migrated from inert_config_wiring_tests.rs
+#[test]
+fn test_config_defaults() {
+    // AgentScaffoldConfig defaults
+    let scaffold_config = baco::config::AgentScaffoldConfig::default();
+    assert_eq!(scaffold_config.max_rounds, 5);
+    assert_eq!(scaffold_config.paths_per_target, 3);
+    assert!(!scaffold_config.enabled);
+
+    // AgentFlowConfig defaults
+    let agent_flow_config = baco::config::AgentFlowConfig::default();
+    assert_eq!(agent_flow_config.max_iterations, 10);
+    assert!(!agent_flow_config.requires_instrumented_target);
+    assert!(!agent_flow_config.enabled);
+
+    // NormalizationConfig defaults
+    let norm_config = baco::config::NormalizationConfig::default();
+    assert!(!norm_config.enabled);
+    assert!(norm_config.project_baseline_path.is_none());
+}
+
 #[test]
 #[serial]
 fn test_apply_env_overrides_explicit_wins() {
@@ -1567,6 +1820,224 @@ fn test_apply_env_overrides_scan_path() {
 // ============================================================================
 // New Phase Environment Override Tests (static_analysis, security_agent_verification, threat_modeling)
 // ============================================================================
+
+#[test]
+#[serial]
+fn test_env_overrides_all_six_llm_phases() {
+    // Test all six LLM phase keys: discovery, verification, aggregation,
+    // static_analysis, security_agent_verification, threat_modeling
+    let mut guard = EnvVarGuard::new();
+    guard.set("LLM_DISCOVERY_KEY", "env-discovery-key");
+    guard.set("LLM_VERIFICATION_KEY", "env-verification-key");
+    guard.set("LLM_AGGREGATION_KEY", "env-aggregation-key");
+    guard.set("LLM_STATIC_ANALYSIS_KEY", "env-static-analysis-key");
+    guard.set(
+        "LLM_SECURITY_AGENT_VERIFICATION_KEY",
+        "env-security-agent-verification-key",
+    );
+    guard.set("LLM_THREAT_MODELING_KEY", "env-threat-modeling-key");
+
+    let toml_str = base_config_toml();
+    let mut config: ScannerConfig = toml::from_str(&toml_str).unwrap();
+    apply_env_overrides(&mut config);
+
+    assert_eq!(
+        config.llm.phases.discovery.api_key.as_deref(),
+        Some("env-discovery-key"),
+        "discovery phase key"
+    );
+    assert_eq!(
+        config.llm.phases.verification.api_key.as_deref(),
+        Some("env-verification-key"),
+        "verification phase key"
+    );
+    assert_eq!(
+        config.llm.phases.aggregation.api_key.as_deref(),
+        Some("env-aggregation-key"),
+        "aggregation phase key"
+    );
+    assert_eq!(
+        config.llm.phases.static_analysis.api_key.as_deref(),
+        Some("env-static-analysis-key"),
+        "static_analysis phase key"
+    );
+    assert_eq!(
+        config
+            .llm
+            .phases
+            .security_agent_verification
+            .api_key
+            .as_deref(),
+        Some("env-security-agent-verification-key"),
+        "security_agent_verification phase key"
+    );
+    assert_eq!(
+        config.llm.phases.threat_modeling.api_key.as_deref(),
+        Some("env-threat-modeling-key"),
+        "threat_modeling phase key"
+    );
+}
+
+#[test]
+#[serial]
+fn test_env_overrides_unset_phases_untouched() {
+    // When env vars are not set, phases should remain None
+    let mut guard = EnvVarGuard::new();
+    guard.clear("LLM_DISCOVERY_KEY");
+    guard.clear("LLM_VERIFICATION_KEY");
+    guard.clear("LLM_AGGREGATION_KEY");
+    guard.clear("LLM_STATIC_ANALYSIS_KEY");
+    guard.clear("LLM_SECURITY_AGENT_VERIFICATION_KEY");
+    guard.clear("LLM_THREAT_MODELING_KEY");
+
+    let toml_str = base_config_toml();
+    let mut config: ScannerConfig = toml::from_str(&toml_str).unwrap();
+    apply_env_overrides(&mut config);
+
+    assert!(
+        config.llm.phases.discovery.api_key.is_none(),
+        "discovery should remain None"
+    );
+    assert!(
+        config.llm.phases.verification.api_key.is_none(),
+        "verification should remain None"
+    );
+    assert!(
+        config.llm.phases.aggregation.api_key.is_none(),
+        "aggregation should remain None"
+    );
+    assert!(
+        config.llm.phases.static_analysis.api_key.is_none(),
+        "static_analysis should remain None"
+    );
+    assert!(
+        config
+            .llm
+            .phases
+            .security_agent_verification
+            .api_key
+            .is_none(),
+        "security_agent_verification should remain None"
+    );
+    assert!(
+        config.llm.phases.threat_modeling.api_key.is_none(),
+        "threat_modeling should remain None"
+    );
+}
+
+#[test]
+#[serial]
+fn test_env_overrides_explicit_toml_wins() {
+    // When TOML has explicit value, env var should not override
+    let mut guard = EnvVarGuard::new();
+    guard.set("LLM_DISCOVERY_KEY", "env-key");
+    guard.set("LLM_VERIFICATION_KEY", "env-key");
+    guard.set("LLM_AGGREGATION_KEY", "env-key");
+    guard.set("LLM_STATIC_ANALYSIS_KEY", "env-key");
+    guard.set("LLM_SECURITY_AGENT_VERIFICATION_KEY", "env-key");
+    guard.set("LLM_THREAT_MODELING_KEY", "env-key");
+
+    let toml_str = r#"
+        [project]
+        name = "test"
+        path = "/tmp/test"
+
+        [output]
+        dir = "./out"
+
+        [scanner]
+        max_file_size_kb = 100
+
+        [llm]
+        timeout_secs = 30
+        max_retries = 2
+        retry_backoff_ms = 1000
+
+        [llm.phases.discovery]
+        base_url = "http://test"
+        api_key = "explicit-discovery"
+
+        [llm.phases.verification]
+        base_url = "http://test"
+        api_key = "explicit-verification"
+
+        [llm.phases.aggregation]
+        base_url = "http://test"
+        api_key = "explicit-aggregation"
+
+        [llm.phases.static_analysis]
+        base_url = "http://test"
+        api_key = "explicit-static"
+
+        [llm.phases.security_agent_verification]
+        base_url = "http://test"
+        api_key = "explicit-security-agent"
+
+        [llm.phases.threat_modeling]
+        base_url = "http://test"
+        api_key = "explicit-threat"
+    "#;
+
+    let mut config: ScannerConfig = toml::from_str(toml_str).unwrap();
+    apply_env_overrides(&mut config);
+
+    assert_eq!(
+        config.llm.phases.discovery.api_key,
+        Some("explicit-discovery".to_string())
+    );
+    assert_eq!(
+        config.llm.phases.verification.api_key,
+        Some("explicit-verification".to_string())
+    );
+    assert_eq!(
+        config.llm.phases.aggregation.api_key,
+        Some("explicit-aggregation".to_string())
+    );
+    assert_eq!(
+        config.llm.phases.static_analysis.api_key,
+        Some("explicit-static".to_string())
+    );
+    assert_eq!(
+        config.llm.phases.security_agent_verification.api_key,
+        Some("explicit-security-agent".to_string())
+    );
+    assert_eq!(
+        config.llm.phases.threat_modeling.api_key,
+        Some("explicit-threat".to_string())
+    );
+}
+
+#[test]
+#[serial]
+fn test_env_overrides_partial_set() {
+    // Only some env vars set - others should remain None
+    let mut guard = EnvVarGuard::new();
+    guard.set("LLM_DISCOVERY_KEY", "env-discovery");
+    guard.set("LLM_STATIC_ANALYSIS_KEY", "env-static");
+    // Leave others unset
+
+    let toml_str = base_config_toml();
+    let mut config: ScannerConfig = toml::from_str(&toml_str).unwrap();
+    apply_env_overrides(&mut config);
+
+    assert_eq!(
+        config.llm.phases.discovery.api_key.as_deref(),
+        Some("env-discovery")
+    );
+    assert_eq!(
+        config.llm.phases.static_analysis.api_key.as_deref(),
+        Some("env-static")
+    );
+    assert!(config.llm.phases.verification.api_key.is_none());
+    assert!(config.llm.phases.aggregation.api_key.is_none());
+    assert!(config
+        .llm
+        .phases
+        .security_agent_verification
+        .api_key
+        .is_none());
+    assert!(config.llm.phases.threat_modeling.api_key.is_none());
+}
 
 #[test]
 #[serial]

@@ -230,3 +230,141 @@ fn test_all_cwe_mappings_have_corresponding_prompts() {
         );
     }
 }
+
+// ============================================================================
+// ADDITIONAL ROUTER HUNT WIRING TESTS
+// ============================================================================
+
+/// Test all shipped domains have CWE mappings
+#[test]
+fn test_all_shipped_domains_have_cwe_mappings() {
+    use baco::router::CweRouter;
+
+    let router = CweRouter::default();
+
+    // Test all shipped domains
+    let domain_tests = vec![
+        ("injection", vec!["CWE-89", "CWE-78", "CWE-90", "CWE-119"]),
+        ("xss", vec!["CWE-79", "CWE-80"]),
+        ("auth", vec!["CWE-287", "CWE-285", "CWE-290"]),
+        ("path_traversal", vec!["CWE-22", "CWE-23", "CWE-36"]),
+        ("crypto", vec!["CWE-327", "CWE-328", "CWE-757"]),
+        ("resource", vec!["CWE-400", "CWE-770", "CWE-190"]),
+        ("deserialization", vec!["CWE-502", "CWE-503", "CWE-20"]),
+    ];
+
+    for (expected_domain, cwe_ids) in domain_tests {
+        for cwe_id in cwe_ids {
+            let route = router.route_cwe(cwe_id);
+            assert_eq!(
+                route.domain,
+                Some(expected_domain.to_string()),
+                "{} should map to {} domain",
+                cwe_id,
+                expected_domain
+            );
+        }
+    }
+}
+
+/// Test lane discipline text presence in hunt prompts
+#[test]
+fn test_hunt_prompts_contain_lane_discipline_text() {
+    use baco::prompt::engine::PromptEngine;
+
+    let engine = PromptEngine::new();
+
+    // All hunt prompts should contain lane discipline markers
+    let cwe_tests = vec![
+        ("CWE-89", "injection"),
+        ("CWE-79", "xss"),
+        ("CWE-287", "auth"),
+        ("CWE-22", "path_traversal"),
+        ("CWE-327", "crypto"),
+        ("CWE-400", "resource"),
+        ("CWE-502", "deserialization"),
+    ];
+
+    for (cwe_id, domain) in cwe_tests {
+        let prompt = engine.hunt_prompt_for_cwe(cwe_id);
+        if let Some(content) = prompt {
+            // Check for argus work marker or similar lane discipline text
+            let has_lane_text = content.contains("Scope")
+                || content.contains("lane")
+                || content.contains("boundaries");
+            assert!(
+                has_lane_text,
+                "{} prompt ({}) should contain lane discipline text",
+                domain, cwe_id
+            );
+        } else {
+            panic!("{} should have a prompt for {} domain", cwe_id, domain);
+        }
+    }
+}
+
+/// Test unknown CWE fallback behavior
+#[test]
+fn test_unknown_cwe_fallback_graceful() {
+    use baco::router::CweRouter;
+
+    let router = CweRouter::default();
+
+    // Various unknown CWE patterns
+    let unknown_cwes = vec!["CWE-999999", "CWE-0", "CWE-9999", "CWE-invalid"];
+
+    for cwe_id in unknown_cwes {
+        let route = router.route_cwe(cwe_id);
+        assert_eq!(
+            route.domain, None,
+            "Unknown CWE {} should return None domain",
+            cwe_id
+        );
+        assert_eq!(route.model_override, None);
+    }
+}
+
+/// Test CWE mapping edge cases
+#[test]
+fn test_cwe_mapping_edge_cases() {
+    use baco::prompt::templates::cwe_to_hunt_domain;
+
+    // Edge case CWEs
+    assert_eq!(cwe_to_hunt_domain("CWE-1"), None, "CWE-1 is too generic");
+    assert_eq!(
+        cwe_to_hunt_domain("CWE-1000"),
+        None,
+        "High CWE numbers usually unmapped"
+    );
+    assert_eq!(
+        cwe_to_hunt_domain(""),
+        None,
+        "Empty string should return None"
+    );
+    assert_eq!(
+        cwe_to_hunt_domain("INVALID"),
+        None,
+        "Invalid format should return None"
+    );
+}
+
+/// Test router consistency: same CWE always returns same domain
+#[test]
+fn test_router_consistency_same_cwe_same_domain() {
+    use baco::router::CweRouter;
+
+    let router1 = CweRouter::default();
+    let router2 = CweRouter::default();
+
+    let test_cwes = vec!["CWE-79", "CWE-89", "CWE-287", "CWE-22"];
+
+    for cwe_id in test_cwes {
+        let route1 = router1.route_cwe(cwe_id);
+        let route2 = router2.route_cwe(cwe_id);
+
+        assert_eq!(
+            route1.domain, route2.domain,
+            "Same CWE should return same domain across router instances"
+        );
+    }
+}

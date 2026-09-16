@@ -84,11 +84,6 @@ fn test_scan_phase_root_cause_dedup() {
 }
 
 #[test]
-fn test_scan_phase_multi_verifier() {
-    assert_eq!(format!("{:?}", ScanPhase::MultiVerifier), "MultiVerifier");
-}
-
-#[test]
 fn test_scan_phase_auto_patching() {
     assert_eq!(format!("{:?}", ScanPhase::AutoPatching), "AutoPatching");
 }

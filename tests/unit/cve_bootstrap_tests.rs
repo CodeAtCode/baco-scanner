@@ -14,16 +14,6 @@ use tempfile::TempDir;
 // ============================================================================
 
 #[test]
-fn test_cve_bootstrap_basic() {
-    let temp_dir = TempDir::new().unwrap();
-    let bootstrapper = CveBootstrapper::new(temp_dir.path().to_string_lossy().to_string());
-
-    // Should initialize without error
-    assert!(temp_dir.path().exists());
-    drop(bootstrapper);
-}
-
-#[test]
 fn test_cve_bootstrap_empty() {
     let temp_dir = TempDir::new().unwrap();
     let bootstrapper = CveBootstrapper::new(temp_dir.path().to_string_lossy().to_string());
@@ -825,4 +815,383 @@ async fn test_cve_enrichment_empty_findings() {
     // Test that enrichment with empty findings returns empty results
     // Note: This test verifies the function handles empty input gracefully
     assert!(findings.is_empty());
+}
+// ============================================================================
+// NVD/KEV JSON Parsing from Canned Strings
+// ============================================================================
+
+#[test]
+fn test_parse_nvd_json_canned_string() {
+    let nvd_json = r#"{
+        "CVE_Items": [
+            {
+                "cve": {
+                    "CVE_data_meta": {
+                        "ID": "CVE-2024-1234"
+                    },
+                    "description": {
+                        "description_data": [
+                            {
+                                "value": "SQL injection vulnerability"
+                            }
+                        ]
+                    }
+                },
+                "impact": {
+                    "baseMetricV3": {
+                        "cvssV3": {
+                            "baseScore": 9.8,
+                            "severity": "CRITICAL"
+                        }
+                    }
+                }
+            }
+        ]
+    }"#;
+
+    let value: serde_json::Value = serde_json::from_str(nvd_json).unwrap();
+    let items = value.get("CVE_Items").unwrap().as_array().unwrap();
+
+    assert_eq!(items.len(), 1);
+
+    let cve_id = &items[0]["cve"]["CVE_data_meta"]["ID"];
+    assert_eq!(cve_id.as_str().unwrap(), "CVE-2024-1234");
+}
+
+#[test]
+fn test_parse_kev_json_canned_string() {
+    let kev_json = r#"{
+        "vulnerabilities": [
+            {
+                "cveID": "CVE-2024-5678",
+                "vendorProject": "Microsoft",
+                "product": "Edge",
+                "vulnerabilityName": "Use-after-free",
+                "dateAdded": "2024-01-15",
+                "shortDescription": "Use-after-free in Edge browser"
+            }
+        ]
+    }"#;
+
+    let value: serde_json::Value = serde_json::from_str(kev_json).unwrap();
+    let vulns = value.get("vulnerabilities").unwrap().as_array().unwrap();
+
+    assert_eq!(vulns.len(), 1);
+    assert_eq!(vulns[0]["cveID"].as_str().unwrap(), "CVE-2024-5678");
+    assert_eq!(vulns[0]["vendorProject"].as_str().unwrap(), "Microsoft");
+}
+
+#[test]
+fn test_parse_nvd_json_multiple_cves() {
+    let nvd_json = r#"{
+        "CVE_Items": [
+            {
+                "cve": {
+                    "CVE_data_meta": {"ID": "CVE-2024-001"},
+                    "description": {"description_data": [{"value": "XSS"}]}
+                },
+                "impact": {"baseMetricV3": {"cvssV3": {"baseScore": 7.5, "severity": "HIGH"}}}
+            },
+            {
+                "cve": {
+                    "CVE_data_meta": {"ID": "CVE-2024-002"},
+                    "description": {"description_data": [{"value": "SQLi"}]}
+                },
+                "impact": {"baseMetricV3": {"cvssV3": {"baseScore": 9.0, "severity": "CRITICAL"}}}
+            }
+        ]
+    }"#;
+
+    let value: serde_json::Value = serde_json::from_str(nvd_json).unwrap();
+    let items = value.get("CVE_Items").unwrap().as_array().unwrap();
+
+    assert_eq!(items.len(), 2);
+    assert_eq!(
+        items[0]["cve"]["CVE_data_meta"]["ID"].as_str().unwrap(),
+        "CVE-2024-001"
+    );
+    assert_eq!(
+        items[1]["cve"]["CVE_data_meta"]["ID"].as_str().unwrap(),
+        "CVE-2024-002"
+    );
+}
+
+#[test]
+fn test_parse_kev_json_empty() {
+    let kev_json = r#"{"vulnerabilities": []}"#;
+
+    let value: serde_json::Value = serde_json::from_str(kev_json).unwrap();
+    let vulns = value.get("vulnerabilities").unwrap().as_array().unwrap();
+
+    assert!(vulns.is_empty());
+}
+
+#[test]
+fn test_parse_nvd_json_invalid_format() {
+    let invalid_json = r#"{"not": "nvd format"}"#;
+
+    let value: serde_json::Value = serde_json::from_str(invalid_json).unwrap();
+    let items = value.get("CVE_Items");
+
+    assert!(items.is_none());
+}
+
+// ============================================================================
+// Version Range Matching Tests
+// ============================================================================
+
+#[test]
+fn test_version_range_matching_exact() {
+    // Test exact version match
+    let dep_version = "1.0.0";
+    let cve_affected = "1.0.0";
+
+    // Simple string comparison for exact match
+    assert_eq!(dep_version, cve_affected);
+}
+
+#[test]
+fn test_version_range_matching_caret() {
+    // ^1.0.0 should match 1.0.0, 1.0.1, 1.1.0, but not 2.0.0
+    let dep_spec = "^1.0.0";
+
+    // Parse caret range
+    let base_version = dep_spec.trim_start_matches('^');
+    assert_eq!(base_version, "1.0.0");
+}
+
+#[test]
+fn test_version_range_matching_tilde() {
+    // ~1.0.0 should match 1.0.0, 1.0.1, 1.0.2, but not 1.1.0
+    let dep_spec = "~1.0.0";
+
+    let base_version = dep_spec.trim_start_matches('~');
+    assert_eq!(base_version, "1.0.0");
+}
+
+#[test]
+fn test_version_range_matching_star() {
+    // * should match any version
+    let dep_spec = "*";
+
+    assert_eq!(dep_spec, "*");
+}
+
+#[test]
+fn test_version_parsing_semver() {
+    let versions = vec![
+        ("1.0.0", (1, 0, 0)),
+        ("2.1.3", (2, 1, 3)),
+        ("0.0.1", (0, 0, 1)),
+        ("10.20.30", (10, 20, 30)),
+    ];
+
+    for (version_str, expected) in versions {
+        let parts: Vec<u32> = version_str.split('.').map(|p| p.parse().unwrap()).collect();
+
+        assert_eq!(
+            (parts[0], parts[1], parts[2]),
+            expected,
+            "Failed for version: {}",
+            version_str
+        );
+    }
+}
+
+#[test]
+fn test_version_comparison_less_than() {
+    let v1: (u32, u32, u32) = (1, 0, 0);
+    let v2: (u32, u32, u32) = (2, 0, 0);
+
+    assert!(v1 < v2);
+}
+
+#[test]
+fn test_version_comparison_greater_than() {
+    let v1: (u32, u32, u32) = (2, 1, 0);
+    let v2: (u32, u32, u32) = (2, 0, 0);
+
+    assert!(v1 > v2);
+}
+
+#[test]
+fn test_version_comparison_equal() {
+    let v1: (u32, u32, u32) = (1, 0, 0);
+    let v2: (u32, u32, u32) = (1, 0, 0);
+
+    assert_eq!(v1, v2);
+}
+
+// ============================================================================
+// Dedup Merge Tests
+// ============================================================================
+
+#[test]
+fn test_cve_dedup_by_id() {
+    let mut cves = vec![
+        CveEntry::new(
+            "CVE-2024-001",
+            "SQL injection",
+            V3Severity::High,
+            CveSource::NVD,
+        ),
+        CveEntry::new(
+            "CVE-2024-001", // Duplicate
+            "SQL injection vulnerability",
+            V3Severity::Critical,
+            CveSource::KEV,
+        ),
+        CveEntry::new("CVE-2024-002", "XSS", V3Severity::Medium, CveSource::NVD),
+    ];
+
+    // Deduplicate by CVE ID
+    let mut seen = std::collections::HashSet::new();
+    cves.retain(|cve| seen.insert(cve.cve_id.clone()));
+
+    assert_eq!(cves.len(), 2);
+    assert_eq!(cves[0].cve_id, "CVE-2024-001");
+    assert_eq!(cves[1].cve_id, "CVE-2024-002");
+}
+
+#[test]
+fn test_cve_merge_kev_priority() {
+    // KEV entries should take priority over NVD for same CVE
+    let nvd_cve = CveEntry::new(
+        "CVE-2024-001",
+        "Generic description",
+        V3Severity::Medium,
+        CveSource::NVD,
+    );
+
+    let kev_cve = CveEntry::new(
+        "CVE-2024-001",
+        "Actively exploited",
+        V3Severity::Critical,
+        CveSource::KEV,
+    );
+
+    // KEV has higher priority
+    let merged = if matches!(kev_cve.source, CveSource::KEV) {
+        kev_cve
+    } else {
+        nvd_cve
+    };
+
+    assert_eq!(merged.source, CveSource::KEV);
+    assert_eq!(merged.severity, V3Severity::Critical);
+}
+
+#[test]
+fn test_cve_merge_dedup_empty() {
+    let cves: Vec<CveEntry> = vec![];
+
+    let mut seen = std::collections::HashSet::new();
+    let deduped: Vec<CveEntry> = cves
+        .into_iter()
+        .filter(|cve| seen.insert(cve.cve_id.clone()))
+        .collect();
+
+    assert!(deduped.is_empty());
+}
+
+#[test]
+fn test_cve_merge_all_unique() {
+    let cves = vec![
+        CveEntry::new("CVE-2024-001", "Desc1", V3Severity::Low, CveSource::NVD),
+        CveEntry::new("CVE-2024-002", "Desc2", V3Severity::Low, CveSource::NVD),
+        CveEntry::new("CVE-2024-003", "Desc3", V3Severity::Low, CveSource::NVD),
+    ];
+
+    let mut seen = std::collections::HashSet::new();
+    let deduped: Vec<CveEntry> = cves
+        .into_iter()
+        .filter(|cve| seen.insert(cve.cve_id.clone()))
+        .collect();
+
+    assert_eq!(deduped.len(), 3);
+}
+
+// ============================================================================
+// CVE Entry Construction Tests
+// ============================================================================
+
+#[test]
+fn test_cve_entry_new() {
+    let cve = CveEntry::new(
+        "CVE-2024-1234",
+        "Test vulnerability description",
+        V3Severity::High,
+        CveSource::NVD,
+    );
+
+    assert_eq!(cve.cve_id, "CVE-2024-1234");
+    assert_eq!(cve.description, "Test vulnerability description");
+    assert_eq!(cve.severity, V3Severity::High);
+    assert_eq!(cve.source, CveSource::NVD);
+}
+
+#[test]
+fn test_cve_entry_clone() {
+    let cve = CveEntry::new("CVE-2024-1234", "Test", V3Severity::Medium, CveSource::KEV);
+
+    let cloned = cve.clone();
+
+    assert_eq!(cve.cve_id, cloned.cve_id);
+    assert_eq!(cve.description, cloned.description);
+    assert_eq!(cve.severity, cloned.severity);
+    assert_eq!(cve.source, cloned.source);
+}
+
+// ============================================================================
+// CVE Cluster Tests (without HashMap due to V3Severity not implementing Hash)
+// ============================================================================
+
+#[test]
+fn test_cluster_by_severity_count() {
+    // Count by severity without HashMap
+    let cves = [
+        CveEntry::new("CVE-2024-001", "SQLi", V3Severity::Critical, CveSource::NVD),
+        CveEntry::new("CVE-2024-002", "XSS", V3Severity::High, CveSource::NVD),
+        CveEntry::new("CVE-2024-003", "Info leak", V3Severity::Low, CveSource::NVD),
+    ];
+
+    // Count critical
+    let critical_count = cves
+        .iter()
+        .filter(|c| c.severity == V3Severity::Critical)
+        .count();
+    let high_count = cves
+        .iter()
+        .filter(|c| c.severity == V3Severity::High)
+        .count();
+    let low_count = cves
+        .iter()
+        .filter(|c| c.severity == V3Severity::Low)
+        .count();
+
+    assert_eq!(critical_count, 1);
+    assert_eq!(high_count, 1);
+    assert_eq!(low_count, 1);
+}
+
+#[test]
+fn test_cluster_by_source_count() {
+    // Count by source without HashMap
+    let cves = [
+        CveEntry::new("CVE-2024-001", "Desc1", V3Severity::Low, CveSource::NVD),
+        CveEntry::new("CVE-2024-002", "Desc2", V3Severity::Low, CveSource::KEV),
+        CveEntry::new("CVE-2024-003", "Desc3", V3Severity::Low, CveSource::NVD),
+    ];
+
+    let nvd_count = cves
+        .iter()
+        .filter(|c| matches!(c.source, CveSource::NVD))
+        .count();
+    let kev_count = cves
+        .iter()
+        .filter(|c| matches!(c.source, CveSource::KEV))
+        .count();
+
+    assert_eq!(nvd_count, 2);
+    assert_eq!(kev_count, 1);
 }

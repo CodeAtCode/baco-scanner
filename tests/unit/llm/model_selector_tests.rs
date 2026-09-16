@@ -265,3 +265,47 @@ fn test_selector_deterministic_behavior() {
         assert_eq!(&results[0], result);
     }
 }
+
+// ============================================================================
+// Additional Edge Case Tests
+// ============================================================================
+
+#[test]
+fn test_selector_with_very_large_model_count() {
+    let models: Vec<String> = (0..1000).map(|i| format!("model-{}", i)).collect();
+    let selector = AtomicModelSelector::new(models.clone());
+
+    // Should handle large counts without overflow
+    for i in 0..10000 {
+        let model = selector.next();
+        let expected_idx = i % 1000;
+        assert_eq!(model, format!("model-{}", expected_idx));
+    }
+}
+
+#[test]
+fn test_selector_all_models_returns_clone() {
+    let selector = AtomicModelSelector::new(vec!["a".to_string(), "b".to_string()]);
+
+    let mut models1 = selector.all_models();
+    let models2 = selector.all_models();
+
+    // Should return independent clones
+    assert_eq!(models1, models2);
+    models1.push("c".to_string());
+    assert_eq!(selector.all_models().len(), 2); // Original unchanged
+}
+
+#[test]
+fn test_selector_next_after_many_calls() {
+    let selector = AtomicModelSelector::new(vec!["x".to_string(), "y".to_string()]);
+
+    // Make many calls
+    for _ in 0..1000000 {
+        let _ = selector.next();
+    }
+
+    // Should still work correctly (atomic operations are thread-safe)
+    assert_eq!(selector.next(), "x");
+    assert_eq!(selector.next(), "y");
+}

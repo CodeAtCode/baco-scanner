@@ -12,7 +12,7 @@
 
 use baco::config::{PromptSpec, RouterConfig};
 use baco::findings::Severity;
-use baco::router::CweRouter;
+use baco::router::{CweRouter, DomainConfig, RouterRegistry};
 use std::collections::HashMap;
 
 /// Create a test finding with specific CWE ID and file path
@@ -327,4 +327,144 @@ fn test_route_cwe_unknown() {
     let route = router.route_cwe("CWE-999999");
     assert_eq!(route.domain, None);
     assert_eq!(route.model_override, None);
+}
+// ============================================================================
+// Additional tests: registry merge + override precedence
+// ============================================================================
+
+#[test]
+fn test_router_registry_merge_default_with_config() {
+    let mut cwe_overrides = HashMap::new();
+    cwe_overrides.insert(
+        "CWE-79".to_string(),
+        PromptSpec {
+            prompt_template: "xss_custom".to_string(),
+            model_override: Some("custom-xss-model".to_string()),
+        },
+    );
+
+    let config = RouterConfig {
+        enabled: true,
+        default_prompt: "llm_static_analysis".to_string(),
+        cwe_overrides,
+        language_overrides: HashMap::new(),
+    };
+
+    let router = CweRouter::from_config(&config);
+
+    let route = router.route_cwe("CWE-79");
+    assert_eq!(route.domain, Some("xss".to_string()));
+    assert_eq!(route.model_override, Some("custom-xss-model".to_string()));
+}
+
+#[test]
+fn test_router_domain_fallback_when_no_override() {
+    let router = CweRouter::default();
+
+    let route = router.route_cwe("CWE-89");
+    assert_eq!(route.domain, Some("injection".to_string()));
+    assert_eq!(route.model_override, None);
+}
+
+#[test]
+fn test_router_registry_add_domain() {
+    let mut registry = RouterRegistry::new();
+
+    let config = DomainConfig {
+        model_override: Some("test-model".to_string()),
+    };
+
+    registry.add_domain("test-domain".to_string(), config);
+
+    let retrieved = registry.get_domain("test-domain");
+    assert!(retrieved.is_some());
+    assert_eq!(
+        retrieved.unwrap().model_override,
+        Some("test-model".to_string())
+    );
+}
+
+#[test]
+fn test_router_registry_get_nonexistent_domain() {
+    let registry = RouterRegistry::new();
+
+    let retrieved = registry.get_domain("nonexistent");
+    assert!(retrieved.is_none());
+}
+
+#[test]
+fn test_router_registry_multiple_domains() {
+    let mut registry = RouterRegistry::new();
+
+    registry.add_domain(
+        "domain1".to_string(),
+        DomainConfig {
+            model_override: Some("model1".to_string()),
+        },
+    );
+    registry.add_domain(
+        "domain2".to_string(),
+        DomainConfig {
+            model_override: None,
+        },
+    );
+    registry.add_domain(
+        "domain3".to_string(),
+        DomainConfig {
+            model_override: Some("model3".to_string()),
+        },
+    );
+
+    assert_eq!(
+        registry.get_domain("domain1").unwrap().model_override,
+        Some("model1".to_string())
+    );
+    assert_eq!(registry.get_domain("domain2").unwrap().model_override, None);
+    assert_eq!(
+        registry.get_domain("domain3").unwrap().model_override,
+        Some("model3".to_string())
+    );
+    assert!(registry.get_domain("domain4").is_none());
+}
+
+#[test]
+fn test_router_clone_preserves_config() {
+    let mut cwe_overrides = HashMap::new();
+    cwe_overrides.insert(
+        "CWE-79".to_string(),
+        PromptSpec {
+            prompt_template: "xss_specialized".to_string(),
+            model_override: Some("xss-model".to_string()),
+        },
+    );
+
+    let config = RouterConfig {
+        enabled: true,
+        default_prompt: "custom_prompt".to_string(),
+        cwe_overrides,
+        language_overrides: HashMap::new(),
+    };
+
+    let router1 = CweRouter::from_config(&config);
+    let router2 = router1.clone();
+
+    let route1 = router1.route_cwe("CWE-79");
+    let route2 = router2.route_cwe("CWE-79");
+
+    assert_eq!(route1.domain, route2.domain);
+    assert_eq!(route1.model_override, route2.model_override);
+    assert_eq!(router1.default_prompt(), router2.default_prompt());
+}
+
+#[test]
+fn test_router_default_prompt_access() {
+    let config = RouterConfig {
+        enabled: true,
+        default_prompt: "my_custom_prompt".to_string(),
+        cwe_overrides: HashMap::new(),
+        language_overrides: HashMap::new(),
+    };
+
+    let router = CweRouter::from_config(&config);
+    assert_eq!(router.default_prompt(), "my_custom_prompt");
 }

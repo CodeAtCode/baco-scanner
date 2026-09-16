@@ -405,3 +405,50 @@ fn test_render_finding_with_all_metadata() {
     assert!(html.contains("Statement range"));
     assert!(html.contains("Verification notes"));
 }
+// ============================================================================
+// render_finding_with_id tests (0 refs - pure function coverage)
+// ============================================================================
+
+#[test]
+fn test_render_finding_with_id_basic() {
+    use baco::report::html::finding_renderer::render_finding_with_id;
+
+    let finding = make_finding(Severity::High, "src/test.rs", Some(42));
+    let html = render_finding_with_id(&finding, "custom-id-123");
+
+    assert!(html.contains("id=\"custom-id-123\""));
+    assert!(html.contains("High"));
+    assert!(html.contains("src/test.rs"));
+}
+
+#[test]
+fn test_render_finding_with_id_preserves_all_finding_data() {
+    use baco::report::html::finding_renderer::render_finding_with_id;
+
+    let mut finding = make_finding(Severity::Critical, "src/vuln.rs", Some(100));
+    finding.title = "Critical Vulnerability".to_string();
+    finding.description = "This is a critical issue".to_string();
+    finding.cwe_id = Some("CWE-89".to_string());
+
+    let html = render_finding_with_id(&finding, "vuln-001");
+
+    assert!(html.contains("id=\"vuln-001\""));
+    assert!(html.contains("Critical Vulnerability"));
+    assert!(html.contains("CWE-89"));
+    assert!(html.contains(":100"));
+}
+
+#[test]
+fn test_render_finding_with_id_different_ids_produce_different_output() {
+    use baco::report::html::finding_renderer::render_finding_with_id;
+
+    let finding = make_finding(Severity::High, "src/test.rs", Some(42));
+
+    let html1 = render_finding_with_id(&finding, "id-one");
+    let html2 = render_finding_with_id(&finding, "id-two");
+
+    assert!(html1.contains("id=\"id-one\""));
+    assert!(html2.contains("id=\"id-two\""));
+    assert!(!html1.contains("id=\"id-two\""));
+    assert!(!html2.contains("id=\"id-one\""));
+}

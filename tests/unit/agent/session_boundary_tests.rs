@@ -120,10 +120,9 @@ async fn test_analyze_file_max_turns_zero_immediate_exit() {
     assert!(result.is_ok());
     let finding = result.unwrap();
 
-    // With max_turns=0, the loop should exit immediately at turn 1 > 0
-    // The turn counter increments first, then checks if turn > max_turns
-    // So it will be turn 1 when it breaks
-    assert!(finding.agent_turns >= 1);
+    // With max_turns=0 no turn runs; the loop exits before any LLM call
+    // and the recorded turn count stays at zero
+    assert_eq!(finding.agent_turns, 0);
     // Should be an empty/audit finding since no LLM response was processed
     assert!(finding.finding.title.is_empty() || finding.finding.title.contains("Security Audit"));
 }

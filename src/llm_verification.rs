@@ -8,6 +8,7 @@
 //! - Integration with AnalysisContext
 
 use crate::findings::{VerificationStatus, VulnerabilityFinding};
+use crate::llm::traits::AsyncLlmClient;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -191,24 +192,5 @@ where
                 confidence_adjustment: 0.0,
             })
         }
-    }
-}
-
-/// Trait for LLM clients used in triage
-#[async_trait::async_trait]
-pub trait AsyncLlmClient: Send + Sync {
-    async fn chat(
-        &self,
-        messages: &[crate::llm::ChatMessage],
-    ) -> Result<crate::llm::ChatResponseWithModel, crate::error::ScanError>;
-}
-
-#[async_trait::async_trait]
-impl AsyncLlmClient for crate::llm::LlmClient {
-    async fn chat(
-        &self,
-        messages: &[crate::llm::ChatMessage],
-    ) -> Result<crate::llm::ChatResponseWithModel, crate::error::ScanError> {
-        crate::llm::LlmClient::chat(self, messages).await
     }
 }

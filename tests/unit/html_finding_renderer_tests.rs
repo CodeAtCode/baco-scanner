@@ -653,6 +653,52 @@ fn test_render_finding_with_statement_range() {
 }
 
 #[test]
+fn test_render_finding_with_verification_notes_markdown() {
+    let mut finding = make_finding("f55", Severity::Medium, "src/test.rs", Some(10));
+    finding.verification_notes =
+        Some("Manual review confirmed\n- Checked inputs\n- Verified outputs".to_string());
+
+    let html = baco::report::html::finding_renderer::render_finding(&finding, 51);
+
+    assert!(html.contains("Verification notes"));
+    // Markdown should be converted to HTML
+    assert!(html.contains("Manual review confirmed"));
+}
+
+#[test]
+fn test_render_finding_verification_status_confirmed() {
+    let mut finding = make_finding("f55", Severity::Medium, "src/test.rs", Some(10));
+    finding.verification_status = Some(baco::findings::VerificationStatus::Confirmed);
+
+    let html = baco::report::html::finding_renderer::render_finding(&finding, 51);
+
+    assert!(html.contains("Verification"));
+    assert!(html.contains("confirmed"));
+}
+
+#[test]
+fn test_render_finding_verification_status_false_positive() {
+    let mut finding = make_finding("f55", Severity::Medium, "src/test.rs", Some(10));
+    finding.verification_status = Some(baco::findings::VerificationStatus::FalsePositive);
+
+    let html = baco::report::html::finding_renderer::render_finding(&finding, 51);
+
+    assert!(html.contains("Verification"));
+    assert!(html.contains("false_positive"));
+}
+
+#[test]
+fn test_render_finding_verification_status_needs_review() {
+    let mut finding = make_finding("f55", Severity::Medium, "src/test.rs", Some(10));
+    finding.verification_status = Some(baco::findings::VerificationStatus::NeedsReview);
+
+    let html = baco::report::html::finding_renderer::render_finding(&finding, 51);
+
+    assert!(html.contains("Verification"));
+    assert!(html.contains("needs_review"));
+}
+
+#[test]
 fn test_render_finding_with_verification_notes() {
     let mut finding = make_finding("f55", Severity::Medium, "src/test.rs", Some(10));
     finding.verification_notes = Some("Manual review confirmed".to_string());
@@ -686,6 +732,44 @@ fn test_render_finding_with_cross_file_references() {
     assert!(html.contains("Cross-file refs"));
     assert!(html.contains("src/utils.rs"));
     assert!(html.contains("src/lib.rs"));
+}
+
+#[test]
+fn test_render_finding_cross_file_references_escaped() {
+    let mut finding = make_finding("f57", Severity::High, "src/test.rs", Some(10));
+    finding.cross_file_references = Some(vec!["<script>evil.js</script>".to_string()]);
+
+    let html = baco::report::html::finding_renderer::render_finding(&finding, 53);
+
+    assert!(html.contains("Cross-file refs"));
+    assert!(!html.contains("<script>"));
+    assert!(html.contains("&lt;script&gt;"));
+}
+
+#[test]
+fn test_render_finding_notes_box_content_log_only() {
+    let mut finding = make_finding("f58", Severity::Medium, "src/test.rs", Some(10));
+    finding.verification_notes = Some("Log entry: manual review done".to_string());
+    finding.verification_status = Some(baco::findings::VerificationStatus::Confirmed);
+
+    let html = baco::report::html::finding_renderer::render_finding(&finding, 54);
+
+    // Notes box should show content without raw JSON
+    assert!(html.contains("Verification notes"));
+    assert!(html.contains("Log entry"));
+    assert!(!html.contains("{"));
+    assert!(!html.contains("}"));
+}
+
+#[test]
+fn test_render_finding_notes_box_content_test_passed() {
+    let mut finding = make_finding("f59", Severity::Medium, "src/test.rs", Some(10));
+    finding.verification_notes = Some("Test passed: exploit payload blocked".to_string());
+
+    let html = baco::report::html::finding_renderer::render_finding(&finding, 55);
+
+    assert!(html.contains("Verification notes"));
+    assert!(html.contains("Test passed"));
 }
 
 // ============================================================================

@@ -457,3 +457,206 @@ async fn test_verify_finding_error_messages_propagated_correctly() {
     assert!(log.contains("EACCES"));
     assert!(log.contains("permission denied"));
 }
+
+// ============================================================================
+// Test 9: Missing file guard - file_read on nonexistent path
+// Verify that missing file errors are handled correctly
+// ============================================================================
+
+#[tokio::test]
+async fn test_verify_finding_missing_file_guard() {
+    let responses = vec![
+        MockLlmClient::mock_tool_call(
+            "file_read",
+            json!({ "path": "nonexistent_file.rs" }),
+        ),
+        ChatResponse {
+            content: "Error: FILE_NOT_FOUND - nonexistent_file.rs does not exist\nCannot proceed with verification".to_string(),
+            tool_calls: vec![],
+            raw: json!({}),
+            model_used: "mock".to_string(),
+        },
+    ];
+
+    let mock_client = MockLlmClient::new(responses);
+    let (session, _tmpdir) = create_session(mock_client, 5, 30);
+
+    let finding = create_test_finding();
+    let result = session.verify_finding("test.rs", &finding).await;
+
+    assert!(result.is_ok());
+    let verified = result.unwrap();
+
+    assert_eq!(
+        verified.finding.verification_status,
+        Some(VerificationStatus::NeedsReview)
+    );
+    assert!(verified.test_log.is_some());
+    assert!(verified.test_log.unwrap().contains("FILE_NOT_FOUND"));
+}
+
+// ============================================================================
+// Test 10: Invalid JSON in tool response arguments
+// Verify that malformed JSON arguments are handled
+// ============================================================================
+
+#[tokio::test]
+async fn test_verify_finding_invalid_json_arguments() {
+    let responses = vec![
+        ChatResponse {
+            content: "".to_string(),
+            tool_calls: vec![baco::agent::ToolCall {
+                id: Some("call_1".to_string()),
+                name: "file_write".to_string(),
+                arguments: serde_json::json!({ "path": "test.py" }), // Missing required "content"
+            }],
+            raw: json!({}),
+            model_used: "mock".to_string(),
+        },
+        ChatResponse {
+            content:
+                "Error: Missing required field 'content' in file_write arguments\nCannot write file"
+                    .to_string(),
+            tool_calls: vec![],
+            raw: json!({}),
+            model_used: "mock".to_string(),
+        },
+    ];
+
+    let mock_client = MockLlmClient::new(responses);
+    let (session, _tmpdir) = create_session(mock_client, 5, 30);
+
+    let finding = create_test_finding();
+    let result = session.verify_finding("test.rs", &finding).await;
+
+    assert!(result.is_ok());
+    let verified = result.unwrap();
+
+    assert_eq!(
+        verified.finding.verification_status,
+        Some(VerificationStatus::NeedsReview)
+    );
+    assert!(verified.test_log.is_some());
+    assert!(verified.test_log.unwrap().contains("Missing required"));
+}
+
+// ============================================================================
+// Test 11: Sandbox escape attempt blocked
+// Verify that path traversal attempts are blocked
+// ============================================================================
+
+#[tokio::test]
+async fn test_verify_finding_sandbox_escape_blocked() {
+    let responses = vec![
+        MockLlmClient::mock_tool_call(
+            "file_read",
+            json!({ "path": "../../../etc/passwd" }),
+        ),
+        ChatResponse {
+            content: "Error: SANDBOX_VIOLATION - Path traversal attempt blocked\nSecurity guard rejected the request".to_string(),
+            tool_calls: vec![],
+            raw: json!({}),
+            model_used: "mock".to_string(),
+        },
+    ];
+
+    let mock_client = MockLlmClient::new(responses);
+    let (session, _tmpdir) = create_session(mock_client, 5, 30);
+
+    let finding = create_test_finding();
+    let result = session.verify_finding("test.rs", &finding).await;
+
+    assert!(result.is_ok());
+    let verified = result.unwrap();
+
+    assert_eq!(
+        verified.finding.verification_status,
+        Some(VerificationStatus::NeedsReview)
+    );
+    assert!(verified.test_log.is_some());
+    assert!(verified.test_log.unwrap().contains("SANDBOX_VIOLATION"));
+}
+
+// ============================================================================
+// Test 12: Compilation timeout
+// Verify that compilation timeouts are handled
+// ============================================================================
+
+#[tokio::test]
+async fn test_verify_finding_compilation_timeout() {
+    let responses = vec![
+        MockLlmClient::mock_tool_call(
+            "file_write",
+            json!({ "path": "slow_compile.rs", "content": "fn main() {}" }),
+        ),
+        MockLlmClient::mock_tool_call(
+            "test_compile",
+            json!({ "source_path": "slow_compile.rs", "language": "rust" }),
+        ),
+        ChatResponse {
+            content: "Compilation timed out after 30 seconds\nProcess was killed".to_string(),
+            tool_calls: vec![],
+            raw: json!({}),
+            model_used: "mock".to_string(),
+        },
+    ];
+
+    let mock_client = MockLlmClient::new(responses);
+    let (session, _tmpdir) = create_session(mock_client, 5, 30);
+
+    let finding = create_test_finding();
+    let result = session.verify_finding("test.rs", &finding).await;
+
+    assert!(result.is_ok());
+    let verified = result.unwrap();
+
+    assert_eq!(
+        verified.finding.verification_status,
+        Some(VerificationStatus::NeedsReview)
+    );
+    assert!(verified.test_log.is_some());
+    assert!(verified.test_log.unwrap().contains("timed out"));
+}
+
+// ============================================================================
+// Test 13: Test execution crash with core dump
+// Verify that crashes with core dumps are handled
+// ============================================================================
+
+#[tokio::test]
+async fn test_verify_finding_test_crash_with_core_dump() {
+    let responses = vec![
+        MockLlmClient::mock_tool_call(
+            "file_write",
+            json!({ "path": "crash_test.py", "content": "import os; os.abort()" }),
+        ),
+        MockLlmClient::mock_tool_call(
+            "test_run",
+            json!({ "executable_path": "crash_test.py", "timeout_secs": 10 }),
+        ),
+        ChatResponse {
+            content: "Test crashed with signal SIGABRT (6)\nCore dump generated at /tmp/core.12345"
+                .to_string(),
+            tool_calls: vec![],
+            raw: json!({}),
+            model_used: "mock".to_string(),
+        },
+    ];
+
+    let mock_client = MockLlmClient::new(responses);
+    let (session, _tmpdir) = create_session(mock_client, 5, 30);
+
+    let finding = create_test_finding();
+    let result = session.verify_finding("test.rs", &finding).await;
+
+    assert!(result.is_ok());
+    let verified = result.unwrap();
+
+    assert_eq!(
+        verified.finding.verification_status,
+        Some(VerificationStatus::NeedsReview)
+    );
+    assert!(verified.test_log.is_some());
+    let log = verified.test_log.unwrap();
+    assert!(log.contains("crashed") || log.contains("SIGABRT"));
+}

@@ -12,6 +12,7 @@ use std::path::PathBuf;
 
 fn create_test_config() -> ScannerConfig {
     ScannerConfig {
+        eval: Default::default(),
         project: baco::config::ProjectConfig {
             languages: vec!["rust".to_string()],
             ..Default::default()
@@ -78,7 +79,6 @@ fn test_scan_phase_all_variants_exist() {
         ScanPhase::Reporting,
         ScanPhase::ThreatModeling,
         ScanPhase::RootCauseDedup,
-        ScanPhase::MultiVerifier,
         ScanPhase::AutoPatching,
         ScanPhase::CveBootstrap,
         ScanPhase::PocCompiler,
@@ -90,7 +90,7 @@ fn test_scan_phase_all_variants_exist() {
         ScanPhase::Error,
     ];
 
-    assert_eq!(phases.len(), 26);
+    assert_eq!(phases.len(), 25);
 }
 
 #[test]

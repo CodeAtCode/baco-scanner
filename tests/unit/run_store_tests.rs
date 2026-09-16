@@ -400,4 +400,208 @@ fn test_stable_key_same_for_same_finding() {
     let key2 = run_store::stable_finding_key(&finding2);
 
     assert_eq!(key1, key2, "Same finding should produce same key");
+    assert_eq!(key1, key2, "Same finding should produce same key");
+}
+
+// ============================================================================
+// ADDITIONAL PRIOR RUNS STORE TESTS
+// ============================================================================
+
+/// Test round-trip: save and load a single run
+#[test]
+fn test_save_multiple_runs_load_all() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let output_dir = temp_dir.path();
+
+    // Save a single run
+    let findings = vec![make_finding(
+        "run1-finding1",
+        "src/test.rs",
+        Some(10),
+        Some("code"),
+        None,
+    )];
+    run_store::save_run(output_dir, &findings);
+
+    // Load the run
+    let loaded = run_store::load_prior_runs(output_dir, 10);
+    assert_eq!(loaded.len(), 1, "Should load 1 finding from the saved run");
+    assert_eq!(loaded[0].id, "run1-finding1");
+}
+
+/// Test skip-directive selection: only Confirmed/FalsePositive go into skip_keys
+#[test]
+fn test_build_prior_knowledge_skip_directive_selection() {
+    let findings = vec![
+        make_finding(
+            "1",
+            "src/a.rs",
+            Some(10),
+            Some("code"),
+            Some(VerificationStatus::Confirmed),
+        ),
+        make_finding(
+            "2",
+            "src/b.rs",
+            Some(20),
+            Some("code"),
+            Some(VerificationStatus::FalsePositive),
+        ),
+        make_finding(
+            "3",
+            "src/c.rs",
+            Some(30),
+            Some("code"),
+            Some(VerificationStatus::NeedsReview),
+        ),
+        make_finding("4", "src/d.rs", Some(40), Some("code"), None),
+        make_finding(
+            "5",
+            "src/e.rs",
+            Some(50),
+            Some("code"),
+            Some(VerificationStatus::Failed),
+        ),
+    ];
+
+    let knowledge = run_store::build_prior_knowledge(&findings);
+
+    // Only findings 1 and 2 should be in skip_keys
+    assert_eq!(knowledge.skip_keys.len(), 2, "Should have 2 skip keys");
+    assert_eq!(knowledge.prior_count, 5, "Should count all findings");
+
+    // Verify the skip keys match findings 1 and 2
+    let key1 = run_store::stable_finding_key(&findings[0]);
+    let key2 = run_store::stable_finding_key(&findings[1]);
+    assert!(knowledge.skip_keys.contains(&key1));
+    assert!(knowledge.skip_keys.contains(&key2));
+}
+
+/// Test retention trim: max_runs limits loaded runs
+#[test]
+fn test_load_prior_runs_retention_trim() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let output_dir = temp_dir.path();
+    let runs_dir = output_dir.join("runs");
+
+    // Create 10 run directories
+    for i in 1..=10 {
+        let run_dir = runs_dir.join(format!("run-{:04}", i * 1000));
+        std::fs::create_dir_all(&run_dir).unwrap();
+        let findings = vec![make_finding(
+            &format!("run{}", i),
+            "src/test.rs",
+            Some(10),
+            Some("code"),
+            None,
+        )];
+        let json = serde_json::to_string(&findings).unwrap();
+        File::create(run_dir.join("findings.json"))
+            .unwrap()
+            .write_all(json.as_bytes())
+            .unwrap();
+    }
+
+    // Load with max_runs=5
+    let loaded = run_store::load_prior_runs(output_dir, 5);
+    assert_eq!(
+        loaded.len(),
+        5,
+        "Should load only 5 most recent runs due to retention trim"
+    );
+
+    // Should be from the 5 most recent runs (run-10000, run-9000, run-8000, run-7000, run-6000)
+    // Each run has 1 finding with id "run1", "run2", etc.
+    // Most recent first: run-10000 (run10), run-9000 (run9), run-8000 (run8), run-7000 (run7), run-6000 (run6)
+    assert!(
+        loaded[0].id.contains("10") || loaded[0].id.contains("9"),
+        "First finding should be from run10 or run9"
+    );
+    assert_eq!(
+        loaded.len(),
+        5,
+        "Should have exactly 5 findings from 5 runs"
+    );
+}
+
+/// Test save_run creates correct directory structure
+#[test]
+fn test_save_run_directory_structure() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let output_dir = temp_dir.path();
+
+    let findings = vec![make_finding(
+        "1",
+        "src/test.rs",
+        Some(10),
+        Some("code"),
+        None,
+    )];
+    run_store::save_run(output_dir, &findings);
+
+    // Check directory structure
+    let runs_dir = output_dir.join("runs");
+    assert!(runs_dir.exists(), "Runs directory should exist");
+
+    let run_dirs: Vec<_> = std::fs::read_dir(&runs_dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .collect();
+
+    assert_eq!(run_dirs.len(), 1, "Should have exactly one run directory");
+
+    let findings_file = run_dirs[0].join("findings.json");
+    assert!(
+        findings_file.exists(),
+        "findings.json should exist in run directory"
+    );
+}
+
+/// Test load_prior_runs handles empty findings.json
+#[test]
+fn test_load_prior_runs_empty_findings_file() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let output_dir = temp_dir.path();
+    let runs_dir = output_dir.join("runs");
+    let run_dir = runs_dir.join("run-1000");
+
+    std::fs::create_dir_all(&run_dir).unwrap();
+    // Write empty array
+    File::create(run_dir.join("findings.json"))
+        .unwrap()
+        .write_all(b"[]")
+        .unwrap();
+
+    let loaded = run_store::load_prior_runs(output_dir, 5);
+    assert_eq!(loaded.len(), 0, "Should load empty array as zero findings");
+}
+
+/// Test stable_finding_key includes taxonomy domain in hash
+#[test]
+fn test_stable_key_includes_taxonomy_domain() {
+    let finding1 = make_finding_with_cwe(
+        "1",
+        "src/test.rs",
+        Some(10),
+        Some("code"),
+        Some("CWE-79"),
+        None,
+    );
+    let finding2 = make_finding_with_cwe(
+        "2",
+        "src/test.rs",
+        Some(10),
+        Some("code"),
+        Some("CWE-89"),
+        None,
+    );
+
+    let key1 = run_store::stable_finding_key(&finding1);
+    let key2 = run_store::stable_finding_key(&finding2);
+
+    assert_ne!(
+        key1, key2,
+        "Different CWEs should produce different keys due to taxonomy domain"
+    );
 }

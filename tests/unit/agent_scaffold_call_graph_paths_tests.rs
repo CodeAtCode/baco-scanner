@@ -9,11 +9,20 @@ use baco::agent_scaffold::call_graph_paths::{
 use baco::context::control_path::Language;
 
 fn create_temp_file(content: &str, ext: &str) -> PathBuf {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
     let mut temp_dir = std::env::temp_dir();
     temp_dir.push("baco_call_graph_test");
     let _ = fs::create_dir_all(&temp_dir);
 
-    let file_path = temp_dir.join(format!("test.{}", ext));
+    // Unique name per call — a fixed name made multi-file tests overwrite
+    // each other's sources under parallel execution
+    let file_path = temp_dir.join(format!(
+        "test-{}-{}.{}",
+        std::process::id(),
+        COUNTER.fetch_add(1, Ordering::Relaxed),
+        ext
+    ));
     let mut file = fs::File::create(&file_path).unwrap();
     file.write_all(content.as_bytes()).unwrap();
     file_path
@@ -236,4 +245,99 @@ fn test_call_graph_builder_unreadable_file() {
 
     // Should handle gracefully with empty graph
     assert!(graph.entry_points.is_empty());
+}
+
+#[test]
+fn test_call_graph_builder_with_multiple_files() {
+    let content1 = r#"
+fn main() {
+    helper_a();
+}
+
+fn helper_a() {
+    helper_b();
+}
+"#;
+
+    let content2 = r#"
+fn helper_b() {
+    println!("B");
+}
+"#;
+
+    let path1 = create_temp_file(content1, "rs");
+    let path2 = create_temp_file(content2, "rs");
+
+    let mut builder = CallGraphBuilder::new();
+    builder.add_source_file(&path1, Language::Rust);
+    builder.add_source_file(&path2, Language::Rust);
+    let graph = builder.build();
+
+    assert!(graph.entry_points.contains(&"main".to_string()));
+    assert!(graph.adjacency.contains_key("main"));
+
+    let _ = fs::remove_file(&path1);
+    let _ = fs::remove_file(&path2);
+}
+
+#[test]
+fn test_call_graph_entry_point_classification() {
+    let content = r#"
+fn main() {
+    entry_a();
+    entry_b();
+}
+
+fn entry_a() {
+    helper();
+}
+
+fn entry_b() {
+    helper();
+}
+
+fn helper() {
+    println!("helper");
+}
+"#;
+
+    let path = create_temp_file(content, "rs");
+    let mut builder = CallGraphBuilder::new();
+    builder.add_source_file(&path, Language::Rust);
+    let graph = builder.build();
+
+    // main is entry point, entry_a and entry_b are called by main
+    assert!(graph.entry_points.contains(&"main".to_string()));
+
+    let _ = fs::remove_file(&path);
+}
+
+#[test]
+fn test_random_dfs_shallow_path_preference() {
+    let mut adj = HashMap::new();
+    adj.insert("start".to_string(), vec!["a".to_string(), "b".to_string()]);
+    adj.insert("a".to_string(), vec!["target".to_string()]);
+    adj.insert("b".to_string(), vec!["target".to_string()]);
+
+    let mut visited = HashSet::new();
+    let mut path = vec!["start".to_string()];
+
+    // Should find a path (either through a or b)
+    let result = random_dfs("start", "target", &adj, &mut visited, &mut path, 10);
+    assert!(result.is_some());
+    let path = result.unwrap();
+    assert!(path.len() >= 2); // start -> something -> target
+}
+
+#[test]
+fn test_sample_paths_to_self_reference() {
+    let graph = CallGraph {
+        adjacency: HashMap::new(),
+        entry_points: vec!["self_ref".to_string()],
+    };
+
+    // Requesting path to self should return single-element path
+    let paths = graph.sample_paths_to("self_ref", 5);
+    assert_eq!(paths.len(), 1);
+    assert_eq!(paths[0].0, vec!["self_ref".to_string()]);
 }

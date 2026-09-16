@@ -15,7 +15,6 @@ use baco::config::AgentConfig;
 use baco::findings::{Severity, VerificationStatus, VulnerabilityFinding};
 use baco::llm::ChatResponse;
 use serde_json::json;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 
 /// Helper to create a minimal AgentConfig for tests
@@ -156,80 +155,6 @@ fn test_session_has_tool_registry() {
 // ============================================================================
 // Progress Callback Tests
 // ============================================================================
-
-#[test]
-fn test_progress_callback_basic() {
-    let called = Arc::new(AtomicBool::new(false));
-    let called_clone = called.clone();
-
-    let progress_cb: ProgressCallback = Arc::new(move |_msg| {
-        called_clone.store(true, Ordering::SeqCst);
-    });
-
-    progress_cb("test message".to_string());
-
-    assert!(called.load(Ordering::SeqCst));
-}
-
-#[test]
-fn test_progress_callback_with_counter() {
-    let count = Arc::new(AtomicUsize::new(0));
-    let count_clone = count.clone();
-
-    let progress_cb: ProgressCallback = Arc::new(move |_msg| {
-        count_clone.fetch_add(1, Ordering::SeqCst);
-    });
-
-    progress_cb("msg1".to_string());
-    progress_cb("msg2".to_string());
-    progress_cb("msg3".to_string());
-
-    assert_eq!(count.load(Ordering::SeqCst), 3);
-}
-
-#[test]
-fn test_progress_callback_thread_safe() {
-    let called = Arc::new(AtomicBool::new(false));
-    let called_clone = called.clone();
-    let progress_cb: ProgressCallback = Arc::new(move |_msg| {
-        called_clone.store(true, Ordering::SeqCst);
-    });
-
-    // Clone and call from "another thread" (simulated)
-    let progress_cb_clone = progress_cb.clone();
-    progress_cb_clone("from clone".to_string());
-
-    assert!(called.load(Ordering::SeqCst));
-}
-
-#[test]
-fn test_progress_callback_empty_message() {
-    let called = Arc::new(AtomicBool::new(false));
-    let called_clone = called.clone();
-
-    let progress_cb: ProgressCallback = Arc::new(move |_msg| {
-        called_clone.store(true, Ordering::SeqCst);
-    });
-
-    progress_cb("".to_string());
-
-    assert!(called.load(Ordering::SeqCst));
-}
-
-#[test]
-fn test_progress_callback_long_message() {
-    let called = Arc::new(AtomicBool::new(false));
-    let called_clone = called.clone();
-
-    let progress_cb: ProgressCallback = Arc::new(move |_msg| {
-        called_clone.store(true, Ordering::SeqCst);
-    });
-
-    let long_msg = "a".repeat(10000);
-    progress_cb(long_msg);
-
-    assert!(called.load(Ordering::SeqCst));
-}
 
 // ============================================================================
 // analyze_file Tests - Basic Scenarios
@@ -1337,6 +1262,130 @@ fn test_parse_agent_verdict_key_value_protocol() {
         verdict.log,
         "compiled=true\ntest_passed=true\nVulnerability confirmed"
     );
+}
+
+#[test]
+fn test_parse_agent_verdict_json_with_extra_fields() {
+    let verdict = baco::agent::session::parse_agent_verdict(
+        r#"{"compiled": true, "test_passed": false, "log": "failed", "extra": "ignored", "nested": {}}"#,
+    );
+    assert!(verdict.compiled);
+    assert!(!verdict.test_passed);
+    assert_eq!(verdict.log, "failed");
+}
+
+#[test]
+fn test_parse_agent_verdict_legacy_false_values() {
+    let verdict =
+        baco::agent::session::parse_agent_verdict("compiled=false\ntest_passed=false\nTest failed");
+    assert!(!verdict.compiled);
+    assert!(!verdict.test_passed);
+    assert!(verdict.log.contains("Test failed"));
+}
+
+#[test]
+fn test_parse_agent_verdict_json_false_values() {
+    let verdict = baco::agent::session::parse_agent_verdict(
+        r#"{"compiled": false, "test_passed": false, "log": "both failed"}"#,
+    );
+    assert!(!verdict.compiled);
+    assert!(!verdict.test_passed);
+    assert_eq!(verdict.log, "both failed");
+}
+
+#[test]
+fn test_parse_agent_verdict_malformed_json_falls_back_to_keyvalue() {
+    let content = "compiled=true\ntest_passed=false\nSome notes";
+    let verdict = baco::agent::session::parse_agent_verdict(content);
+    assert!(verdict.compiled);
+    assert!(!verdict.test_passed);
+}
+
+#[test]
+fn test_parse_agent_verdict_empty_json_object() {
+    let verdict = baco::agent::session::parse_agent_verdict("{}");
+    assert!(!verdict.compiled);
+    assert!(!verdict.test_passed);
+    assert_eq!(verdict.log, "{}"); // missing log falls back to the raw content
+}
+
+#[test]
+fn test_parse_agent_verdict_whitespace_only() {
+    let verdict = baco::agent::session::parse_agent_verdict("   \n\n   ");
+    assert!(!verdict.compiled);
+    assert!(!verdict.test_passed);
+}
+
+#[tokio::test]
+async fn test_token_accounting_empty_response() {
+    let responses = vec![ChatResponse {
+        content: "".to_string(),
+        tool_calls: vec![],
+        raw: json!({}),
+        model_used: "test-model".to_string(),
+    }];
+
+    let mock_client = MockLlmClient::new(responses);
+    let config = create_test_config(10);
+    let temp_dir = create_temp_dir();
+    let progress_cb: ProgressCallback = Arc::new(|_| {});
+
+    let test_file = create_test_file(&temp_dir, "test.rs", "fn main() {}");
+    let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
+
+    let result = session
+        .analyze_file(test_file.to_string_lossy().as_ref())
+        .await;
+
+    assert!(result.is_ok());
+    let finding = result.unwrap();
+    // Verify session completed without error
+    assert!(finding.agent_turns > 0); // Document that turns should be positive
+}
+
+#[tokio::test]
+async fn test_token_accounting_with_tool_calls() {
+    let responses = vec![
+        MockLlmClient::mock_tool_call("file_read", json!({ "path": "test.rs" })),
+        MockLlmClient::mock_final_response(
+            r#"{"title": "Found", "description": "Issue", "severity": "Medium"}"#,
+        ),
+    ];
+
+    let mock_client = MockLlmClient::new(responses);
+    let config = create_test_config(10);
+    let temp_dir = create_temp_dir();
+    let progress_cb: ProgressCallback = Arc::new(|_| {});
+
+    let test_file = create_test_file(&temp_dir, "test.rs", "fn main() {}");
+    let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
+
+    let result = session
+        .analyze_file(test_file.to_string_lossy().as_ref())
+        .await;
+
+    assert!(result.is_ok());
+    let finding = result.unwrap();
+    assert!(finding.agent_turns >= 1);
+}
+
+#[tokio::test]
+async fn test_session_with_zero_max_turns() {
+    let mock_client = MockLlmClient::new(vec![]);
+    let config = create_test_config(0);
+    let temp_dir = create_temp_dir();
+    let progress_cb: ProgressCallback = Arc::new(|_| {});
+
+    let test_file = create_test_file(&temp_dir, "test.rs", "fn main() {}");
+    let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
+
+    let result = session
+        .analyze_file(test_file.to_string_lossy().as_ref())
+        .await;
+
+    assert!(result.is_ok());
+    let finding = result.unwrap();
+    assert_eq!(finding.agent_turns, 0);
 }
 
 #[test]

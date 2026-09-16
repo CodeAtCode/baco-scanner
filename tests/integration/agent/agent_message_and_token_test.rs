@@ -1,4 +1,4 @@
-use baco::llm_metrics::{LlmMetricsTracker, ModelMetrics, OperationMetrics, RecordRequestParams};
+use baco::llm::metrics::{LlmMetricsTracker, ModelMetrics, OperationMetrics, RecordRequestParams};
 use std::collections::HashMap;
 
 #[test]
@@ -131,7 +131,7 @@ fn test_html_report_includes_token_metrics() {
         },
     );
 
-    let llm_metrics = baco::llm_metrics::LlmMetrics {
+    let llm_metrics = baco::llm::metrics::LlmMetrics {
         total_requests: 2,
         total_success: 2,
         total_failed: 0,

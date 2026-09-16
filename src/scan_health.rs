@@ -3,7 +3,7 @@
 //! Aggregates per-phase status, LLM outcomes, file counts, and token usage.
 
 use crate::checkpoint::ScanPhase;
-use crate::llm_metrics::LlmMetrics;
+use crate::llm::metrics::LlmMetrics;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -289,7 +289,7 @@ impl ScanHealth {
     /// Compute per-phase spend from operation metrics and pricing table
     /// Returns a vector of PhaseSpend entries, one per unique phase
     pub fn compute_phase_spend(
-        operation_metrics: &HashMap<String, crate::llm_metrics::OperationMetrics>,
+        operation_metrics: &HashMap<String, crate::llm::metrics::OperationMetrics>,
         pricing: Option<&HashMap<String, crate::config::ModelPricing>>,
     ) -> Vec<PhaseSpend> {
         use std::collections::HashMap as StdHashMap;
@@ -421,7 +421,6 @@ pub fn phase_name(phase: &ScanPhase) -> String {
         ScanPhase::Reporting => "Reporting".to_string(),
         ScanPhase::ThreatModeling => "ThreatModeling".to_string(),
         ScanPhase::RootCauseDedup => "RootCauseDedup".to_string(),
-        ScanPhase::MultiVerifier => "MultiVerifier".to_string(),
         ScanPhase::AutoPatching => "AutoPatching".to_string(),
         ScanPhase::CveBootstrap => "CveBootstrap".to_string(),
         ScanPhase::PocCompiler => "PocCompiler".to_string(),

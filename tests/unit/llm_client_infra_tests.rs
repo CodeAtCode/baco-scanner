@@ -1,8 +1,8 @@
 //! Tests for LLM client infrastructure: cache, rate limiting, and retry policy
 
 use baco::llm::{chat_endpoint, ChatMessage, LlmClient, LlmConfig};
-use baco::llm_cache;
-use baco::llm_metrics::LlmMetricsTracker;
+
+use baco::llm::metrics::LlmMetricsTracker;
 use baco::rate_limiter::RateLimiter;
 use tempfile::TempDir;
 
@@ -34,7 +34,7 @@ async fn test_cache_hit_without_http() {
     // Compute the cache key the same way the client does
     let messages = vec![ChatMessage::user("Test message")];
     let messages_json = serde_json::to_vec(&messages).unwrap();
-    let cache_key = llm_cache::compute_cache_key(
+    let cache_key = baco::llm::cache::compute_cache_key(
         "test-model",
         "http://127.0.0.1:9",
         0.5,
@@ -49,7 +49,7 @@ async fn test_cache_hit_without_http() {
         "timestamp": "2024-01-01T00:00:00Z"
     })
     .to_string();
-    llm_cache::write_cached_response(&cache_dir, &cache_key, &cached_response).unwrap();
+    baco::llm::cache::write_cached_response(&cache_dir, &cache_key, &cached_response).unwrap();
 
     // Call chat - should hit cache and NOT attempt HTTP
     let result = client.chat(&messages).await;
@@ -140,20 +140,35 @@ fn test_llm_client_rate_limiter_config() {
 /// Test cache key computation is deterministic
 #[test]
 fn test_cache_key_deterministic() {
-    let key1 =
-        llm_cache::compute_cache_key("model1", "http://localhost:8080", 0.5, Some(100), b"[]");
-    let key2 =
-        llm_cache::compute_cache_key("model1", "http://localhost:8080", 0.5, Some(100), b"[]");
+    let key1 = baco::llm::cache::compute_cache_key(
+        "model1",
+        "http://localhost:8080",
+        0.5,
+        Some(100),
+        b"[]",
+    );
+    let key2 = baco::llm::cache::compute_cache_key(
+        "model1",
+        "http://localhost:8080",
+        0.5,
+        Some(100),
+        b"[]",
+    );
     assert_eq!(key1, key2);
 }
 
 /// Test cache key changes with different inputs
 #[test]
 fn test_cache_key_varies_with_inputs() {
-    let key1 =
-        llm_cache::compute_cache_key("model1", "http://localhost:8080", 0.5, Some(100), b"[]");
+    let key1 = baco::llm::cache::compute_cache_key(
+        "model1",
+        "http://localhost:8080",
+        0.5,
+        Some(100),
+        b"[]",
+    );
 
-    let key2 = llm_cache::compute_cache_key(
+    let key2 = baco::llm::cache::compute_cache_key(
         "model2", // Different model
         "http://localhost:8080",
         0.5,
@@ -162,7 +177,7 @@ fn test_cache_key_varies_with_inputs() {
     );
     assert_ne!(key1, key2);
 
-    let key3 = llm_cache::compute_cache_key(
+    let key3 = baco::llm::cache::compute_cache_key(
         "model1",
         "http://localhost:9090", // Different URL
         0.5,
@@ -171,7 +186,7 @@ fn test_cache_key_varies_with_inputs() {
     );
     assert_ne!(key1, key3);
 
-    let key4 = llm_cache::compute_cache_key(
+    let key4 = baco::llm::cache::compute_cache_key(
         "model1",
         "http://localhost:8080",
         0.7, // Different temperature
@@ -184,7 +199,7 @@ fn test_cache_key_varies_with_inputs() {
 /// Test effective cache directory default
 #[test]
 fn test_effective_cache_dir_default() {
-    let dir = llm_cache::get_effective_cache_dir(None);
+    let dir = baco::llm::cache::get_effective_cache_dir(None);
     assert_eq!(dir, std::path::PathBuf::from("baco-output/llm-cache"));
 }
 
@@ -192,7 +207,7 @@ fn test_effective_cache_dir_default() {
 #[test]
 fn test_effective_cache_dir_custom() {
     let custom = "/custom/cache".to_string();
-    let dir = llm_cache::get_effective_cache_dir(Some(&custom));
+    let dir = baco::llm::cache::get_effective_cache_dir(Some(&custom));
     assert_eq!(dir, std::path::PathBuf::from("/custom/cache"));
 }
 

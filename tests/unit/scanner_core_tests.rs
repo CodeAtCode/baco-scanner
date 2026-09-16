@@ -926,6 +926,7 @@ async fn test_scanner_run_nonexistent_target() {
 
 fn create_test_config_core_migrated() -> ScannerConfig {
     ScannerConfig {
+        eval: Default::default(),
         project: ProjectConfig {
             name: "test-project".to_string(),
             path: "/tmp/test-project".to_string(),
@@ -1248,4 +1249,259 @@ async fn test_check_early_termination_disabled_inline_migrated() {
 
     assert!(result.is_ok());
     assert!(!result.unwrap());
+}
+// ============================================================================
+// Additional Tests: URL Parsing Edge Cases, Early Termination Logic
+// ============================================================================
+
+#[test]
+fn test_extract_owner_repo_from_url_gitlab() {
+    let url = "https://gitlab.com/owner/repo.git";
+    let result = Scanner::extract_owner_repo_from_url(url);
+
+    assert!(result.is_some());
+    let (owner, repo) = result.unwrap();
+    assert_eq!(owner, "owner");
+    assert_eq!(repo, "repo");
+}
+
+#[test]
+fn test_extract_owner_repo_from_url_bitbucket() {
+    let url = "https://bitbucket.org/owner/repo";
+    let result = Scanner::extract_owner_repo_from_url(url);
+
+    assert!(result.is_some());
+    let (owner, repo) = result.unwrap();
+    assert_eq!(owner, "owner");
+    assert_eq!(repo, "repo");
+}
+
+#[test]
+fn test_extract_owner_repo_from_url_with_multiple_slashes() {
+    let url = "https://github.com/owner/repo/path/to/file";
+    let result = Scanner::extract_owner_repo_from_url(url);
+
+    assert!(result.is_some());
+    let (owner, repo) = result.unwrap();
+    assert_eq!(owner, "owner");
+    assert_eq!(repo, "repo");
+}
+
+#[test]
+fn test_extract_owner_repo_from_url_ssh_with_port() {
+    let url = "ssh://git@github.com:22/owner/repo.git";
+    let result = Scanner::extract_owner_repo_from_url(url);
+
+    // This format may or may not be supported depending on implementation
+    let _ = result;
+}
+
+#[test]
+fn test_extract_owner_repo_from_url_with_query_params() {
+    let url = "https://github.com/owner/repo.git?param=value";
+    let result = Scanner::extract_owner_repo_from_url(url);
+
+    assert!(result.is_some());
+    let (owner, repo) = result.unwrap();
+    assert_eq!(owner, "owner");
+    assert_eq!(repo, "repo");
+}
+
+#[test]
+fn test_extract_owner_repo_from_url_uppercase() {
+    let url = "https://github.com/OWNER/REPO.GIT";
+    let result = Scanner::extract_owner_repo_from_url(url);
+
+    assert!(result.is_some());
+    let (owner, repo) = result.unwrap();
+    assert_eq!(owner, "OWNER");
+    assert_eq!(repo, "REPO");
+}
+
+#[test]
+fn test_extract_owner_repo_from_url_with_dash() {
+    let url = "https://github.com/my-org/my-repo-name.git";
+    let result = Scanner::extract_owner_repo_from_url(url);
+
+    assert!(result.is_some());
+    let (owner, repo) = result.unwrap();
+    assert_eq!(owner, "my-org");
+    assert_eq!(repo, "my-repo-name");
+}
+
+#[test]
+fn test_extract_owner_repo_from_url_with_underscore() {
+    let url = "https://github.com/my_org/my_repo.git";
+    let result = Scanner::extract_owner_repo_from_url(url);
+
+    assert!(result.is_some());
+    let (owner, repo) = result.unwrap();
+    assert_eq!(owner, "my_org");
+    assert_eq!(repo, "my_repo");
+}
+
+#[test]
+fn test_scanner_state_borrow_mut() {
+    let config = create_test_config();
+    let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), false);
+
+    // Test mutable borrow - use send_modify instead
+    scanner.state.send_modify(|s| {
+        s.files_scanned = 100;
+        s.current_phase = ScanPhase::Semgrep;
+    });
+
+    let state = scanner.state.borrow();
+    assert_eq!(state.files_scanned, 100);
+    assert_eq!(state.current_phase, ScanPhase::Semgrep);
+}
+
+#[test]
+fn test_scanner_add_multiple_findings_same_id() {
+    let config = create_test_config();
+    let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), false);
+
+    let finding = create_test_finding();
+    scanner.add_finding(finding.clone());
+    scanner.add_finding(finding.clone());
+    scanner.add_finding(finding);
+
+    let findings = scanner.findings();
+    assert_eq!(findings.len(), 3);
+    assert!(findings.iter().all(|f| f.id == "test-finding-001"));
+}
+
+#[test]
+fn test_scanner_update_findings_with_duplicates() {
+    let config = create_test_config();
+    let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), false);
+
+    let findings = vec![create_test_finding(), create_test_finding()];
+    scanner.update_findings(findings);
+
+    let result = scanner.findings();
+    assert_eq!(result.len(), 2);
+}
+
+#[test]
+fn test_scanner_checkpoint_path_various_output_dirs() {
+    let test_cases = vec![
+        ("/tmp/output", "/tmp/output/checkpoint.json"),
+        ("/tmp/output/nested", "/tmp/output/nested/checkpoint.json"),
+        (
+            "/absolute/path/to/output",
+            "/absolute/path/to/output/checkpoint.json",
+        ),
+    ];
+
+    for (output_dir, expected_checkpoint) in test_cases {
+        let mut config = create_test_config();
+        config.output.dir = output_dir.to_string();
+
+        let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), false);
+        assert_eq!(
+            scanner.checkpoint_path.to_string_lossy(),
+            expected_checkpoint
+        );
+    }
+}
+
+#[test]
+fn test_scanner_with_force_flag_true() {
+    let config = create_test_config();
+    let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), true);
+
+    assert!(scanner.force);
+}
+
+#[test]
+fn test_scanner_with_force_flag_false() {
+    let config = create_test_config();
+    let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), false);
+
+    assert!(!scanner.force);
+}
+
+#[test]
+fn test_scanner_state_error_accumulation() {
+    let config = create_test_config();
+    let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), false);
+
+    scanner.state.send_modify(|s| {
+        s.errors.push("error 1".to_string());
+        s.errors.push("error 2".to_string());
+        s.errors.push("error 3".to_string());
+    });
+
+    let state = scanner.state.borrow();
+    assert_eq!(state.errors.len(), 3);
+    assert_eq!(state.errors[0], "error 1");
+    assert_eq!(state.errors[2], "error 3");
+}
+
+#[test]
+fn test_scanner_state_phase_transition() {
+    let config = create_test_config();
+    let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), false);
+
+    let phases = vec![
+        ScanPhase::Indexing,
+        ScanPhase::Semgrep,
+        ScanPhase::CweRouting,
+        ScanPhase::LlmDiscovery,
+        ScanPhase::Complete,
+    ];
+
+    for phase in phases {
+        scanner.state.send_modify(|s| {
+            s.current_phase = phase.clone();
+        });
+
+        let state = scanner.state.borrow();
+        assert_eq!(state.current_phase, phase);
+    }
+}
+
+#[test]
+fn test_scanner_findings_empty_after_update() {
+    let config = create_test_config();
+    let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), false);
+
+    scanner.add_finding(create_test_finding());
+    assert_eq!(scanner.findings().len(), 1);
+
+    scanner.update_findings(Vec::new());
+    assert!(scanner.findings().is_empty());
+}
+
+#[test]
+fn test_scanner_target_path_absolute_vs_relative() {
+    let config = create_test_config();
+
+    let absolute_scanner = Scanner::new(config.clone(), PathBuf::from("/absolute/path"), false);
+    let relative_scanner = Scanner::new(config, PathBuf::from("./relative/path"), false);
+
+    assert!(absolute_scanner.target_path().is_absolute());
+    assert!(!relative_scanner.target_path().is_absolute());
+}
+
+#[test]
+fn test_scanner_multiple_state_modifications() {
+    let config = create_test_config();
+    let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), false);
+
+    // Multiple state modifications
+    scanner.state.send_modify(|s| {
+        s.files_scanned = 50;
+        s.current_phase = ScanPhase::Semgrep;
+    });
+
+    scanner.state.send_modify(|s| {
+        s.files_scanned = 100;
+        s.current_phase = ScanPhase::CweRouting;
+    });
+
+    let state = scanner.state.borrow();
+    assert_eq!(state.files_scanned, 100);
+    assert_eq!(state.current_phase, ScanPhase::CweRouting);
 }

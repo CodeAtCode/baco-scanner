@@ -1326,3 +1326,150 @@ fn test_guarded_edge_inline_migrated() {
         _ => panic!("expected Guarded edge"),
     }
 }
+
+// ============================================================================
+// AgentFlow executor mock integration tests
+// ============================================================================
+
+#[test]
+fn test_executor_config_gating_disabled() {
+    let harness = AgentFlowHarness::new();
+    // Verify that an empty harness fails typecheck
+    let result = typecheck(&harness);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_diagnose_coverage_threshold_exceeded() {
+    let execution = baco::agent_flow::executor::ExecutionResult {
+        outputs: vec![baco::agent_flow::executor::AgentOutput {
+            role: "analyst".into(),
+            content: "done".into(),
+            success: true,
+        }],
+        rounds: 1,
+    };
+
+    let mut channels = BTreeSet::new();
+    channels.insert(FeedbackChannel::Coverage);
+
+    // Coverage increase above threshold triggers rewrite
+    let signals = vec![FeedbackSignal::CoverageIncrease(0.30)];
+    let diag = diagnose(&execution, &channels, signals);
+
+    assert!(diag.should_rewrite);
+}
+
+#[test]
+fn test_diagnose_branch_hit_no_coverage_increase() {
+    let execution = baco::agent_flow::executor::ExecutionResult {
+        outputs: vec![baco::agent_flow::executor::AgentOutput {
+            role: "analyst".into(),
+            content: "done".into(),
+            success: true,
+        }],
+        rounds: 1,
+    };
+
+    let channels = BTreeSet::new();
+    let signals = vec![FeedbackSignal::BranchHit(5)];
+    let diag = diagnose(&execution, &channels, signals);
+
+    // Branch hit alone means the harness reached the target — no rewrite needed
+    assert!(!diag.should_rewrite);
+}
+
+#[test]
+fn test_diagnose_sanitizer_crash_with_outcome_channel() {
+    let execution = baco::agent_flow::executor::ExecutionResult {
+        outputs: vec![baco::agent_flow::executor::AgentOutput {
+            role: "analyst".into(),
+            content: "done".into(),
+            success: true,
+        }],
+        rounds: 1,
+    };
+
+    let mut channels = BTreeSet::new();
+    channels.insert(FeedbackChannel::Outcome);
+    channels.insert(FeedbackChannel::Sanitizer);
+
+    let signals = vec![FeedbackSignal::SanitizerCrash {
+        kind: "use-after-free".into(),
+        location: "vuln.c:100".into(),
+    }];
+    let diag = diagnose(&execution, &channels, signals);
+
+    // Sanitizer crash with outcome channel - expected behavior, no rewrite
+    assert!(!diag.should_rewrite);
+}
+
+#[test]
+fn test_proposer_harness_summary_with_fanout() {
+    use baco::agent_flow::proposer::build_harness_summary;
+
+    let mut harness = AgentFlowHarness::new();
+    let analyst = harness.add_agent(test_agent("analyst"));
+    let fanout = harness.add_fanout(analyst, 4);
+    let validator = harness.add_agent(test_agent("validator"));
+    harness.add_edge(
+        fanout,
+        validator,
+        EdgeKind::Data,
+        "{{ analyst.out }}".to_string(),
+    );
+
+    let summary = build_harness_summary(&harness);
+
+    assert!(summary.contains("analyst"));
+    assert!(summary.contains("validator"));
+    assert!(summary.contains("data"));
+}
+
+#[test]
+fn test_apply_rewrite_multiple_edits() {
+    let mut harness = AgentFlowHarness::new();
+    harness.add_agent(test_agent("analyst"));
+
+    let proposal = RewriteProposal {
+        edits: vec![
+            HarnessEdit::AddAgent {
+                role: "reviewer".into(),
+                prompt: "Review findings".into(),
+            },
+            HarnessEdit::AddAgent {
+                role: "validator".into(),
+                prompt: "Validate findings".into(),
+            },
+            HarnessEdit::AddEdge {
+                from_role: "analyst".into(),
+                to_role: "reviewer".into(),
+                kind: "data".into(),
+                template: "{{ analyst.out }}".into(),
+            },
+        ],
+        rationale: "Add review and validation".into(),
+    };
+
+    let new_harness = apply_rewrite(&harness, &proposal);
+
+    assert_eq!(new_harness.nodes.len(), 3);
+    assert_eq!(new_harness.edges.len(), 1);
+}
+
+#[test]
+fn test_apply_rewrite_remove_nonexistent_agent() {
+    let mut harness = AgentFlowHarness::new();
+    harness.add_agent(test_agent("analyst"));
+
+    let proposal = RewriteProposal {
+        edits: vec![HarnessEdit::RemoveAgent {
+            role: "nonexistent".into(),
+        }],
+        rationale: "Remove nonexistent".into(),
+    };
+
+    // Should handle gracefully - no panic
+    let new_harness = apply_rewrite(&harness, &proposal);
+    assert_eq!(new_harness.nodes.len(), 1);
+}

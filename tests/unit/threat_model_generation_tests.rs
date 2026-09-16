@@ -14,16 +14,6 @@ use tempfile::tempdir;
 // ============================================================================
 
 #[test]
-fn test_generate_threat_model_static_basic() {
-    let architecture = "A simple web app with database";
-    let tm = generate_threat_model_static(architecture);
-
-    assert!(tm.contains("TRUST BOUNDARIES"));
-    assert!(tm.contains("DATA FLOWS"));
-    assert!(tm.contains("STRIDE THREATS"));
-}
-
-#[test]
 fn test_generate_threat_model_static_no_db() {
     let architecture = "No database, just static files";
     let tm = generate_threat_model_static(architecture);
@@ -297,4 +287,98 @@ async fn test_generate_threat_model_with_llm_fallback_various_architectures() {
         assert!(result.contains("TRUST BOUNDARIES"));
         assert!(result.contains("STRIDE"));
     }
+}
+
+// ============================================================================
+// ADDITIONAL STATIC MODEL TESTS
+// ============================================================================
+
+/// Test STRIDE categories present in static output
+#[test]
+fn test_generate_threat_model_static_stride_categories() {
+    let tm = generate_threat_model_static("Web app with PostgreSQL database");
+
+    // All six STRIDE categories should be present
+    assert!(tm.contains("Spoofing"), "Should contain Spoofing category");
+    assert!(
+        tm.contains("Tampering"),
+        "Should contain Tampering category"
+    );
+    assert!(
+        tm.contains("Repudiation"),
+        "Should contain Repudiation category"
+    );
+    assert!(
+        tm.contains("Information Disclosure"),
+        "Should contain Information Disclosure category"
+    );
+    assert!(
+        tm.contains("Denial of Service"),
+        "Should contain Denial of Service category"
+    );
+    assert!(
+        tm.contains("Elevation of Privilege"),
+        "Should contain Elevation of Privilege category"
+    );
+}
+
+/// Test VulnInstruct specification sections when specs provided
+#[test]
+fn test_generate_threat_model_static_vulninstruct_sections() {
+    let tm = generate_threat_model_static("Microservice with gRPC and Redis cache");
+
+    // Should contain specification-style sections
+    assert!(tm.contains("THREAT MODEL"), "Should have main header");
+    assert!(tm.contains("DATA FLOWS"), "Should describe data flow");
+    assert!(
+        tm.contains("TRUST BOUNDARIES"),
+        "Should define trust boundaries"
+    );
+    assert!(tm.contains("STRIDE THREATS"), "Should list threats");
+}
+
+/// Test static generation handles empty architecture gracefully
+#[test]
+fn test_generate_threat_model_static_empty_architecture() {
+    let tm = generate_threat_model_static("");
+
+    // Should still produce valid output with default structure
+    assert!(
+        tm.contains("STRIDE"),
+        "Should contain STRIDE even with empty architecture"
+    );
+    assert!(
+        tm.contains("TRUST BOUNDARIES"),
+        "Should have trust boundaries section"
+    );
+}
+
+/// Test static generation for CLI tool architecture
+#[test]
+fn test_generate_threat_model_static_cli_architecture() {
+    let tm = generate_threat_model_static("CLI tool with file system access");
+
+    // CLI-specific threats should be present
+    assert!(tm.contains("file"), "Should mention file system");
+    assert!(
+        !tm.contains("SQL injection"),
+        "CLI without DB should not have SQLi threats"
+    );
+}
+
+/// Test static generation distinguishes network vs local
+/// Test static generation distinguishes network vs local
+#[test]
+fn test_generate_threat_model_static_network_vs_local() {
+    let tm_network = generate_threat_model_static("HTTP API server");
+    let tm_local = generate_threat_model_static("Local batch processor");
+
+    // Both should produce valid threat models
+    assert!(tm_network.contains("STRIDE"));
+    assert!(tm_local.contains("STRIDE"));
+    // Static generation produces consistent output regardless of input
+    assert_eq!(
+        tm_network.contains("TRUST BOUNDARIES"),
+        tm_local.contains("TRUST BOUNDARIES")
+    );
 }

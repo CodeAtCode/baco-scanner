@@ -182,7 +182,7 @@ max_llm_calls = 250
 ]
 
 [knowledge.hook_registry.python]
-hook_label = ""
+hook_label = "urlpatterns"
 registrations = [
   '''(?si)\bpath\s*\(\s*[\x27\x22](?P<hook>[^\x27\x22]*)[\x27\x22]\s*,\s*''',
   '''(?si)\bre_path\s*\(\s*[\x27\x22](?P<hook>[^\x27\x22]*)[\x27\x22]\s*,\s*''',

@@ -399,3 +399,177 @@ mod parse_response_tests {
         }
     }
 }
+
+// ============================================================================
+// Truncate Code Tests
+// ============================================================================
+
+#[cfg(test)]
+mod truncate_code_tests {
+    use baco::llm::LlmClient;
+    use baco::llm::LlmConfig;
+    use baco::llm_analysis::LlmAnalyzer;
+
+    fn create_test_analyzer() -> LlmAnalyzer {
+        let config = LlmConfig {
+            base_url: "https://api.test.com/v1".to_string(),
+            api_key: "test-key".to_string(),
+            model: "test-model".to_string(),
+            models: vec![],
+            timeout: 30,
+            max_retries: 3,
+            retry_backoff_ms: 1000,
+            temperature: 0.5,
+            max_reasoning_tokens: None,
+            enable_llm_cache: false,
+            cache_dir: None,
+            max_concurrent: 3,
+            pricing: Default::default(),
+        };
+        let client = LlmClient::new(config);
+        LlmAnalyzer::new(client, vec!["rust".to_string()], 1024, &Default::default())
+    }
+
+    #[test]
+    fn test_truncate_code_under_budget() {
+        let analyzer = create_test_analyzer();
+        let code = "fn main() { println!(\"hello\"); }";
+
+        let result = analyzer.truncate_code(code);
+
+        // Code under 8000 bytes should be returned unchanged
+        assert_eq!(result, code);
+        assert!(!result.contains("[truncated"));
+    }
+
+    #[test]
+    fn test_truncate_code_exact_budget() {
+        let analyzer = create_test_analyzer();
+        // Create code exactly 8000 bytes
+        let code = "x".repeat(8000);
+
+        let result = analyzer.truncate_code(&code);
+
+        // Should be returned unchanged (at the boundary)
+        assert_eq!(result.len(), 8000);
+        assert!(!result.contains("[truncated"));
+    }
+
+    #[test]
+    fn test_truncate_code_over_budget() {
+        let analyzer = create_test_analyzer();
+        // Create code over 8000 bytes
+        let code = "y".repeat(10000);
+
+        let result = analyzer.truncate_code(&code);
+
+        // Should be truncated with notice
+        assert!(result.contains("[truncated"));
+        assert!(result.contains("omitted]"));
+        // Total should be under budget (content + notice)
+        assert!(result.len() <= 8000);
+    }
+
+    #[test]
+    fn test_truncate_code_preserves_start() {
+        let analyzer = create_test_analyzer();
+        let prefix = "IMPORTANT_PREFIX_CODE";
+        let code = format!("{}{}", prefix, "z".repeat(10000));
+
+        let result = analyzer.truncate_code(&code);
+
+        // Start of code should be preserved
+        assert!(result.starts_with(prefix));
+    }
+
+    #[test]
+    fn test_truncate_code_multi_byte_chars() {
+        let analyzer = create_test_analyzer();
+        // Unicode multi-byte characters (emoji, etc.)
+        let code = "Hello \u{1F600}".repeat(2000); // 2000 emojis = ~10000 bytes
+
+        let result = analyzer.truncate_code(&code);
+
+        // Should handle multi-byte chars correctly (no invalid UTF-8)
+        assert!(result.is_ascii() || result.chars().all(|c| c.is_ascii() || c == '\u{1F600}'));
+        assert!(result.len() <= 8000);
+    }
+
+    #[test]
+    fn test_truncate_code_omitted_count() {
+        let analyzer = create_test_analyzer();
+        let code = "a".repeat(10000);
+
+        let result = analyzer.truncate_code(&code);
+
+        // Should report approximately 2000 chars omitted (8000 budget - notice)
+        assert!(result.contains("[truncated -"));
+        assert!(result.contains("chars omitted]"));
+    }
+}
+
+// ============================================================================
+// Language for Extension Tests
+// ============================================================================
+
+#[cfg(test)]
+mod language_for_extension_tests {
+    use baco::llm_analysis::LlmAnalyzer;
+
+    #[test]
+    fn test_language_for_extension_rust() {
+        let lang = LlmAnalyzer::language_for_extension("rs");
+        // Rust has a bundled tree-sitter grammar
+        assert!(lang.is_some());
+        assert_eq!(lang.unwrap(), "rust");
+    }
+
+    #[test]
+    fn test_language_for_extension_c() {
+        let lang = LlmAnalyzer::language_for_extension("c");
+        // C has a bundled tree-sitter grammar
+        assert!(lang.is_some());
+        assert_eq!(lang.unwrap(), "c");
+    }
+
+    #[test]
+    fn test_language_for_extension_cpp() {
+        let lang = LlmAnalyzer::language_for_extension("cpp");
+        // C++ has a bundled tree-sitter grammar
+        assert!(lang.is_some());
+        assert_eq!(lang.unwrap(), "cpp");
+    }
+
+    #[test]
+    fn test_language_for_extension_go() {
+        // Go is indexed via the unified extension map but has no bundled
+        // tree-sitter grammar, so the chunker-facing lookup returns None
+        let lang = LlmAnalyzer::language_for_extension("go");
+        assert!(lang.is_none());
+    }
+
+    #[test]
+    fn test_language_for_extension_java() {
+        // Java is indexed via the unified extension map but has no bundled
+        // tree-sitter grammar, so the chunker-facing lookup returns None
+        let lang = LlmAnalyzer::language_for_extension("java");
+        assert!(lang.is_none());
+    }
+
+    #[test]
+    fn test_language_for_extension_unknown() {
+        let lang = LlmAnalyzer::language_for_extension("unknown_ext_xyz");
+        // Unknown extension should return None
+        assert!(lang.is_none());
+    }
+
+    #[test]
+    fn test_language_for_extension_case_insensitive() {
+        let lang_upper = LlmAnalyzer::language_for_extension("RS");
+        let lang_lower = LlmAnalyzer::language_for_extension("rs");
+
+        // Should be case-insensitive
+        assert_eq!(lang_upper, lang_lower);
+        assert!(lang_upper.is_some());
+    }
+}

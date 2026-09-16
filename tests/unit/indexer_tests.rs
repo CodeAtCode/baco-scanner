@@ -220,42 +220,6 @@ fn test_index_project_subdirectories() {
 // FileIndex Tests - index_project_incremental
 // ============================================================================
 
-#[test]
-fn test_index_project_incremental_basic() {
-    let temp_dir = TempDir::new().unwrap();
-
-    File::create(temp_dir.path().join("test.c")).unwrap();
-    File::create(temp_dir.path().join("test.rs")).unwrap();
-
-    let (index, hash_store) = FileIndex::index_project_incremental(
-        temp_dir.path().to_str().unwrap(),
-        &["c".to_string(), "rust".to_string()],
-        1024 * 1024,
-        &[],
-        None,
-        false,
-    )
-    .unwrap();
-
-    assert_eq!(index.files.len(), 2);
-    assert!(index.hash_store.is_some());
-    assert!(hash_store.get_last_scan().is_some());
-}
-
-#[test]
-fn test_index_project_incremental_invalid_path() {
-    let result = FileIndex::index_project_incremental(
-        "/nonexistent/path",
-        &["c".to_string()],
-        1024 * 1024,
-        &[],
-        None,
-        false,
-    );
-
-    assert!(result.is_err());
-}
-
 // ============================================================================
 // FileIndex Tests - get_files
 // ============================================================================
@@ -747,4 +711,206 @@ fn test_index_invalid_path() {
         false,
     );
     assert!(result.is_err());
+}
+// ============================================================================
+// Extension Map Completeness Tests
+// ============================================================================
+
+#[test]
+fn test_extension_map_includes_csharp_ruby_go_java() {
+    let temp_dir = TempDir::new().unwrap();
+
+    File::create(temp_dir.path().join("test.cs")).unwrap();
+    File::create(temp_dir.path().join("test.rb")).unwrap();
+    File::create(temp_dir.path().join("test.go")).unwrap();
+    File::create(temp_dir.path().join("test.java")).unwrap();
+
+    let index = FileIndex::index_project(
+        temp_dir.path().to_str().unwrap(),
+        &[
+            "csharp".to_string(),
+            "ruby".to_string(),
+            "go".to_string(),
+            "java".to_string(),
+        ],
+        1024 * 1024,
+        &[],
+        false,
+    )
+    .unwrap();
+
+    assert_eq!(index.files.len(), 4);
+}
+
+// ============================================================================
+// Size Boundary Tests
+// ============================================================================
+
+#[test]
+fn test_size_boundary_exact_limit() {
+    let temp_dir = TempDir::new().unwrap();
+
+    let test_file = temp_dir.path().join("test.c");
+    let content = "x".repeat(1000);
+    File::create(&test_file)
+        .unwrap()
+        .write_all(content.as_bytes())
+        .unwrap();
+
+    let index = FileIndex::index_project(
+        temp_dir.path().to_str().unwrap(),
+        &["c".to_string()],
+        1000,
+        &[],
+        false,
+    )
+    .unwrap();
+
+    assert_eq!(index.files.len(), 1);
+}
+
+#[test]
+fn test_size_boundary_one_byte_over() {
+    let temp_dir = TempDir::new().unwrap();
+
+    let test_file = temp_dir.path().join("test.c");
+    let content = "x".repeat(1001);
+    File::create(&test_file)
+        .unwrap()
+        .write_all(content.as_bytes())
+        .unwrap();
+
+    let index = FileIndex::index_project(
+        temp_dir.path().to_str().unwrap(),
+        &["c".to_string()],
+        1000,
+        &[],
+        false,
+    )
+    .unwrap();
+
+    assert_eq!(index.files.len(), 0);
+}
+
+#[test]
+fn test_incremental_select_changed_files() {
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("test.c");
+    File::create(&test_file)
+        .unwrap()
+        .write_all(b"int main() {}")
+        .unwrap();
+
+    let _index1 = FileIndex::index_project(
+        temp_dir.path().to_str().unwrap(),
+        &["c".to_string()],
+        1024 * 1024,
+        &[],
+        true,
+    )
+    .unwrap();
+
+    File::create(&test_file)
+        .unwrap()
+        .write_all(b"int main() { return 1; }")
+        .unwrap();
+
+    let index2 = FileIndex::index_project_incremental(
+        temp_dir.path().to_str().unwrap(),
+        &["c".to_string()],
+        1024 * 1024,
+        &[],
+        None,
+        true,
+    )
+    .unwrap();
+
+    assert_eq!(index2.0.files.len(), 1);
+}
+
+#[test]
+fn test_incremental_select_new_files() {
+    let temp_dir = TempDir::new().unwrap();
+    File::create(temp_dir.path().join("test1.c")).unwrap();
+
+    let _index1 = FileIndex::index_project(
+        temp_dir.path().to_str().unwrap(),
+        &["c".to_string()],
+        1024 * 1024,
+        &[],
+        true,
+    )
+    .unwrap();
+
+    File::create(temp_dir.path().join("test2.c")).unwrap();
+
+    let index2 = FileIndex::index_project_incremental(
+        temp_dir.path().to_str().unwrap(),
+        &["c".to_string()],
+        1024 * 1024,
+        &[],
+        None,
+        true,
+    )
+    .unwrap();
+
+    assert_eq!(index2.0.files.len(), 2);
+}
+
+#[test]
+fn test_incremental_select_removed_files() {
+    let temp_dir = TempDir::new().unwrap();
+    File::create(temp_dir.path().join("test1.c")).unwrap();
+    File::create(temp_dir.path().join("test2.c")).unwrap();
+
+    let _index1 = FileIndex::index_project(
+        temp_dir.path().to_str().unwrap(),
+        &["c".to_string()],
+        1024 * 1024,
+        &[],
+        true,
+    )
+    .unwrap();
+
+    std::fs::remove_file(temp_dir.path().join("test2.c")).unwrap();
+
+    let index2 = FileIndex::index_project_incremental(
+        temp_dir.path().to_str().unwrap(),
+        &["c".to_string()],
+        1024 * 1024,
+        &[],
+        None,
+        true,
+    )
+    .unwrap();
+
+    assert_eq!(index2.0.files.len(), 1);
+    assert_eq!(index2.0.files[0].path.file_name().unwrap(), "test1.c");
+}
+
+// ============================================================================
+// Should-Analyze Decision Tests
+// ============================================================================
+
+#[test]
+fn test_should_analyze_binary_file_excluded() {
+    let temp_dir = TempDir::new().unwrap();
+
+    let test_file = temp_dir.path().join("test.dat");
+    let binary_content = vec![0x00, 0x01, 0x02, 0xFF, 0xFE];
+    File::create(&test_file)
+        .unwrap()
+        .write_all(&binary_content)
+        .unwrap();
+
+    let index = FileIndex::index_project(
+        temp_dir.path().to_str().unwrap(),
+        &["c".to_string()],
+        1024 * 1024,
+        &[],
+        false,
+    )
+    .unwrap();
+
+    assert_eq!(index.files.len(), 0);
 }

@@ -288,41 +288,70 @@ fn check_llm_phases(config_path: Option<&Path>) -> CheckResult {
 
     let phases = &config.llm.phases;
     let mut missing_config = Vec::new();
+    let mut keyless = Vec::new();
 
     // Check each phase by name
-    check_phase_config("discovery", &phases.discovery, &mut missing_config);
-    check_phase_config("verification", &phases.verification, &mut missing_config);
-    check_phase_config("aggregation", &phases.aggregation, &mut missing_config);
+    check_phase_config(
+        "discovery",
+        &phases.discovery,
+        &mut missing_config,
+        &mut keyless,
+    );
+    check_phase_config(
+        "verification",
+        &phases.verification,
+        &mut missing_config,
+        &mut keyless,
+    );
+    check_phase_config(
+        "aggregation",
+        &phases.aggregation,
+        &mut missing_config,
+        &mut keyless,
+    );
     check_phase_config(
         "static_analysis",
         &phases.static_analysis,
         &mut missing_config,
+        &mut keyless,
     );
     check_phase_config(
         "security_agent_verification",
         &phases.security_agent_verification,
         &mut missing_config,
+        &mut keyless,
     );
     check_phase_config(
         "threat_modeling",
         &phases.threat_modeling,
         &mut missing_config,
+        &mut keyless,
     );
 
-    if missing_config.is_empty() {
+    if missing_config.is_empty() && keyless.is_empty() {
         CheckResult {
             name: "llm_phases".to_string(),
             status: CheckStatus::Ok,
             detail: "All enabled LLM phases have complete configuration".to_string(),
         }
     } else {
+        let mut parts = Vec::new();
+        if !missing_config.is_empty() {
+            parts.push(format!(
+                "Missing LLM config for phase(s): {}",
+                missing_config.join(", ")
+            ));
+        }
+        if !keyless.is_empty() {
+            parts.push(format!(
+                "phases without api_key (will be skipped at runtime): {}",
+                keyless.join(", ")
+            ));
+        }
         CheckResult {
             name: "llm_phases".to_string(),
             status: CheckStatus::Warn,
-            detail: format!(
-                "Missing LLM config for phase(s): {}",
-                missing_config.join(", ")
-            ),
+            detail: parts.join("; "),
         }
     }
 }
@@ -331,6 +360,7 @@ fn check_phase_config(
     name: &str,
     phase: &crate::config::LlmPhaseConfig,
     missing: &mut Vec<String>,
+    keyless: &mut Vec<String>,
 ) {
     // If api_key is set, the phase is enabled and needs full config
     if phase.api_key.as_ref().is_some_and(|k| !k.is_empty()) {
@@ -344,11 +374,15 @@ fn check_phase_config(
         if !needs.is_empty() {
             missing.push(format!("{} (missing: {})", name, needs.join(", ")));
         }
+    } else {
+        // No key: the phase will be skipped at runtime — surface it so a
+        // blind-scan setup is visible before scanning, not only in the report.
+        keyless.push(name.to_string());
     }
 }
 
 /// Check if semgrep is on PATH
-fn check_semgrep() -> CheckResult {
+pub fn check_semgrep() -> CheckResult {
     match which::which("semgrep") {
         Ok(path) => {
             // Get version
@@ -375,7 +409,7 @@ fn check_semgrep() -> CheckResult {
 }
 
 /// Check if python3 is on PATH
-fn check_python3() -> CheckResult {
+pub fn check_python3() -> CheckResult {
     match which::which("python3") {
         Ok(path) => {
             let version = Command::new(&path)
@@ -436,7 +470,7 @@ fn check_joern(config_path: Option<&Path>) -> CheckResult {
 }
 
 /// Check if output directory is writable
-fn check_output_dir_writable(output_dir: Option<&Path>) -> CheckResult {
+pub fn check_output_dir_writable(output_dir: Option<&Path>) -> CheckResult {
     let path = match output_dir {
         Some(p) => p.to_path_buf(),
         None => PathBuf::from("baco-output"),
@@ -488,7 +522,7 @@ fn check_output_dir_writable(output_dir: Option<&Path>) -> CheckResult {
 }
 
 /// Check disk space on output filesystem
-fn check_disk_space(output_dir: Option<&Path>) -> CheckResult {
+pub fn check_disk_space(output_dir: Option<&Path>) -> CheckResult {
     use std::fs;
 
     let path = match output_dir {
@@ -563,63 +597,5 @@ fn check_disk_space(output_dir: Option<&Path>) -> CheckResult {
             status: CheckStatus::Ok,
             detail: format!("Disk space check skipped (non-Unix platform)"),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::TempDir;
-
-    #[test]
-    fn test_check_status_serialization() {
-        assert_eq!(serde_json::to_string(&CheckStatus::Ok).unwrap(), "\"ok\"");
-        assert_eq!(
-            serde_json::to_string(&CheckStatus::Warn).unwrap(),
-            "\"warn\""
-        );
-        assert_eq!(
-            serde_json::to_string(&CheckStatus::Fail).unwrap(),
-            "\"fail\""
-        );
-    }
-
-    #[test]
-    fn test_doctor_results_exit_code() {
-        let mut results = DoctorResults::new();
-        assert_eq!(results.exit_code(), 0);
-
-        results.add(CheckResult {
-            name: "test".to_string(),
-            status: CheckStatus::Warn,
-            detail: "warning".to_string(),
-        });
-        assert_eq!(results.exit_code(), 0); // Warn doesn't cause non-zero
-
-        results.add(CheckResult {
-            name: "test2".to_string(),
-            status: CheckStatus::Fail,
-            detail: "failure".to_string(),
-        });
-        assert_eq!(results.exit_code(), 1); // Fail causes non-zero
-    }
-
-    #[test]
-    fn test_output_dir_writable_tempdir() {
-        let temp_dir = TempDir::new().unwrap();
-        let result = check_output_dir_writable(Some(temp_dir.path()));
-        assert_eq!(result.status, CheckStatus::Ok);
-        assert!(result.detail.contains("writable"));
-    }
-
-    #[test]
-    fn test_output_dir_create_if_missing() {
-        let temp_dir = TempDir::new().unwrap();
-        let new_dir = temp_dir.path().join("new_output");
-        assert!(!new_dir.exists());
-
-        let result = check_output_dir_writable(Some(&new_dir));
-        assert_eq!(result.status, CheckStatus::Ok);
-        assert!(new_dir.exists());
     }
 }

@@ -69,21 +69,6 @@ fn test_rulesynth_config_default() {
 }
 
 #[test]
-fn test_rulesynth_config_creation() {
-    let config = RuleSynthConfig {
-        enabled: true,
-        output_dir: PathBuf::from("/tmp/test_rules"),
-        max_rules_per_cwe: 10,
-        mocq_mode: false,
-        max_iterations: 5,
-        corpus_path: None,
-    };
-    assert!(config.enabled);
-    assert_eq!(config.output_dir, PathBuf::from("/tmp/test_rules"));
-    assert_eq!(config.max_rules_per_cwe, 10);
-}
-
-#[test]
 fn test_rulesynth_config_serialization() {
     let config = RuleSynthConfig {
         enabled: true,
@@ -120,32 +105,6 @@ fn test_semgrep_rule_serialization() {
     assert_eq!(rule.id, deserialized.id);
     assert_eq!(rule.language, deserialized.language);
     assert_eq!(rule.yaml, deserialized.yaml);
-}
-
-#[test]
-fn test_semgrep_rule_debug() {
-    let rule = SemgrepRule {
-        id: "debug-test".to_string(),
-        language: "javascript".to_string(),
-        yaml: "test".to_string(),
-    };
-
-    let debug_str = format!("{:?}", rule);
-    assert!(debug_str.contains("debug-test"));
-    assert!(debug_str.contains("javascript"));
-}
-
-// ============================================================================
-// RuleSynthesizer tests
-// ============================================================================
-
-#[test]
-fn test_rulesynthesizer_new() {
-    let config = RuleSynthConfig::default();
-    // We can't create an LlmClient without dependencies, so just test that
-    // the constructor exists and compiles with a mock reference
-    // This test mainly ensures the API is correct
-    assert_eq!(config.max_rules_per_cwe, 5);
 }
 
 // ============================================================================

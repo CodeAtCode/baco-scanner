@@ -241,3 +241,101 @@ fn test_index_directory_excludes_patterns() {
     assert!(ext_map.contains_key("py"));
     assert!(!ext_map.contains_key("js"));
 }
+
+#[test]
+fn test_fn_lookup_fuzzy_match_none() {
+    let content = r#"
+fn main_function() {
+    println!("main");
+}
+"#;
+
+    let path = create_temp_file(content, "rs");
+    let mut lookup = FunctionLookup::new();
+    lookup.index_file(&path, Language::Rust);
+
+    // Should not find exact match
+    assert!(lookup.lookup("main").is_none());
+    assert!(lookup.lookup("main_func").is_none());
+
+    let _ = fs::remove_file(&path);
+}
+
+#[test]
+fn test_fn_lookup_with_generics() {
+    let content = r#"
+fn generic_func<T>(x: T) -> T {
+    x
+}
+
+fn main() {
+    let _ = generic_func(42);
+}
+"#;
+
+    let path = create_temp_file(content, "rs");
+    let mut lookup = FunctionLookup::new();
+    lookup.index_file(&path, Language::Rust);
+
+    assert!(lookup.contains("generic_func"));
+    let body = lookup.lookup("generic_func").unwrap();
+    assert!(body.contains("fn generic_func"));
+
+    let _ = fs::remove_file(&path);
+}
+
+#[test]
+fn test_fn_lookup_multiple_definitions_last_wins() {
+    let content = r#"
+fn duplicate() {
+    println!("first");
+}
+
+fn duplicate() {
+    println!("second");
+}
+
+fn main() {
+    duplicate();
+}
+"#;
+
+    let path = create_temp_file(content, "rs");
+    let mut lookup = FunctionLookup::new();
+    lookup.index_file(&path, Language::Rust);
+
+    // Should have the function (last definition wins in the index)
+    assert!(lookup.contains("duplicate"));
+    let body = lookup.lookup("duplicate").unwrap();
+    // The body should contain the function definition
+    assert!(body.contains("fn duplicate"));
+
+    let _ = fs::remove_file(&path);
+}
+
+#[test]
+fn test_fn_lookup_with_special_chars_in_name() {
+    let content = r#"
+fn func_with_underscores() {
+    println!("test");
+}
+
+fn func123() {
+    println!("numbers");
+}
+
+fn main() {
+    func_with_underscores();
+    func123();
+}
+"#;
+
+    let path = create_temp_file(content, "rs");
+    let mut lookup = FunctionLookup::new();
+    lookup.index_file(&path, Language::Rust);
+
+    assert!(lookup.contains("func_with_underscores"));
+    assert!(lookup.contains("func123"));
+
+    let _ = fs::remove_file(&path);
+}

@@ -329,3 +329,8 @@ max_runs = 5
 # secret_storage = "vault"  # "vault" → ${VAULT_TOKEN} refs are placeholders, NOT leaks
 # risk_tolerance = "low"  # does NOT mean only report criticals — prioritize ruthlessly, report everything real
 # severity_rules = { "XSS" = "Critical", "SQLi" = "Critical" }  # OVERRIDE lines for specific rules
+
+[eval]
+# Minimum aggregate pass-rate for `baco eval` (0.0-1.0).
+# The BACO_EVAL_FLOOR environment variable overrides this value.
+floor = 0.70

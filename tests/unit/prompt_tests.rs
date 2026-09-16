@@ -715,3 +715,118 @@ const _: () = {
     assert!(MAX_PROMPT_OVERRIDE_LENGTH > 0);
     assert!(MAX_PROMPT_OVERRIDE_LENGTH < 100000);
 };
+
+// ============================================================================
+// ADDITIONAL PROMPT ENGINE TESTS
+// ============================================================================
+
+/// Test placeholder substitution table completeness
+#[test]
+fn test_placeholder_substitution_table() {
+    use baco::prompt::templates::TemplateVariables;
+    use std::collections::HashMap;
+
+    let mut vars = TemplateVariables(HashMap::new());
+    vars.0
+        .insert("PROJECT_PATH".to_string(), "/test/path".to_string());
+    vars.0
+        .insert("FILE_EXTENSIONS".to_string(), ".rs,.toml".to_string());
+
+    // Verify substitution works
+    let template = "Path: %%PROJECT_PATH%%, Extensions: %%FILE_EXTENSIONS%%";
+    let mut result = template.to_string();
+    for (key, value) in &vars.0 {
+        result = result.replace(&format!("%%{}%%", key), value);
+    }
+
+    assert!(result.contains("/test/path"));
+    assert!(result.contains(".rs,.toml"));
+    assert!(!result.contains("%%PROJECT_PATH%%"));
+}
+
+/// Test control character sanitization removes dangerous chars
+#[test]
+fn test_control_char_sanitization_removes_dangerous() {
+    // Test various control characters
+    let dangerous_chars = vec![
+        ("\x00", "null byte"),
+        ("\x01", "SOH"),
+        ("\x02", "STX"),
+        ("\x1f", "unit separator"),
+        ("\x7f", "delete"),
+    ];
+
+    for (char, name) in dangerous_chars {
+        let input = format!("safe prompt{}with danger", char);
+        let result = sanitize_prompt_override(&input);
+        assert!(!result.contains(char), "{} should be removed", name);
+    }
+}
+
+/// Test hunt routing flag effect on prompt selection
+#[test]
+fn test_hunt_routing_flag_effect() {
+    use baco::prompt::engine::PromptEngine;
+
+    let engine = PromptEngine::new();
+
+    // When hunt routing is enabled, should get domain-specific prompts
+    let injection_prompt = engine.hunt_prompt_for_cwe("CWE-89");
+    assert!(
+        injection_prompt.is_some(),
+        "CWE-89 should return injection prompt when hunt routing enabled"
+    );
+
+    let xss_prompt = engine.hunt_prompt_for_cwe("CWE-79");
+    assert!(
+        xss_prompt.is_some(),
+        "CWE-79 should return xss prompt when hunt routing enabled"
+    );
+}
+
+/// Test missing prompt file fallback to default
+#[test]
+fn test_missing_prompt_file_fallback() {
+    use baco::prompt::{get_prompt, load_phase_prompts};
+
+    // Load from non-existent path
+    let loaded = load_phase_prompts(Some("/nonexistent/path"));
+
+    // Should fall back to defaults
+    let indexing = get_prompt("indexing", &loaded, None, "default indexing");
+    assert_eq!(
+        indexing, "default indexing",
+        "Should use fallback when file missing"
+    );
+}
+
+/// Test %%...%% form placeholder handling
+#[test]
+fn test_legacy_placeholder_format_handling() {
+    use baco::prompt::engine::PromptEngine;
+
+    let engine = PromptEngine::new();
+    let indexing = engine.get_prompt(&BacoPhase::Indexing);
+
+    // Legacy format should be present
+    assert!(indexing.contains("%%PROJECT_PATH%%"));
+    assert!(indexing.contains("%%FILE_EXTENSIONS%%"));
+    assert!(indexing.contains("%%LANGUAGES%%"));
+
+    // Verify these are actual placeholders, not substituted values
+    assert!(indexing.contains("%%"));
+}
+
+/// Test sanitize override with mixed valid/invalid content
+#[test]
+fn test_sanitize_mixed_valid_invalid_content() {
+    let input = "Analyze this\x00code\x01for\x1fsecurity\x7fvulnerabilities";
+    let result = sanitize_prompt_override(input);
+
+    // Should remove all control chars but keep text
+    assert_eq!(result, "Analyze thiscodeforsecurityvulnerabilities");
+    assert!(!result.contains('\x00'));
+    assert!(!result.contains('\x01'));
+    assert!(!result.contains('\x1f'));
+    assert!(!result.contains('\x7f'));
+}

@@ -9,11 +9,13 @@
 /// Returns None if the URL format is not recognized
 pub fn extract_owner_repo_from_url(url: &str) -> Option<(String, String)> {
     let url = url.trim();
+    // Query strings and fragments are not part of the repo path
+    let url = url.split(['?', '#']).next().unwrap_or(url);
     if url.starts_with("git@") {
         let without_git = url.trim_start_matches("git@");
         if let Some((_host, rest)) = without_git.split_once(':') {
             if let Some((owner, repo)) = rest.split_once('/') {
-                let repo = repo.trim_end_matches(".git");
+                let repo = strip_git_suffix(repo);
                 return Some((owner.to_string(), repo.to_string()));
             }
         }
@@ -24,12 +26,21 @@ pub fn extract_owner_repo_from_url(url: &str) -> Option<(String, String)> {
         if let Some((_host, rest)) = without_scheme.split_once('/') {
             let parts: Vec<&str> = rest.split('/').collect();
             if parts.len() >= 2 {
-                let repo = parts[1].trim_end_matches(".git");
+                let repo = strip_git_suffix(parts[1]);
                 return Some((parts[0].to_string(), repo.to_string()));
             }
         }
     }
     None
+}
+
+/// Case-insensitive `.git` suffix strip (remotes vary in casing)
+fn strip_git_suffix(s: &str) -> &str {
+    if s.len() >= 4 && s[s.len() - 4..].eq_ignore_ascii_case(".git") {
+        &s[..s.len() - 4]
+    } else {
+        s
+    }
 }
 
 /// Get Git remote URL from a repository path

@@ -256,3 +256,87 @@ fn test_staging_area_is_created_field_access() {
     };
     assert!(staging_created.is_created);
 }
+// ============================================================================
+// Additional Tests: Path Normalization, Patch Decision Logic
+// ============================================================================
+
+#[test]
+fn test_staging_worktree_path_uniqueness() {
+    // Verify that sequential worktree paths are unique
+    let path1 = std::env::temp_dir().join(format!("baco-staging-{}-{}", std::process::id(), 0));
+    let path2 = std::env::temp_dir().join(format!("baco-staging-{}-{}", std::process::id(), 1));
+
+    assert_ne!(path1, path2);
+    assert!(path1.to_string_lossy().contains("baco-staging-"));
+    assert!(path2.to_string_lossy().contains("baco-staging-"));
+}
+
+#[test]
+fn test_staging_area_path_contains_process_id() {
+    let path = std::env::temp_dir().join(format!("baco-staging-{}-{}", std::process::id(), 0));
+    let path_str = path.to_string_lossy();
+
+    assert!(path_str.contains(&std::process::id().to_string()));
+}
+
+#[test]
+fn test_apply_patch_to_worktree_path_construction() {
+    let worktree_path = PathBuf::from("/tmp/test-worktree");
+    let patch_path = worktree_path.join("patch.diff");
+
+    assert_eq!(patch_path, PathBuf::from("/tmp/test-worktree/patch.diff"));
+}
+
+#[test]
+fn test_staging_area_cleanup_idempotent() {
+    let mut staging = StagingArea {
+        worktree_path: PathBuf::from("/tmp/cleanup-idempotent"),
+        original_repo_path: PathBuf::from("/tmp/repo"),
+        is_created: false,
+    };
+
+    // Cleanup when not created should succeed
+    let result1 = staging.cleanup();
+    assert!(result1.is_ok());
+
+    // Second cleanup should also succeed
+    let result2 = staging.cleanup();
+    assert!(result2.is_ok());
+}
+
+#[test]
+fn test_staging_area_rollback_idempotent() {
+    let mut staging = StagingArea {
+        worktree_path: PathBuf::from("/tmp/rollback-idempotent"),
+        original_repo_path: PathBuf::from("/tmp/repo"),
+        is_created: false,
+    };
+
+    // Rollback when not created should succeed
+    let result1 = staging.rollback();
+    assert!(result1.is_ok());
+
+    // Second rollback should also succeed
+    let result2 = staging.rollback();
+    assert!(result2.is_ok());
+}
+
+#[test]
+fn test_staging_worktree_path_temp_directory() {
+    let temp_dir = std::env::temp_dir();
+    let worktree_path = temp_dir.join(format!("baco-staging-{}-{}", std::process::id(), 0));
+
+    assert!(worktree_path.starts_with(&temp_dir));
+}
+
+#[test]
+fn test_staging_area_original_repo_preserved() {
+    let original_path = PathBuf::from("/original/repo/path");
+    let staging = StagingArea {
+        worktree_path: PathBuf::from("/tmp/worktree"),
+        original_repo_path: original_path.clone(),
+        is_created: true,
+    };
+
+    assert_eq!(staging.original_repo_path, original_path);
+}

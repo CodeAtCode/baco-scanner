@@ -338,3 +338,172 @@ fn test_empty_findings_no_external_urls() {
 
     let _ = fs::remove_file(output_path);
 }
+
+// ============================================================================
+// Template Rendering Guard Tests (Auto-escape)
+// ============================================================================
+
+#[test]
+fn test_auto_escape_html_special_chars_in_title() {
+    // Test that < > & " are properly escaped in finding titles
+    let finding = make_finding(
+        "xss1",
+        Severity::High,
+        "src/test.rs",
+        Some(10),
+        Some("<script>alert('xss')</script>"),
+    );
+    let output_path = "/tmp/test_escape_title.html";
+
+    let _ = fs::remove_file(output_path);
+    let result = generate_html_report(&[finding], output_path, None, None);
+
+    assert!(result.is_ok());
+
+    let content = fs::read_to_string(output_path).expect("Should read HTML");
+
+    // Should NOT contain raw script tags
+    assert!(
+        !content.contains("<script>alert"),
+        "Raw script tags should be escaped"
+    );
+
+    // Should contain escaped version
+    assert!(
+        content.contains("&lt;script&gt;") || content.contains("&amp;lt;script&amp;gt;"),
+        "Script tags should be HTML-escaped"
+    );
+
+    let _ = fs::remove_file(output_path);
+}
+
+#[test]
+fn test_auto_escape_html_special_chars_in_description() {
+    // Test that special chars are escaped in descriptions
+    let mut finding = make_finding(
+        "xss2",
+        Severity::High,
+        "src/test.rs",
+        Some(10),
+        Some("Test"),
+    );
+    finding.description = "<div>malicious</div> & <span>code</span>".to_string();
+    let output_path = "/tmp/test_escape_desc.html";
+
+    let _ = fs::remove_file(output_path);
+    let result = generate_html_report(&[finding], output_path, None, None);
+
+    assert!(result.is_ok());
+
+    let content = fs::read_to_string(output_path).expect("Should read HTML");
+
+    // Should NOT contain raw div/span tags from description
+    assert!(
+        !content.contains("<div>malicious</div>"),
+        "Raw HTML in description should be escaped"
+    );
+
+    // Should contain escaped version
+    assert!(
+        content.contains("&lt;div&gt;") || content.contains("&amp;lt;div&amp;gt;"),
+        "HTML tags should be escaped in description"
+    );
+
+    let _ = fs::remove_file(output_path);
+}
+
+#[test]
+fn test_auto_escape_html_special_chars_in_file_path() {
+    // Test that special chars are escaped in file paths
+    let mut finding = make_finding(
+        "xss3",
+        Severity::High,
+        "src/test.rs",
+        Some(10),
+        Some("Test"),
+    );
+    finding.file_path = "src/<script>evil</script>.rs".to_string();
+    let output_path = "/tmp/test_escape_path.html";
+
+    let _ = fs::remove_file(output_path);
+    let result = generate_html_report(&[finding], output_path, None, None);
+
+    assert!(result.is_ok());
+
+    let content = fs::read_to_string(output_path).expect("Should read HTML");
+
+    // Should NOT contain raw script tags in file path
+    assert!(
+        !content.contains("<script>evil</script>"),
+        "Raw script tags in file path should be escaped"
+    );
+
+    // Should contain escaped version
+    assert!(
+        content.contains("&lt;script&gt;") || content.contains("&amp;lt;script&amp;gt;"),
+        "Script tags should be escaped in file path"
+    );
+
+    let _ = fs::remove_file(output_path);
+}
+
+#[test]
+fn test_no_unclosed_tags_on_malicious_input() {
+    // Test that unclosed tags in input don't break HTML structure
+    let mut finding = make_finding(
+        "xss4",
+        Severity::High,
+        "src/test.rs",
+        Some(10),
+        Some("Test"),
+    );
+    finding.description = "<div>unclosed".to_string();
+    let output_path = "/tmp/test_unclosed.html";
+
+    let _ = fs::remove_file(output_path);
+    let result = generate_html_report(&[finding], output_path, None, None);
+
+    assert!(result.is_ok());
+
+    let content = fs::read_to_string(output_path).expect("Should read HTML");
+
+    // HTML should still be well-formed - check for balanced body/html tags
+    let body_open = content.matches("<body>").count();
+    let body_close = content.matches("</body>").count();
+    let html_open = content.matches("<html").count();
+    let html_close = content.matches("</html>").count();
+
+    assert_eq!(body_open, body_close, "Body tags should be balanced");
+    assert_eq!(html_open, html_close, "HTML tags should be balanced");
+
+    let _ = fs::remove_file(output_path);
+}
+
+#[test]
+fn test_auto_escape_quotes_in_content() {
+    // Test that quotes are properly escaped
+    let mut finding = make_finding(
+        "xss5",
+        Severity::High,
+        "src/test.rs",
+        Some(10),
+        Some("Test"),
+    );
+    finding.description = "He said \"Hello & Goodbye\"".to_string();
+    let output_path = "/tmp/test_escape_quotes.html";
+
+    let _ = fs::remove_file(output_path);
+    let result = generate_html_report(&[finding], output_path, None, None);
+
+    assert!(result.is_ok());
+
+    let content = fs::read_to_string(output_path).expect("Should read HTML");
+
+    // Should contain escaped quotes
+    assert!(
+        content.contains("&quot;") || content.contains("&#39;"),
+        "Quotes should be HTML-escaped"
+    );
+
+    let _ = fs::remove_file(output_path);
+}

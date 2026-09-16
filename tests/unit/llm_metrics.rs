@@ -2,7 +2,7 @@
 //!
 //! Covers: LlmMetricsTracker, ModelMetrics, OperationMetrics, LlmMetrics
 
-use baco::llm_metrics::{
+use baco::llm::metrics::{
     LlmMetrics, LlmMetricsTracker, ModelMetrics, OperationMetrics, RecordRequestParams,
 };
 

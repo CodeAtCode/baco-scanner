@@ -74,26 +74,31 @@ pub struct SuiteReport {
     pub aggregate: f32,
 }
 
-/// Resolve the eval-suite floor: `BACO_EVAL_FLOOR` if set (must parse as f32 in 0.0..=1.0),
-/// otherwise [`DEFAULT_EVAL_FLOOR`].
-pub fn eval_floor() -> Result<f32, String> {
+/// Resolve the eval-suite floor: `BACO_EVAL_FLOOR` env override (must parse as f32
+/// in 0.0..=1.0), otherwise the `[eval] floor` config value. Returns the winning
+/// value together with a label naming its source.
+pub fn eval_floor(config_floor: f32) -> Result<(f32, &'static str), String> {
     let Ok(raw) = std::env::var("BACO_EVAL_FLOOR") else {
-        return Ok(DEFAULT_EVAL_FLOOR);
+        return validate_floor(config_floor, "eval.floor");
     };
     let raw = raw.trim();
     if raw.is_empty() {
-        return Ok(DEFAULT_EVAL_FLOOR);
+        return validate_floor(config_floor, "eval.floor");
     }
     let floor: f32 = raw
         .parse()
         .map_err(|e| format!("Invalid BACO_EVAL_FLOOR '{}': {}", raw, e))?;
+    validate_floor(floor, "BACO_EVAL_FLOOR")
+}
+
+fn validate_floor(floor: f32, source: &'static str) -> Result<(f32, &'static str), String> {
     if !(0.0..=1.0).contains(&floor) {
         return Err(format!(
-            "BACO_EVAL_FLOOR must be between 0.0 and 1.0, got {}",
-            floor
+            "{} must be between 0.0 and 1.0, got {}",
+            source, floor
         ));
     }
-    Ok(floor)
+    Ok((floor, source))
 }
 
 /// Run the offline eval suite over every target discovered under `eval_root`.

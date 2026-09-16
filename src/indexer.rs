@@ -74,6 +74,15 @@ impl FileIndex {
                 continue;
             }
 
+            // Hidden files (dotfiles) are not source targets
+            if entry
+                .file_name()
+                .to_str()
+                .is_some_and(|n| n.starts_with('.'))
+            {
+                continue;
+            }
+
             // Symlink containment: resolve real path and check it's under the scan root
             if entry
                 .path()
@@ -103,7 +112,9 @@ impl FileIndex {
                 .extension()
                 .and_then(|e: &std::ffi::OsStr| e.to_str())
             {
-                if let Some(lang) = lang_extensions.get(ext) {
+                // Extension matching is case-insensitive (test.C is C)
+                let ext = ext.to_lowercase();
+                if let Some(lang) = lang_extensions.get(&ext) {
                     let hash = if let Some(ref store) = previous_hash_store {
                         store.get_hash(entry_path).cloned()
                     } else {
@@ -174,6 +185,15 @@ impl FileIndex {
                 continue;
             }
 
+            // Hidden files (dotfiles) are not source targets
+            if entry
+                .file_name()
+                .to_str()
+                .is_some_and(|n| n.starts_with('.'))
+            {
+                continue;
+            }
+
             // Symlink containment: resolve real path and check it's under the scan root
             if entry
                 .path()
@@ -203,7 +223,9 @@ impl FileIndex {
                 .extension()
                 .and_then(|e: &std::ffi::OsStr| e.to_str())
             {
-                if let Some(lang) = lang_extensions.get(ext) {
+                // Extension matching is case-insensitive (test.C is C)
+                let ext = ext.to_lowercase();
+                if let Some(lang) = lang_extensions.get(&ext) {
                     all_files.push(FileInfo {
                         path: entry_path.to_path_buf(),
                         size,

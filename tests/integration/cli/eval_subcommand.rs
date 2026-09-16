@@ -282,6 +282,114 @@ fn test_eval_suite_invalid_floor_value_fails() {
     );
 }
 
+/// Write a temp config file containing the given `[eval]` floor and return its path.
+fn write_eval_config(floor: &str) -> std::path::PathBuf {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let path = std::env::temp_dir().join(format!(
+        "baco-eval-cfg-{}-{}.toml",
+        std::process::id(),
+        COUNTER.fetch_add(1, Ordering::Relaxed)
+    ));
+    std::fs::write(&path, format!("[eval]\nfloor = {}\n", floor)).expect("write temp config");
+    path
+}
+
+/// Like `run_baco_eval` but with an explicit `--config` argument.
+fn run_baco_eval_with_config(
+    args: &[&str],
+    env_floor: Option<&str>,
+    config: &std::path::Path,
+) -> std::process::Output {
+    let mut cmd = std::process::Command::new("cargo");
+    cmd.args(["run", "--bin", "baco", "--", "eval"])
+        .arg("--config")
+        .arg(config)
+        .args(args);
+    match env_floor {
+        Some(value) => {
+            cmd.env("BACO_EVAL_FLOOR", value);
+        }
+        None => {
+            cmd.env_remove("BACO_EVAL_FLOOR");
+        }
+    }
+    cmd.output().expect("Failed to run baco eval")
+}
+
+#[test]
+fn test_eval_suite_config_floor_used() {
+    let config = write_eval_config("0.5");
+    let output = run_baco_eval_with_config(&[], None, &config);
+
+    assert!(
+        output.status.success(),
+        "config floor 0.5 with a 100% aggregate should pass, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("Floor: 0.50 (eval.floor)"),
+        "Should name eval.floor as the active source, got: {}",
+        stdout
+    );
+}
+
+#[test]
+fn test_eval_suite_config_floor_one_fails() {
+    // Strictly-greater semantics make floor 1.0 impossible to exceed
+    let config = write_eval_config("1.0");
+    let output = run_baco_eval_with_config(&[], None, &config);
+
+    assert!(
+        !output.status.success(),
+        "config floor 1.0 must make the suite exit non-zero"
+    );
+}
+
+#[test]
+fn test_eval_suite_config_floor_invalid_rejected() {
+    let config = write_eval_config("1.5");
+    let output = run_baco_eval_with_config(&[], None, &config);
+
+    assert!(
+        !output.status.success(),
+        "An out-of-range config floor must fail loudly"
+    );
+
+    let combined = format!(
+        "{} {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        combined.contains("between 0.0 and 1.0"),
+        "Should explain the invalid floor, got: {}",
+        combined
+    );
+}
+
+#[test]
+fn test_eval_suite_env_overrides_config_floor() {
+    // env 0.5 must win over a config floor (1.0) that would fail the suite
+    let config = write_eval_config("1.0");
+    let output = run_baco_eval_with_config(&[], Some("0.5"), &config);
+
+    assert!(
+        output.status.success(),
+        "BACO_EVAL_FLOOR=0.5 must override config floor 1.0, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("Floor: 0.50 (BACO_EVAL_FLOOR)"),
+        "Should name BACO_EVAL_FLOOR as the active source, got: {}",
+        stdout
+    );
+}
+
 #[test]
 fn test_eval_all_flag_rejects_combined_args() {
     let output = run_baco_eval(&["--all", "--target", "somewhere"], None);

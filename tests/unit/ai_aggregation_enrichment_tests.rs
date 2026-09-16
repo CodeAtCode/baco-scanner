@@ -480,3 +480,181 @@ fn test_extract_json_field_field_at_start_of_json() {
 
     assert_eq!(result, Some("First field".to_string()));
 }
+// ============================================================================
+// build_volatile_enrichment_tail tests (0 refs - pure function coverage)
+// ============================================================================
+
+#[test]
+fn test_build_volatile_enrichment_tail_empty_findings() {
+    use baco::report::ai_aggregation::enrichment::build_volatile_enrichment_tail;
+
+    let findings: Vec<VulnerabilityFinding> = vec![];
+    let result = build_volatile_enrichment_tail(&findings);
+
+    // No finding entries, but the closing instruction is always present
+    assert!(!result.contains("Finding #"));
+    assert!(result.contains("Return JSON array now."));
+}
+
+#[test]
+fn test_build_volatile_enrichment_tail_single_finding() {
+    use baco::report::ai_aggregation::enrichment::build_volatile_enrichment_tail;
+
+    let finding = create_finding("f1", "Test", Severity::High, "src/test.rs");
+    let findings = vec![finding];
+    let result = build_volatile_enrichment_tail(&findings);
+
+    // The tail identifies findings by index + title, not by id
+    assert!(result.contains("Finding #0"));
+    assert!(result.contains("Test"));
+    assert!(result.contains("src/test.rs"));
+}
+
+#[test]
+fn test_build_volatile_enrichment_tail_multiple_findings() {
+    use baco::report::ai_aggregation::enrichment::build_volatile_enrichment_tail;
+
+    let findings = vec![
+        create_finding("f1", "Test 1", Severity::High, "src/test1.rs"),
+        create_finding("f2", "Test 2", Severity::Critical, "src/test2.rs"),
+        create_finding("f3", "Test 3", Severity::Low, "src/test3.rs"),
+    ];
+    let result = build_volatile_enrichment_tail(&findings);
+
+    assert!(result.contains("Finding #0"));
+    assert!(result.contains("Finding #1"));
+    assert!(result.contains("Finding #2"));
+    assert!(result.contains("Test 1"));
+    assert!(result.contains("Test 2"));
+    assert!(result.contains("Test 3"));
+}
+
+#[test]
+fn test_build_volatile_enrichment_tail_includes_severity() {
+    use baco::report::ai_aggregation::enrichment::build_volatile_enrichment_tail;
+
+    let finding = create_finding("f1", "Test", Severity::Critical, "src/test.rs");
+    let findings = vec![finding];
+    let result = build_volatile_enrichment_tail(&findings);
+
+    assert!(result.contains("Critical"));
+}
+
+#[test]
+fn test_build_volatile_enrichment_tail_includes_file_path() {
+    use baco::report::ai_aggregation::enrichment::build_volatile_enrichment_tail;
+
+    let finding = create_finding("f1", "Test", Severity::High, "src/path/to/file.rs");
+    let findings = vec![finding];
+    let result = build_volatile_enrichment_tail(&findings);
+
+    assert!(result.contains("src/path/to/file.rs"));
+}
+
+// ============================================================================
+// Enrichment Merge Precedence Tests
+// ============================================================================
+
+#[tokio::test]
+async fn test_enrichment_merge_precedence_description() {
+    let config = create_empty_config();
+    let service = EnrichmentService::new(&config);
+
+    let mut finding = create_finding("f1", "Test", Severity::High, "src/test.rs");
+    finding.description = "Existing description".to_string();
+    let findings = vec![finding];
+
+    let (enriched, _) = service.enrich_findings(&findings).await;
+
+    // With no client, existing description should be preserved
+    assert_eq!(enriched[0].description, "Existing description");
+}
+
+#[tokio::test]
+async fn test_enrichment_merge_precedence_recommendation() {
+    let config = create_empty_config();
+    let service = EnrichmentService::new(&config);
+
+    let mut finding = create_finding("f1", "Test", Severity::High, "src/test.rs");
+    finding.recommendation = Some("Existing recommendation".to_string());
+    let findings = vec![finding];
+
+    let (enriched, _) = service.enrich_findings(&findings).await;
+
+    // With no client, existing recommendation should be preserved
+    assert_eq!(
+        enriched[0].recommendation,
+        Some("Existing recommendation".to_string())
+    );
+}
+
+#[tokio::test]
+async fn test_enrichment_merge_precedence_cwe_id() {
+    let config = create_empty_config();
+    let service = EnrichmentService::new(&config);
+
+    let mut finding = create_finding("f1", "Test", Severity::High, "src/test.rs");
+    finding.cwe_id = Some("CWE-79".to_string());
+    let findings = vec![finding];
+
+    let (enriched, _) = service.enrich_findings(&findings).await;
+
+    // With no client, existing CWE ID should be preserved
+    assert_eq!(enriched[0].cwe_id, Some("CWE-79".to_string()));
+}
+
+// ============================================================================
+// Volatile Tail Trimming Tests
+// ============================================================================
+
+#[test]
+fn test_build_volatile_enrichment_tail_trim_long_title() {
+    use baco::report::ai_aggregation::enrichment::build_volatile_enrichment_tail;
+
+    let finding = create_finding(
+        "f1",
+        "Very Long Title That Exceeds Normal Length Limits",
+        Severity::High,
+        "src/test.rs",
+    );
+    let findings = vec![finding];
+    let result = build_volatile_enrichment_tail(&findings);
+
+    // Should handle long titles gracefully
+    assert!(result.contains("Finding #0"));
+    assert!(result.contains("Very Long Title"));
+}
+
+#[test]
+fn test_build_volatile_enrichment_tail_trim_long_file_path() {
+    use baco::report::ai_aggregation::enrichment::build_volatile_enrichment_tail;
+
+    let finding = create_finding(
+        "f1",
+        "Test",
+        Severity::High,
+        "very/long/path/to/src/test.rs",
+    );
+    let findings = vec![finding];
+    let result = build_volatile_enrichment_tail(&findings);
+
+    // Should handle long file paths gracefully
+    assert!(result.contains("very/long/path/to/src/test.rs"));
+}
+
+#[test]
+fn test_build_volatile_enrichment_tail_consistent_formatting() {
+    use baco::report::ai_aggregation::enrichment::build_volatile_enrichment_tail;
+
+    let findings = vec![
+        create_finding("f1", "Test 1", Severity::High, "src/test1.rs"),
+        create_finding("f2", "Test 2", Severity::Critical, "src/test2.rs"),
+    ];
+    let result = build_volatile_enrichment_tail(&findings);
+
+    // Should have consistent formatting for multiple findings
+    assert!(result.contains("Finding #0"));
+    assert!(result.contains("Finding #1"));
+    assert!(result.contains("Test 1"));
+    assert!(result.contains("Test 2"));
+}
