@@ -35,7 +35,7 @@ enum Commands {
         evidence_gate: bool,
         #[arg(long, help = "Print estimate and exit before LLM/semgrep phases")]
         dry_run: bool,
-        #[arg(long, help = "Preset name (not yet available)")]
+        #[arg(long, help = "Preset name")]
         preset: Option<String>,
     },
     Resume {
@@ -133,11 +133,6 @@ async fn main() {
         logger.without_time().init();
     } else {
         logger.init();
-    }
-
-    // Exit early if quiet mode suppresses everything else
-    if cli.quiet {
-        // Only show errors via tracing's error! macro
     }
 
     match cli.command {
@@ -246,10 +241,12 @@ async fn main() {
                     std::process::exit(1);
                 };
                 info!("Running eval on target: {:?}", target);
-                run_eval(&target, &ground_truth, findings, cli.quiet).unwrap_or_else(|e| {
-                    tracing::error!("Eval failed: {}", e);
-                    std::process::exit(1);
-                });
+                run_eval(&target, &ground_truth, findings, cli.quiet)
+                    .await
+                    .unwrap_or_else(|e| {
+                        tracing::error!("Eval failed: {}", e);
+                        std::process::exit(1);
+                    });
             }
         }
         Commands::Preset { action } => run_preset_command(action, cli.quiet),
@@ -345,15 +342,9 @@ async fn run_scan(
             checkpoint_path.display()
         );
         tracing::info!(
-            "Auto-resuming from last phase. Use 'baco resume --checkpoint {}' for manual control.",
-            checkpoint_path.display()
+            "Checkpoint exists. Scan will start fresh. Use --resume for continuation or delete checkpoint to start clean."
         );
     }
-
-    if !quiet {
-        tracing::info!("Running scanner pipeline...");
-    }
-
     // Use a simple message instead of spinner - scanner will show its own progress bar
     if !quiet {
         eprintln!("Initializing scanner...");
@@ -778,7 +769,8 @@ fn run_report(input: &Path, format: &str, quiet: bool) -> Result<(), Box<dyn std
         "html" => output_dir.join("report.html"),
         "json" => output_dir.join("findings.json"),
         "sarif" => output_dir.join("report.sarif"),
-        _ => output_dir.join(format),
+        "markdown" => output_dir.join("report.md"),
+        _ => return Err(format!("Unsupported report format: {}", format).into()),
     };
 
     if !quiet {
@@ -817,7 +809,13 @@ fn run_report(input: &Path, format: &str, quiet: bool) -> Result<(), Box<dyn std
         "markdown" => {
             use baco::report::markdown::generate_markdown_report;
             let md_path = output_path.clone();
-            let md_content = generate_markdown_report(&findings, "unknown");
+            // Derive project name from input directory name
+            let project_name = input
+                .parent()
+                .and_then(|p| p.file_name())
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| "unknown".to_string());
+            let md_content = generate_markdown_report(&findings, &project_name);
             std::fs::write(&md_path, md_content)
                 .map_err(|e| format!("Failed to write markdown report: {}", e))?;
             if !quiet {
@@ -965,16 +963,12 @@ fn run_preset_command(action: PresetCommands, quiet: bool) {
             match preset::load_preset(&name) {
                 Ok(_) => {
                     // For show, we need to read the raw TOML content
-                    // Try bundled first
-                    if let Some(content) = preset_content(&name) {
+                    // Try bundled first (single source of truth - has all 8 presets)
+                    if let Some(content) = preset::get_bundled_preset_for_display(&name) {
                         println!("{}", content);
                     } else {
                         // Try user directory
-                        let user_path = preset::home_dir()
-                            .join(".config")
-                            .join("baco")
-                            .join("presets")
-                            .join(format!("{}.toml", name));
+                        let user_path = preset::user_preset_path(&name);
                         if user_path.exists() {
                             match std::fs::read_to_string(&user_path) {
                                 Ok(content) => println!("{}", content),
@@ -995,17 +989,6 @@ fn run_preset_command(action: PresetCommands, quiet: bool) {
                 }
             }
         }
-    }
-}
-
-fn preset_content(name: &str) -> Option<&'static str> {
-    match name {
-        "wordpress-core" => Some(include_str!("../presets/wordpress-core.toml")),
-        "wordpress-plugin" => Some(include_str!("../presets/wordpress-plugin.toml")),
-        "litellm" => Some(include_str!("../presets/litellm.toml")),
-        "oss-python" => Some(include_str!("../presets/oss-python.toml")),
-        "oss-monorepo" => Some(include_str!("../presets/oss-monorepo.toml")),
-        _ => None,
     }
 }
 
@@ -1081,7 +1064,7 @@ fn run_eval_suite(
     }
 }
 
-fn run_eval(
+async fn run_eval(
     target: &Path,
     ground_truth: &Path,
     findings_path: Option<PathBuf>,
@@ -1126,7 +1109,7 @@ fn run_eval(
         std::fs::create_dir_all(&output_dir)?;
 
         let scanner = baco::scanner::Scanner::new(config, target.to_path_buf(), false);
-        tokio::runtime::Handle::current().block_on(scanner.run())?
+        scanner.run().await?
     };
 
     // Score findings against oracle

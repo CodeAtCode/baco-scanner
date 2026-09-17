@@ -216,3 +216,88 @@ fn test_env_var_count_matches_docs() {
         llm_env_vars
     );
 }
+
+/// Count integrated papers from research-integration.md table
+fn count_papers_from_research_integration() -> usize {
+    let content = include_str!("../../docs/research-integration.md");
+
+    // Count table rows in the Integration Status Summary table
+    // Pattern: | Paper Name | ... | Status |
+    let mut count = 0;
+    for line in content.lines() {
+        if line.trim().starts_with('|')
+            && line.contains('|')
+            && !line.contains("| Paper |")  // skip header
+            && !line.contains("|-------|")
+        // skip separator
+        {
+            count += 1;
+        }
+    }
+    count
+}
+
+#[test]
+fn test_papers_count_matches_research_integration() {
+    let papers_count = count_papers_from_research_integration();
+
+    let readme = include_str!("../../README.md");
+    let docs_readme = include_str!("../../docs/README.md");
+    let research_doc = include_str!("../../docs/research-integration.md");
+    let contributing = include_str!("../../CONTRIBUTING.md");
+
+    // All docs should cite the same papers count
+    let re = regex::Regex::new(r"(\d+)\s*papers?").unwrap();
+
+    // Check README and docs/README.md. Lines mentioning the SURVEY are skipped:
+    // the survey cites 36 SURVEYED papers — a different, true number. Only the
+    // integrated count must match research-integration.md.
+    for (label, text) in [("README.md", readme), ("docs/README.md", docs_readme)] {
+        for line in text.lines() {
+            if line.to_lowercase().contains("survey") {
+                continue;
+            }
+            for cap in re.captures_iter(line) {
+                let count: usize = cap[1].parse().unwrap();
+                if count > 10 {
+                    assert_eq!(
+                        count, papers_count,
+                        "{} cites {} papers but docs/research-integration.md has {} entries",
+                        label, count, papers_count
+                    );
+                }
+            }
+        }
+    }
+
+    // Check research-integration.md itself
+    for line in research_doc.lines() {
+        if line.to_lowercase().contains("survey") {
+            continue;
+        }
+        for cap in re.captures_iter(line) {
+            let count: usize = cap[1].parse().unwrap();
+            if count > 10 {
+                assert_eq!(
+                    count, papers_count,
+                    "docs/research-integration.md cites {} papers but has {} entries",
+                    count, papers_count
+                );
+            }
+        }
+    }
+
+    // Check CONTRIBUTING.md if it exists and mentions papers
+    if contributing.contains("paper") || contributing.contains("Paper") {
+        for cap in re.captures_iter(contributing) {
+            let count: usize = cap[1].parse().unwrap();
+            if count > 10 {
+                assert_eq!(
+                    count, papers_count,
+                    "CONTRIBUTING.md cites {} papers but docs/research-integration.md has {} entries",
+                    count, papers_count
+                );
+            }
+        }
+    }
+}

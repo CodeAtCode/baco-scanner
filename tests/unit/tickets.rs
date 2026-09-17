@@ -453,8 +453,8 @@ async fn test_search_github_with_cve_id() {
     mock.assert_async().await;
 }
 
-#[tokio::test]
-async fn test_ticket_reference_clone_and_debug() {
+#[test]
+fn test_ticket_reference_clone_and_debug() {
     let reference = TicketReference {
         ticket_id: "123".to_string(),
         ticket_url: "https://github.com/owner/repo/issues/123".to_string(),
@@ -1082,8 +1082,8 @@ async fn test_search_gitlab_with_authentication_keyword() {
     mock.assert_async().await;
 }
 
-#[tokio::test]
-async fn test_ticket_searcher_new() {
+#[test]
+fn test_ticket_searcher_new() {
     use baco::tickets::{TicketSearcher, TicketSystem};
 
     let systems = vec![TicketSystem {
@@ -1335,8 +1335,8 @@ async fn test_search_long_string() {
     assert_eq!(results.len(), 0);
 }
 
-#[tokio::test]
-async fn test_search_reference_struct() {
+#[test]
+fn test_search_reference_struct() {
     let reference = TicketReference {
         ticket_id: "TEST-123".to_string(),
         ticket_url: "https://example.com/test/123".to_string(),

@@ -689,8 +689,8 @@ fn test_parse_go_mod_nonexistent_path() {
 // CVE Enrichment Tests (using mockito)
 // ============================================================================
 
-#[tokio::test]
-async fn test_cve_enrichment_cwe_match() {
+#[test]
+fn test_cve_enrichment_cwe_match() {
     use baco::evidence::EvidenceSource;
     use baco::findings::Severity;
 
@@ -756,8 +756,8 @@ async fn test_cve_enrichment_cwe_match() {
     assert!(finding.evidence[0].detail.contains("CVE-2024-1234"));
 }
 
-#[tokio::test]
-async fn test_cve_enrichment_no_match() {
+#[test]
+fn test_cve_enrichment_no_match() {
     use baco::findings::Severity;
 
     // Create a finding with no matching CVE CWE
@@ -804,8 +804,8 @@ async fn test_cve_enrichment_no_match() {
     assert_eq!(finding.evidence.len(), initial_evidence_count);
 }
 
-#[tokio::test]
-async fn test_cve_enrichment_empty_findings() {
+#[test]
+fn test_cve_enrichment_empty_findings() {
     use baco::cve_bootstrap::CveBootstrapper;
 
     let temp_dir = TempDir::new().unwrap();

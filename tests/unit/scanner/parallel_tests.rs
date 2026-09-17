@@ -500,8 +500,8 @@ fn test_combine_parallel_results_preserves_initial_findings_order() {
 // Tests migrated from src/scanner/parallel.rs inline #[cfg(test)] block
 // ============================================================================
 
-#[tokio::test]
-async fn test_combine_parallel_results_with_all_success_inline_migrated() {
+#[test]
+fn test_combine_parallel_results_with_all_success_inline_migrated() {
     let findings = vec![create_test_finding_simple("Initial", Severity::Low)];
 
     let indexing_result = Ok((
@@ -532,8 +532,8 @@ async fn test_combine_parallel_results_with_all_success_inline_migrated() {
     assert_eq!(analyzed_files[0], "file3.rs");
 }
 
-#[tokio::test]
-async fn test_combine_parallel_results_with_none_results_inline_migrated() {
+#[test]
+fn test_combine_parallel_results_with_none_results_inline_migrated() {
     let findings = vec![create_test_finding_simple("Initial", Severity::Low)];
 
     let (combined_findings, analyzed_files) = combine_parallel_results(findings, None, None, None);
@@ -543,8 +543,8 @@ async fn test_combine_parallel_results_with_none_results_inline_migrated() {
     assert!(analyzed_files.is_empty());
 }
 
-#[tokio::test]
-async fn test_combine_parallel_results_with_error_results_inline_migrated() {
+#[test]
+fn test_combine_parallel_results_with_error_results_inline_migrated() {
     let findings = vec![create_test_finding_simple("Initial", Severity::Low)];
 
     let indexing_result = Err("Indexing failed".to_string());
@@ -562,8 +562,8 @@ async fn test_combine_parallel_results_with_error_results_inline_migrated() {
     assert!(analyzed_files.is_empty());
 }
 
-#[tokio::test]
-async fn test_combine_parallel_results_partial_success_inline_migrated() {
+#[test]
+fn test_combine_parallel_results_partial_success_inline_migrated() {
     let findings = vec![create_test_finding_simple("Initial", Severity::Low)];
 
     let indexing_result = Ok((
@@ -590,8 +590,8 @@ async fn test_combine_parallel_results_partial_success_inline_migrated() {
     assert_eq!(analyzed_files[0], "file3.rs");
 }
 
-#[tokio::test]
-async fn test_parallel_phase_config_creation_inline_migrated() {
+#[test]
+fn test_parallel_phase_config_creation_inline_migrated() {
     let pb = ProgressBar::hidden();
     let completed_phases: [ScanPhase; 2] = [ScanPhase::Indexing, ScanPhase::Semgrep];
 
@@ -609,8 +609,8 @@ async fn test_parallel_phase_config_creation_inline_migrated() {
     assert_eq!(config.completed_phases.len(), 2);
 }
 
-#[tokio::test]
-async fn test_parallel_phase_result_creation_inline_migrated() {
+#[test]
+fn test_parallel_phase_result_creation_inline_migrated() {
     let findings = vec![create_test_finding_simple("Test", Severity::High)];
     let duration = Duration::from_secs(42);
 

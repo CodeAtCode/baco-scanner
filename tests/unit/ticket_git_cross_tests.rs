@@ -36,15 +36,15 @@ fn create_test_scanner(config: ScannerConfig, temp_dir: &TempDir) -> Scanner {
 // run_ticket_cross_ref Tests
 // ============================================================================
 
-#[tokio::test]
-async fn test_ticket_cross_ref_with_empty_findings() {
+#[test]
+fn test_ticket_cross_ref_with_empty_findings() {
     // Empty findings should return empty results
     let findings: Vec<VulnerabilityFinding> = vec![];
     assert!(findings.is_empty());
 }
 
-#[tokio::test]
-async fn test_ticket_cross_ref_with_multiple_findings() {
+#[test]
+fn test_ticket_cross_ref_with_multiple_findings() {
     let temp_dir = TempDir::new().unwrap();
     let config = ScannerConfig::default();
     let scanner = create_test_scanner(config, &temp_dir);
@@ -61,8 +61,8 @@ async fn test_ticket_cross_ref_with_multiple_findings() {
     let _ = scanner;
 }
 
-#[tokio::test]
-async fn test_ticket_cross_ref_preserves_finding_data() {
+#[test]
+fn test_ticket_cross_ref_preserves_finding_data() {
     let temp_dir = TempDir::new().unwrap();
     let config = ScannerConfig::default();
     let scanner = create_test_scanner(config, &temp_dir);
@@ -80,8 +80,8 @@ async fn test_ticket_cross_ref_preserves_finding_data() {
     let _ = scanner;
 }
 
-#[tokio::test]
-async fn test_ticket_cross_ref_with_no_ticket_systems() {
+#[test]
+fn test_ticket_cross_ref_with_no_ticket_systems() {
     let temp_dir = TempDir::new().unwrap();
     let config = ScannerConfig::default();
 
@@ -96,8 +96,8 @@ async fn test_ticket_cross_ref_with_no_ticket_systems() {
 // run_git_analysis Tests
 // ============================================================================
 
-#[tokio::test]
-async fn test_git_analysis_with_nonexistent_path() {
+#[test]
+fn test_git_analysis_with_nonexistent_path() {
     let config = ScannerConfig::default();
     let _scanner = Scanner::new(config, PathBuf::from("/nonexistent/path"), false);
 
@@ -106,8 +106,8 @@ async fn test_git_analysis_with_nonexistent_path() {
     assert!(remote_url.is_none());
 }
 
-#[tokio::test]
-async fn test_git_analysis_with_empty_path() {
+#[test]
+fn test_git_analysis_with_empty_path() {
     let config = ScannerConfig::default();
     let _scanner = Scanner::new(config, PathBuf::from(""), false);
 
@@ -115,8 +115,8 @@ async fn test_git_analysis_with_empty_path() {
     assert!(remote_url.is_none());
 }
 
-#[tokio::test]
-async fn test_git_analysis_preserves_findings_without_git() {
+#[test]
+fn test_git_analysis_preserves_findings_without_git() {
     let temp_dir = TempDir::new().unwrap();
     let config = ScannerConfig::default();
     let scanner = create_test_scanner(config, &temp_dir);
@@ -138,8 +138,8 @@ async fn test_git_analysis_preserves_findings_without_git() {
 // run_cross_file_analysis Tests
 // ============================================================================
 
-#[tokio::test]
-async fn test_cross_file_analysis_with_empty_findings() {
+#[test]
+fn test_cross_file_analysis_with_empty_findings() {
     let temp_dir = TempDir::new().unwrap();
     let config = ScannerConfig::default();
     let scanner = create_test_scanner(config, &temp_dir);
@@ -151,8 +151,8 @@ async fn test_cross_file_analysis_with_empty_findings() {
     let _ = scanner;
 }
 
-#[tokio::test]
-async fn test_cross_file_analysis_with_multiple_findings() {
+#[test]
+fn test_cross_file_analysis_with_multiple_findings() {
     let temp_dir = TempDir::new().unwrap();
     let config = ScannerConfig::default();
     let scanner = create_test_scanner(config, &temp_dir);
@@ -168,8 +168,8 @@ async fn test_cross_file_analysis_with_multiple_findings() {
     let _ = scanner;
 }
 
-#[tokio::test]
-async fn test_cross_file_analysis_preserves_finding_ids() {
+#[test]
+fn test_cross_file_analysis_preserves_finding_ids() {
     let temp_dir = TempDir::new().unwrap();
     let config = ScannerConfig::default();
     let scanner = create_test_scanner(config, &temp_dir);
@@ -277,8 +277,8 @@ fn test_extract_owner_repo_from_url_whitespace() {
 // Edge Cases
 // ============================================================================
 
-#[tokio::test]
-async fn test_phase_with_many_findings() {
+#[test]
+fn test_phase_with_many_findings() {
     let temp_dir = TempDir::new().unwrap();
     let config = ScannerConfig::default();
     let scanner = create_test_scanner(config, &temp_dir);
@@ -300,8 +300,8 @@ async fn test_phase_with_many_findings() {
     let _ = scanner;
 }
 
-#[tokio::test]
-async fn test_phase_with_various_severities() {
+#[test]
+fn test_phase_with_various_severities() {
     let temp_dir = TempDir::new().unwrap();
     let config = ScannerConfig::default();
     let scanner = create_test_scanner(config, &temp_dir);
@@ -322,8 +322,8 @@ async fn test_phase_with_various_severities() {
     let _ = scanner;
 }
 
-#[tokio::test]
-async fn test_phase_with_special_filenames() {
+#[test]
+fn test_phase_with_special_filenames() {
     let temp_dir = TempDir::new().unwrap();
     let config = ScannerConfig::default();
     let scanner = create_test_scanner(config, &temp_dir);

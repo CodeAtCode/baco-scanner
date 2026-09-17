@@ -1013,6 +1013,8 @@ impl AsyncLlmClient for LlmClient {
     }
 }
 
+/// Abstraction point for test mocking of LLM providers (no production implementors
+/// by design: LlmClient implements its own async methods directly).
 pub trait LlmProvider {
     fn chat(&self, messages: &[ChatMessage]) -> Result<String, ScanError>;
 }

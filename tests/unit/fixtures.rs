@@ -392,7 +392,6 @@ pub fn create_test_config_all_features() -> ScannerConfig {
     config.scanner.performance.enable_confidence_refinement = true;
     config.scanner.performance.enable_threat_modeling = true;
     config.scanner.performance.enable_root_cause_dedup = true;
-    config.scanner.performance.enable_multi_verifier = true;
     config.scanner.performance.enable_auto_patching = true;
     config.scanner.performance.enable_cve_bootstrap = true;
     config.scanner.performance.enable_poc_compilation = true;

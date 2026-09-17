@@ -432,8 +432,8 @@ async fn test_parallel_stress_50_concurrent_tasks() {
 }
 
 /// Test that demonstrates the pattern for migrating serial_test to parallel-safe code
-#[tokio::test]
-async fn migration_example_env_var_pattern() {
+#[test]
+fn migration_example_env_var_pattern() {
     // BEFORE (requires serial):
     // #[test]
     // #[serial]

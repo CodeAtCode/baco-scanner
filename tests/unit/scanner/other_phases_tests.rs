@@ -1560,8 +1560,8 @@ async fn test_llm_verification_with_findings() {
 }
 
 // ExploitSynth with disabled config
-#[tokio::test]
-async fn test_exploit_synth_disabled() {
+#[test]
+fn test_exploit_synth_disabled() {
     use baco::config::ExploitConfig;
 
     let mut config = ExploitConfig::default();
@@ -1570,8 +1570,8 @@ async fn test_exploit_synth_disabled() {
 }
 
 // RuleSynthesis with disabled config
-#[tokio::test]
-async fn test_rule_synthesis_disabled() {
+#[test]
+fn test_rule_synthesis_disabled() {
     use baco::config::RuleSynthConfig;
 
     let mut config = RuleSynthConfig::default();

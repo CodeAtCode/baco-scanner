@@ -27,8 +27,8 @@ fn test_mock_llm_client_new() {
     assert_eq!(mock.response_count(), 2);
 }
 
-#[tokio::test]
-async fn test_mock_tool_call() {
+#[test]
+fn test_mock_tool_call() {
     let response = MockLlmClient::mock_tool_call(
         "search_tool",
         json!({
@@ -49,8 +49,8 @@ async fn test_mock_tool_call() {
     assert!(!response.content.is_empty());
 }
 
-#[tokio::test]
-async fn test_mock_final_response() {
+#[test]
+fn test_mock_final_response() {
     let response = MockLlmClient::mock_final_response("Converged to final answer");
 
     assert_eq!(response.content, "Converged to final answer");

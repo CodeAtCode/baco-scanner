@@ -148,6 +148,7 @@ mod init_tests;
 mod llm;
 mod orchestrator_integration_tests;
 mod org_context_tests;
+mod phantom_config_fields_tests;
 mod phase;
 mod php_support_tests;
 mod pipeline_ordering_tests;

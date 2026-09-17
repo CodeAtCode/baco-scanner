@@ -11,9 +11,7 @@ BACO uses a **data-driven PhaseGraph** (`src/scanner/pipeline/orchestrator.rs`) 
 
 ## Pipeline Phases
 
-**Core Pipeline (23 phases):**
-
-**Core Pipeline**:
+**Core Pipeline (23 phases total: 4 parallel + 19 sequential):**
 
 > **Note:** Phase order is defined in `PhaseGraph::new()` (src/scanner/pipeline/orchestrator.rs:28-53). This table is manually maintained and should be updated when that code changes.
 
@@ -36,12 +34,12 @@ BACO uses a **data-driven PhaseGraph** (`src/scanner/pipeline/orchestrator.rs`) 
 | 15 | AI Aggregation | `llm.phases.aggregation` (API key present) |
 | 16 | Threat Modeling | `scanner.performance.enable_threat_modeling=false` |
 | 17 | Root Cause Deduplication | `scanner.performance.enable_root_cause_dedup=true` |
-| 19 | Auto-Patching | `scanner.performance.enable_auto_patching=false` |
-| 20 | CVE Bootstrap | `scanner.performance.enable_cve_bootstrap=true` |
-| 21 | PoC Compilation | `scanner.performance.enable_poc_compilation=false` |
-| 22 | Exploit Synthesis | `exploit.enabled=false` |
-| 23 | Variant Search | `scanner.performance.enable_variant_search=true` |
-| 24 | Reporting | Always-on |
+| 18 | Auto-Patching | `scanner.performance.enable_auto_patching=false` |
+| 19 | CVE Bootstrap | `scanner.performance.enable_cve_bootstrap=true` |
+| 20 | PoC Compilation | `scanner.performance.enable_poc_compilation=false` |
+| 21 | Exploit Synthesis | `exploit.enabled=false` |
+| 22 | Variant Search | `scanner.performance.enable_variant_search=true` |
+| 23 | Reporting | Always-on |
 
 ## Data Flow
 

@@ -1,6 +1,6 @@
 # Contributing to BACO
 
-Welcome! BACO (Bug Analysis & Cross-reference Orchestrator) is a research-backed SAST scanner that augments static analysis with LLM-powered discovery across a 23-phase pipeline. Sponsored by [Regolo.AI](https://regolo.ai), this project integrates techniques from 20 academic papers to detect vulnerabilities with higher accuracy than traditional tools.
+Welcome! BACO (Bug Analysis & Cross-reference Orchestrator) is a research-backed SAST scanner that augments static analysis with LLM-powered discovery across a 23-phase pipeline. Sponsored by [Regolo.AI](https://regolo.ai), this project integrates techniques from 31 academic papers to detect vulnerabilities with higher accuracy than traditional tools.
 
 ## Getting Started
 

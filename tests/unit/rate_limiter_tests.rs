@@ -9,24 +9,24 @@ use baco::rate_limiter::RateLimiter;
 // RateLimiter::new() Tests
 // ============================================================================
 
-#[tokio::test]
-async fn test_rate_limiter_new_sets_correct_capacity() {
+#[test]
+fn test_rate_limiter_new_sets_correct_capacity() {
     let limiter = RateLimiter::new(5);
 
     assert_eq!(limiter.max_concurrent(), 5);
     assert_eq!(limiter.available_permits(), 5);
 }
 
-#[tokio::test]
-async fn test_rate_limiter_new_with_zero_capacity() {
+#[test]
+fn test_rate_limiter_new_with_zero_capacity() {
     let limiter = RateLimiter::new(0);
 
     assert_eq!(limiter.max_concurrent(), 0);
     assert_eq!(limiter.available_permits(), 0);
 }
 
-#[tokio::test]
-async fn test_rate_limiter_new_with_large_capacity() {
+#[test]
+fn test_rate_limiter_new_with_large_capacity() {
     let limiter = RateLimiter::new(1000);
 
     assert_eq!(limiter.max_concurrent(), 1000);
@@ -37,8 +37,8 @@ async fn test_rate_limiter_new_with_large_capacity() {
 // RateLimiter::default() Tests
 // ============================================================================
 
-#[tokio::test]
-async fn test_rate_limiter_default_capacity() {
+#[test]
+fn test_rate_limiter_default_capacity() {
     let limiter = RateLimiter::default();
 
     assert_eq!(limiter.max_concurrent(), 3);
@@ -85,8 +85,8 @@ async fn test_acquire_exhausts_permits() {
 // RateLimiter::try_acquire() Tests
 // ============================================================================
 
-#[tokio::test]
-async fn test_try_acquire_succeeds_when_permits_available() {
+#[test]
+fn test_try_acquire_succeeds_when_permits_available() {
     let limiter = RateLimiter::new(5);
 
     let permit = limiter.try_acquire();
@@ -119,8 +119,8 @@ async fn test_try_acquire_succeeds_after_drop() {
     assert!(limiter.try_acquire().is_some());
 }
 
-#[tokio::test]
-async fn test_try_acquire_with_zero_capacity() {
+#[test]
+fn test_try_acquire_with_zero_capacity() {
     let limiter = RateLimiter::new(0);
 
     let result = limiter.try_acquire();
@@ -132,8 +132,8 @@ async fn test_try_acquire_with_zero_capacity() {
 // RateLimiter::available_permits() Tests
 // ============================================================================
 
-#[tokio::test]
-async fn test_available_permits_initial_value() {
+#[test]
+fn test_available_permits_initial_value() {
     let limiter = RateLimiter::new(10);
 
     assert_eq!(limiter.available_permits(), 10);
@@ -189,8 +189,8 @@ async fn test_concurrent_acquire_and_release() {
 // Edge Cases
 // ============================================================================
 
-#[tokio::test]
-async fn test_zero_capacity_limiter() {
+#[test]
+fn test_zero_capacity_limiter() {
     let limiter = RateLimiter::new(0);
 
     assert_eq!(limiter.max_concurrent(), 0);
@@ -315,8 +315,8 @@ async fn test_rate_limiter_concurrent_requests() {
     assert!(limiter.try_acquire().is_some());
 }
 
-#[tokio::test]
-async fn test_rate_limiter_default() {
+#[test]
+fn test_rate_limiter_default() {
     let limiter = RateLimiter::default();
     assert_eq!(limiter.max_concurrent(), 3);
     assert_eq!(limiter.available_permits(), 3);
@@ -371,8 +371,8 @@ async fn test_rate_limiter_permit_recovery() {
     assert_eq!(limiter.available_permits(), 2);
 }
 
-#[tokio::test]
-async fn test_rate_limiter_zero_capacity() {
+#[test]
+fn test_rate_limiter_zero_capacity() {
     let limiter = RateLimiter::new(0);
 
     assert_eq!(limiter.available_permits(), 0);
@@ -401,8 +401,8 @@ async fn test_rate_limiter_large_capacity() {
     assert_eq!(limiter.available_permits(), 100);
 }
 
-#[tokio::test]
-async fn test_rate_limiter_try_acquire_behavior() {
+#[test]
+fn test_rate_limiter_try_acquire_behavior() {
     let limiter = RateLimiter::new(2);
 
     let p1 = limiter.try_acquire();

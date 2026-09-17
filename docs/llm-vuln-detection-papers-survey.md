@@ -26,11 +26,9 @@ This document is the **full survey** of 36 papers from the Awesome-LLMs-for-Vuln
 ## 2. Top 5 Recommended Papers for Integration
 
 All five papers were approved by the project owner on 2026-08-11 for
-integration into baco. The full implementation roadmap with sub-tasks,
-file paths, and acceptance criteria lives in [`../todo.md`](../todo.md)
-(P1-P5). Each integration is gated behind a config flag that defaults to
-`enabled = false`, so existing scanner behaviour is unchanged until an
-operator opts in.
+integration into baco (P1-P5). Each integration is gated behind a config
+flag that defaults to `enabled = false`, so existing scanner behaviour is
+unchanged until an operator opts in.
 
 ### P1 — VulTriage: Triple-Path Context Augmentation (arXiv:2605.09461)
 
@@ -60,7 +58,7 @@ operator opts in.
   P1.5 Wire triple-path into prompt.
 - **Risk:** Low–medium. Reuses existing tree-sitter parsers and CPG slice
   from `CpgSlice` phase. Knowledge Path needs an embedding endpoint
-  (open question Q1 in `todo.md`).
+  (open question Q1).
 - **Why integrate:** Strong empirical false-positive reduction; minimal
   structural change to baco.
 
@@ -102,7 +100,7 @@ operator opts in.
   retrieval tool, P2.5 Wire agent scaffold into SecurityAgentVerification.
 - **Risk:** Medium. Agent scaffold depends on call-graph quality and a
   tool-calling interface in `LlmClient` (shared prerequisite PS1 in
-  `todo.md`). Policy sampling is 5× LLM calls — must be opt-in.
+  Policy sampling is 5× LLM calls — must be opt-in.
 - **Why integrate:** Inference-time techniques are portable to any
   reasoning-capable model already configured in baco; agent scaffold
   gives the existing `SecurityAgentVerification` phase a concrete
@@ -134,7 +132,7 @@ operator opts in.
   corpus, P3.3 LLM proposer with feedback loop, P3.4 Emit accepted rules
   to disk, P3.5 Config + tests.
 - **Risk:** Medium. Needs a labelled trace corpus (open question Q2 in
-  `todo.md`); start small (CWE-78, CWE-89).
+  start small (CWE-78, CWE-89).
 - **Why integrate:** Bridges symbolic + LLM without replacing existing
   flows; reduces rule-author fatigue. Emitted Semgrep rules are consumed
   by the existing `Semgrep` phase with no further wiring.
@@ -183,7 +181,7 @@ operator opts in.
   walker, P4.3 Four-dimension extractor, P4.4 Level selector + prompt
   integration, P4.5 Model-aware level auto-selection.
 - **Risk:** Low–medium. Call-graph quality is the main dependency (shared
-  prerequisite PS3 in `todo.md`).
+  prerequisite PS3).
 - **Why integrate:** Largest reported precision boost among the five
   papers; abstraction is a strict superset of P1's Control Path, so the
   two compose.
@@ -237,9 +235,9 @@ operator opts in.
   P5.3 Runtime executor, P5.4 Diagnoser, P5.5 Proposer (search loop).
 - **Risk:** High. Coverage/sanitizer feedback requires build
   instrumentation that baco does not have today (shared prerequisite PS2
-  in `todo.md`). Recommend shipping P5.1-P5.4 (static harness execution)
+  Recommend shipping P5.1-P5.4 (static harness execution)
   first and deferring P5.5 (search loop) until instrumentation is
-  available (open question Q3 in `todo.md`).
+  available (open question Q3).
 - **Why integrate:** Most invasive but highest ceiling. Makes the
   existing `SecurityAgentVerification` phase a concrete, searchable
   harness space instead of a fixed pipeline; the typed DSL gives

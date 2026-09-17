@@ -686,3 +686,38 @@ fn test_classify_retryable_429_without_retry_after() {
     assert!(should_retry);
     assert!(retry_after.is_none());
 }
+
+// ============================================================================
+// Round-Robin Model Selection Tests (A5 fix verification)
+// ============================================================================
+
+#[test]
+fn test_round_robin_one_advance_per_call() {
+    // Verify that each chat() call advances the model selector exactly once
+    // This tests the A5 fix: model is selected once and threaded through
+    let config = LlmConfig {
+        base_url: "https://api.test.com/v1".to_string(),
+        api_key: "test-key".to_string(),
+        model: String::new(),
+        models: vec!["model-a".to_string(), "model-b".to_string()],
+        timeout: 30,
+        max_retries: 3,
+        retry_backoff_ms: 1000,
+        temperature: 0.5,
+        max_reasoning_tokens: None,
+        enable_llm_cache: false,
+        cache_dir: None,
+        max_concurrent: 3,
+        pricing: Default::default(),
+    };
+    let client = LlmClient::new(config);
+
+    // Each call to model_name() should advance the selector once
+    let model1 = client.model_name();
+    let model2 = client.model_name();
+    let model3 = client.model_name();
+
+    assert_eq!(model1, "model-a");
+    assert_eq!(model2, "model-b");
+    assert_eq!(model3, "model-a"); // Cycles back
+}

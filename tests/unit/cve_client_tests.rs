@@ -699,8 +699,8 @@ fn test_dedup_severity_values_round_trip() {
 // Additional cve_client.rs inline tests (migrated)
 // ============================================================================
 
-#[tokio::test]
-async fn test_parse_kev_response() {
+#[test]
+fn test_parse_kev_response() {
     let mock_json = serde_json::json!({
         "vulnerabilities": [
             {
@@ -725,8 +725,8 @@ async fn test_parse_kev_response() {
     assert_eq!(response.vulnerabilities[0].severity, "high");
 }
 
-#[tokio::test]
-async fn test_dedup_kev_priority() {
+#[test]
+fn test_dedup_kev_priority() {
     let kev = vec![CveEntry {
         cve_id: "CVE-2024-1234".to_string(),
         description: "KEV description".to_string(),
@@ -770,8 +770,8 @@ async fn test_dedup_kev_priority() {
     assert_eq!(cve_9999.source, CveSource::NVD);
 }
 
-#[tokio::test]
-async fn test_parse_kev_empty_vulnerabilities() {
+#[test]
+fn test_parse_kev_empty_vulnerabilities() {
     let mock_json = serde_json::json!({
         "vulnerabilities": []
     });
@@ -780,15 +780,15 @@ async fn test_parse_kev_empty_vulnerabilities() {
     assert_eq!(response.vulnerabilities.len(), 0);
 }
 
-#[tokio::test]
-async fn test_parse_kev_invalid_json() {
+#[test]
+fn test_parse_kev_invalid_json() {
     let invalid_json = r#"{"invalid": json}"#;
     let result: Result<baco::cve_client::KeVResponse, _> = serde_json::from_str(invalid_json);
     assert!(result.is_err());
 }
 
-#[tokio::test]
-async fn test_dedup_multiple_kev_entries() {
+#[test]
+fn test_dedup_multiple_kev_entries() {
     let kev = vec![
         CveEntry {
             cve_id: "CVE-2024-1111".to_string(),
@@ -904,8 +904,8 @@ fn test_map_nvd_severity_unknown_defaults_to_medium() {
     assert_eq!(CveSeverity::Medium, CveSeverity::Medium);
 }
 
-#[tokio::test]
-async fn test_dedup_only_nvd_inline() {
+#[test]
+fn test_dedup_only_nvd_inline() {
     let kev = vec![];
     let nvd = vec![CveEntry {
         cve_id: "CVE-2024-1111".to_string(),
@@ -922,8 +922,8 @@ async fn test_dedup_only_nvd_inline() {
     assert_eq!(result[0].source, CveSource::NVD);
 }
 
-#[tokio::test]
-async fn test_dedup_only_kev_inline() {
+#[test]
+fn test_dedup_only_kev_inline() {
     let kev = vec![CveEntry {
         cve_id: "CVE-2024-1111".to_string(),
         description: "KEV only".to_string(),

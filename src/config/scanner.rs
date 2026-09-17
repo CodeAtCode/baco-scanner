@@ -87,8 +87,6 @@ pub struct PerformanceSettings {
     pub enable_threat_modeling: bool,
     #[serde(default = "crate::config::default_enable_root_cause_dedup")]
     pub enable_root_cause_dedup: bool,
-    #[serde(default = "crate::config::default_enable_multi_verifier")]
-    pub enable_multi_verifier: bool,
     #[serde(default = "crate::config::default_enable_auto_patching")]
     pub enable_auto_patching: bool,
     #[serde(default = "crate::config::default_enable_poc_compilation")]
@@ -136,7 +134,6 @@ impl Default for PerformanceSettings {
             max_parallel_tasks: default_four(),
             enable_threat_modeling: crate::config::default_enable_threat_modeling(),
             enable_root_cause_dedup: crate::config::default_enable_root_cause_dedup(),
-            enable_multi_verifier: crate::config::default_enable_multi_verifier(),
             enable_auto_patching: crate::config::default_enable_auto_patching(),
             enable_poc_compilation: crate::config::default_enable_poc_compilation(),
             enable_confidence_refinement: crate::config::default_enable_confidence_refinement(),

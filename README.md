@@ -33,16 +33,15 @@ cargo build --release
 # 2. Install semgrep (required for static analysis)
 pip install semgrep
 
-# 3. Set your LLM API key
-export MISTRAL_API_KEY="your-key-here"
+# 3. Set your LLM API key (per-phase or generic fallback)
+export LLM_DISCOVERY_KEY="your-key-here"  # or LLM_API_KEY for generic fallback
 
-# 4. Run pre-flight checks
+# 4. Initialize config and run pre-flight checks
+./target/release/baco init /path/to/project
 ./target/release/baco doctor
 
-# 5. Configure and scan
-cp config.toml my-config.toml
-# Edit my-config.toml: set [project] path to your target code
-./target/release/baco scan --config my-config.toml
+# 5. Scan
+./target/release/baco scan --config config.toml
 ```
 
 ### Additional subcommands
@@ -75,17 +74,15 @@ cp config.toml my-config.toml
 ./target/release/baco scan --config my.toml --force     # Force full rescan
 ```
 
-- **Phases**: 4 parallel (Indexing, Semgrep, CpgSlice, LlmStaticAnalysis) + sequential phases — some disabled by default (see [Configuration](docs/configuration.md))
+- **Phases**: 4 parallel (Indexing, Semgrep, CpgSlice, LlmStaticAnalysis) + 19 sequential phases — some disabled by default (see [Configuration](docs/configuration.md))
 
-### What happens next
 
-- **Phases**: 4 parallel (Indexing, Semgrep, CpgSlice, LlmStaticAnalysis) + sequential phases — some disabled by default (see [Configuration](docs/configuration.md))
 
 ## Features
 
 - **Pipeline profiles**: `core` (default) runs essential phases; `all` enables experimental phases (still individually flag-gated) — set with `scanner.profile = "core" | "all"`
 - **Pipeline phases**: Indexing → Semgrep → CpgSlice (`[cpg]` section, requires Joern) → LlmStaticAnalysis → CweRouting (`router.enabled`) → RuleSynthesis (experimental) → LlmDiscovery → LlmVerification → Validate (opt-in) → SecurityAgentVerification (opt-in) → TicketCrossRef → GitAnalysis → CrossFileAnalysis → ConfidenceScoring → AiAggregation → ThreatModeling (`enable_threat_modeling`) → RootCauseDedup → MultiVerifier (`enable_multi_verifier`, experimental) → AutoPatching (`enable_auto_patching`, opt-in) → CveBootstrap → PocCompiler (`enable_poc_compilation`, opt-in) → ExploitSynth (`[exploit]` section, experimental) → VariantSearch → Reporting
-- **Parallel execution**: Indexing, Semgrep, CpgSlice, and LlmStaticAnalysis run concurrently; 20 sequential phases follow
+- **Parallel execution**: Indexing, Semgrep, CpgSlice, and LlmStaticAnalysis run concurrently; 19 sequential phases follow
 - **CWE-aware MoE (opt-in)**: BM25 RAG retrieval from CWE knowledge base, routes to specialized analysis paths — enable with `router.enabled = true`
 - **Research-backed**: 16 academic papers integrated (VulTriage, VulIn, MoCQ, MoEVD, AgentFlow) — see [Research Integration](docs/research-integration.md)
 - **Checkpoint/resume**: Crash recovery after each phase
@@ -134,12 +131,18 @@ cp config.toml my-config.toml
 
 ## Supported Languages
 
-| Language   | Static analysis          | LLM analysis |
-| ---------- | ------------------------ | ------------ |
-| C / C++    | tree-sitter + semgrep    | ✅           |
-| Rust       | tree-sitter + semgrep    | ✅           |
-| Python     | tree-sitter + semgrep    | ✅           |
-| JavaScript | tree-sitter + semgrep    | ✅           |
+| Language      | Static analysis          | LLM analysis |
+| ------------- | ------------------------ | ------------ |
+| C / C++       | tree-sitter + semgrep    | ✅           |
+| Rust          | tree-sitter + semgrep    | ✅           |
+| Python        | tree-sitter + semgrep    | ✅           |
+| JavaScript    | tree-sitter + semgrep    | ✅           |
+| TypeScript    | tree-sitter + semgrep    | ✅           |
+| PHP           | tree-sitter + semgrep    | ✅           |
+| Go            | tree-sitter + semgrep    | ✅           |
+| Java          | tree-sitter + semgrep    | ✅           |
+| C#            | tree-sitter + semgrep    | ✅           |
+| Ruby          | tree-sitter + semgrep    | ✅           |
 
 ## Outputs
 
@@ -166,7 +169,7 @@ See [Research Integration](docs/research-integration.md) for per-paper details (
 - [Operator Tuning](docs/operator-tuning.md) — Performance flags and scenario-based tuning
 - [Output Interpretation](docs/output-interpretation.md) — Reading findings, confidence, triage verdicts
 - [Troubleshooting](docs/troubleshooting.md) — Common errors and fixes
-- [Roadmap](todo.md) — Completed and pending work
+
 
 ### Reading Order
 
@@ -179,7 +182,7 @@ Recommended for new users:
 6. **docs/operator-tuning.md** — performance tuning
 7. **docs/output-interpretation.md** — reading results
 8. **docs/troubleshooting.md** — error fixes
-9. **todo.md** — roadmap
+
 
 ## Acknowledgements
 

@@ -699,8 +699,8 @@ fn test_mock_llm_client_with_model_name() {
     assert_eq!(mock.model_name(), "custom-model");
 }
 
-#[tokio::test]
-async fn test_mock_tool_call_helper() {
+#[test]
+fn test_mock_tool_call_helper() {
     let response =
         MockLlmClient::mock_tool_call("test_tool", serde_json::json!({ "arg1": "value1" }));
 
@@ -712,8 +712,8 @@ async fn test_mock_tool_call_helper() {
     );
 }
 
-#[tokio::test]
-async fn test_mock_final_response_helper() {
+#[test]
+fn test_mock_final_response_helper() {
     let response = MockLlmClient::mock_final_response("Final answer");
 
     assert_eq!(response.content, "Final answer");

@@ -4,7 +4,7 @@
 /// and CLI flags. Loading order: built-in defaults → user config.toml → preset file → CLI flags.
 /// Presets are applied on top of the user config and take precedence.
 use serde::{Deserialize, Serialize};
-use std::env;
+
 use std::fs;
 use std::path::PathBuf;
 
@@ -254,8 +254,19 @@ pub fn list_available_presets() -> Vec<String> {
 
 /// Get home directory (cross-platform)
 pub fn home_dir() -> PathBuf {
-    env::var("HOME")
-        .map(PathBuf::from)
-        .or_else(|_| env::var("USERPROFILE").map(PathBuf::from))
-        .unwrap_or_else(|_| PathBuf::from("/"))
+    dirs::home_dir().unwrap_or_else(|| PathBuf::from("/"))
+}
+
+/// Get user preset path
+pub fn user_preset_path(name: &str) -> PathBuf {
+    home_dir()
+        .join(".config")
+        .join("baco")
+        .join("presets")
+        .join(format!("{}.toml", name))
+}
+
+/// Get bundled preset for display (public wrapper around private get_bundled_preset)
+pub fn get_bundled_preset_for_display(name: &str) -> Option<&'static str> {
+    get_bundled_preset(name)
 }

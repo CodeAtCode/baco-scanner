@@ -1,10 +1,10 @@
 # Research-Backed Design
 
-Baco's LLM integration is informed by a survey of 36 papers from [Awesome-LLMs-for-Vulnerability-Detection](https://github.com/huhusmang/Awesome-LLMs-for-Vulnerability-Detection). This document details the 20 papers integrated into baco's architecture and what each contributes.
+Baco's LLM integration is informed by a survey of 36 papers from [Awesome-LLMs-for-Vulnerability-Detection](https://github.com/huhusmang/Awesome-LLMs-for-Vulnerability-Detection). This document details the 31 papers integrated into baco's architecture and what each contributes.
 
 ## Scope
 
-This document covers the **20 papers already integrated** into baco's architecture — what each contributes, where it's wired in, and the config flag that enables it.
+This document covers the **31 papers already integrated** into baco's architecture — what each contributes, where it's wired in, and the config flag that enables it.
 
 ## Integration Status Summary
 

@@ -89,8 +89,8 @@ fn create_test_finding(id: &str, line: u32) -> VulnerabilityFinding {
     }
 }
 
-#[tokio::test]
-async fn test_batch_verdict_with_index_field() {
+#[test]
+fn test_batch_verdict_with_index_field() {
     // Well-formed response WITH index field
     let json_response = r#"[
         {"index": 0, "verification_status": "confirmed", "verification_notes": "Real vulnerability"},
@@ -109,8 +109,8 @@ async fn test_batch_verdict_with_index_field() {
     assert_eq!(results[2].1, "Unclear evidence");
 }
 
-#[tokio::test]
-async fn test_batch_verdict_without_index_field_positional_fallback() {
+#[test]
+fn test_batch_verdict_without_index_field_positional_fallback() {
     // Response WITHOUT index field - should use positional fallback
     let json_response = r#"[
         {"verification_status": "confirmed", "verification_notes": "First item"},
@@ -144,8 +144,8 @@ async fn test_batch_verdict_malformed_object_salvage() {
     assert!(results[0].1.contains("invalid json"));
 }
 
-#[tokio::test]
-async fn test_batch_verdict_invalid_status_defaults_to_needs_review() {
+#[test]
+fn test_batch_verdict_invalid_status_defaults_to_needs_review() {
     // Invalid verification_status should default to NeedsReview
     let json_response = r#"[
         {"index": 0, "verification_status": "invalid_status", "verification_notes": "Bad status"}
@@ -158,8 +158,8 @@ async fn test_batch_verdict_invalid_status_defaults_to_needs_review() {
     assert_eq!(results[0].1, "Bad status");
 }
 
-#[tokio::test]
-async fn test_batch_verdict_fewer_items_than_expected() {
+#[test]
+fn test_batch_verdict_fewer_items_than_expected() {
     // Response has fewer items than expected
     let json_response = r#"[
         {"index": 0, "verification_status": "confirmed", "verification_notes": "First"}

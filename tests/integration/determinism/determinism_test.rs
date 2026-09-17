@@ -25,8 +25,8 @@ fn index_project(path: &std::path::Path) -> Result<FileIndex, std::io::Error> {
 }
 
 /// Indexing is purely filesystem-based and must be 100% deterministic.
-#[tokio::test]
-async fn test_indexing_determinism_same_fixture() {
+#[test]
+fn test_indexing_determinism_same_fixture() {
     let temp_dir = TempDir::new().unwrap();
     fs::write(temp_dir.path().join("main.rs"), "fn main() {}").unwrap();
     fs::write(temp_dir.path().join("lib.rs"), "pub fn lib() {}").unwrap();
@@ -43,8 +43,8 @@ async fn test_indexing_determinism_same_fixture() {
 }
 
 /// Large file set: determinism under scale.
-#[tokio::test]
-async fn test_indexing_determinism_many_files() {
+#[test]
+fn test_indexing_determinism_many_files() {
     let temp_dir = TempDir::new().unwrap();
 
     for i in 0..20 {
@@ -66,8 +66,8 @@ async fn test_indexing_determinism_many_files() {
 }
 
 /// Two different projects should each produce deterministic file sets.
-#[tokio::test]
-async fn test_multi_project_indexing_determinism() {
+#[test]
+fn test_multi_project_indexing_determinism() {
     let project_a = TempDir::new().unwrap();
     let project_b = TempDir::new().unwrap();
 

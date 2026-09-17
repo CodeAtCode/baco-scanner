@@ -172,8 +172,8 @@ fn test_ai_aggregation_phase_new_with_empty_config() {
     let _phase = AiAggregationPhase::new(config);
 }
 
-#[tokio::test]
-async fn test_async_compatible() {
+#[test]
+fn test_async_compatible() {
     let config = make_config();
     let _phase = AiAggregationPhase::new(config);
 }
@@ -1171,8 +1171,8 @@ async fn test_aggregation_executive_summary_contains_recommendation() {
     assert!(result.executive_summary.contains("Recommendation:"));
 }
 
-#[tokio::test]
-async fn test_conflict_resolver_empty_findings() {
+#[test]
+fn test_conflict_resolver_empty_findings() {
     let findings: Vec<&VulnerabilityFinding> = vec![];
 
     let conflict = ConflictResolver::resolve_severity_conflict("empty:0", &findings);

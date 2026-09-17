@@ -197,7 +197,6 @@ fn test_parse_full_config() {
         early_termination_threshold = 500.0
         enable_threat_modeling = true
         enable_root_cause_dedup = true
-        enable_multi_verifier = true
         enable_auto_patching = true
         enable_poc_compilation = true
         enable_confidence_refinement = true
@@ -1301,7 +1300,6 @@ fn test_performance_settings_defaults() {
     assert!(!settings.enable_incremental_scan);
     assert!(!settings.enable_threat_modeling);
     assert!(settings.enable_root_cause_dedup);
-    assert!(!settings.enable_multi_verifier);
     assert!(!settings.enable_auto_patching);
     assert!(!settings.enable_poc_compilation);
     assert!(settings.enable_confidence_refinement);

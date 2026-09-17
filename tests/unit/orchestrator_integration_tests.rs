@@ -133,8 +133,8 @@ fn test_scanner_construction_with_force_false() {
 // Test: Force Flag Behavior
 // ============================================================================
 
-#[tokio::test]
-async fn test_force_flag_ignores_existing_checkpoint() {
+#[test]
+fn test_force_flag_ignores_existing_checkpoint() {
     let output_dir = PathBuf::from("/tmp/test_output_force_ignores");
     let _ = fs::remove_dir_all(&output_dir);
     fs::create_dir_all(&output_dir).unwrap();
@@ -154,8 +154,8 @@ async fn test_force_flag_ignores_existing_checkpoint() {
     let _ = fs::remove_dir_all(&output_dir);
 }
 
-#[tokio::test]
-async fn test_force_false_with_no_checkpoint_starts_fresh() {
+#[test]
+fn test_force_false_with_no_checkpoint_starts_fresh() {
     let output_dir = PathBuf::from("/tmp/test_output_force_no_checkpoint");
     let _ = fs::remove_dir_all(&output_dir);
     fs::create_dir_all(&output_dir).unwrap();
@@ -515,8 +515,8 @@ fn test_scanner_config_custom_performance_settings() {
 // Test: Early Exit When Scan Complete
 // ============================================================================
 
-#[tokio::test]
-async fn test_run_scanner_with_complete_checkpoint_exits_early() {
+#[test]
+fn test_run_scanner_with_complete_checkpoint_exits_early() {
     let output_dir = PathBuf::from("/tmp/test_output_complete_exit");
     let _ = fs::remove_dir_all(&output_dir);
     fs::create_dir_all(&output_dir).unwrap();

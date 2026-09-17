@@ -25,7 +25,11 @@ pub async fn run_indexing(
 
     // Try to load previous hash store for incremental scanning
     let hash_store_path = PathBuf::from(&config.output.dir).join("file_hashes.json");
-    let _previous_hash_store = if hash_store_path.exists() {
+    let incremental = config.scanner.performance.enable_incremental_scan;
+    if !incremental {
+        tracing::debug!("Incremental scan disabled, hash store not loaded");
+    }
+    let _previous_hash_store = if incremental && hash_store_path.exists() {
         match crate::incremental_scan::FileHashStore::load(&hash_store_path.to_string_lossy()) {
             Ok(store) => {
                 tracing::info!("Loaded previous hash store with {} entries", store.len());
@@ -57,13 +61,15 @@ pub async fn run_indexing(
     };
 
     // Save hash store for future incremental scans
-    if let Some(parent) = hash_store_path.parent() {
-        let _ = std::fs::create_dir_all(parent);
-    }
-    if let Err(e) = hash_store.save(&hash_store_path.to_string_lossy()) {
-        tracing::warn!("Failed to save hash store: {}", e);
-    } else {
-        tracing::info!("Saved hash store with {} entries", hash_store.len());
+    if incremental {
+        if let Some(parent) = hash_store_path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        if let Err(e) = hash_store.save(&hash_store_path.to_string_lossy()) {
+            tracing::warn!("Failed to save hash store: {}", e);
+        } else {
+            tracing::info!("Saved hash store with {} entries", hash_store.len());
+        }
     }
 
     // Extract framework hooks from language-matched files and save hook map

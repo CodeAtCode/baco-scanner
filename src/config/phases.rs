@@ -3,11 +3,7 @@ use std::path::PathBuf;
 
 /// Aggregation configuration including false positive store settings
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct AggregationConfig {
-    /// Path to the false positive store JSON file
-    #[serde(default)]
-    pub fp_store_path: Option<PathBuf>,
-}
+pub struct AggregationConfig {}
 
 /// Rule synthesis configuration (MoCQ: LLM→semgrep rule generation)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -63,10 +59,6 @@ pub fn default_enable_threat_modeling() -> bool {
 pub const DEFAULT_ENABLE_ROOT_CAUSE_DEDUP: bool = true;
 pub fn default_enable_root_cause_dedup() -> bool {
     DEFAULT_ENABLE_ROOT_CAUSE_DEDUP
-}
-pub const DEFAULT_ENABLE_MULTI_VERIFIER: bool = false;
-pub fn default_enable_multi_verifier() -> bool {
-    DEFAULT_ENABLE_MULTI_VERIFIER
 }
 pub const DEFAULT_ENABLE_AUTO_PATCHING: bool = false;
 pub fn default_enable_auto_patching() -> bool {

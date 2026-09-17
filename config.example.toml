@@ -114,7 +114,7 @@ enable_hunt_prompts = false
 timeout_secs = 60
 # Maximum number of retries for failed requests (on 429/5xx)
 max_retries = 3
-# Retry backoff in milliseconds (exponential: ms * 2^attempt)
+# Retry backoff in milliseconds (linear: ms * (retries + 1))
 retry_backoff_ms = 2000
 # Maximum concurrent LLM requests (default: 4)
 max_concurrent = 4
@@ -190,58 +190,6 @@ project = "libxml2"
 # enabled = false       # Set to true to enable the agent
 # max_turns = 10        # Maximum agent conversation turns per issue
 
-# --- Paper-Integration Research Flags (P1-P5) ---
-# All flags default to disabled. Enable to opt in to experimental
-# research-backed analysis augmentations. See todo.md for details.
-
-# VulTriage triple-path context augmentation — arXiv:2605.09461
-# Augments LLM input with control path (AST/CFG/DFG), knowledge path
-# (CWE pattern RAG), and semantic path (function summary) before judgement.
-#[vultriage]
-#enabled = false
-#control_path = true
-#knowledge_path = true
-#semantic_path = true
-
-# VulnLLM-R policy-based generation — arXiv:2605.09461
-# Queries the LLM N times to build a CWE candidate set, then a final
-# call picks one label. Increases LLM cost ~5x.
-#[policy_sampling]
-#enabled = false
-#samples = 4
-
-# VulnLLM-R agent scaffold — arXiv:2605.09461
-# Builds 3-path call-graph context + function-lookup tool per target.
-#[agent_scaffold]
-#enabled = false
-#max_rounds = 5
-#paths_per_target = 3
-
-# MoCQ neuro-symbolic rule synthesis (RuleSynthesis 2.0) — arXiv:2605.13918
-# LLM proposes patterns in a DSL → symbolic validator gives feedback → loop.
-# Extends [scanner.rulesynth] with these fields:
-#[scanner.rulesynth]
-#mocq_mode = false
-#max_iterations = 5
-#corpus_path = "tests/fixtures/"
-
-# PacVD primitive-API abstraction — arXiv:2605.07785
-# Appends callee abstraction at one of four granularity levels to the
-# LLM prompt. Level 1 = fuzzy branches only; 4 = concrete branches + key vars.
-#[pacvd]
-#enabled = false
-#level = 2
-#auto_level = false
-
-# AgentFlow multi-agent harness synthesis — arXiv:2605.11835
-# Represents the harness as a typed graph DSL with a search loop.
-# Most invasive integration — static harness only until P5.5.
-#[agent_flow]
-#enabled = false
-#max_iterations = 10
-#requires_instrumented_target = false
-
-
 # CPG-guided slicing
 [cpg]
 # Whether CPG slicing is enabled
@@ -267,41 +215,7 @@ project = "libxml2"
 # Whether the Validate phase is enabled
 # enabled = false
 
-# Triple-path context augmentation (P1: VulTriage)
-[vultriage]
-# Whether triple-path context augmentation is enabled
-# enabled = false
-# Whether to include the control path (AST/CFG/DFG verbalisation)
-# control_path = true
-# Whether to include the knowledge path (CWE pattern RAG)
-# knowledge_path = true
-# Whether to include the semantic path (function summary)
-# semantic_path = true
 
-# Policy-based generation
-[policy_sampling]
-# Whether policy-based generation is enabled
-# enabled = false
-# Number of sampling rounds to build the policy
-# samples = 4
-
-# Agent scaffold
-[agent_scaffold]
-# Whether the agent scaffold is enabled
-# enabled = false
-# Maximum interaction rounds per target function
-# max_rounds = 5
-# Number of call-graph paths to sample per target function
-# paths_per_target = 3
-
-# Primitive-API abstraction
-[pacvd]
-# Whether PacVD abstraction is enabled
-# enabled = false
-# Abstraction level 1-4 (1=fuzzy, 4=concrete)
-# level = 2
-# Whether to auto-select the level based on the configured LLM model
-# auto_level = false
 
 # Citation verification gate: deterministic checks that report citations
 # (file existence, line ranges) match the scanned tree before rendering.

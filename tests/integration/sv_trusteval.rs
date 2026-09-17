@@ -54,8 +54,8 @@ fn fixture_path(name: &str) -> PathBuf {
 }
 
 /// Test that vulnerable fixtures produce findings with correct CWE
-#[tokio::test]
-async fn test_vulnerable_fixtures_detect_cwe() {
+#[test]
+fn test_vulnerable_fixtures_detect_cwe() {
     let test_cases = vec![
         ("cwe089_vuln.c", "CWE-89", "SQL Injection"),
         ("cwe079_vuln.c", "CWE-79", "XSS Vulnerability"),
@@ -121,8 +121,8 @@ async fn test_vulnerable_fixtures_detect_cwe() {
 }
 
 /// Test that safe fixtures produce no findings
-#[tokio::test]
-async fn test_safe_fixtures_no_findings() {
+#[test]
+fn test_safe_fixtures_no_findings() {
     let safe_files = vec![
         "cwe089_safe.c",
         "cwe079_safe.c",
@@ -162,8 +162,8 @@ async fn test_safe_fixtures_no_findings() {
 }
 
 /// Test paired comparison: vulnerable files produce higher confidence than safe pairs
-#[tokio::test]
-async fn test_paired_confidence_comparison() {
+#[test]
+fn test_paired_confidence_comparison() {
     let pairs = vec![
         ("cwe089_vuln.c", "cwe089_safe.c", "CWE-89", "SQL Injection"),
         (
