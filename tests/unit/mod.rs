@@ -107,6 +107,7 @@ mod confidence_normalization;
 mod confidence_refinement;
 mod config;
 mod cost_estimate_tests;
+mod coverage_small_modules_tests;
 mod cpg_joern_tests;
 mod cpg_queries_tests;
 mod cpg_slice_phase_tests;
