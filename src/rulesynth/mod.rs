@@ -12,10 +12,11 @@ pub mod proposer;
 pub mod symbolic_validator;
 
 pub use emitter::emit_yaml;
-pub use pattern_dsl::{Pattern, PatternError, Severity, TaintSink, TaintSource};
+pub use pattern_dsl::{parse_pattern, Pattern, PatternError, Severity, TaintSink, TaintSource};
 pub use proposer::{build_prompt_messages, extract_pattern, run_proposer_loop};
 pub use symbolic_validator::{
-    format_feedback, load_corpus, pattern_matches_code, validate, LabelledTrace, ValidationOutcome,
+    format_feedback, load_corpus, pattern_matches_code, validate, LabelledTrace, TraceResult,
+    ValidationOutcome,
 };
 pub use validator::{validate_rule, RuleError};
 

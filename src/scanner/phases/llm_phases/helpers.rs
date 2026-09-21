@@ -2,7 +2,7 @@ use crate::findings::VulnerabilityFinding;
 use regex::Regex;
 
 /// Detect language from file path
-pub(super) fn detect_language(path: &std::path::Path) -> crate::context::control_path::Language {
+pub fn detect_language(path: &std::path::Path) -> crate::context::control_path::Language {
     match path.extension().and_then(|e| e.to_str()) {
         Some("c" | "h") => crate::context::control_path::Language::C,
         Some("rs") => crate::context::control_path::Language::Rust,
@@ -15,7 +15,7 @@ pub(super) fn detect_language(path: &std::path::Path) -> crate::context::control
 /// Extract function name from a finding's title or code snippet.
 ///
 /// Looks for patterns like "function X", "def X", "fn X" in the title or code_snippet.
-pub(super) fn extract_function_name_from_finding(finding: &VulnerabilityFinding) -> Option<String> {
+pub fn extract_function_name_from_finding(finding: &VulnerabilityFinding) -> Option<String> {
     let patterns = [
         r"function\s+([a-zA-Z_][a-zA-Z0-9_]*)",
         r"def\s+([a-zA-Z_][a-zA-Z0-9_]*)",
