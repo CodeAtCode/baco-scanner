@@ -573,3 +573,166 @@ mod language_for_extension_tests {
         assert!(lang_upper.is_some());
     }
 }
+#[test]
+fn chunk_file_with_ranges_groups_rust_functions() {
+    let code = "fn alpha() {\n    let a = 1;\n}\nfn beta() {\n    let b = 2;\n}\n";
+    let chunks = baco::llm_analysis::LlmAnalyzer::chunk_file_with_ranges(code, "rust", 1024);
+    assert!(!chunks.is_empty());
+    let all_text = chunks
+        .iter()
+        .map(|c| c.text.clone())
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(all_text.contains("fn alpha"));
+    assert!(all_text.contains("fn beta"));
+    for chunk in &chunks {
+        assert!(chunk.end_line >= chunk.start_line);
+    }
+}
+
+#[test]
+fn chunk_file_with_ranges_unknown_language_empty() {
+    let chunks =
+        baco::llm_analysis::LlmAnalyzer::chunk_file_with_ranges("x = 1\n", "klingon", 1024);
+    assert!(chunks.is_empty());
+}
+#[test]
+fn map_chunk_line_absolute_relative_and_clamped() {
+    use baco::llm_analysis::map_chunk_line;
+    assert_eq!(map_chunk_line(15, 10, 20), 15);
+    assert_eq!(map_chunk_line(3, 10, 20), 12);
+    assert_eq!(map_chunk_line(99, 10, 20), 10);
+    assert_eq!(map_chunk_line(0, 10, 20), 10);
+}
+#[tokio::test]
+async fn analyze_file_chunked_path_with_mockito() {
+    let mut server = mockito::Server::new_async().await;
+    let _mock = server
+        .mock("POST", "/v1/chat/completions")
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(
+            r#"{"choices": [{"message": {"content": "[{\"severity\": \"high\", \"title\": \"X\", \"description\": \"d\", \"line\": 1, \"cwe_id\": \"CWE-79\"}]"}}]}"#,
+        )
+        .create();
+
+    let dir = tempfile::TempDir::new().unwrap();
+    let path = dir.path().join("big.rs");
+    let body = (0..60)
+        .map(|i| format!("fn f{i}() {{\n    let x{i} = {i};\n}}\n"))
+        .collect::<Vec<_>>()
+        .join("");
+    std::fs::write(&path, &body).unwrap();
+
+    let llm_config = baco::llm::LlmConfig {
+        base_url: server.url(),
+        api_key: "test".to_string(),
+        model: "m".to_string(),
+        models: vec![],
+        timeout: 5,
+        max_retries: 0,
+        retry_backoff_ms: 0,
+        temperature: 0.5,
+        max_reasoning_tokens: None,
+        enable_llm_cache: false,
+        cache_dir: None,
+        max_concurrent: 3,
+        pricing: Default::default(),
+    };
+    let client = baco::llm::LlmClient::new(llm_config);
+    let scanner_config = baco::config::ScannerConfig::default();
+    let analyzer = baco::llm_analysis::LlmAnalyzer::new(
+        client,
+        vec!["rust".to_string()],
+        100,
+        &scanner_config,
+    );
+    let findings = analyzer.analyze_file(&path).await.unwrap();
+    assert!(
+        !findings.is_empty(),
+        "chunked analysis should report mocked findings"
+    );
+}
+#[tokio::test]
+async fn analyze_file_llm_error_yields_empty() {
+    let mut server = mockito::Server::new_async().await;
+    let _mock = server
+        .mock("POST", "/v1/chat/completions")
+        .with_status(500)
+        .with_body("internal error")
+        .create();
+
+    let dir = tempfile::TempDir::new().unwrap();
+    let path = dir.path().join("small.rs");
+    std::fs::write(&path, "fn a() {}\n").unwrap();
+
+    let llm_config = baco::llm::LlmConfig {
+        base_url: server.url(),
+        api_key: "test".to_string(),
+        model: "m".to_string(),
+        models: vec![],
+        timeout: 5,
+        max_retries: 0,
+        retry_backoff_ms: 0,
+        temperature: 0.5,
+        max_reasoning_tokens: None,
+        enable_llm_cache: false,
+        cache_dir: None,
+        max_concurrent: 3,
+        pricing: Default::default(),
+    };
+    let client = baco::llm::LlmClient::new(llm_config);
+    let scanner_config = baco::config::ScannerConfig::default();
+    let analyzer = baco::llm_analysis::LlmAnalyzer::new(
+        client,
+        vec!["rust".to_string()],
+        1024,
+        &scanner_config,
+    );
+    let findings = analyzer.analyze_file(&path).await.unwrap();
+    assert!(findings.is_empty());
+}
+#[tokio::test]
+async fn analyze_file_structured_output_path_with_mockito() {
+    let mut server = mockito::Server::new_async().await;
+    let _mock = server
+        .mock("POST", "/v1/chat/completions")
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(
+            r#"{"choices": [{"message": {"content": "{\"findings\": [{\"severity\": \"high\", \"title\": \"X\", \"description\": \"d\", \"line\": 1, \"cwe_id\": \"CWE-79\"}]}"}}]}"#,
+        )
+        .create();
+
+    let dir = tempfile::TempDir::new().unwrap();
+    let path = dir.path().join("s.rs");
+    std::fs::write(&path, "fn a() {}\n").unwrap();
+
+    let llm_config = baco::llm::LlmConfig {
+        base_url: server.url(),
+        api_key: "test".to_string(),
+        model: "m".to_string(),
+        models: vec![],
+        timeout: 5,
+        max_retries: 0,
+        retry_backoff_ms: 0,
+        temperature: 0.5,
+        max_reasoning_tokens: None,
+        enable_llm_cache: false,
+        cache_dir: None,
+        max_concurrent: 3,
+        pricing: Default::default(),
+    };
+    let client = baco::llm::LlmClient::new(llm_config);
+    let scanner_config = baco::config::ScannerConfig::default();
+    let analyzer = baco::llm_analysis::LlmAnalyzer::new(
+        client,
+        vec!["rust".to_string()],
+        1024,
+        &scanner_config,
+    )
+    .with_structured_output(true);
+    let findings = analyzer.analyze_file(&path).await.unwrap();
+    assert_eq!(findings.len(), 1);
+    assert_eq!(findings[0].title, "X");
+}

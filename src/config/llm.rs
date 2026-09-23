@@ -3,6 +3,9 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct LlmConfig {
+    /// Global endpoint used by any phase without its own `base_url`.
+    #[serde(default)]
+    pub base_url: String,
     #[serde(default)]
     pub timeout_secs: u64,
     #[serde(default)]

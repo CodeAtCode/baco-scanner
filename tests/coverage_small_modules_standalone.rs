@@ -4,11 +4,12 @@
 use baco::config::knowledge::KnowledgeConfig;
 use baco::error::ScanError;
 use baco::eval::{
-    eval_floor, parse_oracle, score_findings, ExpectedFinding, ExpectedSuppressed, OracleFile,
-    DEFAULT_EVAL_FLOOR,
+    DEFAULT_EVAL_FLOOR, ExpectedFinding, ExpectedSuppressed, OracleFile, eval_floor, parse_oracle,
+    score_findings,
 };
 use baco::findings::{Severity, VulnerabilityFinding};
 use baco::llm::{ChatMessage, ChatResponseWithModel, LlmChatClient};
+use serial_test::serial;
 
 fn make_finding(
     file_path: &str,
@@ -222,32 +223,36 @@ fn test_score_findings_line_tolerance() {
 }
 
 #[test]
+#[serial]
 fn test_eval_floor_from_env() {
-    std::env::set_var("BACO_EVAL_FLOOR", "0.85");
+    unsafe { std::env::set_var("BACO_EVAL_FLOOR", "0.85") };
     let result = eval_floor(0.70).expect("Valid floor from env");
     assert_eq!(result.0, 0.85);
     assert_eq!(result.1, "BACO_EVAL_FLOOR");
-    std::env::remove_var("BACO_EVAL_FLOOR");
+    unsafe { std::env::remove_var("BACO_EVAL_FLOOR") };
 }
 
 #[test]
+#[serial]
 fn test_eval_floor_from_config() {
-    std::env::remove_var("BACO_EVAL_FLOOR");
+    unsafe { std::env::remove_var("BACO_EVAL_FLOOR") };
     let result = eval_floor(0.75).expect("Valid floor from config");
     assert_eq!(result.0, 0.75);
     assert_eq!(result.1, "eval.floor");
 }
 
 #[test]
+#[serial]
 fn test_eval_floor_invalid_env() {
-    std::env::set_var("BACO_EVAL_FLOOR", "invalid");
+    unsafe { std::env::set_var("BACO_EVAL_FLOOR", "invalid") };
     let result = eval_floor(0.70);
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("Invalid BACO_EVAL_FLOOR"));
-    std::env::remove_var("BACO_EVAL_FLOOR");
+    unsafe { std::env::remove_var("BACO_EVAL_FLOOR") };
 }
 
 #[test]
+#[serial]
 fn test_eval_floor_out_of_range() {
     let result = eval_floor(1.5);
     assert!(result.is_err());

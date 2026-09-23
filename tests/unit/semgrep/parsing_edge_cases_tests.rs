@@ -467,11 +467,13 @@ fn test_very_long_file_path() {
     assert_eq!(findings.len(), 1);
     // File not found, but should not panic
     assert!(findings[0].code_snippet.is_some());
-    assert!(findings[0]
-        .code_snippet
-        .as_ref()
-        .unwrap()
-        .contains("file not found"));
+    assert!(
+        findings[0]
+            .code_snippet
+            .as_ref()
+            .unwrap()
+            .contains("file not found")
+    );
 }
 
 // ============================================================================

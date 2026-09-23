@@ -114,28 +114,20 @@ pub fn write_findings_json(
         }
     }
 
+    let count_sev = |sev: &Severity| {
+        findings
+            .iter()
+            .filter(|f| std::mem::discriminant(&f.severity) == std::mem::discriminant(sev))
+            .count()
+    };
+
     let summary = ReportSummary {
         total_findings: findings.len(),
-        critical: findings
-            .iter()
-            .filter(|f| matches!(f.severity, Severity::Critical))
-            .count(),
-        high: findings
-            .iter()
-            .filter(|f| matches!(f.severity, Severity::High))
-            .count(),
-        medium: findings
-            .iter()
-            .filter(|f| matches!(f.severity, Severity::Medium))
-            .count(),
-        low: findings
-            .iter()
-            .filter(|f| matches!(f.severity, Severity::Low))
-            .count(),
-        info: findings
-            .iter()
-            .filter(|f| matches!(f.severity, Severity::Info))
-            .count(),
+        critical: count_sev(&Severity::Critical),
+        high: count_sev(&Severity::High),
+        medium: count_sev(&Severity::Medium),
+        low: count_sev(&Severity::Low),
+        info: count_sev(&Severity::Info),
         early_termination: early_termination_info,
         llm_metrics: llm_metrics.map(|metrics| {
             let models: Vec<ModelMetricsSummary> = metrics

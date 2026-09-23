@@ -296,14 +296,16 @@ fn test_generate_with_findings() {
     assert_eq!(tm.frontmatter.project_type, "web");
     assert_eq!(tm.frontmatter.total_threats, 4);
     assert_eq!(tm.frontmatter.high_risk_areas.len(), 2); // Critical and High only
-    assert!(tm
-        .frontmatter
-        .high_risk_areas
-        .contains(&"src/db.rs".to_string()));
-    assert!(tm
-        .frontmatter
-        .high_risk_areas
-        .contains(&"src/handler.rs".to_string()));
+    assert!(
+        tm.frontmatter
+            .high_risk_areas
+            .contains(&"src/db.rs".to_string())
+    );
+    assert!(
+        tm.frontmatter
+            .high_risk_areas
+            .contains(&"src/handler.rs".to_string())
+    );
     assert!(tm.body.contains("SQL Injection"));
     assert!(tm.body.contains("XSS Vulnerability"));
     assert!(tm.body.contains("Hardcoded Secret"));
@@ -330,10 +332,11 @@ fn test_generate_with_only_critical_findings() {
     let tm = ThreatModelFile::generate(&ctx, &findings);
 
     assert_eq!(tm.frontmatter.total_threats, 1);
-    assert!(tm
-        .frontmatter
-        .high_risk_areas
-        .contains(&"src/critical.rs".to_string()));
+    assert!(
+        tm.frontmatter
+            .high_risk_areas
+            .contains(&"src/critical.rs".to_string())
+    );
     assert!(tm.body.contains("#### Critical"));
 }
 
@@ -720,14 +723,18 @@ fn test_merge_with_both_having_high_risk_areas() {
     let merged = ThreatModelFile::merge_with_existing(&new, &existing);
 
     assert_eq!(merged.frontmatter.high_risk_areas.len(), 2);
-    assert!(merged
-        .frontmatter
-        .high_risk_areas
-        .contains(&"src/existing.rs".to_string()));
-    assert!(merged
-        .frontmatter
-        .high_risk_areas
-        .contains(&"src/new.rs".to_string()));
+    assert!(
+        merged
+            .frontmatter
+            .high_risk_areas
+            .contains(&"src/existing.rs".to_string())
+    );
+    assert!(
+        merged
+            .frontmatter
+            .high_risk_areas
+            .contains(&"src/new.rs".to_string())
+    );
 }
 
 #[test]
@@ -772,9 +779,11 @@ fn test_merge_includes_previous_scan_info() {
     let merged = ThreatModelFile::merge_with_existing(&new, &existing);
 
     assert!(merged.body.contains("Previous scan"));
-    assert!(merged
-        .body
-        .contains(&existing.frontmatter.generated_at[..4])); // Check year from existing timestamp
+    assert!(
+        merged
+            .body
+            .contains(&existing.frontmatter.generated_at[..4])
+    ); // Check year from existing timestamp
     assert!(merged.body.contains("Total threats found: 10"));
 }
 
@@ -1058,14 +1067,18 @@ fn test_full_save_load_merge_cycle() {
     // Step 5: Load final and verify both files present
     let final_tm = ThreatModelFile::load(tmp.path()).unwrap().unwrap();
     assert!(final_tm.body.contains("Previous scan"));
-    assert!(final_tm
-        .frontmatter
-        .high_risk_areas
-        .contains(&"a.rs".to_string()));
-    assert!(final_tm
-        .frontmatter
-        .high_risk_areas
-        .contains(&"b.rs".to_string()));
+    assert!(
+        final_tm
+            .frontmatter
+            .high_risk_areas
+            .contains(&"a.rs".to_string())
+    );
+    assert!(
+        final_tm
+            .frontmatter
+            .high_risk_areas
+            .contains(&"b.rs".to_string())
+    );
 }
 
 #[test]

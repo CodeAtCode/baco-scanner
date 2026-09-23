@@ -1,8 +1,8 @@
 //! Tool execution helper to avoid duplication in session.rs
 
+use crate::agent::AgentFinding;
 use crate::agent::sandbox::ToolSandbox;
 use crate::agent::tool_schema::ToolRegistry;
-use crate::agent::AgentFinding;
 use crate::findings::{Severity, VulnerabilityFinding};
 use crate::llm::{ChatMessage, ChatResponse};
 use std::path::PathBuf;

@@ -164,6 +164,13 @@ BACO supports single or multiple models per phase. When multiple models are conf
 
 **Default max_reasoning_tokens:** unset (`None` — no cap unless configured)
 
+**Global fallback:** `[llm] base_url` applies to every phase without its own `base_url`:
+
+```toml
+[llm]
+base_url = "https://api.mistral.ai/v1"
+```
+
 **Per-phase overrides:** Each phase supports optional `timeout_secs` and `temperature` overrides:
 
 ```toml
@@ -338,10 +345,8 @@ include_rejected = false
 ## Environment Variables
 
 | Env Var | Usage |
-## Environment Variables
-
-| Env Var | Usage |
 |---------|-------|
+| `LLM_API_KEY` | Fallback for any `llm.phases.<slot>.api_key` when the slot-specific `LLM_<SLOT>_KEY` is unset |
 | `LLM_DISCOVERY_KEY` | Overrides `llm.phases.discovery.api_key` |
 | `LLM_VERIFICATION_KEY` | Overrides `llm.phases.verification.api_key` |
 | `LLM_AGGREGATION_KEY` | Overrides `llm.phases.aggregation.api_key` |

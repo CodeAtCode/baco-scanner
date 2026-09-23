@@ -1,8 +1,8 @@
 /// Preset system for loading project-type-specific scanner configurations.
 ///
-/// Presets provide a base configuration layer that is overridden by user config.toml
-/// and CLI flags. Loading order: built-in defaults → user config.toml → preset file → CLI flags.
-/// Presets are applied on top of the user config and take precedence.
+/// Presets provide a base configuration layer under user config.toml.
+/// Loading order: built-in defaults → preset file → user config.toml → env → CLI flags.
+/// User config wins over preset (TOML deep merge of explicit user keys).
 use serde::{Deserialize, Serialize};
 
 use std::fs;
@@ -183,11 +183,7 @@ pub fn load_preset(name: &str) -> Result<PresetOverlay, ScanError> {
     }
 
     // Check user directory
-    let user_preset_path = home_dir()
-        .join(".config")
-        .join("baco")
-        .join("presets")
-        .join(format!("{}.toml", name));
+    let user_preset_path = user_preset_dir().join(format!("{}.toml", name));
 
     if user_preset_path.exists() {
         let content = fs::read_to_string(&user_preset_path).map_err(ScanError::IoError)?;
@@ -227,7 +223,7 @@ pub fn list_available_presets() -> Vec<String> {
         .collect::<Vec<_>>();
 
     // Add user directory presets
-    let user_dir = home_dir().join(".config").join("baco").join("presets");
+    let user_dir = user_preset_dir();
 
     if user_dir.exists() {
         if let Ok(entries) = fs::read_dir(&user_dir) {
@@ -252,18 +248,17 @@ pub fn list_available_presets() -> Vec<String> {
     presets
 }
 
-/// Get home directory (cross-platform)
-pub fn home_dir() -> PathBuf {
-    dirs::home_dir().unwrap_or_else(|| PathBuf::from("/"))
+/// User preset directory via the platform config dir.
+fn user_preset_dir() -> PathBuf {
+    dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from("/.config"))
+        .join("baco")
+        .join("presets")
 }
 
 /// Get user preset path
 pub fn user_preset_path(name: &str) -> PathBuf {
-    home_dir()
-        .join(".config")
-        .join("baco")
-        .join("presets")
-        .join(format!("{}.toml", name))
+    user_preset_dir().join(format!("{}.toml", name))
 }
 
 /// Get bundled preset for display (public wrapper around private get_bundled_preset)

@@ -43,7 +43,10 @@ fn test_sarif_schema_version() {
     let findings = vec![make_finding(Severity::High, "test-1")];
     let result = generate_sarif_report(&findings, None).unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
-    assert_eq!(parsed["$schema"], "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json");
+    assert_eq!(
+        parsed["$schema"],
+        "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json"
+    );
     assert_eq!(parsed["version"], "2.1.0");
 }
 
@@ -169,14 +172,18 @@ fn test_sarif_poc_related_locations() {
     let arr = related.as_array().unwrap();
     assert_eq!(arr.len(), 2);
 
-    assert!(arr[0]["location"]["message"]["text"]
-        .as_str()
-        .unwrap()
-        .contains("Proof of Concept"));
-    assert!(arr[1]["location"]["message"]["text"]
-        .as_str()
-        .unwrap()
-        .contains("Mitigation"));
+    assert!(
+        arr[0]["location"]["message"]["text"]
+            .as_str()
+            .unwrap()
+            .contains("Proof of Concept")
+    );
+    assert!(
+        arr[1]["location"]["message"]["text"]
+            .as_str()
+            .unwrap()
+            .contains("Mitigation")
+    );
 }
 
 #[test]
@@ -294,8 +301,7 @@ fn test_sarif_uri_base_id() {
 
     // Structure: locations[0].physicalLocation.artifactLocation.uriBaseId
     assert_eq!(
-        parsed["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["artifactLocation"]
-            ["uriBaseId"],
+        parsed["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["artifactLocation"]["uriBaseId"],
         "file://"
     );
 }

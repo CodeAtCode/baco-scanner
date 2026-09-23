@@ -1,9 +1,9 @@
 use async_trait::async_trait;
-use baco::agent::session::AgentLlmClient;
 use baco::agent::ToolCall;
+use baco::agent::session::AgentLlmClient;
 use baco::llm::{ChatMessage, ChatResponse, ToolSchema};
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// Mock LLM client for testing without calling real LLM endpoints
 /// Implements LlmClient trait with pre-programmed responses

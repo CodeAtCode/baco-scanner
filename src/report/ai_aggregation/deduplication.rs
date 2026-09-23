@@ -7,8 +7,6 @@ use std::collections::HashSet;
 
 /// Semantic deduplication service
 pub struct DeduplicationService {
-    #[allow(dead_code)]
-    enrichment: EnrichmentService,
     llm_config: crate::llm::LlmConfig,
 }
 
@@ -16,7 +14,6 @@ impl DeduplicationService {
     /// Create a new deduplication service
     pub fn new(config: &crate::llm::LlmConfig) -> Self {
         Self {
-            enrichment: EnrichmentService::new(config),
             llm_config: config.clone(),
         }
     }

@@ -5,17 +5,17 @@
 
 use crate::context::knowledge_path::extract_keywords;
 use crate::vuln_spec::schema::{DomainCategory, SecuritySpecification};
-use once_cell::sync::Lazy;
 use regex::Regex;
 use std::collections::HashMap;
+use std::sync::LazyLock;
 use std::sync::RwLock;
 
 /// Static embedding index for specifications
 /// Global by design: the spec embedding index is shared across phases within a scan.
 /// Mutations are serialized via the RwLock; tests that build or clear the index must
 /// run under #[serial] (see test flake history).
-pub static EMBEDDING_INDEX: Lazy<RwLock<SpecEmbeddingIndex>> =
-    Lazy::new(|| RwLock::new(SpecEmbeddingIndex::new()));
+pub static EMBEDDING_INDEX: LazyLock<RwLock<SpecEmbeddingIndex>> =
+    LazyLock::new(|| RwLock::new(SpecEmbeddingIndex::new()));
 
 /// Maximum number of dimensions for embeddings
 pub const EMBEDDING_DIM: usize = 768;
@@ -138,7 +138,7 @@ impl Bm25Index {
     }
 
     fn tokenize(&self, text: &str) -> Vec<String> {
-        static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[a-zA-Z0-9_]+").unwrap());
+        static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[a-zA-Z0-9_]+").unwrap());
 
         RE.find_iter(text)
             .map(|m| m.as_str().to_lowercase())

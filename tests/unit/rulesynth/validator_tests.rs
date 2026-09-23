@@ -1,6 +1,6 @@
 //! Unit tests for validator module (migrated from inline #[cfg(test)] block)
 
-use baco::rulesynth::{validate_rule, RuleError};
+use baco::rulesynth::{RuleError, validate_rule};
 
 #[test]
 fn test_validate_valid_yaml_missing_rules_key() {

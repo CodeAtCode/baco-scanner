@@ -96,3 +96,35 @@ pub fn parse_diff(diff_output: &str) -> (u32, u32, u32) {
 
     (files_changed, insertions, deletions)
 }
+/// List files changed in a git revspec (`git diff --name-only`), repo-relative.
+/// `repo_path` should be the repository root or a directory inside it.
+pub fn changed_files(repo_path: &str, revspec: &str) -> Result<Vec<std::path::PathBuf>, String> {
+    let output = std::process::Command::new("git")
+        .args(["-C", repo_path, "diff", "--name-only", revspec, "--"])
+        .output()
+        .map_err(|e| format!("Failed to run git diff: {e}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "git diff failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    Ok(String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .map(std::path::PathBuf::from)
+        .collect())
+}
+
+/// Keep findings whose path matches the changed set. Compares exact paths
+/// plus suffix matches on normalized separators, covering absolute finding
+/// paths against repo-relative changed entries (and vice versa).
+pub fn matches_changed_set(file_path: &str, changed: &[std::path::PathBuf]) -> bool {
+    let normalized = file_path.replace('\\', "/");
+    changed.iter().any(|p| {
+        let entry = p.to_string_lossy().replace('\\', "/");
+        normalized == entry
+            || normalized.ends_with(format!("/{entry}").as_str())
+            || entry.ends_with(format!("/{normalized}").as_str())
+    })
+}

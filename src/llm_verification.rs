@@ -8,7 +8,7 @@
 //! - Integration with AnalysisContext
 
 use crate::findings::{VerificationStatus, VulnerabilityFinding};
-use crate::llm::traits::AsyncLlmClient;
+use crate::llm::LlmChatClient;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -130,7 +130,7 @@ pub async fn rationale_check<C>(
     finding: &VulnerabilityFinding,
 ) -> Result<RationaleVerdict, Box<dyn std::error::Error + Send + Sync>>
 where
-    C: AsyncLlmClient + Send + Sync,
+    C: LlmChatClient + Send + Sync,
 {
     // Build prompt variables
     let mut variables = HashMap::new();

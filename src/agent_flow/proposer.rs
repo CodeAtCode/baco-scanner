@@ -4,7 +4,7 @@
 //! changing edges, or modifying prompt templates. Calls the LLM to generate
 //! rewrite suggestions.
 
-use super::diagnoser::{format_diagnostic, Diagnostic};
+use super::diagnoser::{Diagnostic, format_diagnostic};
 use super::dsl::{AgentFlowHarness, EdgeKind};
 use crate::llm::LlmClient;
 

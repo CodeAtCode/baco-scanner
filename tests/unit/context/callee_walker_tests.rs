@@ -1,6 +1,6 @@
 //! Unit tests for src/context/callee_walker.rs - CallSite extraction
 
-use baco::context::callee_walker::{extract_call_sites, CallSite};
+use baco::context::callee_walker::{CallSite, extract_call_sites};
 use std::collections::BTreeSet;
 
 // ============================================================================
@@ -488,7 +488,7 @@ fn test_no_calls_inline_migrated() {
 
 #[test]
 fn test_simple_call_inline_migrated() {
-    use baco::context::callee_walker::{extract_call_sites, CallSite};
+    use baco::context::callee_walker::{CallSite, extract_call_sites};
 
     let sites = extract_call_sites("foo(1, 2)");
     assert!(sites.contains(&CallSite {
@@ -499,7 +499,7 @@ fn test_simple_call_inline_migrated() {
 
 #[test]
 fn test_nested_call_inline_migrated() {
-    use baco::context::callee_walker::{extract_call_sites, CallSite};
+    use baco::context::callee_walker::{CallSite, extract_call_sites};
 
     let sites = extract_call_sites("outer(inner(1), 2)");
     assert!(sites.contains(&CallSite {
@@ -514,7 +514,7 @@ fn test_nested_call_inline_migrated() {
 
 #[test]
 fn test_zero_args_inline_migrated() {
-    use baco::context::callee_walker::{extract_call_sites, CallSite};
+    use baco::context::callee_walker::{CallSite, extract_call_sites};
 
     let sites = extract_call_sites("getpid()");
     assert!(sites.contains(&CallSite {

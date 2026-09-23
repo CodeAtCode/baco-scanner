@@ -8,8 +8,7 @@ fn test_agent_message_with_tools_is_specific() {
     let tools_list = tools_used.join(", ");
     let message = format!(
         "Offensive security analysis using {} performed {} turns of investigation. No critical exploitable vulnerability was identified after tracing data flow and checking for common attack vectors (SQLi, XSS, command injection, path traversal). Code demonstrates defensive programming practices.",
-        tools_list,
-        turn_count
+        tools_list, turn_count
     );
 
     assert!(message.contains("file_read, pattern_search"));

@@ -14,7 +14,7 @@
 
 use crate::fixtures::make_rulesynth_config;
 use baco::config::RuleSynthConfig;
-use baco::rulesynth::{validate_rule, RuleError, SemgrepRule};
+use baco::rulesynth::{RuleError, SemgrepRule, validate_rule};
 use std::path::PathBuf;
 
 // ============================================================================

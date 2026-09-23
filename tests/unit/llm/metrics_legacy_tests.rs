@@ -457,9 +457,11 @@ async fn test_complex_metrics_scenario() {
     // Check operation metrics
     assert_eq!(metrics.by_operation.len(), 2);
     assert!(metrics.by_operation.contains_key("chat:discovery"));
-    assert!(metrics
-        .by_operation
-        .contains_key("chat_with_tools:verification"));
+    assert!(
+        metrics
+            .by_operation
+            .contains_key("chat_with_tools:verification")
+    );
 }
 // ============================================================================
 // Additional LlmMetrics Tests

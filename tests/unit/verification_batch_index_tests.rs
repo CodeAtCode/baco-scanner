@@ -138,9 +138,11 @@ async fn test_batch_verdict_malformed_object_salvage() {
 
     // Entire batch fails - all become NeedsReview with raw content
     assert_eq!(results.len(), 3);
-    assert!(results
-        .iter()
-        .all(|(status, _)| *status == VerificationStatus::NeedsReview));
+    assert!(
+        results
+            .iter()
+            .all(|(status, _)| *status == VerificationStatus::NeedsReview)
+    );
     assert!(results[0].1.contains("invalid json"));
 }
 
@@ -210,13 +212,15 @@ async fn test_verify_findings_batched_with_index() {
 #[tokio::test]
 async fn test_verify_findings_batched_without_index_fallback() {
     // Test full batch verification flow without index field
-    let responses = vec![r#"[
+    let responses = vec![
+        r#"[
             {"verification_status": "confirmed", "verification_notes": "First"},
             {"verification_status": "false_positive", "verification_notes": "Second"},
             {"verification_status": "needs_review", "verification_notes": "Third"},
             {"verification_status": "confirmed", "verification_notes": "Fourth"}
         ]"#
-    .to_string()];
+        .to_string(),
+    ];
 
     let client = MockLlmClient::new(responses);
     let findings = vec![

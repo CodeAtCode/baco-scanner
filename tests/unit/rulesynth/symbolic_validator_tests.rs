@@ -1,8 +1,8 @@
 //! Unit tests for symbolic_validator module (migrated from inline #[cfg(test)] block)
 
 use baco::rulesynth::pattern_dsl::{Pattern, Severity, TaintSink, TaintSource};
-use baco::rulesynth::symbolic_validator::{load_corpus, pattern_matches_code, TraceResult};
-use baco::rulesynth::{format_feedback, validate, LabelledTrace, ValidationOutcome};
+use baco::rulesynth::symbolic_validator::{TraceResult, load_corpus, pattern_matches_code};
+use baco::rulesynth::{LabelledTrace, ValidationOutcome, format_feedback, validate};
 
 fn make_pattern() -> Pattern {
     Pattern {

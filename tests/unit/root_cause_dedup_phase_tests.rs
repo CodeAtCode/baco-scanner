@@ -278,9 +278,11 @@ fn test_deduplicate_preserves_locations() {
     let group = &groups[0];
     assert_eq!(group.all_locations.len(), 2);
     assert!(group.all_locations.contains(&("src/db.rs".to_string(), 42)));
-    assert!(group
-        .all_locations
-        .contains(&("src/db.rs".to_string(), 100)));
+    assert!(
+        group
+            .all_locations
+            .contains(&("src/db.rs".to_string(), 100))
+    );
 }
 
 #[test]

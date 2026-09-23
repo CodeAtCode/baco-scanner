@@ -274,10 +274,12 @@ async fn test_enrichment_batching_call_count() {
             finding.description.contains(&format!("Desc {}", i))
                 || finding.description.contains(&format!("Finding {}", i))
         );
-        assert!(finding
-            .recommendation
-            .as_ref()
-            .is_some_and(|r| r.contains(&format!("Rec {}", i))));
+        assert!(
+            finding
+                .recommendation
+                .as_ref()
+                .is_some_and(|r| r.contains(&format!("Rec {}", i)))
+        );
     }
 }
 
@@ -286,15 +288,17 @@ async fn test_enrichment_batch_single_bad_item() {
     // Test that a single bad item in a batch keeps empty fields while others are enriched
     let findings: Vec<VulnerabilityFinding> = (0..5).map(create_finding).collect();
 
-    let responses = vec![serde_json::to_string(&[
-        json!({"index": 0, "description": "Desc 0", "recommendation": "Rec 0"}),
-        json!({"index": 1, "description": "Desc 1", "recommendation": "Rec 1"}),
-        // Malformed - missing fields
-        json!({"index": 2}),
-        json!({"index": 3, "description": "Desc 3", "recommendation": "Rec 3"}),
-        json!({"index": 4, "description": "Desc 4", "recommendation": "Rec 4"}),
-    ])
-    .unwrap()];
+    let responses = vec![
+        serde_json::to_string(&[
+            json!({"index": 0, "description": "Desc 0", "recommendation": "Rec 0"}),
+            json!({"index": 1, "description": "Desc 1", "recommendation": "Rec 1"}),
+            // Malformed - missing fields
+            json!({"index": 2}),
+            json!({"index": 3, "description": "Desc 3", "recommendation": "Rec 3"}),
+            json!({"index": 4, "description": "Desc 4", "recommendation": "Rec 4"}),
+        ])
+        .unwrap(),
+    ];
 
     let client = CountingLlmClient::new(responses);
     let results = enrich_findings_batched(&client, &findings, 8).await;
@@ -308,10 +312,12 @@ async fn test_enrichment_batch_single_bad_item() {
 
     // Item 2 should have default enrichment due to parse failure
     assert!(!results[2].description.contains("Desc 2"));
-    assert!(results[2]
-        .recommendation
-        .as_ref()
-        .is_some_and(|r| r == "Review and fix the identified security issue."));
+    assert!(
+        results[2]
+            .recommendation
+            .as_ref()
+            .is_some_and(|r| r == "Review and fix the identified security issue.")
+    );
 
     // Items 3, 4 should be enriched
     assert!(results[3].description.contains("Desc 3"));

@@ -2,7 +2,7 @@
 //!
 //! Migrated from src/agent/tool_schema.rs inline tests
 
-use baco::agent::tool_schema::{default_tools, tool_definitions, Tool, ToolRegistry};
+use baco::agent::tool_schema::{Tool, ToolRegistry, default_tools, tool_definitions};
 
 #[allow(dead_code)]
 struct MockTool;
@@ -144,10 +144,12 @@ fn test_tool_definitions_required_fields() {
         .iter()
         .find(|d| d["function"]["name"].as_str() == Some("file_read"))
         .unwrap();
-    assert!(file_read["function"]["parameters"]["required"]
-        .as_array()
-        .unwrap()
-        .contains(&serde_json::json!("path")));
+    assert!(
+        file_read["function"]["parameters"]["required"]
+            .as_array()
+            .unwrap()
+            .contains(&serde_json::json!("path"))
+    );
 
     let pattern_search = definitions
         .iter()
@@ -183,10 +185,12 @@ fn test_tool_definitions_required_fields() {
         .iter()
         .find(|d| d["function"]["name"].as_str() == Some("test_run"))
         .unwrap();
-    assert!(test_run["function"]["parameters"]["required"]
-        .as_array()
-        .unwrap()
-        .contains(&serde_json::json!("executable_path")));
+    assert!(
+        test_run["function"]["parameters"]["required"]
+            .as_array()
+            .unwrap()
+            .contains(&serde_json::json!("executable_path"))
+    );
 }
 
 #[test]

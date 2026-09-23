@@ -41,9 +41,11 @@ mod tests {
         let refined = refinements.get("f1").unwrap();
 
         assert!(refined.refined_score < refined.original_score);
-        assert!(refined
-            .factors
-            .contains(&ConfidenceFactor::FalsePositiveDetected));
+        assert!(
+            refined
+                .factors
+                .contains(&ConfidenceFactor::FalsePositiveDetected)
+        );
     }
 
     #[test]
@@ -57,9 +59,11 @@ mod tests {
         let refinements = phase.run(vec![finding], &context, true, 0.1);
         let refined = refinements.get("f1").unwrap();
 
-        assert!(refined
-            .factors
-            .contains(&ConfidenceFactor::MultiSourceConfirmation));
+        assert!(
+            refined
+                .factors
+                .contains(&ConfidenceFactor::MultiSourceConfirmation)
+        );
     }
 
     #[test]
@@ -100,9 +104,11 @@ mod tests {
         let refinements = phase.run(vec![finding], &context, true, 0.1);
         let refined = refinements.get("f1").unwrap();
 
-        assert!(refined
-            .factors
-            .contains(&ConfidenceFactor::CrossFileReachability));
+        assert!(
+            refined
+                .factors
+                .contains(&ConfidenceFactor::CrossFileReachability)
+        );
     }
 
     #[test]
@@ -246,9 +252,11 @@ mod tests {
         let refined = refinements.get("f1").unwrap();
 
         assert!((refined.refined_score - 0.9).abs() < 0.01);
-        assert!(refined
-            .factors
-            .contains(&ConfidenceFactor::MultiSourceConfirmation));
+        assert!(
+            refined
+                .factors
+                .contains(&ConfidenceFactor::MultiSourceConfirmation)
+        );
     }
 
     #[test]
@@ -264,9 +272,11 @@ mod tests {
         let refined = refinements.get("f1").unwrap();
 
         assert!((refined.refined_score - 0.88).abs() < 0.001);
-        assert!(refined
-            .factors
-            .contains(&ConfidenceFactor::CrossFileReachability));
+        assert!(
+            refined
+                .factors
+                .contains(&ConfidenceFactor::CrossFileReachability)
+        );
     }
 
     #[test]
@@ -315,9 +325,11 @@ mod tests {
         let refined = refinements.get("f1").unwrap();
 
         assert!((refined.refined_score - 0.5).abs() < 0.001);
-        assert!(refined
-            .factors
-            .contains(&ConfidenceFactor::FalsePositiveDetected));
+        assert!(
+            refined
+                .factors
+                .contains(&ConfidenceFactor::FalsePositiveDetected)
+        );
     }
 
     #[test]
@@ -393,9 +405,11 @@ mod tests {
         let refined = refinements.get("f1").unwrap();
 
         assert!((refined.refined_score - 0.75).abs() < 0.001);
-        assert!(refined
-            .factors
-            .contains(&ConfidenceFactor::LowConfidenceSource));
+        assert!(
+            refined
+                .factors
+                .contains(&ConfidenceFactor::LowConfidenceSource)
+        );
     }
 
     #[test]
@@ -532,10 +546,12 @@ mod tests {
         let refined = refinements.get("f1").unwrap();
 
         assert!((refined.refined_score - 0.08).abs() < 0.01);
-        assert!(refined
-            .factors
-            .iter()
-            .any(|f| matches!(f, ConfidenceFactor::NeverSubmitMatch { .. })));
+        assert!(
+            refined
+                .factors
+                .iter()
+                .any(|f| matches!(f, ConfidenceFactor::NeverSubmitMatch { .. }))
+        );
     }
 
     #[test]
@@ -553,10 +569,12 @@ mod tests {
         let refined = refinements.get("f2").unwrap();
 
         assert!((refined.refined_score - 0.08).abs() < 0.01);
-        assert!(refined
-            .factors
-            .iter()
-            .any(|f| matches!(f, ConfidenceFactor::NeverSubmitMatch { .. })));
+        assert!(
+            refined
+                .factors
+                .iter()
+                .any(|f| matches!(f, ConfidenceFactor::NeverSubmitMatch { .. }))
+        );
     }
 
     #[test]
@@ -573,10 +591,12 @@ mod tests {
         let refined = refinements.get("f3").unwrap();
 
         assert!((refined.refined_score - 0.08).abs() < 0.01);
-        assert!(refined
-            .factors
-            .iter()
-            .any(|f| matches!(f, ConfidenceFactor::NeverSubmitMatch { .. })));
+        assert!(
+            refined
+                .factors
+                .iter()
+                .any(|f| matches!(f, ConfidenceFactor::NeverSubmitMatch { .. }))
+        );
     }
 
     #[test]
@@ -593,10 +613,12 @@ mod tests {
         let refined = refinements.get("f4").unwrap();
 
         assert!((refined.refined_score - 0.08).abs() < 0.01);
-        assert!(refined
-            .factors
-            .iter()
-            .any(|f| matches!(f, ConfidenceFactor::NeverSubmitMatch { .. })));
+        assert!(
+            refined
+                .factors
+                .iter()
+                .any(|f| matches!(f, ConfidenceFactor::NeverSubmitMatch { .. }))
+        );
     }
 
     #[test]
@@ -612,9 +634,11 @@ mod tests {
         let refinements = phase.run(vec![finding], &context, true, 0.1);
         let refined = refinements.get("f5").unwrap();
 
-        assert!(!refined
-            .factors
-            .iter()
-            .any(|f| matches!(f, ConfidenceFactor::NeverSubmitMatch { .. })));
+        assert!(
+            !refined
+                .factors
+                .iter()
+                .any(|f| matches!(f, ConfidenceFactor::NeverSubmitMatch { .. }))
+        );
     }
 }

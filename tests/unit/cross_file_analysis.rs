@@ -466,18 +466,22 @@ fn test_mixed_same_and_different_cwe() {
     let cwe2 = result.iter().find(|f| f.id == "cwe2").unwrap();
 
     assert!(cwe1_a.cross_file_references.is_some());
-    assert!(cwe1_a
-        .cross_file_references
-        .as_ref()
-        .unwrap()
-        .contains(&"cwe1_b".to_string()));
+    assert!(
+        cwe1_a
+            .cross_file_references
+            .as_ref()
+            .unwrap()
+            .contains(&"cwe1_b".to_string())
+    );
 
     assert!(cwe1_b.cross_file_references.is_some());
-    assert!(cwe1_b
-        .cross_file_references
-        .as_ref()
-        .unwrap()
-        .contains(&"cwe1_a".to_string()));
+    assert!(
+        cwe1_b
+            .cross_file_references
+            .as_ref()
+            .unwrap()
+            .contains(&"cwe1_a".to_string())
+    );
 
     assert!(cwe2.cross_file_references.is_none());
 }

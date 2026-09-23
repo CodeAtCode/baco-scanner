@@ -337,9 +337,11 @@ async fn test_generate_executive_summary_no_findings() {
     let findings: Vec<VulnerabilityFinding> = vec![];
     let result = phase.run(findings, &context).await;
 
-    assert!(result
-        .executive_summary
-        .contains("Total Unique Findings: 0"));
+    assert!(
+        result
+            .executive_summary
+            .contains("Total Unique Findings: 0")
+    );
     assert!(result.executive_summary.contains("Risk Level:"));
 }
 
@@ -409,9 +411,11 @@ async fn test_generate_executive_summary_critical_risk() {
     let result = phase.run(findings, &context).await;
 
     assert!(result.executive_summary.contains("Risk Level: CRITICAL"));
-    assert!(result
-        .executive_summary
-        .contains("Immediate action required"));
+    assert!(
+        result
+            .executive_summary
+            .contains("Immediate action required")
+    );
 }
 
 #[tokio::test]
@@ -598,9 +602,11 @@ async fn test_run_aggregation_empty_findings() {
     let result = phase.run(findings, &context).await;
 
     assert_eq!(result.unified_reports.len(), 0);
-    assert!(result
-        .executive_summary
-        .contains("Total Unique Findings: 0"));
+    assert!(
+        result
+            .executive_summary
+            .contains("Total Unique Findings: 0")
+    );
 }
 
 #[tokio::test]
@@ -1666,4 +1672,68 @@ fn test_ai_confidence_calculation() {
 
     assert!(ai_confidence.overall > 0.0);
     assert!(!ai_confidence.positive_factors.is_empty());
+}
+#[test]
+fn test_conflict_resolver_resolve_verification_conflict() {
+    let findings = [
+        make_aggregation_finding(
+            "f1",
+            Severity::High,
+            0.5,
+            "src/main.rs",
+            Some(42),
+            Some("CWE-79"),
+            Some(baco::findings::VerificationStatus::Confirmed),
+        ),
+        make_aggregation_finding(
+            "f2",
+            Severity::High,
+            0.5,
+            "src/main.rs",
+            Some(42),
+            Some("CWE-79"),
+            Some(baco::findings::VerificationStatus::FalsePositive),
+        ),
+    ];
+    let finding_refs: Vec<&VulnerabilityFinding> = findings.iter().collect();
+
+    let conflict = ConflictResolver::resolve_verification_conflict("src/main.rs:42", &finding_refs);
+
+    assert_eq!(
+        conflict.conflict_type,
+        baco::report::ai_aggregation::models::ConflictType::VerificationConflict
+    );
+}
+
+#[test]
+fn detect_conflicts_finds_cwe_mismatch_in_group() {
+    let phase = AiAggregationPhase::new(make_config());
+    let findings = vec![
+        make_aggregation_finding(
+            "f1",
+            Severity::High,
+            0.5,
+            "src/main.rs",
+            Some(42),
+            Some("CWE-79"),
+            None,
+        ),
+        make_aggregation_finding(
+            "f2",
+            Severity::High,
+            0.5,
+            "src/main.rs",
+            Some(42),
+            Some("CWE-89"),
+            None,
+        ),
+    ];
+    let grouped = phase.group_findings_by_location(&findings);
+    assert_eq!(grouped.len(), 1);
+    let conflicts = phase.detect_conflicts(&grouped);
+    assert_eq!(conflicts.len(), 1);
+    assert_eq!(
+        conflicts[0].conflict_type,
+        baco::report::ai_aggregation::models::ConflictType::CweMismatch
+    );
 }

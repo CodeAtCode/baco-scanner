@@ -10,7 +10,7 @@ use crate::fixtures::{
 use baco::checkpoint::ScanPhase;
 use baco::findings::{Severity, VulnerabilityFinding};
 use baco::phase::helpers::create_test_finding_simple;
-use baco::scanner::{combine_parallel_results, ParallelPhaseResult, ParallelSlot};
+use baco::scanner::{ParallelPhaseResult, ParallelSlot, combine_parallel_results};
 use indicatif::ProgressBar;
 
 use std::time::Duration;

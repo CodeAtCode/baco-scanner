@@ -3,8 +3,8 @@
 
 use baco::config::ScannerConfig;
 use baco::init::{
-    detect_languages_in_dir, detect_project_markers, generate_config_content, run_init,
-    suggest_preset, InitCommand,
+    InitCommand, detect_languages_in_dir, detect_project_markers, generate_config_content,
+    run_init, suggest_preset,
 };
 use std::collections::HashSet;
 use std::fs;

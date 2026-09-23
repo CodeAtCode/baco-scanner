@@ -9,7 +9,7 @@
 //! 6. Edge cases - empty input, boundary values, special characters
 
 use baco::config::RuleSynthConfig;
-use baco::rulesynth::{extract_rule_id, parse_yaml_rules, RuleError, SemgrepRule};
+use baco::rulesynth::{RuleError, SemgrepRule, extract_rule_id, parse_yaml_rules};
 use std::path::PathBuf;
 
 // Local copy of build_prompt for testing (mirrors src/rulesynth/prompt.rs)

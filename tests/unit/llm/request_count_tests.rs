@@ -98,11 +98,13 @@ async fn test_verification_n_findings_leq_batch_size() {
     let findings: Vec<VulnerabilityFinding> = (0..5).map(create_finding).collect();
     let hunt_prompts: HashMap<String, String> = HashMap::new();
 
-    let responses = vec![serde_json::to_string(&vec![
-        json!({"index": 0, "verification_status": "confirmed", "verification_notes": "OK"});
-        5
-    ])
-    .unwrap()];
+    let responses = vec![
+        serde_json::to_string(&vec![
+            json!({"index": 0, "verification_status": "confirmed", "verification_notes": "OK"});
+            5
+        ])
+        .unwrap(),
+    ];
 
     let client = CountingLlmClient::new(responses);
     let (results, _fallback_count) =
@@ -240,4 +242,43 @@ async fn test_parse_failure_batch_counts_as_one_call() {
             i
         );
     }
+}
+/// LLM client that always fails (exercises the batch-error arm).
+struct FailingLlmClient;
+
+impl LlmChatClient for FailingLlmClient {
+    async fn chat(&self, _messages: &[ChatMessage]) -> Result<ChatResponseWithModel, ScanError> {
+        Err(ScanError::Server {
+            message: "boom".to_string(),
+            source: None,
+        })
+    }
+}
+
+#[tokio::test]
+async fn verify_batch_client_error_marks_all_needs_review() {
+    let client = FailingLlmClient;
+    let findings = vec![create_finding(1), create_finding(2)];
+    let (results, fallback) =
+        verify_findings_batched(&client, &findings, 8, &HashMap::new(), &HashMap::new()).await;
+    assert_eq!(results.len(), 2);
+    assert!(
+        results
+            .iter()
+            .all(|(status, _)| *status == VerificationStatus::NeedsReview)
+    );
+    assert_eq!(fallback, 0);
+}
+
+#[tokio::test]
+async fn verify_batch_missing_index_counts_positional_fallback() {
+    let client = CountingLlmClient::new(vec![
+        r#"[{"verification_status": "confirmed", "verification_notes": "ok"}, {"verification_status": "false_positive", "verification_notes": "no"}]"#.to_string(),
+    ]);
+    let findings = vec![create_finding(1), create_finding(2)];
+    let (results, fallback) =
+        verify_findings_batched(&client, &findings, 8, &HashMap::new(), &HashMap::new()).await;
+    assert_eq!(results.len(), 2);
+    assert_eq!(fallback, 2);
+    assert_eq!(client.get_call_count(), 1);
 }

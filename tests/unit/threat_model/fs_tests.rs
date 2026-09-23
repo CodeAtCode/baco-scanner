@@ -98,14 +98,16 @@ fn test_generate_threat_model() {
     assert_eq!(tm.frontmatter.version, "1.0");
     assert_eq!(tm.frontmatter.project_type, "web");
     assert_eq!(tm.frontmatter.total_threats, 2);
-    assert!(tm
-        .frontmatter
-        .high_risk_areas
-        .contains(&"src/db.rs".to_string()));
-    assert!(tm
-        .frontmatter
-        .high_risk_areas
-        .contains(&"src/handler.rs".to_string()));
+    assert!(
+        tm.frontmatter
+            .high_risk_areas
+            .contains(&"src/db.rs".to_string())
+    );
+    assert!(
+        tm.frontmatter
+            .high_risk_areas
+            .contains(&"src/handler.rs".to_string())
+    );
     assert!(tm.body.contains("SQL Injection"));
     assert!(tm.body.contains("XSS in Header"));
 }
@@ -170,14 +172,18 @@ fn test_merge_with_existing() {
     let merged = ThreatModelFile::merge_with_existing(&new, &existing);
 
     // Should have combined high risk areas
-    assert!(merged
-        .frontmatter
-        .high_risk_areas
-        .contains(&"src/db.rs".to_string()));
-    assert!(merged
-        .frontmatter
-        .high_risk_areas
-        .contains(&"src/handler.rs".to_string()));
+    assert!(
+        merged
+            .frontmatter
+            .high_risk_areas
+            .contains(&"src/db.rs".to_string())
+    );
+    assert!(
+        merged
+            .frontmatter
+            .high_risk_areas
+            .contains(&"src/handler.rs".to_string())
+    );
 
     // Should have newer timestamp
     assert!(merged.frontmatter.generated_at.contains("2024-01-02"));

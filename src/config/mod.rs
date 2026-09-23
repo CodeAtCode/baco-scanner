@@ -214,16 +214,63 @@ impl ScannerConfig {
         Ok(config)
     }
 
-    fn validate_phase(phase_name: &str, phase: &LlmPhaseConfig) -> Result<(), ConfigError> {
+    /// Load with a preset applied UNDER the user file: defaults → preset →
+    /// user-explicit-keys (TOML deep merge, arrays replaced wholesale).
+    /// User config wins over preset; explicit `temperature = 0.0` applies.
+    pub fn from_file_with_preset(
+        path: &str,
+        preset: Option<crate::preset::PresetOverlay>,
+    ) -> Result<Self, ConfigError> {
+        let mut base = ScannerConfig::default();
+        if let Some(overlay) = preset {
+            overlay.merge_into(&mut base);
+        }
+        let content = fs::read_to_string(path)?;
+        let expanded = expand_env_vars(&content);
+        let user_val: toml::Value = toml::from_str(&expanded)?;
+        let mut base_val = toml::Value::try_from(&base).map_err(|e| ConfigError::Parse {
+            message: e.to_string(),
+            line: None,
+            column: None,
+        })?;
+        fn deep_merge(base: &mut toml::Value, overlay: toml::Value) {
+            match (base, overlay) {
+                (toml::Value::Table(base_map), toml::Value::Table(overlay_map)) => {
+                    for (key, overlay_val) in overlay_map {
+                        match base_map.get_mut(&key) {
+                            Some(base_val) => deep_merge(base_val, overlay_val),
+                            None => {
+                                base_map.insert(key, overlay_val);
+                            }
+                        }
+                    }
+                }
+                (base_slot, overlay_val) => {
+                    *base_slot = overlay_val;
+                }
+            }
+        }
+        deep_merge(&mut base_val, user_val);
+        let config: ScannerConfig = base_val.try_into()?;
+        Ok(config)
+    }
+
+    fn validate_phase(
+        phase_name: &str,
+        phase: &LlmPhaseConfig,
+        global_base_url: &str,
+    ) -> Result<(), ConfigError> {
         // If api_key is empty/None, LLM is disabled for this phase - skip validation
-        if phase.api_key.as_ref().map_or(true, |k| k.is_empty()) {
+        if phase.api_key.as_ref().is_none_or(|k| k.is_empty()) {
             return Ok(());
         }
 
-        if phase.base_url.is_empty() {
+        if phase.base_url.is_empty() && global_base_url.is_empty() {
             return Err(ConfigError::Validation {
                 field: format!("{}.base_url", phase_name),
-                message: "base_url is required when API key is set".to_string(),
+                message:
+                    "base_url is required when API key is set (per-phase or global [llm] base_url)"
+                        .to_string(),
             });
         }
         let models = phase.get_models();
@@ -238,9 +285,21 @@ impl ScannerConfig {
     }
 
     pub fn validate(&self) -> Result<(), ConfigError> {
-        Self::validate_phase("llm.phases.discovery", &self.llm.phases.discovery)?;
-        Self::validate_phase("llm.phases.verification", &self.llm.phases.verification)?;
-        Self::validate_phase("llm.phases.aggregation", &self.llm.phases.aggregation)?;
+        Self::validate_phase(
+            "llm.phases.discovery",
+            &self.llm.phases.discovery,
+            &self.llm.base_url,
+        )?;
+        Self::validate_phase(
+            "llm.phases.verification",
+            &self.llm.phases.verification,
+            &self.llm.base_url,
+        )?;
+        Self::validate_phase(
+            "llm.phases.aggregation",
+            &self.llm.phases.aggregation,
+            &self.llm.base_url,
+        )?;
         let project_path = PathBuf::from(&self.project.path);
         if !project_path.exists() {
             return Err(ConfigError::Validation {

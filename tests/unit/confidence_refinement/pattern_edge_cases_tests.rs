@@ -159,9 +159,11 @@ fn test_multiple_patterns_same_finding() {
 
     // Should match false positive pattern and reduce confidence
     assert!(refined.refined_score < refined.original_score);
-    assert!(refined
-        .factors
-        .contains(&baco::confidence_refinement::ConfidenceFactor::FalsePositiveDetected));
+    assert!(
+        refined
+            .factors
+            .contains(&baco::confidence_refinement::ConfidenceFactor::FalsePositiveDetected)
+    );
 }
 
 #[test]
@@ -363,9 +365,11 @@ fn test_refine_confidence_unicode_handling() {
 
     // Should match false positive pattern
     assert!(refined.refined_score < refined.original_score);
-    assert!(refined
-        .factors
-        .contains(&baco::confidence_refinement::ConfidenceFactor::FalsePositiveDetected));
+    assert!(
+        refined
+            .factors
+            .contains(&baco::confidence_refinement::ConfidenceFactor::FalsePositiveDetected)
+    );
 }
 
 #[test]

@@ -11,10 +11,10 @@
 #![allow(clippy::too_many_lines)]
 
 use baco::prompt::{
-    cwe_to_hunt_domain, get_all_defaults, get_default_prompt, get_hunt_prompt, get_prompt,
-    load_hunt_prompts, load_phase_prompts, sanitize_prompt_override, validate_prompt_override,
-    BacoPhase, ProjectType, PromptEngine, PromptOverrides, TemplateVariables,
-    MAX_PROMPT_OVERRIDE_LENGTH,
+    BacoPhase, MAX_PROMPT_OVERRIDE_LENGTH, ProjectType, PromptEngine, PromptOverrides,
+    TemplateVariables, cwe_to_hunt_domain, get_all_defaults, get_default_prompt, get_hunt_prompt,
+    get_prompt, load_hunt_prompts, load_phase_prompts, sanitize_prompt_override,
+    validate_prompt_override,
 };
 use std::collections::HashMap;
 
@@ -641,31 +641,43 @@ fn test_load_hunt_prompts() {
 fn test_hunt_prompts_non_empty() {
     let hunt_prompts = load_hunt_prompts(None);
 
-    assert!(!hunt_prompts
-        .get("injection")
-        .unwrap_or(&String::new())
-        .is_empty());
-    assert!(!hunt_prompts
-        .get("auth")
-        .unwrap_or(&String::new())
-        .is_empty());
+    assert!(
+        !hunt_prompts
+            .get("injection")
+            .unwrap_or(&String::new())
+            .is_empty()
+    );
+    assert!(
+        !hunt_prompts
+            .get("auth")
+            .unwrap_or(&String::new())
+            .is_empty()
+    );
     assert!(!hunt_prompts.get("xss").unwrap_or(&String::new()).is_empty());
-    assert!(!hunt_prompts
-        .get("path_traversal")
-        .unwrap_or(&String::new())
-        .is_empty());
-    assert!(!hunt_prompts
-        .get("crypto")
-        .unwrap_or(&String::new())
-        .is_empty());
-    assert!(!hunt_prompts
-        .get("resource")
-        .unwrap_or(&String::new())
-        .is_empty());
-    assert!(!hunt_prompts
-        .get("deserialization")
-        .unwrap_or(&String::new())
-        .is_empty());
+    assert!(
+        !hunt_prompts
+            .get("path_traversal")
+            .unwrap_or(&String::new())
+            .is_empty()
+    );
+    assert!(
+        !hunt_prompts
+            .get("crypto")
+            .unwrap_or(&String::new())
+            .is_empty()
+    );
+    assert!(
+        !hunt_prompts
+            .get("resource")
+            .unwrap_or(&String::new())
+            .is_empty()
+    );
+    assert!(
+        !hunt_prompts
+            .get("deserialization")
+            .unwrap_or(&String::new())
+            .is_empty()
+    );
 }
 
 #[test]

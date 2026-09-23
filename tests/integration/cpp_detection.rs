@@ -70,7 +70,10 @@ mod tests {
             assert!(
                 !matching.is_empty(),
                 "vulnerable fixture must match rule '{rule_id}' (found {} findings with matching base ID)",
-                findings.iter().filter(|f| base_rule_id(&f.title).contains(rule_id)).count()
+                findings
+                    .iter()
+                    .filter(|f| base_rule_id(&f.title).contains(rule_id))
+                    .count()
             );
         }
     }

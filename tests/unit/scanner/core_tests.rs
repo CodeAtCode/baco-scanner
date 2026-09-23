@@ -1027,6 +1027,7 @@ fn create_test_config_core_migrated() -> ScannerConfig {
             performance: PerformanceSettings::default(),
         },
         llm: LlmConfig {
+            base_url: String::new(),
             timeout_secs: 30,
             max_retries: 3,
             retry_backoff_ms: 1000,

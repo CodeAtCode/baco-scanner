@@ -62,7 +62,6 @@ impl TicketSearcher {
         Ok(matches)
     }
 
-    #[allow(dead_code)]
     async fn search_github(
         &self,
         system: &TicketSystem,
@@ -185,22 +184,6 @@ impl TicketSearcher {
         }
     }
 
-    #[allow(dead_code)]
-    pub(crate) fn parse_github_url(&self, url: &str) -> Result<(String, String), String> {
-        let url = url.trim_end_matches('/');
-        let parts: Vec<&str> = url.split('/').collect();
-
-        if parts.len() >= 2 {
-            Ok((
-                parts[parts.len() - 2].to_string(),
-                parts[parts.len() - 1].to_string(),
-            ))
-        } else {
-            Err(format!("Invalid GitHub URL format: {}", url))
-        }
-    }
-
-    #[allow(dead_code)]
     async fn search_gitlab(
         &self,
         system: &TicketSystem,
@@ -334,8 +317,6 @@ struct GithubIssue {
 
 #[derive(Debug, Deserialize)]
 struct GitlabIssue {
-    #[allow(dead_code)]
-    id: u32,
     iid: u32,
     #[serde(rename = "web_url")]
     web_url: String,

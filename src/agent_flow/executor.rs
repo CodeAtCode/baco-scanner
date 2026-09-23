@@ -98,11 +98,7 @@ pub fn topological_sort(harness: &AgentFlowHarness) -> Option<Vec<usize>> {
         }
     }
 
-    if order.len() == n {
-        Some(order)
-    } else {
-        None
-    }
+    if order.len() == n { Some(order) } else { None }
 }
 
 pub fn resolve_template(template: &str, outputs: &BTreeMap<String, AgentOutput>) -> String {

@@ -13,8 +13,8 @@ use baco::checkpoint::ScanPhase;
 use baco::config::{AgentConfig, LlmPhaseConfig, LlmPhasesConfig, ScannerSettings};
 use baco::findings::{Severity, VerificationStatus};
 use baco::llm::metrics::LlmMetricsTracker;
-use baco::scanner::phases::{run_phase, PhaseConfig};
 use baco::scanner::Scanner;
+use baco::scanner::phases::{PhaseConfig, run_phase};
 use indicatif::ProgressBar;
 use std::path::PathBuf;
 
@@ -45,6 +45,7 @@ fn create_test_config_with_static_analysis() -> baco::config::ScannerConfig {
             performance: baco::config::PerformanceSettings::default(),
         },
         llm: baco::config::LlmConfig {
+            base_url: String::new(),
             timeout_secs: 30,
             max_retries: 3,
             retry_backoff_ms: 1000,
@@ -526,6 +527,17 @@ fn test_phase_llm_config_missing_base_url_errors() {
 
     let result = baco::llm::phase_llm_config(&config, "static_analysis", None);
     assert!(result.is_err(), "Should error when base_url is missing");
+}
+
+#[test]
+fn test_phase_llm_config_falls_back_to_global_base_url() {
+    let mut config = create_test_config_with_static_analysis();
+    config.llm.phases.static_analysis.base_url = String::new();
+    config.llm.base_url = "http://global:8080".to_string();
+
+    let result = baco::llm::phase_llm_config(&config, "static_analysis", None);
+    assert!(result.is_ok(), "Should fall back to global base_url");
+    assert_eq!(result.unwrap().base_url, "http://global:8080");
 }
 
 #[test]

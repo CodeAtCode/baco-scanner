@@ -4,7 +4,7 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use baco::agent_scaffold::call_graph_paths::{
-    hash_string, random_dfs, CallGraph, CallGraphBuilder,
+    CallGraph, CallGraphBuilder, hash_string, random_dfs,
 };
 use baco::context::control_path::Language;
 

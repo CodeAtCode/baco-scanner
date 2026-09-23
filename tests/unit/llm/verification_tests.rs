@@ -7,8 +7,8 @@ use baco::findings::{
     IssueCategory, SecurityIssue, Severity, VerificationStatus, VulnerabilityFinding,
 };
 use baco::llm_verification::{
-    render_template, RationaleVerdict, TriageResult, TriageVerdict, VerificationReport,
-    VerificationResult,
+    RationaleVerdict, TriageResult, TriageVerdict, VerificationReport, VerificationResult,
+    render_template,
 };
 use baco::project_type::ProjectType;
 use std::collections::HashMap;

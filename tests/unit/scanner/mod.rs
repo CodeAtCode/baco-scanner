@@ -15,4 +15,5 @@ mod other_phases_tests;
 mod parallel_tests;
 mod phases;
 mod sequential_tests;
+mod static_analysis_tests;
 mod types_tests;

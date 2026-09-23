@@ -94,7 +94,7 @@ pub fn build_stable_verification_prefix(
          2. **Correctly-scoped sibling SAFE?** — Is the correctly-scoped sibling branch or sanitized twin safe? Would flagging this exact code survive review, or am I flagging safe code?\n\
          3. **Explicit boundary defeated?** — Does the exploit path defeat an explicit security boundary (acting past an enforced role), or is it own-data-only?\n\
          4. **Real citation?** — Is the cited file/line/symbol real and present in the code shown, or am I hallucinating from patterns?\n\n\
-         **Closing rule**: If any answer is unresolved, downgrade to NeedsReview. Default to NOT confirming: under-reporting a maybe beats flooding with false positives.\n\n"
+         **Closing rule**: If any answer is unresolved, downgrade to NeedsReview. Default to NOT confirming: under-reporting a maybe beats flooding with false positives.\n\n",
     );
 
     // Add hunt domain guidance (stable within phase+domain)
@@ -154,7 +154,7 @@ pub fn build_stable_verification_prefix(
 
 /// Extract language key from file path for required primitives matching.
 /// .phtml -> "php"; otherwise extension string as-is.
-fn extract_language_from_path(file_path: &str) -> String {
+pub fn extract_language_from_path(file_path: &str) -> String {
     if let Some(ext) = std::path::Path::new(file_path).extension() {
         let ext_str = ext.to_string_lossy().to_lowercase();
         if ext_str == "phtml" {
@@ -329,9 +329,9 @@ pub async fn verify_findings_batched<C: LlmChatClient>(
             ChatMessage::system(
                 "You are a security vulnerability verifier. Analyze findings and return JSON array verdicts.\n\
                  STRICT OUTPUT FORMAT: Return ONLY valid JSON array with no prose outside.\n\
-                 Do NOT include any text before or after the JSON."
+                 Do NOT include any text before or after the JSON.",
             ),
-            ChatMessage::user(&prompt_text)
+            ChatMessage::user(&prompt_text),
         ];
 
         match client.chat(&messages).await {
@@ -419,7 +419,9 @@ pub async fn run_llm_verification(
         let client = match crate::llm::create_llm_client_with_metrics(scanner, "verification") {
             Some(client) => client,
             None => {
-                tracing::warn!("Verification skipped: LLM client unavailable (incomplete llm.phases.verification config)");
+                tracing::warn!(
+                    "Verification skipped: LLM client unavailable (incomplete llm.phases.verification config)"
+                );
                 pb.set_position(base + 100);
                 return Ok((findings, analyzed_files.to_vec(), Vec::new()));
             }
@@ -582,9 +584,9 @@ pub async fn run_llm_verification(
 
                     let messages = vec![
                         ChatMessage::system(
-                            "You are a security vulnerability verifier. Analyze the finding and determine if it's a true positive, false positive, or needs review.\n\nSTRICT OUTPUT FORMAT: Return ONLY valid JSON with no prose outside the JSON object.\n\nJSON schema:\n{\n  \"verification_status\": \"confirmed|false_positive|needs_review\",\n  \"verification_notes\": \"detailed reasoning for the verdict\"\n}\n\nDo NOT include any text before or after the JSON."
+                            "You are a security vulnerability verifier. Analyze the finding and determine if it's a true positive, false positive, or needs review.\n\nSTRICT OUTPUT FORMAT: Return ONLY valid JSON with no prose outside the JSON object.\n\nJSON schema:\n{\n  \"verification_status\": \"confirmed|false_positive|needs_review\",\n  \"verification_notes\": \"detailed reasoning for the verdict\"\n}\n\nDo NOT include any text before or after the JSON.",
                         ),
-                        ChatMessage::user(&prompt_text)
+                        ChatMessage::user(&prompt_text),
                     ];
                     let result = client.chat(&messages).await;
 
@@ -628,7 +630,7 @@ pub async fn run_llm_verification(
     let poc_engine = PoCGenerationEngine::new();
 
     // Determine target languages for PoC based on project stack
-    let poc_formats = if let Some(ref stack) = project_stack {
+    let poc_formats = if let Some(stack) = project_stack {
         let mut formats = Vec::new();
         for lang in &stack.languages {
             match lang.to_lowercase().as_str() {

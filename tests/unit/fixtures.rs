@@ -223,6 +223,7 @@ pub fn create_test_config() -> ScannerConfig {
             },
         },
         llm: LlmConfig {
+            base_url: String::new(),
             timeout_secs: 30,
             max_retries: 0,
             retry_backoff_ms: 0,
@@ -545,7 +546,7 @@ impl EnvVarGuard {
         let mut previous = HashMap::new();
         for &(key, value) in vars {
             let old_value = std::env::var(key).ok();
-            std::env::set_var(key, value);
+            unsafe { std::env::set_var(key, value) };
             previous.insert(key.to_string(), old_value);
         }
         Self { vars: previous }

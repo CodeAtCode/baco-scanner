@@ -9,8 +9,8 @@
 //! - Template variable detection and content validation
 
 use baco::prompt::templates::{
-    get_all_defaults, get_default_prompt, get_hunt_prompt, get_template_variables, render_template,
-    BacoPhase, ProjectType, TemplateVariables,
+    BacoPhase, ProjectType, TemplateVariables, get_all_defaults, get_default_prompt,
+    get_hunt_prompt, get_template_variables, render_template,
 };
 use std::collections::HashMap;
 

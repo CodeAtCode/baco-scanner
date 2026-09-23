@@ -163,9 +163,11 @@ fn test_load_with_multiple_findings() {
     let loaded = AnalysisContext::load(tmp_dir.path()).unwrap();
 
     assert_eq!(loaded.findings_so_far.len(), 3);
-    assert!(loaded
-        .findings_so_far
-        .contains(&"CWE-79: XSS in header".to_string()));
+    assert!(
+        loaded
+            .findings_so_far
+            .contains(&"CWE-79: XSS in header".to_string())
+    );
 }
 
 // ============================================================================

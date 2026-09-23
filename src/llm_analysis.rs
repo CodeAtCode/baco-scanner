@@ -720,7 +720,7 @@ impl LlmAnalyzer {
                 .replace("%%CODE_CONTENT%%", &self.truncate_code(&chunk.text))
                 .replace("%%CWE_SPECS%%", &cwe_specs);
 
-            let user_prompt = if let Some(ref prefix) = &self.context_prefix {
+            let user_prompt = if let Some(prefix) = &self.context_prefix {
                 format!("{}\n\n{}", prefix, prompt)
             } else {
                 prompt

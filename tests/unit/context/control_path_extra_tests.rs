@@ -1,6 +1,6 @@
 //! Unit tests for control path extraction.
 
-use baco::context::control_path::{extract, Language};
+use baco::context::control_path::{Language, extract};
 
 #[test]
 fn test_c_function_with_branch_cfg() {

@@ -194,39 +194,40 @@ async fn run_parallel_phases(
             .iter()
             .any(|f| !f.description.is_empty());
 
-    let llm_static_handle =
-        if !is_phase_completed(&ScanPhase::LlmStaticAnalysis) || !has_valid_findings {
-            if !is_phase_completed(&ScanPhase::LlmStaticAnalysis) {
-                tracing::info!("[LLM] Running LLM Static Analysis phase");
-            } else {
-                tracing::warn!(
+    let llm_static_handle = if !is_phase_completed(&ScanPhase::LlmStaticAnalysis)
+        || !has_valid_findings
+    {
+        if !is_phase_completed(&ScanPhase::LlmStaticAnalysis) {
+            tracing::info!("[LLM] Running LLM Static Analysis phase");
+        } else {
+            tracing::warn!(
                 "[LLM] Checkpoint has {} findings but all have empty descriptions - forcing re-run",
                 checkpoint_findings.len()
             );
-            }
-            let this = scanner;
-            let pb = pb.clone();
-            let initial_findings = findings.clone();
-            let analyzed_files_clone = analyzed_files.clone();
-            let sem_perm = semaphore.clone();
-            Some(async move {
-                let _permit = sem_perm.acquire().await;
-                this.run_phase(
-                    &ScanPhase::LlmStaticAnalysis,
-                    initial_findings,
-                    &pb,
-                    &analyzed_files_clone,
-                )
-                .await
-            })
-        } else {
-            tracing::info!(
-                "[LLM] Skipping phase ({} valid findings in checkpoint)",
-                checkpoint_findings.len()
-            );
-            findings.extend(checkpoint_findings);
-            None
-        };
+        }
+        let this = scanner;
+        let pb = pb.clone();
+        let initial_findings = findings.clone();
+        let analyzed_files_clone = analyzed_files.clone();
+        let sem_perm = semaphore.clone();
+        Some(async move {
+            let _permit = sem_perm.acquire().await;
+            this.run_phase(
+                &ScanPhase::LlmStaticAnalysis,
+                initial_findings,
+                &pb,
+                &analyzed_files_clone,
+            )
+            .await
+        })
+    } else {
+        tracing::info!(
+            "[LLM] Skipping phase ({} valid findings in checkpoint)",
+            checkpoint_findings.len()
+        );
+        findings.extend(checkpoint_findings);
+        None
+    };
 
     // CpgSlice is experimental - skip it in core profile
     let cpg_slice_handle = if profile == ScanPipelineProfile::Core {

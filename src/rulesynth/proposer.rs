@@ -4,8 +4,8 @@
 //! against the trace corpus, feeds back the validation outcome, and repeats
 //! until the pattern converges (F1 >= threshold) or `max_iterations` is reached.
 
-use super::pattern_dsl::{parse_pattern, Pattern};
-use super::symbolic_validator::{format_feedback, validate, LabelledTrace, ValidationOutcome};
+use super::pattern_dsl::{Pattern, parse_pattern};
+use super::symbolic_validator::{LabelledTrace, ValidationOutcome, format_feedback, validate};
 use crate::llm::{ChatMessage, LlmClient};
 
 /// Threshold F1 score for convergence.
@@ -32,7 +32,7 @@ pub async fn run_proposer_loop(
         let outcome = validate(&pattern, traces);
         if best
             .as_ref()
-            .map_or(true, |(_, o)| outcome.score() > o.score())
+            .is_none_or(|(_, o)| outcome.score() > o.score())
         {
             best = Some((pattern.clone(), outcome.clone()));
         }

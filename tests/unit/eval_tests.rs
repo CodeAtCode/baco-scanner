@@ -1,6 +1,6 @@
 //! Tests for eval module - extracted from inline #[cfg(test)] mod
 
-use baco::eval::{parse_oracle, score_findings, ExpectedFinding, ExpectedSuppressed, OracleFile};
+use baco::eval::{ExpectedFinding, ExpectedSuppressed, OracleFile, parse_oracle, score_findings};
 use baco::findings::{Severity, VulnerabilityFinding};
 
 #[test]
@@ -722,4 +722,19 @@ fn test_multiple_expected_with_false_flags() {
     assert_eq!(report.false_flags, 1);
     // Precision = matched / (matched + false_flags) = 1 / 2 = 0.5
     assert_eq!(report.precision, 0.5);
+}
+
+// ============================================================================
+// default_eval_root Tests
+// ============================================================================
+
+#[test]
+fn test_default_eval_root_ends_with_eval() {
+    // Test that default_eval_root() returns a path ending with "eval"
+    let path = baco::cli::eval::default_eval_root();
+    assert!(
+        path.ends_with("eval"),
+        "default_eval_root() should return a path ending with 'eval', got: {:?}",
+        path
+    );
 }

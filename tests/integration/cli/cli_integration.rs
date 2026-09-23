@@ -180,8 +180,8 @@ fn test_report_invalid_format() {
 
     assert_eq!(
         output.status.code(),
-        Some(1),
-        "Invalid report format should exit with code 1"
+        Some(2),
+        "Invalid report format is rejected by clap at parse time (exit code 2)"
     );
 }
 

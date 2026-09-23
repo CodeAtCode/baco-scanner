@@ -127,14 +127,16 @@ mod discovery_skip_tests {
             "Should process 2 findings with Semgrep"
         );
 
-        assert!(skipped.iter().all(|f| f
-            .evidence
-            .iter()
-            .any(|e| matches!(e.source, EvidenceSource::LlmAnalysis(_)))));
-        assert!(to_process.iter().all(|f| !f
-            .evidence
-            .iter()
-            .any(|e| matches!(e.source, EvidenceSource::LlmAnalysis(_)))));
+        assert!(skipped.iter().all(|f| {
+            f.evidence
+                .iter()
+                .any(|e| matches!(e.source, EvidenceSource::LlmAnalysis(_)))
+        }));
+        assert!(to_process.iter().all(|f| {
+            !f.evidence
+                .iter()
+                .any(|e| matches!(e.source, EvidenceSource::LlmAnalysis(_)))
+        }));
     }
 }
 

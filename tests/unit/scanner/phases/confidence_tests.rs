@@ -115,9 +115,11 @@ fn test_confidence_single_source() {
 
     assert_eq!(result.original_score, 0.5);
     // Single source should not get multi-source boost
-    assert!(!result
-        .factors
-        .contains(&ConfidenceFactor::MultiSourceConfirmation));
+    assert!(
+        !result
+            .factors
+            .contains(&ConfidenceFactor::MultiSourceConfirmation)
+    );
 }
 
 #[test]
@@ -131,9 +133,11 @@ fn test_confidence_multi_source() {
 
     // +0.1 multi-source, then -0.05 low-confidence source (bandit)
     assert_eq!(result.refined_score, 0.55);
-    assert!(result
-        .factors
-        .contains(&ConfidenceFactor::MultiSourceConfirmation));
+    assert!(
+        result
+            .factors
+            .contains(&ConfidenceFactor::MultiSourceConfirmation)
+    );
 }
 
 #[test]
@@ -147,9 +151,11 @@ fn test_confidence_cross_file() {
 
     // Should get +0.08 for cross-file reachability
     assert_eq!(result.refined_score, 0.58);
-    assert!(result
-        .factors
-        .contains(&ConfidenceFactor::CrossFileReachability));
+    assert!(
+        result
+            .factors
+            .contains(&ConfidenceFactor::CrossFileReachability)
+    );
 }
 
 #[test]
@@ -190,9 +196,11 @@ fn test_confidence_false_positive_lowers() {
 
     // -0.3 for false positive, +0.05 severity boost (high severity, base > 0.7)
     assert_eq!(result.refined_score, 0.55);
-    assert!(result
-        .factors
-        .contains(&ConfidenceFactor::FalsePositiveDetected));
+    assert!(
+        result
+            .factors
+            .contains(&ConfidenceFactor::FalsePositiveDetected)
+    );
 }
 
 #[test]
@@ -248,9 +256,11 @@ fn test_confidence_low_confidence_source_penalty() {
 
     // Should be reduced by 0.05 for low-confidence source
     assert_eq!(result.refined_score, 0.65);
-    assert!(result
-        .factors
-        .contains(&ConfidenceFactor::LowConfidenceSource));
+    assert!(
+        result
+            .factors
+            .contains(&ConfidenceFactor::LowConfidenceSource)
+    );
 }
 
 #[test]
@@ -264,9 +274,11 @@ fn test_confidence_triage_true_positive() {
 
     // Should be increased by 0.10
     assert_eq!(result.refined_score, 0.6);
-    assert!(result
-        .factors
-        .contains(&ConfidenceFactor::TriageTruePositive));
+    assert!(
+        result
+            .factors
+            .contains(&ConfidenceFactor::TriageTruePositive)
+    );
 }
 
 #[test]
@@ -280,9 +292,11 @@ fn test_confidence_triage_false_positive() {
 
     // Should be reduced by 0.25
     assert_eq!(result.refined_score, 0.45);
-    assert!(result
-        .factors
-        .contains(&ConfidenceFactor::TriageFalsePositive));
+    assert!(
+        result
+            .factors
+            .contains(&ConfidenceFactor::TriageFalsePositive)
+    );
 }
 
 #[test]
@@ -296,9 +310,11 @@ fn test_confidence_rationale_validated() {
 
     // Should be increased by 0.10
     assert_eq!(result.refined_score, 0.6);
-    assert!(result
-        .factors
-        .contains(&ConfidenceFactor::RationaleValidated));
+    assert!(
+        result
+            .factors
+            .contains(&ConfidenceFactor::RationaleValidated)
+    );
 }
 
 #[test]
@@ -312,9 +328,11 @@ fn test_confidence_rationale_flawed() {
 
     // Should be reduced by 0.20
     assert_eq!(result.refined_score, 0.5);
-    assert!(result
-        .factors
-        .contains(&ConfidenceFactor::RationaleValidated));
+    assert!(
+        result
+            .factors
+            .contains(&ConfidenceFactor::RationaleValidated)
+    );
 }
 
 #[test]
@@ -330,10 +348,12 @@ fn test_confidence_never_submit_penalty() {
 
     // Severity boost (+0.05) applies first, then never-submit multiplies by 0.1
     assert_eq!(result.refined_score, 0.085);
-    assert!(result
-        .factors
-        .iter()
-        .any(|f| matches!(f, ConfidenceFactor::NeverSubmitMatch { .. })));
+    assert!(
+        result
+            .factors
+            .iter()
+            .any(|f| matches!(f, ConfidenceFactor::NeverSubmitMatch { .. }))
+    );
 }
 
 #[test]

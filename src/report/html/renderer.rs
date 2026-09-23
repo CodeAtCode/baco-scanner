@@ -3,7 +3,7 @@ use crate::error::ScanError;
 use crate::evidence::classify_finding;
 pub use crate::findings::VulnerabilityFinding;
 use chrono::Utc;
-use minijinja::{context, Environment};
+use minijinja::{Environment, context};
 use std::collections::HashMap;
 use std::fs;
 

@@ -10,8 +10,8 @@
 
 use baco::config::scanner::ScanPipelineProfile;
 use baco::config::{
-    apply_env_overrides, expand_env_vars, AgentConfig, LlmPhaseConfig, PerformanceSettings,
-    ScannerConfig,
+    AgentConfig, LlmPhaseConfig, PerformanceSettings, ScannerConfig, apply_env_overrides,
+    expand_env_vars,
 };
 use serial_test::serial;
 use std::collections::HashMap;
@@ -31,13 +31,13 @@ impl EnvVarGuard {
     fn set(&mut self, key: &str, value: &str) {
         let prev = std::env::var(key).ok();
         self.vars.insert(key.to_string(), prev);
-        std::env::set_var(key, value);
+        unsafe { std::env::set_var(key, value) };
     }
 
     fn clear(&mut self, key: &str) {
         let prev = std::env::var(key).ok();
         self.vars.insert(key.to_string(), prev);
-        std::env::remove_var(key);
+        unsafe { std::env::remove_var(key) };
     }
 }
 
@@ -45,8 +45,8 @@ impl Drop for EnvVarGuard {
     fn drop(&mut self) {
         for (key, value) in &self.vars {
             match value {
-                Some(v) => std::env::set_var(key, v),
-                None => std::env::remove_var(key),
+                Some(v) => unsafe { std::env::set_var(key, v) },
+                None => unsafe { std::env::remove_var(key) },
             }
         }
     }
@@ -1689,7 +1689,7 @@ path = "${UNSET_VAR_NAME}"
 "#;
 
     // Ensure var is unset
-    std::env::remove_var("UNSET_VAR_NAME");
+    unsafe { std::env::remove_var("UNSET_VAR_NAME") };
 
     let expanded = expand_env_vars(content);
 
@@ -1769,7 +1769,7 @@ max_file_size_kb = 1024
     fs::write(&config_path, config_content).unwrap();
 
     // Ensure var is unset
-    std::env::remove_var("UNSET_CONFIG_PATH");
+    unsafe { std::env::remove_var("UNSET_CONFIG_PATH") };
 
     // The config will parse but the path will be the literal string
     let config_result = ScannerConfig::from_file(config_path.to_str().unwrap());
@@ -2028,12 +2028,14 @@ fn test_env_overrides_partial_set() {
     );
     assert!(config.llm.phases.verification.api_key.is_none());
     assert!(config.llm.phases.aggregation.api_key.is_none());
-    assert!(config
-        .llm
-        .phases
-        .security_agent_verification
-        .api_key
-        .is_none());
+    assert!(
+        config
+            .llm
+            .phases
+            .security_agent_verification
+            .api_key
+            .is_none()
+    );
     assert!(config.llm.phases.threat_modeling.api_key.is_none());
 }
 
@@ -2190,4 +2192,28 @@ fn test_new_phase_toml_takes_precedence() {
         Some("toml-threat-key"),
         "threat_modeling: TOML takes precedence"
     );
+}
+#[test]
+fn preset_deep_merge_user_wins_and_zero_applies() {
+    let dir = std::env::temp_dir().join(format!("baco-a14-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("config.toml");
+    std::fs::write(&path, "[llm]\ntemperature = 0.0\nmax_retries = 7\n").unwrap();
+    let preset = baco::preset::PresetOverlay {
+        llm: Some(baco::config::LlmConfig {
+            temperature: 0.5,
+            max_retries: 9,
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    let config =
+        baco::config::ScannerConfig::from_file_with_preset(path.to_str().unwrap(), Some(preset))
+            .unwrap();
+    assert!(
+        (config.llm.temperature - 0.0).abs() < f32::EPSILON,
+        "explicit user temperature=0.0 must win over preset 0.5"
+    );
+    assert_eq!(config.llm.max_retries, 7);
+    let _ = std::fs::remove_dir_all(&dir);
 }

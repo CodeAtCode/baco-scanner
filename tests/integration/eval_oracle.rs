@@ -3,7 +3,7 @@
 //! These tests verify the eval module's parsing and scoring functionality
 //! using the fixture oracles.
 
-use baco::eval::{parse_oracle, score_findings, ExpectedFinding, ExpectedSuppressed, OracleFile};
+use baco::eval::{ExpectedFinding, ExpectedSuppressed, OracleFile, parse_oracle, score_findings};
 use baco::findings::{Severity, VulnerabilityFinding};
 use std::path::PathBuf;
 

@@ -21,6 +21,21 @@ fn load_env_api_keys() -> HashMap<String, Option<String>> {
     if let Ok(key) = env::var("LLM_THREAT_MODELING_KEY") {
         overrides.insert("threat_modeling".to_string(), Some(key));
     }
+    // Global fallback: LLM_API_KEY fills phases without a slot-specific key.
+    if let Ok(fallback) = env::var("LLM_API_KEY") {
+        for phase in [
+            "discovery",
+            "verification",
+            "aggregation",
+            "static_analysis",
+            "security_agent_verification",
+            "threat_modeling",
+        ] {
+            overrides
+                .entry(phase.to_string())
+                .or_insert_with(|| Some(fallback.clone()));
+        }
+    }
     overrides
 }
 
@@ -99,7 +114,7 @@ impl EnvVarGuard {
         let mut previous = HashMap::new();
         for &(key, value) in vars {
             let old_value = std::env::var(key).ok();
-            std::env::set_var(key, value);
+            unsafe { std::env::set_var(key, value) };
             previous.insert(key.to_string(), old_value);
         }
         Self { vars: previous }

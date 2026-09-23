@@ -188,7 +188,9 @@ pub async fn run_llm_discovery(
         let client = match crate::llm::create_llm_client_with_metrics(scanner, "discovery") {
             Some(client) => client,
             None => {
-                tracing::warn!("Discovery skipped: LLM client unavailable (incomplete llm.phases.discovery config)");
+                tracing::warn!(
+                    "Discovery skipped: LLM client unavailable (incomplete llm.phases.discovery config)"
+                );
                 pb.set_position(base + 100);
                 return Ok((findings, analyzed_files.to_vec()));
             }

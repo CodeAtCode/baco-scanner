@@ -4,8 +4,8 @@
 use baco::config::{LlmPhaseConfig, LlmPhasesConfig, ScannerConfig};
 use baco::error::ScanError;
 use baco::llm::{
-    create_llm_client_with_metrics, phase_llm_config, AtomicModelSelector, ChatMessage,
-    ChatResponseWithModel, LlmClient, LlmConfig,
+    AtomicModelSelector, ChatMessage, ChatResponseWithModel, LlmClient, LlmConfig,
+    create_llm_client_with_metrics, phase_llm_config,
 };
 
 // ============================================================================

@@ -56,9 +56,7 @@ impl FileIndex {
             std::fs::canonicalize(project_path).unwrap_or_else(|_| PathBuf::from(project_path));
 
         // Build the exclusion matcher
-        let exclude_matcher = ExcludeMatcher::new(excludes).unwrap_or_else(|_| {
-            ExcludeMatcher::new(&[]).expect("Empty patterns should always work")
-        });
+        let exclude_matcher = ExcludeMatcher::new_or_empty(excludes);
 
         let walk = WalkDir::new(project_path).into_iter();
         for entry in walk {
@@ -166,9 +164,7 @@ impl FileIndex {
             std::fs::canonicalize(project_path).unwrap_or_else(|_| PathBuf::from(project_path));
 
         // Build the exclusion matcher
-        let exclude_matcher = ExcludeMatcher::new(excludes).unwrap_or_else(|_| {
-            ExcludeMatcher::new(&[]).expect("Empty patterns should always work")
-        });
+        let exclude_matcher = ExcludeMatcher::new_or_empty(excludes);
 
         let walk = WalkDir::new(project_path).into_iter();
 
@@ -372,6 +368,13 @@ pub fn language_for_extension(ext: &str) -> Option<&'static str> {
 /// Invalid glob patterns are skipped with a warning; the matcher remains functional for valid patterns.
 pub struct ExcludeMatcher {
     set: GlobSet,
+}
+
+impl ExcludeMatcher {
+    pub fn new_or_empty(patterns: &[String]) -> Self {
+        Self::new(patterns)
+            .unwrap_or_else(|_| Self::new(&[]).expect("Empty patterns should always work"))
+    }
 }
 
 impl ExcludeMatcher {

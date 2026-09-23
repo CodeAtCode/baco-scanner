@@ -1,6 +1,6 @@
 //! Unit tests for pattern_dsl module (migrated from inline #[cfg(test)] block)
 
-use baco::rulesynth::pattern_dsl::{parse_pattern, Severity, TaintSource};
+use baco::rulesynth::pattern_dsl::{Severity, TaintSource, parse_pattern};
 
 #[test]
 fn test_parse_return_source() {

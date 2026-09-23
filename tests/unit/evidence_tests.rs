@@ -1,4 +1,4 @@
-use baco::evidence::{classify_finding, Evidence, EvidenceSource, VerificationTier};
+use baco::evidence::{Evidence, EvidenceSource, VerificationTier, classify_finding};
 use chrono::Utc;
 
 fn make_evidence(source: EvidenceSource) -> Evidence {

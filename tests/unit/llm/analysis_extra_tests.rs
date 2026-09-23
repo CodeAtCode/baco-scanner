@@ -6,8 +6,8 @@
 use baco::config::ScannerConfig;
 use baco::llm::LlmConfig;
 use baco::llm_analysis::{
-    extract_cwe_id, format_cwe_specs, generate_mitigation_code, generate_poc_code,
-    generate_recommendation, LlmAnalyzer,
+    LlmAnalyzer, extract_cwe_id, format_cwe_specs, generate_mitigation_code, generate_poc_code,
+    generate_recommendation,
 };
 use baco::retrieval::CweDocument;
 use std::path::Path;

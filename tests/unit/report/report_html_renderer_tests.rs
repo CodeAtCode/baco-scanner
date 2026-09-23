@@ -1,5 +1,5 @@
 use baco::findings::Severity;
-use baco::report::html::renderer::{generate_html_report, VulnerabilityFinding};
+use baco::report::html::renderer::{VulnerabilityFinding, generate_html_report};
 
 fn make_finding(severity: Severity, file: &str, line: Option<u32>) -> VulnerabilityFinding {
     VulnerabilityFinding {

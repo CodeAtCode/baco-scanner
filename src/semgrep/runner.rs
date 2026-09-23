@@ -1,7 +1,6 @@
 use super::parser::parse_json_output;
 use super::rules::SemgrepRunner;
 use crate::findings::VulnerabilityFinding;
-use std::process::Command;
 use tempfile::NamedTempFile;
 
 impl SemgrepRunner {
@@ -30,63 +29,70 @@ impl SemgrepRunner {
         target_path: &str,
         _output_path: &str,
     ) -> Result<Vec<VulnerabilityFinding>, String> {
-        // Use spawn_blocking to avoid blocking the async runtime
-        let self_clone = self.clone();
-        let target_path_clone = target_path.to_string();
+        // Note: cache functionality removed for Semgrep v2+ compatibility
+        // The --cache-path and --no-cache flags are no longer supported
 
-        tokio::task::spawn_blocking(move || {
-            // Note: cache functionality removed for Semgrep v2+ compatibility
-            // The --cache-path and --no-cache flags are no longer supported
+        // Inline preset rules become temp files; keep them alive until
+        // semgrep exits (NamedTempFile removes them on drop).
+        let custom_rule_files = self.materialize_custom_rules()?;
 
-            // Inline preset rules become temp files; keep them alive until
-            // semgrep exits (NamedTempFile removes them on drop).
-            let custom_rule_files = self_clone.materialize_custom_rules()?;
+        let mut cmd = tokio::process::Command::new("semgrep");
+        cmd.arg("scan")
+            .arg("--json")
+            .arg("--quiet")
+            .arg("--timeout")
+            .arg(self.timeout_secs.to_string())
+            .arg(target_path);
 
-            let mut cmd = Command::new("semgrep");
-            cmd.arg("scan")
-                .arg("--json")
-                .arg("--quiet")
-                .arg(&target_path_clone);
-
-            // Add multiple --config args if rulesets are specified
-            // If empty, derive defaults from project languages
-            let effective_rulesets = self_clone.derive_default_rulesets();
-            if effective_rulesets.is_empty() {
-                // No rulesets - let semgrep use its default behavior
-            } else {
-                for ruleset in &effective_rulesets {
-                    cmd.arg("--config").arg(ruleset);
-                }
+        // Add multiple --config args if rulesets are specified
+        // If empty, derive defaults from project languages
+        let effective_rulesets = self.derive_default_rulesets();
+        if effective_rulesets.is_empty() {
+            // No rulesets - let semgrep use its default behavior
+        } else {
+            for ruleset in &effective_rulesets {
+                cmd.arg("--config").arg(ruleset);
             }
-            for file in &custom_rule_files {
-                cmd.arg("--config").arg(file.path());
-            }
+        }
+        for file in &custom_rule_files {
+            cmd.arg("--config").arg(file.path());
+        }
 
-            let output = cmd
-                .output()
-                .map_err(|e| format!("Failed to run semgrep: {}", e))?;
-
-            if !output.status.success() {
-                return Err(format!(
-                    "Semgrep failed: {}",
-                    String::from_utf8_lossy(&output.stderr)
-                ));
-            }
-
-            // Extract stems from temp file paths for normalization
-            let stems: Vec<String> = custom_rule_files
-                .iter()
-                .map(|f| {
-                    f.path()
-                        .file_stem()
-                        .map(|s| s.to_string_lossy().to_string())
-                        .unwrap_or_default()
-                })
-                .collect();
-
-            parse_json_output(&output.stdout, &self_clone.exclude_rules, &stems)
-        })
+        let output = match tokio::time::timeout(
+            std::time::Duration::from_secs(self.timeout_secs),
+            cmd.kill_on_drop(true).output(),
+        )
         .await
-        .map_err(|e| format!("Semgrep task panicked: {}", e))?
+        {
+            Ok(Ok(output)) => output,
+            Ok(Err(e)) => {
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    return Err(format!("semgrep not found: {e}"));
+                }
+                return Err(format!("semgrep wait failed: {e}"));
+            }
+            Err(_) => return Err(format!("semgrep timed out after {}s", self.timeout_secs)),
+        };
+
+        if !output.status.success() {
+            return Err(format!(
+                "semgrep exited {}: {}",
+                output.status,
+                String::from_utf8_lossy(&output.stderr)
+            ));
+        }
+
+        // Extract stems from temp file paths for normalization
+        let stems: Vec<String> = custom_rule_files
+            .iter()
+            .map(|f| {
+                f.path()
+                    .file_stem()
+                    .map(|s| s.to_string_lossy().to_string())
+                    .unwrap_or_default()
+            })
+            .collect();
+
+        parse_json_output(&output.stdout, &self.exclude_rules, &stems)
     }
 }

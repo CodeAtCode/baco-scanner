@@ -16,9 +16,9 @@ pub mod schema;
 
 // Re-export main types for convenience
 pub use retriever::{
-    add_specs_to_index, build_embedding_index, clear_index, cosine_similarity, generate_embedding,
-    get_index_stats, hybrid_search, reciprocal_rank_fusion, retrieve_relevant_specs,
-    retrieve_with_domain_filter, Bm25Index, EMBEDDING_DIM,
+    Bm25Index, EMBEDDING_DIM, add_specs_to_index, build_embedding_index, clear_index,
+    cosine_similarity, generate_embedding, get_index_stats, hybrid_search, reciprocal_rank_fusion,
+    retrieve_relevant_specs, retrieve_with_domain_filter,
 };
 pub use schema::{DomainCategory, SecuritySpecification, SpecificationSource, VulnSpecConfig};
 

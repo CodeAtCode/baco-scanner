@@ -20,7 +20,6 @@ type FullPhaseResult = Result<
 >;
 
 /// Configuration for parallel phase execution
-#[allow(dead_code)]
 pub struct ParallelSlot<'a> {
     pub indexing_enabled: bool,
     pub semgrep_enabled: bool,
@@ -30,7 +29,6 @@ pub struct ParallelSlot<'a> {
 }
 
 /// Result from parallel phase execution
-#[allow(dead_code)]
 pub struct ParallelPhaseResult {
     pub indexing_findings: Vec<VulnerabilityFinding>,
     pub semgrep_findings: Vec<VulnerabilityFinding>,
@@ -40,7 +38,6 @@ pub struct ParallelPhaseResult {
 }
 
 /// Combine results from multiple parallel phases
-#[allow(dead_code)]
 pub fn combine_parallel_results(
     mut findings: Vec<VulnerabilityFinding>,
     indexing_result: Option<PhaseResult>,

@@ -187,7 +187,6 @@ impl LlmMetricsTracker {
 }
 
 /// Parameters for record_request to reduce argument count warning
-#[allow(dead_code)]
 pub struct RecordRequestParams {
     pub model_name: String,
     pub operation: String,

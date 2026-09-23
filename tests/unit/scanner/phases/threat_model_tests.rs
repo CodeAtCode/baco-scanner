@@ -2,7 +2,7 @@
 //!
 //! Tests threat model generation, STRIDE classification, and edge cases.
 
-use baco::threat_model::{generate_threat_model_static, ThreatModelFile, ThreatModelFrontmatter};
+use baco::threat_model::{ThreatModelFile, ThreatModelFrontmatter, generate_threat_model_static};
 
 // ============================================================================
 // ThreatModelFile Tests

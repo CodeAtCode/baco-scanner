@@ -21,11 +21,12 @@ impl std::fmt::Display for VerificationStatus {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum Severity {
     Critical,
     High,
+    #[default]
     Medium,
     Low,
     Info,
@@ -171,7 +172,7 @@ pub struct SecurityIssue {
     pub custom_tags: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct VulnerabilityFinding {
     pub id: String,
     pub title: String,

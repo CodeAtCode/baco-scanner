@@ -58,7 +58,7 @@ impl PocCompiler {
                 return PoCCompileResult::failure(
                     "rust",
                     vec![format!("Failed to create temp file: {}", e)],
-                )
+                );
             }
         };
 
@@ -120,7 +120,7 @@ impl PocCompiler {
                 return PoCCompileResult::failure(
                     "javascript",
                     vec![format!("Failed to create temp file: {}", e)],
-                )
+                );
             }
         };
 

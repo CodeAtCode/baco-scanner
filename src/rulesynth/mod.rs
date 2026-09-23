@@ -12,13 +12,13 @@ pub mod proposer;
 pub mod symbolic_validator;
 
 pub use emitter::emit_yaml;
-pub use pattern_dsl::{parse_pattern, Pattern, PatternError, Severity, TaintSink, TaintSource};
+pub use pattern_dsl::{Pattern, PatternError, Severity, TaintSink, TaintSource, parse_pattern};
 pub use proposer::{build_prompt_messages, extract_pattern, run_proposer_loop};
 pub use symbolic_validator::{
-    format_feedback, load_corpus, pattern_matches_code, validate, LabelledTrace, TraceResult,
-    ValidationOutcome,
+    LabelledTrace, TraceResult, ValidationOutcome, format_feedback, load_corpus,
+    pattern_matches_code, validate,
 };
-pub use validator::{validate_rule, RuleError};
+pub use validator::{RuleError, validate_rule};
 
 use crate::config::RuleSynthConfig;
 use crate::llm::LlmClient;

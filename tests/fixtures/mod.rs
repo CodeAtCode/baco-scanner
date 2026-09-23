@@ -34,7 +34,6 @@ pub mod mock_llm;
 /// let scanner = Scanner::new(config, "/tmp/test".into(), false);
 /// ```
 pub fn create_test_config() -> ScannerConfig {
-    eprintln!("DEBUG: create_test_config called from fixtures/mod.rs");
     ScannerConfig {
         eval: Default::default(),
         project: ProjectConfig {
@@ -61,6 +60,7 @@ pub fn create_test_config() -> ScannerConfig {
             },
         },
         llm: LlmConfig {
+            base_url: String::new(),
             timeout_secs: 30,
             max_retries: 0,
             retry_backoff_ms: 0,

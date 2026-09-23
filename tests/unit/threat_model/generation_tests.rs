@@ -169,7 +169,7 @@ async fn test_generate_threat_model_with_llm_fallback_architecture_aware() {
 
     // Create an LLM client that will fail
     let config = LlmConfig {
-        base_url: "http://invalid.local:9999".to_string(),
+        base_url: "http://127.0.0.1:1".to_string(),
         api_key: "test".to_string(),
         model: "test".to_string(),
         models: vec![],
@@ -381,4 +381,90 @@ fn test_generate_threat_model_static_network_vs_local() {
         tm_network.contains("TRUST BOUNDARIES"),
         tm_local.contains("TRUST BOUNDARIES")
     );
+}
+#[tokio::test]
+async fn threat_model_llm_passthrough_with_mockito() {
+    let mut server = mockito::Server::new_async().await;
+    let _mock = server
+        .mock("POST", "/v1/chat/completions")
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(r#"{"choices": [{"message": {"content": "Threat Model\n- Spoofing: none"}}]}"#)
+        .create();
+
+    let cfg = baco::llm::LlmConfig {
+        base_url: server.url(),
+        api_key: "k".to_string(),
+        model: "m".to_string(),
+        ..Default::default()
+    };
+    let client = baco::llm::LlmClient::new(cfg);
+    let dir = tempfile::TempDir::new().unwrap();
+    let out =
+        baco::threat_model::generation::generate_threat_model_with_llm(dir.path(), "arch", &client)
+            .await
+            .unwrap();
+    assert!(out.contains("Threat Model"));
+}
+
+#[tokio::test]
+async fn threat_model_llm_error_falls_back_to_static() {
+    let mut server = mockito::Server::new_async().await;
+    let _mock = server
+        .mock("POST", "/v1/chat/completions")
+        .with_status(500)
+        .with_body("boom")
+        .create();
+
+    let cfg = baco::llm::LlmConfig {
+        base_url: server.url(),
+        api_key: "k".to_string(),
+        model: "m".to_string(),
+        max_retries: 0,
+        ..Default::default()
+    };
+    let client = baco::llm::LlmClient::new(cfg);
+    let dir = tempfile::TempDir::new().unwrap();
+    let out =
+        baco::threat_model::generation::generate_threat_model_with_llm(dir.path(), "arch", &client)
+            .await
+            .unwrap();
+    assert!(!out.is_empty());
+}
+#[test]
+fn save_to_context_round_trips_threat_model() {
+    let dir = tempfile::TempDir::new().unwrap();
+    baco::threat_model::generation::save_to_context(dir.path(), "model-text");
+    let ctx = baco::analysis_context::AnalysisContext::load(dir.path()).unwrap();
+    assert_eq!(ctx.threat_model.as_deref(), Some("model-text"));
+}
+#[test]
+fn generate_architecture_static_empty_dir_skeleton() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let summary = baco::threat_model::generation::generate_architecture_static(dir.path());
+    assert!(!summary.is_empty());
+}
+#[test]
+fn generate_architecture_static_full_stack_fixture() {
+    let dir = tempfile::TempDir::new().unwrap();
+    std::fs::write(
+        dir.path().join("main.rs"),
+        "use axum::Router;\n// postgres database via sqlx, auth token required\nfn main() {\n    let data = std::fs::read_to_string(\"x\").unwrap();\n    let _ = (data, \"auth token\", \"postgres\");\n}\n",
+    )
+    .unwrap();
+    let summary = baco::threat_model::generation::generate_architecture_static(dir.path());
+    assert!(summary.contains("- HTTP API: yes"), "missing http arm");
+    assert!(summary.contains("- database: yes"), "missing db arm");
+    assert!(summary.contains("- file system: yes"), "missing fs arm");
+    assert!(
+        summary.contains("- Authentication: yes"),
+        "missing auth arm"
+    );
+}
+#[test]
+fn load_or_generate_architecture_empty_dir() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let ctx = baco::analysis_context::AnalysisContext::default();
+    let arch = baco::threat_model::generation::load_or_generate_architecture(dir.path(), &ctx);
+    assert!(!arch.is_empty());
 }

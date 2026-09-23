@@ -9,7 +9,7 @@ use std::fs;
 use serde::{Deserialize, Serialize};
 
 use super::templates::{
-    cwe_to_hunt_domain, BacoPhase, DefaultPrompts, ProjectType, TemplateVariables,
+    BacoPhase, DefaultPrompts, ProjectType, TemplateVariables, cwe_to_hunt_domain,
 };
 
 /// Configuration for prompt overrides

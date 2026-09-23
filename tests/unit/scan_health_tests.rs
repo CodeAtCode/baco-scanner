@@ -3,7 +3,7 @@
 use baco::checkpoint::ScanPhase;
 use baco::llm::metrics::LlmMetrics;
 use baco::report::json::write_findings_json;
-use baco::scan_health::{from_llm_metrics, LlmOutcomeClass, PhaseStatusKind, ScanHealth};
+use baco::scan_health::{LlmOutcomeClass, PhaseStatusKind, ScanHealth, from_llm_metrics};
 
 use std::fs;
 use std::path::Path;
@@ -260,11 +260,13 @@ fn test_llm_config_skip_entry_contains_phase_slot() {
         .find(|ps| ps.phase == "LlmDiscovery")
         .unwrap();
     assert!(matches!(discovery_entry.status, PhaseStatusKind::Skipped));
-    assert!(discovery_entry
-        .reason
-        .as_ref()
-        .unwrap()
-        .contains("llm.phases.discovery"));
+    assert!(
+        discovery_entry
+            .reason
+            .as_ref()
+            .unwrap()
+            .contains("llm.phases.discovery")
+    );
 }
 
 #[test]

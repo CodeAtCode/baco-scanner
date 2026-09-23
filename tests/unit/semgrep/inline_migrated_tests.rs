@@ -33,12 +33,16 @@ fn test_semgrep_runner_with_exclude_rules() {
 
     assert!(runner.rulesets.is_empty());
     assert_eq!(runner.exclude_rules.len(), 2);
-    assert!(runner
-        .exclude_rules
-        .contains(&"python.lang.security".to_string()));
-    assert!(runner
-        .exclude_rules
-        .contains(&"javascript.security.xss".to_string()));
+    assert!(
+        runner
+            .exclude_rules
+            .contains(&"python.lang.security".to_string())
+    );
+    assert!(
+        runner
+            .exclude_rules
+            .contains(&"javascript.security.xss".to_string())
+    );
 }
 
 #[test]
@@ -447,11 +451,13 @@ fn test_aggregation_multiple_same_rule_creates_single_finding() {
     // Should use first finding's path, not sentinel
     assert_eq!(findings[0].file_path, "file1.py");
     assert_eq!(findings[0].line_number, Some(1));
-    assert!(findings[0]
-        .code_snippet
-        .as_ref()
-        .unwrap()
-        .contains("Found in"));
+    assert!(
+        findings[0]
+            .code_snippet
+            .as_ref()
+            .unwrap()
+            .contains("Found in")
+    );
 }
 
 #[test]

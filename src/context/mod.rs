@@ -14,15 +14,15 @@ pub mod triple_path;
 pub mod callee_walker;
 pub mod pacvd_extractor;
 
-pub use callee_walker::{extract_call_sites, CallSite};
+pub use callee_walker::{CallSite, extract_call_sites};
 pub use control_path::{
-    extract as extract_control_path, ContextError as ControlPathError, ControlPath, Language,
+    ContextError as ControlPathError, ControlPath, Language, extract as extract_control_path,
 };
 pub use knowledge_path::{
-    retrieve as retrieve_knowledge, truncate_text, KnowledgePath, RetrievedRule,
+    KnowledgePath, RetrievedRule, retrieve as retrieve_knowledge, truncate_text,
 };
 pub use pacvd_extractor::{
-    auto_level, categorize, extract as extract_pacvd, tag_cwe, AbstractionLevel, AbstractionVector,
+    AbstractionLevel, AbstractionVector, auto_level, categorize, extract as extract_pacvd, tag_cwe,
 };
-pub use semantic_path::{summarize as summarize_semantic, SemanticPath};
+pub use semantic_path::{SemanticPath, summarize as summarize_semantic};
 pub use triple_path::TriplePathContext;

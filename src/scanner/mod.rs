@@ -24,7 +24,7 @@ pub use pipeline::orchestrator::PhaseGraph;
 // Re-export utility functions from env
 pub use env::{extract_owner_repo_from_url, get_git_remote_url};
 // Re-export parallel module types for testing
-pub use parallel::{combine_parallel_results, ParallelPhaseResult, ParallelSlot};
+pub use parallel::{ParallelPhaseResult, ParallelSlot, combine_parallel_results};
 
 // Use the checkpoint module for save/load
 use crate::checkpoint::ScanPhase;

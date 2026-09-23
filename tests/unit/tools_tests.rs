@@ -2,7 +2,10 @@
 //!
 //! Tests cover diff_analysis functionality including analyze_diff and parse_diff.
 
-use baco::tools::diff_analysis::{analyze_diff, parse_diff, DiffAnalysisInput, DiffAnalysisOutput};
+use baco::tools::diff_analysis::{
+    DiffAnalysisInput, DiffAnalysisOutput, analyze_diff, changed_files, matches_changed_set,
+    parse_diff,
+};
 
 #[cfg(test)]
 mod tests {
@@ -286,4 +289,51 @@ mod tests {
             }
         }
     }
+}
+#[test]
+fn matches_changed_set_exact_suffix_and_miss() {
+    use std::path::PathBuf;
+    let changed = vec![PathBuf::from("src/vuln.rs"), PathBuf::from("web/app.js")];
+    assert!(matches_changed_set("src/vuln.rs", &changed));
+    assert!(matches_changed_set("/repo/src/vuln.rs", &changed));
+    assert!(matches_changed_set("src\\vuln.rs", &changed));
+    assert!(!matches_changed_set("src/clean.rs", &changed));
+    assert!(!matches_changed_set("other/vuln.rs.bak", &changed));
+}
+
+#[test]
+fn changed_files_missing_repo_errors() {
+    let result = changed_files("/nonexistent-dir-baco-probe-xyz", "HEAD");
+    assert!(result.is_err());
+}
+
+#[test]
+fn changed_files_lists_modified_file() {
+    if std::process::Command::new("git")
+        .arg("--version")
+        .output()
+        .is_err()
+    {
+        return;
+    }
+    let dir = std::env::temp_dir().join(format!("baco-diff-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let run = |args: &[&str]| {
+        std::process::Command::new("git")
+            .args(args)
+            .current_dir(&dir)
+            .output()
+            .unwrap()
+    };
+    run(&["init"]);
+    run(&["config", "user.email", "t@t"]);
+    run(&["config", "user.name", "t"]);
+    std::fs::write(dir.join("a.rs"), "fn a() {}\n").unwrap();
+    run(&["add", "."]);
+    run(&["commit", "-m", "base"]);
+    std::fs::write(dir.join("a.rs"), "fn a() {}\nfn b() {}\n").unwrap();
+    let files = changed_files(dir.to_str().unwrap(), "HEAD").unwrap();
+    assert_eq!(files, vec![std::path::PathBuf::from("a.rs")]);
+    let _ = std::fs::remove_dir_all(&dir);
 }

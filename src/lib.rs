@@ -5,6 +5,7 @@ pub mod analysis_context; // AnalysisContext persistence (renamed from context.r
 pub mod chain_analysis;
 pub mod checkpoint;
 pub mod citation_verification;
+pub mod cli;
 pub mod confidence_refinement;
 pub mod config;
 pub mod context; // Context extraction module
@@ -51,6 +52,7 @@ pub mod staging;
 pub mod threat_model;
 pub mod tickets;
 pub mod tools;
+pub mod ui;
 pub mod validation;
 pub mod variant_search;
 pub mod vuln_spec; // VulInSpec specification-guided detection

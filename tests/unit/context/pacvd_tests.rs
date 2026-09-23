@@ -4,8 +4,8 @@
 //! - pacvd_extractor: AbstractionLevel, AbstractionVector, extract(), auto_level()
 //! - callee_walker: CallSite, extract_call_sites()
 
-use baco::context::callee_walker::{extract_call_sites, CallSite};
-use baco::context::pacvd_extractor::{auto_level, extract, AbstractionLevel};
+use baco::context::callee_walker::{CallSite, extract_call_sites};
+use baco::context::pacvd_extractor::{AbstractionLevel, auto_level, extract};
 use std::collections::BTreeSet;
 
 // ============================================================================

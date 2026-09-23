@@ -53,11 +53,13 @@ fn test_missing_file() {
     assert_eq!(report.failed, 1);
     assert_eq!(findings[0].confidence_score, original_confidence * 0.5);
     assert!(findings[0].verification_notes.is_some());
-    assert!(findings[0]
-        .verification_notes
-        .as_ref()
-        .unwrap()
-        .contains("citation verification failed"));
+    assert!(
+        findings[0]
+            .verification_notes
+            .as_ref()
+            .unwrap()
+            .contains("citation verification failed")
+    );
 }
 
 #[test]
@@ -79,11 +81,13 @@ fn test_line_beyond_eof() {
     assert_eq!(report.failed, 1);
     assert_eq!(findings[0].confidence_score, original_confidence * 0.5);
     assert!(findings[0].verification_notes.is_some());
-    assert!(findings[0]
-        .verification_notes
-        .as_ref()
-        .unwrap()
-        .contains("citation verification failed"));
+    assert!(
+        findings[0]
+            .verification_notes
+            .as_ref()
+            .unwrap()
+            .contains("citation verification failed")
+    );
 }
 
 #[test]
@@ -356,9 +360,11 @@ fn test_line_one_beyond_eof() {
     assert_eq!(report.passed, 0);
     assert_eq!(report.failed, 1);
     assert_eq!(findings[0].confidence_score, original_confidence * 0.5);
-    assert!(findings[0]
-        .verification_notes
-        .as_ref()
-        .unwrap()
-        .contains("line 101 out of range"));
+    assert!(
+        findings[0]
+            .verification_notes
+            .as_ref()
+            .unwrap()
+            .contains("line 101 out of range")
+    );
 }

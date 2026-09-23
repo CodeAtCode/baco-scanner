@@ -9,7 +9,7 @@
 
 use baco::cve_bootstrap::CveBootstrapper;
 use baco::cve_client::CveClient;
-use baco::file_hash::{calculate_content_hash, calculate_file_hash, FileHasher};
+use baco::file_hash::{FileHasher, calculate_content_hash, calculate_file_hash};
 use baco::incremental_scan::FileHashStore;
 use baco::indexer::{FileIndex, FileInfo};
 use baco::scanner_types::cve::{CveCluster, CveEntry, CveSource};

@@ -5,9 +5,9 @@ use crate::llm::metrics::LlmMetricsTracker;
 use crate::rate_limiter::RateLimiter;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -204,6 +204,111 @@ pub struct LlmClient {
     rate_limiter: Arc<RateLimiter>,
 }
 
+/// Exponential retry delay: `base_ms * 2^attempt`, capped so
+/// long retry chains stay bounded.
+pub fn backoff_delay_ms(base_ms: u64, attempt: u32) -> u64 {
+    const MAX_BACKOFF_MS: u64 = 30_000;
+    base_ms
+        .saturating_mul(2u64.saturating_pow(attempt))
+        .min(MAX_BACKOFF_MS)
+}
+
+/// Send one chat-completions POST; shared by both retry engines.
+async fn post_chat_request(
+    url: &str,
+    api_key: &str,
+    timeout_secs: u64,
+    payload: &serde_json::Value,
+) -> Result<reqwest::Response, reqwest::Error> {
+    get_client()
+        .post(url)
+        .timeout(Duration::from_secs(timeout_secs))
+        .header("Content-Type", "application/json")
+        .header("Authorization", format!("Bearer {api_key}"))
+        .json(payload)
+        .send()
+        .await
+}
+
+/// Fail-fast errors (400/401/403) shared by both retry engines.
+/// Returns Some(error) when the status must not be retried or failed over.
+pub fn fail_fast_status_error(status: u16, error: &str) -> Option<ScanError> {
+    if status == 400 {
+        return Some(ScanError::Parse {
+            message: format!(
+                "Malformed LLM request (400): {}",
+                error.chars().take(200).collect::<String>()
+            ),
+            source: None,
+        });
+    }
+    if status == 401 || status == 403 {
+        return Some(ScanError::Auth {
+            message: "LLM authentication failed (401/403) — check the API key".to_string(),
+            source: None,
+        });
+    }
+    None
+}
+
+/// Sleep the Retry-After delay (429 with header) or the exponential backoff,
+/// then advance the attempt counter. Shared by both retry engines.
+pub async fn apply_retry_backoff(
+    base_ms: u64,
+    status: u16,
+    retry_after_secs: Option<u64>,
+    retries: &mut u32,
+) {
+    let backoff = match (status, retry_after_secs) {
+        (429, Some(secs)) => secs * 1000,
+        _ => backoff_delay_ms(base_ms, *retries),
+    };
+    *retries += 1;
+    tracing::debug!("Retrying after {}ms", backoff);
+    tokio::time::sleep(Duration::from_millis(backoff)).await;
+}
+
+/// Extract the assistant content from a chat-completions response value.
+pub fn parse_chat_content(result: &serde_json::Value) -> Result<String, &'static str> {
+    result
+        .get("choices")
+        .and_then(|c: &serde_json::Value| c.as_array())
+        .and_then(|arr: &Vec<serde_json::Value>| arr.first())
+        .and_then(|choice| choice.get("message"))
+        .and_then(|msg: &serde_json::Value| msg.get("content"))
+        .and_then(|c: &serde_json::Value| c.as_str())
+        .map(|s| s.to_string())
+        .ok_or("Invalid response format")
+}
+
+/// Extract tool calls from a chat message value (empty vec when absent).
+pub fn parse_tool_calls(message: &serde_json::Value) -> Vec<ToolCall> {
+    message
+        .get("tool_calls")
+        .map(|tc| {
+            tc.as_array()
+                .unwrap_or(&vec![])
+                .iter()
+                .filter_map(|tc| {
+                    tc.get("function")
+                        .and_then(|f| f.get("name"))
+                        .and_then(|name| name.as_str())
+                        .map(|name| ToolCall {
+                            id: tc.get("id").and_then(|i| i.as_str()).map(|s| s.to_string()),
+                            name: name.to_string(),
+                            arguments: tc
+                                .get("function")
+                                .and_then(|f| f.get("arguments"))
+                                .and_then(|a| a.as_object())
+                                .map(|o| serde_json::to_value(o).unwrap_or_default())
+                                .unwrap_or_default(),
+                        })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 impl LlmClient {
     /// Get the current model name (uses first available model if config.model is empty)
     pub fn model_name(&self) -> String {
@@ -293,7 +398,10 @@ impl LlmClient {
         messages_for_metrics: usize,
     ) -> Result<ChatResponseWithModel, ScanError> {
         let url = chat_endpoint(base_url);
-        let model = self.get_current_model();
+        let mut models = self.get_all_models();
+        if models.is_empty() {
+            models.push(self.get_current_model());
+        }
         let start_time = std::time::Instant::now();
 
         // Acquire rate limiter permit
@@ -303,168 +411,183 @@ impl LlmClient {
             .await
             .map_err(|e| format!("Failed to acquire rate limiter permit: {}", e))?;
 
-        let mut retries = 0;
-        let max_attempts = self.config.max_retries;
+        // Fail over across models: each iteration runs the full retry loop
+        // for one model; retryable exhaustion advances to the next model.
+        for (mi, model) in models.iter().enumerate() {
+            let is_last_model = mi + 1 >= models.len();
+            let mut attempt_payload = payload.clone();
+            attempt_payload["model"] = serde_json::json!(model);
 
-        loop {
-            tracing::debug!(
-                "LLM request attempt {}/{} to {} (model: {})",
-                retries + 1,
-                max_attempts,
-                url,
-                model
-            );
+            let mut retries = 0;
+            let max_attempts = self.config.max_retries;
 
-            let response = get_client()
-                .post(&url)
-                .timeout(Duration::from_secs(self.config.timeout))
-                .header("Content-Type", "application/json")
-                .header("Authorization", format!("Bearer {}", self.config.api_key))
-                .json(&payload)
-                .send()
+            loop {
+                tracing::debug!(
+                    "LLM request attempt {}/{} to {} (model: {})",
+                    retries + 1,
+                    max_attempts,
+                    url,
+                    model
+                );
+
+                let response = post_chat_request(
+                    &url,
+                    &self.config.api_key,
+                    self.config.timeout,
+                    &attempt_payload,
+                )
                 .await;
 
-            match response {
-                Ok(resp) if resp.status().is_success() => {
-                    let result: serde_json::Value = resp.json().await?;
+                match response {
+                    Ok(resp) if resp.status().is_success() => {
+                        let result: serde_json::Value = resp.json().await?;
 
-                    let content = result
-                        .get("choices")
-                        .and_then(|c: &serde_json::Value| c.as_array())
-                        .and_then(|arr: &Vec<serde_json::Value>| arr.first())
-                        .and_then(|choice| choice.get("message"))
-                        .and_then(|msg: &serde_json::Value| msg.get("content"))
-                        .and_then(|c: &serde_json::Value| c.as_str())
-                        .ok_or("Invalid response format")?;
+                        let content = parse_chat_content(&result)?;
 
-                    let latency_ms = start_time.elapsed().as_millis() as u64;
+                        let latency_ms = start_time.elapsed().as_millis() as u64;
 
-                    // Record metrics
-                    let tokens_prompt: usize = messages_for_metrics;
-                    let tokens_completion: usize = content.len() / 4;
-                    self.record_metrics(RecordMetricsParams {
-                        model: model.clone(),
-                        operation: "chat".to_string(),
-                        phase: "unknown".to_string(),
-                        tokens_prompt,
-                        tokens_completion,
-                        latency_ms,
-                        success: true,
-                    })
-                    .await;
-
-                    return Ok(ChatResponseWithModel::new(
-                        content.to_string(),
-                        model.clone(),
-                    ));
-                }
-                Ok(resp) => {
-                    let status = resp.status().as_u16();
-
-                    // Extract Retry-After header before consuming resp
-                    let retry_after = resp
-                        .headers()
-                        .get("Retry-After")
-                        .and_then(|v| v.to_str().ok())
-                        .and_then(|s| s.parse::<u64>().ok());
-
-                    let error = resp.text().await.unwrap_or_default();
-                    tracing::warn!(
-                        "LLM request failed with status {} (attempt {}/{}) to {}",
-                        status,
-                        retries + 1,
-                        max_attempts,
-                        url
-                    );
-
-                    // Classify the error
-                    let (should_retry, _) = Self::classify_retryable(status, retry_after);
-
-                    // Fail fast on 400/401/403
-                    if status == 400 {
-                        return Err(ScanError::Parse {
-                            message: format!(
-                                "Malformed LLM request (400): {}",
-                                error.chars().take(200).collect::<String>()
-                            ),
-                            source: None,
-                        });
-                    }
-                    if status == 401 || status == 403 {
-                        return Err(ScanError::Auth {
-                            message: "LLM authentication failed (401/403) — check the API key"
-                                .to_string(),
-                            source: None,
-                        });
-                    }
-
-                    if !should_retry || retries + 1 >= max_attempts {
-                        record_failure_metrics(
-                            self,
-                            model.clone(),
-                            start_time.elapsed().as_millis() as u64,
-                        )
+                        // Record metrics
+                        let tokens_prompt: usize = messages_for_metrics;
+                        let tokens_completion: usize = content.len() / 4;
+                        self.record_metrics(RecordMetricsParams {
+                            model: model.clone(),
+                            operation: "chat".to_string(),
+                            phase: "unknown".to_string(),
+                            tokens_prompt,
+                            tokens_completion,
+                            latency_ms,
+                            success: true,
+                        })
                         .await;
 
-                        return Err(ScanError::Server {
-                            message: format!(
-                                "LLM API request failed after {} retries to URL {}\nStatus: {}\nResponse: {}\nModel: {}",
-                                max_attempts.saturating_sub(1),
-                                url,
-                                status,
-                                error,
-                                model
-                            ),
-                            source: None,
-                        });
-                    }
-
-                    // Honor Retry-After on 429
-                    let backoff = match (status, retry_after) {
-                        (429, Some(secs)) => secs * 1000,
-                        _ => self.config.retry_backoff_ms * (retries + 1) as u64,
-                    };
-                    retries += 1;
-                    tracing::debug!("Retrying after {}ms", backoff);
-                    tokio::time::sleep(Duration::from_millis(backoff)).await;
-                }
-                Err(e) => {
-                    // Network/timeout errors are retryable
-                    let is_timeout = e.is_timeout();
-                    let (status, url_e, kind) = get_error_details(&e);
-                    tracing::warn!(
-                        "LLM request error on model '{}': {}\n(status: {}, type: {}, url: {}) (attempt {}/{})",
-                        model, e, status, kind, url_e, retries + 1, max_attempts
-                    );
-
-                    if !is_timeout && retries + 1 >= max_attempts {
-                        record_failure_metrics(
-                            self,
+                        return Ok(ChatResponseWithModel::new(
+                            content.to_string(),
                             model.clone(),
-                            start_time.elapsed().as_millis() as u64,
+                        ));
+                    }
+                    Ok(resp) => {
+                        let status = resp.status().as_u16();
+
+                        // Extract Retry-After header before consuming resp
+                        let retry_after = resp
+                            .headers()
+                            .get("Retry-After")
+                            .and_then(|v| v.to_str().ok())
+                            .and_then(|s| s.parse::<u64>().ok());
+
+                        let error = resp.text().await.unwrap_or_default();
+                        tracing::warn!(
+                            "LLM request failed with status {} (attempt {}/{}) to {}",
+                            status,
+                            retries + 1,
+                            max_attempts,
+                            url
+                        );
+
+                        // Classify the error
+                        let (should_retry, _) = Self::classify_retryable(status, retry_after);
+
+                        // Fail fast on 400/401/403
+                        if let Some(err) = fail_fast_status_error(status, &error) {
+                            return Err(err);
+                        }
+
+                        if !should_retry || retries + 1 >= max_attempts {
+                            record_failure_metrics(
+                                self,
+                                model.clone(),
+                                start_time.elapsed().as_millis() as u64,
+                            )
+                            .await;
+
+                            let err = ScanError::Server {
+                                message: format!(
+                                    "LLM API request failed after {} retries to URL {}\nStatus: {}\nResponse: {}\nModel: {}",
+                                    max_attempts.saturating_sub(1),
+                                    url,
+                                    status,
+                                    error,
+                                    model
+                                ),
+                                source: None,
+                            };
+                            // Fail fast on non-retryable errors and when no models
+                            // remain; otherwise advance to the next model.
+                            if !should_retry || is_last_model {
+                                return Err(err);
+                            }
+                            tracing::warn!(
+                                "LLM retries exhausted on model '{}', failing over to next model",
+                                model
+                            );
+                            break;
+                        }
+
+                        // Honor Retry-After on 429
+                        apply_retry_backoff(
+                            self.config.retry_backoff_ms,
+                            status,
+                            retry_after,
+                            &mut retries,
                         )
                         .await;
-
-                        return Err(ScanError::Network {
-                            message: format!(
-                                "LLM HTTP request failed after {} retries\nError: {:?}\nStatus: {}\nType: {}\nURL: {}\nModel: {}",
-                                max_attempts.saturating_sub(1),
-                                e,
-                                status,
-                                kind,
-                                url_e,
-                                model
-                            ),
-                            source: Some(Box::new(e) as _),
-                        });
                     }
+                    Err(e) => {
+                        // Network/timeout errors are retryable
+                        let _is_timeout = e.is_timeout();
+                        let (status, url_e, kind) = get_error_details(&e);
+                        tracing::warn!(
+                            "LLM request error on model '{}': {}\n(status: {}, type: {}, url: {}) (attempt {}/{})",
+                            model,
+                            e,
+                            status,
+                            kind,
+                            url_e,
+                            retries + 1,
+                            max_attempts
+                        );
 
-                    retries += 1;
-                    let backoff = self.config.retry_backoff_ms * retries as u64;
-                    tokio::time::sleep(Duration::from_millis(backoff)).await;
+                        if retries + 1 >= max_attempts {
+                            record_failure_metrics(
+                                self,
+                                model.clone(),
+                                start_time.elapsed().as_millis() as u64,
+                            )
+                            .await;
+
+                            let err = ScanError::Network {
+                                message: format!(
+                                    "LLM HTTP request failed after {} retries\nError: {:?}\nStatus: {}\nType: {}\nURL: {}\nModel: {}",
+                                    max_attempts.saturating_sub(1),
+                                    e,
+                                    status,
+                                    kind,
+                                    url_e,
+                                    model
+                                ),
+                                source: Some(Box::new(e) as _),
+                            };
+                            if is_last_model {
+                                return Err(err);
+                            }
+                            tracing::warn!(
+                                "LLM retries exhausted on model '{}', failing over to next model",
+                                model
+                            );
+                            break;
+                        }
+
+                        let backoff = backoff_delay_ms(self.config.retry_backoff_ms, retries);
+                        retries += 1;
+                        tokio::time::sleep(Duration::from_millis(backoff)).await;
+                    }
                 }
             }
         }
+        Err(ScanError::Server {
+            message: "No models configured for LLM failover".to_string(),
+            source: None,
+        })
     }
 
     /// Try a single chat_with_tools request against the given URL
@@ -474,7 +597,10 @@ impl LlmClient {
         payload: serde_json::Value,
     ) -> Result<ChatResponse, ScanError> {
         let url = chat_endpoint(base_url);
-        let model = self.get_current_model();
+        let mut models = self.get_all_models();
+        if models.is_empty() {
+            models.push(self.get_current_model());
+        }
         let start_time = std::time::Instant::now();
 
         // Acquire rate limiter permit
@@ -484,195 +610,187 @@ impl LlmClient {
             .await
             .map_err(|e| format!("Failed to acquire rate limiter permit: {}", e))?;
 
-        let mut retries = 0;
-        let max_attempts = self.config.max_retries;
+        // Fail over across models: each iteration runs the full retry loop
+        // for one model; retryable exhaustion advances to the next model.
+        for (mi, model) in models.iter().enumerate() {
+            let is_last_model = mi + 1 >= models.len();
+            let mut attempt_payload = payload.clone();
+            attempt_payload["model"] = serde_json::json!(model);
 
-        loop {
-            tracing::debug!(
-                "LLM request with tools attempt {}/{} to {} (model: {})",
-                retries + 1,
-                max_attempts,
-                url,
-                model
-            );
+            let mut retries = 0;
+            let max_attempts = self.config.max_retries;
 
-            let response = get_client()
-                .post(&url)
-                .timeout(Duration::from_secs(self.config.timeout))
-                .header("Content-Type", "application/json")
-                .header("Authorization", format!("Bearer {}", self.config.api_key))
-                .json(&payload)
-                .send()
+            loop {
+                tracing::debug!(
+                    "LLM request with tools attempt {}/{} to {} (model: {})",
+                    retries + 1,
+                    max_attempts,
+                    url,
+                    model
+                );
+
+                let response = post_chat_request(
+                    &url,
+                    &self.config.api_key,
+                    self.config.timeout,
+                    &attempt_payload,
+                )
                 .await;
 
-            match response {
-                Ok(resp) if resp.status().is_success() => {
-                    let result: serde_json::Value = resp.json().await?;
+                match response {
+                    Ok(resp) if resp.status().is_success() => {
+                        let result: serde_json::Value = resp.json().await?;
 
-                    let choice = result
-                        .get("choices")
-                        .and_then(|c: &serde_json::Value| c.as_array())
-                        .and_then(|arr: &Vec<serde_json::Value>| arr.first())
-                        .ok_or("Invalid response format: no choices")?;
+                        let choice = result
+                            .get("choices")
+                            .and_then(|c: &serde_json::Value| c.as_array())
+                            .and_then(|arr: &Vec<serde_json::Value>| arr.first())
+                            .ok_or("Invalid response format: no choices")?;
 
-                    let message = choice
-                        .get("message")
-                        .ok_or("Invalid response format: no message")?;
+                        let message = choice
+                            .get("message")
+                            .ok_or("Invalid response format: no message")?;
 
-                    let content = message
-                        .get("content")
-                        .and_then(|c: &serde_json::Value| c.as_str())
-                        .unwrap_or("")
-                        .to_string();
+                        let content = message
+                            .get("content")
+                            .and_then(|c: &serde_json::Value| c.as_str())
+                            .unwrap_or("")
+                            .to_string();
 
-                    // Parse tool_calls if present
-                    let tool_calls = message
-                        .get("tool_calls")
-                        .map(|tc| {
-                            tc.as_array()
-                                .unwrap_or(&vec![])
-                                .iter()
-                                .filter_map(|tc| {
-                                    tc.get("function")
-                                        .and_then(|f| f.get("name"))
-                                        .and_then(|name| name.as_str())
-                                        .map(|name| ToolCall {
-                                            id: tc
-                                                .get("id")
-                                                .and_then(|i| i.as_str())
-                                                .map(|s| s.to_string()),
-                                            name: name.to_string(),
-                                            arguments: tc
-                                                .get("function")
-                                                .and_then(|f| f.get("arguments"))
-                                                .and_then(|a| a.as_object())
-                                                .map(|o| {
-                                                    serde_json::to_value(o).unwrap_or_default()
-                                                })
-                                                .unwrap_or_default(),
-                                        })
-                                })
-                                .collect()
+                        // Parse tool_calls if present
+                        let tool_calls = parse_tool_calls(message);
+
+                        let raw = result.clone();
+                        let latency_ms = start_time.elapsed().as_millis() as u64;
+
+                        // Record metrics
+                        let tokens_prompt: usize = 0;
+                        self.record_metrics(RecordMetricsParams {
+                            model: model.clone(),
+                            operation: "chat_with_tools".to_string(),
+                            phase: "unknown".to_string(),
+                            tokens_prompt,
+                            tokens_completion: 0,
+                            latency_ms,
+                            success: true,
                         })
-                        .unwrap_or_default();
+                        .await;
 
-                    let raw = result.clone();
-                    let latency_ms = start_time.elapsed().as_millis() as u64;
-
-                    // Record metrics
-                    let tokens_prompt: usize = 0;
-                    self.record_metrics(RecordMetricsParams {
-                        model: model.clone(),
-                        operation: "chat_with_tools".to_string(),
-                        phase: "unknown".to_string(),
-                        tokens_prompt,
-                        tokens_completion: 0,
-                        latency_ms,
-                        success: true,
-                    })
-                    .await;
-
-                    return Ok(ChatResponse {
-                        content,
-                        tool_calls,
-                        raw,
-                        model_used: model.clone(),
-                    });
-                }
-                Ok(resp) => {
-                    let status = resp.status().as_u16();
-
-                    // Extract Retry-After header before consuming resp
-                    let retry_after = resp
-                        .headers()
-                        .get("Retry-After")
-                        .and_then(|v| v.to_str().ok())
-                        .and_then(|s| s.parse::<u64>().ok());
-
-                    let error = resp.text().await.unwrap_or_default();
-                    tracing::warn!(
-                        "LLM request with tools failed with status {} (attempt {}/{}) to {}",
-                        status,
-                        retries + 1,
-                        max_attempts,
-                        url
-                    );
-
-                    // Classify the error
-                    let (should_retry, _) = Self::classify_retryable(status, retry_after);
-
-                    // Fail fast on 400/401/403
-                    if status == 400 {
-                        return Err(ScanError::Parse {
-                            message: format!(
-                                "Malformed LLM request (400): {}",
-                                error.chars().take(200).collect::<String>()
-                            ),
-                            source: None,
+                        return Ok(ChatResponse {
+                            content,
+                            tool_calls,
+                            raw,
+                            model_used: model.clone(),
                         });
                     }
-                    if status == 401 || status == 403 {
-                        return Err(ScanError::Auth {
-                            message: "LLM authentication failed (401/403) — check the API key"
-                                .to_string(),
-                            source: None,
-                        });
-                    }
+                    Ok(resp) => {
+                        let status = resp.status().as_u16();
 
-                    if !should_retry || retries + 1 >= max_attempts {
-                        return Err(ScanError::Server {
-                            message: format!(
-                                "LLM API request failed after {} retries to URL {}\nStatus: {}\nResponse: {}\nModel: {}",
-                                max_attempts.saturating_sub(1),
-                                url,
-                                status,
-                                error,
+                        // Extract Retry-After header before consuming resp
+                        let retry_after = resp
+                            .headers()
+                            .get("Retry-After")
+                            .and_then(|v| v.to_str().ok())
+                            .and_then(|s| s.parse::<u64>().ok());
+
+                        let error = resp.text().await.unwrap_or_default();
+                        tracing::warn!(
+                            "LLM request with tools failed with status {} (attempt {}/{}) to {}",
+                            status,
+                            retries + 1,
+                            max_attempts,
+                            url
+                        );
+
+                        // Classify the error
+                        let (should_retry, _) = Self::classify_retryable(status, retry_after);
+
+                        // Fail fast on 400/401/403
+                        if let Some(err) = fail_fast_status_error(status, &error) {
+                            return Err(err);
+                        }
+
+                        if !should_retry || retries + 1 >= max_attempts {
+                            let err = ScanError::Server {
+                                message: format!(
+                                    "LLM API request failed after {} retries to URL {}\nStatus: {}\nResponse: {}\nModel: {}",
+                                    max_attempts.saturating_sub(1),
+                                    url,
+                                    status,
+                                    error,
+                                    model
+                                ),
+                                source: None,
+                            };
+                            if !should_retry || is_last_model {
+                                return Err(err);
+                            }
+                            tracing::warn!(
+                                "LLM retries exhausted on model '{}', failing over to next model",
                                 model
-                            ),
-                            source: None,
-                        });
+                            );
+                            break;
+                        }
+
+                        // Honor Retry-After on 429
+                        apply_retry_backoff(
+                            self.config.retry_backoff_ms,
+                            status,
+                            retry_after,
+                            &mut retries,
+                        )
+                        .await;
                     }
+                    Err(e) => {
+                        // Network/timeout errors are retryable
+                        let _is_timeout = e.is_timeout();
+                        let (status, url_e, kind) = get_error_details(&e);
+                        tracing::warn!(
+                            "LLM request error on model '{}': {}\n(status: {}, type: {}, url: {}) (attempt {}/{})",
+                            model,
+                            e,
+                            status,
+                            kind,
+                            url_e,
+                            retries + 1,
+                            max_attempts
+                        );
 
-                    // Honor Retry-After on 429
-                    let backoff = match (status, retry_after) {
-                        (429, Some(secs)) => secs * 1000,
-                        _ => self.config.retry_backoff_ms * (retries + 1) as u64,
-                    };
-                    retries += 1;
-                    tracing::debug!("Retrying after {}ms", backoff);
-                    tokio::time::sleep(Duration::from_millis(backoff)).await;
-                }
-                Err(e) => {
-                    // Network/timeout errors are retryable
-                    let is_timeout = e.is_timeout();
-                    let (status, url_e, kind) = get_error_details(&e);
-                    tracing::warn!(
-                        "LLM request error on model '{}': {}\n(status: {}, type: {}, url: {}) (attempt {}/{})",
-                        model, e, status, kind, url_e, retries + 1, max_attempts
-                    );
-
-                    if !is_timeout && retries + 1 >= max_attempts {
-                        return Err(ScanError::Network {
-                            message: format!(
-                                "LLM HTTP request failed after {} retries\nError: {:?}\nStatus: {}\nType: {}\nURL: {}\nEndpoint: {}chat/completions\nModel: {}",
-                                max_attempts.saturating_sub(1),
-                                e,
-                                status,
-                                kind,
-                                url_e,
-                                base_url,
+                        if retries + 1 >= max_attempts {
+                            let err = ScanError::Network {
+                                message: format!(
+                                    "LLM HTTP request failed after {} retries\nError: {:?}\nStatus: {}\nType: {}\nURL: {}\nEndpoint: {}chat/completions\nModel: {}",
+                                    max_attempts.saturating_sub(1),
+                                    e,
+                                    status,
+                                    kind,
+                                    url_e,
+                                    base_url,
+                                    model
+                                ),
+                                source: Some(Box::new(e) as _),
+                            };
+                            if is_last_model {
+                                return Err(err);
+                            }
+                            tracing::warn!(
+                                "LLM retries exhausted on model '{}', failing over to next model",
                                 model
-                            ),
-                            source: Some(Box::new(e) as _),
-                        });
-                    }
+                            );
+                            break;
+                        }
 
-                    retries += 1;
-                    let backoff = self.config.retry_backoff_ms * retries as u64;
-                    tokio::time::sleep(Duration::from_millis(backoff)).await;
+                        let backoff = backoff_delay_ms(self.config.retry_backoff_ms, retries);
+                        retries += 1;
+                        tokio::time::sleep(Duration::from_millis(backoff)).await;
+                    }
                 }
             }
         }
+        Err(ScanError::Server {
+            message: "No models configured for LLM failover".to_string(),
+            source: None,
+        })
     }
 
     /// Build chat payload with optional structured output support
@@ -1006,13 +1124,6 @@ impl LlmChatClient for LlmClient {
     }
 }
 
-/// Implement AsyncLlmClient for LlmClient
-impl AsyncLlmClient for LlmClient {
-    async fn chat(&self, messages: &[ChatMessage]) -> Result<ChatResponseWithModel, ScanError> {
-        self.chat(messages).await
-    }
-}
-
 /// Abstraction point for test mocking of LLM providers (no production implementors
 /// by design: LlmClient implements its own async methods directly).
 pub trait LlmProvider {
@@ -1078,10 +1189,10 @@ pub fn create_llm_client_with_metrics(
 
     let api_key = phase_config.api_key.as_ref();
     if api_key.is_none() {
-        eprintln!(
-            "\u{1B}[33m[SCANNER] {} skipped: no API key configured (set llm.phases.{}.api_key)\u{1B}[0m",
+        crate::ui::warn_yellow(format!(
+            "{} skipped: no API key configured (set llm.phases.{}.api_key)",
             phase_name, phase_name
-        );
+        ));
         return None;
     }
 
@@ -1089,7 +1200,7 @@ pub fn create_llm_client_with_metrics(
     let llm_config = match phase_llm_config(&scanner.config, phase_name, None) {
         Ok(cfg) => cfg,
         Err(e) => {
-            eprintln!("\u{1B}[33m[SCANNER] {} skipped: {}\u{1B}[0m", phase_name, e);
+            crate::ui::warn_yellow(format!("{} skipped: {}", phase_name, e));
             tracing::warn!("LLM phase '{}' config error: {}", phase_name, e);
             return None;
         }
@@ -1140,6 +1251,8 @@ pub fn phase_llm_config(
     // If BOTH are empty, error
     let base_url = if !phase_config.base_url.is_empty() {
         phase_config.base_url.clone()
+    } else if !global_llm.base_url.is_empty() {
+        global_llm.base_url.clone()
     } else {
         return Err(ScanError::Config {
             message: format!("LLM phase '{}' has no base_url configured", phase),
@@ -1221,6 +1334,3 @@ fn get_phase_config(
 
 pub mod cache;
 pub mod metrics;
-pub mod traits;
-
-pub use traits::*;

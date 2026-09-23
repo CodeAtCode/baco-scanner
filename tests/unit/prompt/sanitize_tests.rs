@@ -3,7 +3,7 @@
 //! Previously in src/prompt/sanitize.rs #[cfg(test)] mod tests
 
 use baco::prompt::{
-    sanitize_prompt_override, validate_prompt_override, MAX_PROMPT_OVERRIDE_LENGTH,
+    MAX_PROMPT_OVERRIDE_LENGTH, sanitize_prompt_override, validate_prompt_override,
 };
 
 // ============================================================================
@@ -50,9 +50,11 @@ fn test_validate_sql_drop_table_single_quote() {
     let input = "'; DROP TABLE users; --";
     let result = validate_prompt_override(input);
     assert!(result.is_err());
-    assert!(result
-        .unwrap_err()
-        .contains("Potential SQL injection pattern detected"));
+    assert!(
+        result
+            .unwrap_err()
+            .contains("Potential SQL injection pattern detected")
+    );
 }
 
 #[test]
@@ -127,9 +129,11 @@ fn test_validate_shell_semicolon_rm_rf() {
     let input = "; rm -rf /tmp/test";
     let result = validate_prompt_override(input);
     assert!(result.is_err());
-    assert!(result
-        .unwrap_err()
-        .contains("Potential shell injection pattern detected"));
+    assert!(
+        result
+            .unwrap_err()
+            .contains("Potential shell injection pattern detected")
+    );
 }
 
 #[test]

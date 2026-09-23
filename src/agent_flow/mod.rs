@@ -15,11 +15,11 @@ pub mod executor;
 pub mod proposer;
 pub mod typecheck;
 
-pub use diagnoser::{diagnose, format_diagnostic, Diagnostic, FeedbackSignal};
+pub use diagnoser::{Diagnostic, FeedbackSignal, diagnose, format_diagnostic};
 pub use dsl::{Agent, AgentFlowHarness, Edge, EdgeKind, FeedbackChannel, Node, NodeKind};
-pub use executor::{execute, AgentOutput, ExecutionResult};
+pub use executor::{AgentOutput, ExecutionResult, execute};
 pub use proposer::{
-    apply_rewrite, build_harness_summary, parse_rewrite_proposal, parse_single_edit,
-    propose_rewrite, HarnessEdit, RewriteProposal,
+    HarnessEdit, RewriteProposal, apply_rewrite, build_harness_summary, parse_rewrite_proposal,
+    parse_single_edit, propose_rewrite,
 };
-pub use typecheck::{typecheck, TypeError, TypeResult};
+pub use typecheck::{TypeError, TypeResult, typecheck};

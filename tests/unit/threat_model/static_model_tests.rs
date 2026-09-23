@@ -676,11 +676,13 @@ async fn test_full_flow_with_context_persistence() {
     let loaded = AnalysisContext::load(tmp.path()).unwrap();
     assert!(loaded.threat_model.is_some());
     assert!(loaded.threat_model.as_ref().unwrap().contains("STRIDE"));
-    assert!(loaded
-        .threat_model
-        .as_ref()
-        .unwrap()
-        .contains("SQL injection"));
+    assert!(
+        loaded
+            .threat_model
+            .as_ref()
+            .unwrap()
+            .contains("SQL injection")
+    );
 }
 
 #[tokio::test]
@@ -887,7 +889,7 @@ async fn test_generate_threat_model_with_llm_fallback_architecture_aware() {
 
     // Create an LLM client that will fail
     let config = LlmConfig {
-        base_url: "http://invalid.local:9999".to_string(),
+        base_url: "http://127.0.0.1:1".to_string(),
         api_key: "test".to_string(),
         model: "test".to_string(),
         models: vec![],

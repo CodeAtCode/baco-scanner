@@ -3,7 +3,7 @@
 //! This module generates diffable markdown summaries suitable for CI/PR contexts,
 //! with severity-grouped tables and verification-tier breakdowns.
 
-use crate::evidence::{classify_finding, VerificationTier};
+use crate::evidence::{VerificationTier, classify_finding};
 use crate::findings::{Severity, VulnerabilityFinding};
 use crate::report::presenter;
 use chrono::Utc;

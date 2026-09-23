@@ -375,11 +375,13 @@ fn test_parse_semgrep_aggregated_multiple_locations() {
     assert_eq!(findings[0].file_path, "file1.py");
     assert_eq!(findings[0].line_number, Some(1));
     // Code snippet shows "Found in 3 files:" format
-    assert!(findings[0]
-        .code_snippet
-        .as_ref()
-        .unwrap()
-        .contains("3 files"));
+    assert!(
+        findings[0]
+            .code_snippet
+            .as_ref()
+            .unwrap()
+            .contains("3 files")
+    );
 }
 
 #[test]

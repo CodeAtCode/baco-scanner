@@ -67,7 +67,9 @@ pub async fn run_security_agent_verification(
     ) {
         Some(client) => client,
         None => {
-            tracing::warn!("Security Agent verification skipped: LLM client unavailable (incomplete llm.phases.security_agent_verification config)");
+            tracing::warn!(
+                "Security Agent verification skipped: LLM client unavailable (incomplete llm.phases.security_agent_verification config)"
+            );
             pb.set_position(base + 100);
             return Ok((findings, analyzed_files.to_vec()));
         }
@@ -107,9 +109,7 @@ pub async fn run_security_agent_verification(
                 crate::agent_scaffold::call_graph_paths::CallGraphBuilder::new();
 
             // Build exclusion matcher from config patterns
-            let exclude_matcher = ExcludeMatcher::new(exclude_paths).unwrap_or_else(|_| {
-                ExcludeMatcher::new(&[]).expect("Empty patterns should always work")
-            });
+            let exclude_matcher = ExcludeMatcher::new_or_empty(exclude_paths);
 
             let build_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 // Walk directory and add source files

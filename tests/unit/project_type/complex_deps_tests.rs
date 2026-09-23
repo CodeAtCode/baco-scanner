@@ -10,7 +10,7 @@
 //! - Platform-specific dependencies
 //! - Feature flag combinations
 
-use baco::project_type::{detect_from_cargo_toml, detect_from_package_json, ProjectType};
+use baco::project_type::{ProjectType, detect_from_cargo_toml, detect_from_package_json};
 use std::fs;
 use std::io::Write;
 

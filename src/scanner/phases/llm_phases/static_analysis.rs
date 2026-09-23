@@ -4,8 +4,8 @@ use crate::context::callee_walker::extract_call_sites;
 use crate::context::pacvd_extractor::{self, AbstractionLevel};
 use crate::context::semantic_path;
 use crate::context::triple_path::TriplePathContext;
-use crate::scanner::phases::llm_phases::helpers::detect_language;
 use crate::scanner::phases::PhaseConfig;
+use crate::scanner::phases::llm_phases::helpers::detect_language;
 
 use crate::error::ScanResult;
 use crate::findings::VulnerabilityFinding;
@@ -594,7 +594,9 @@ Files to analyze:
         );
 
         let messages = vec![
-            crate::llm::ChatMessage::system("You are a security triage assistant. Be conservative - only flag files with clear security relevance."),
+            crate::llm::ChatMessage::system(
+                "You are a security triage assistant. Be conservative - only flag files with clear security relevance.",
+            ),
             crate::llm::ChatMessage::user(&prompt),
         ];
 

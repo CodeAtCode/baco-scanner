@@ -1,6 +1,6 @@
 //! Tests for LLM client infrastructure: cache, rate limiting, and retry policy
 
-use baco::llm::{chat_endpoint, ChatMessage, LlmClient, LlmConfig};
+use baco::llm::{ChatMessage, LlmClient, LlmConfig, chat_endpoint};
 
 use baco::llm::metrics::LlmMetricsTracker;
 use baco::rate_limiter::RateLimiter;

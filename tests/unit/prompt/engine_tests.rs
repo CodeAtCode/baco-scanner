@@ -12,10 +12,12 @@ use std::collections::HashMap;
 #[test]
 fn test_engine_creation() {
     let engine = PromptEngine::new();
-    assert!(engine
-        .defaults
-        .indexing
-        .contains("Analyze the project structure"));
+    assert!(
+        engine
+            .defaults
+            .indexing
+            .contains("Analyze the project structure")
+    );
 }
 
 #[test]

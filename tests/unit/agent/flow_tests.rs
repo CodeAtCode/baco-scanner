@@ -6,10 +6,10 @@
 //! - proposer.rs: pure helper functions (build_harness_summary, parse_rewrite_proposal, parse_single_edit, apply_rewrite)
 //! - dsl.rs: AgentFlowHarness construction via builders
 
-use baco::agent_flow::diagnoser::{diagnose, format_diagnostic, Diagnostic, FeedbackSignal};
+use baco::agent_flow::diagnoser::{Diagnostic, FeedbackSignal, diagnose, format_diagnostic};
 use baco::agent_flow::dsl::{Agent, AgentFlowHarness, EdgeKind, FeedbackChannel, NodeKind};
-use baco::agent_flow::proposer::{apply_rewrite, HarnessEdit, RewriteProposal};
-use baco::agent_flow::typecheck::{typecheck, TypeError};
+use baco::agent_flow::proposer::{HarnessEdit, RewriteProposal, apply_rewrite};
+use baco::agent_flow::typecheck::{TypeError, typecheck};
 use std::collections::BTreeSet;
 
 // ============================================================================
@@ -736,7 +736,7 @@ fn test_topological_sort_empty_harness_inline_migrated() {
 
 #[test]
 fn test_resolve_template_inline_migrated() {
-    use baco::agent_flow::executor::{resolve_template, AgentOutput};
+    use baco::agent_flow::executor::{AgentOutput, resolve_template};
     use std::collections::BTreeMap;
 
     let mut outputs = BTreeMap::new();
@@ -754,7 +754,7 @@ fn test_resolve_template_inline_migrated() {
 
 #[test]
 fn test_resolve_template_multiple_vars_inline_migrated() {
-    use baco::agent_flow::executor::{resolve_template, AgentOutput};
+    use baco::agent_flow::executor::{AgentOutput, resolve_template};
     use std::collections::BTreeMap;
 
     let mut outputs = BTreeMap::new();
@@ -839,7 +839,7 @@ fn test_execution_result_fails_on_one_failure_inline_migrated() {
 #[test]
 fn test_apply_add_agent_inline_migrated() {
     use baco::agent_flow::dsl::{Agent, AgentFlowHarness, EdgeKind};
-    use baco::agent_flow::proposer::{apply_rewrite, HarnessEdit, RewriteProposal};
+    use baco::agent_flow::proposer::{HarnessEdit, RewriteProposal, apply_rewrite};
     use std::collections::BTreeSet;
 
     let mut h = AgentFlowHarness::new();
@@ -871,7 +871,7 @@ fn test_apply_add_agent_inline_migrated() {
 #[test]
 fn test_apply_remove_agent_inline_migrated() {
     use baco::agent_flow::dsl::{Agent, AgentFlowHarness, EdgeKind};
-    use baco::agent_flow::proposer::{apply_rewrite, HarnessEdit, RewriteProposal};
+    use baco::agent_flow::proposer::{HarnessEdit, RewriteProposal, apply_rewrite};
     use std::collections::BTreeSet;
 
     let mut h = AgentFlowHarness::new();
@@ -903,7 +903,7 @@ fn test_apply_remove_agent_inline_migrated() {
 #[test]
 fn test_apply_update_prompt_inline_migrated() {
     use baco::agent_flow::dsl::{Agent, AgentFlowHarness, EdgeKind};
-    use baco::agent_flow::proposer::{apply_rewrite, HarnessEdit, RewriteProposal};
+    use baco::agent_flow::proposer::{HarnessEdit, RewriteProposal, apply_rewrite};
     use std::collections::BTreeSet;
 
     let mut h = AgentFlowHarness::new();
@@ -941,7 +941,7 @@ fn test_apply_update_prompt_inline_migrated() {
 #[test]
 fn test_apply_add_edge_inline_migrated() {
     use baco::agent_flow::dsl::{Agent, AgentFlowHarness, EdgeKind};
-    use baco::agent_flow::proposer::{apply_rewrite, HarnessEdit, RewriteProposal};
+    use baco::agent_flow::proposer::{HarnessEdit, RewriteProposal, apply_rewrite};
     use std::collections::BTreeSet;
 
     let mut h = AgentFlowHarness::new();
@@ -1198,7 +1198,7 @@ fn test_diagnose_fail_triggers_rewrite_inline_migrated() {
 
 #[test]
 fn test_diagnose_channels_referenced_no_result_inline_migrated() {
-    use baco::agent_flow::diagnoser::{diagnose, FeedbackSignal};
+    use baco::agent_flow::diagnoser::{FeedbackSignal, diagnose};
     use baco::agent_flow::dsl::FeedbackChannel;
     use baco::agent_flow::executor::AgentOutput;
     use baco::agent_flow::executor::ExecutionResult;
@@ -1227,7 +1227,7 @@ fn test_diagnose_channels_referenced_no_result_inline_migrated() {
 
 #[test]
 fn test_format_diagnostic_inline_migrated() {
-    use baco::agent_flow::diagnoser::{format_diagnostic, Diagnostic, FeedbackSignal};
+    use baco::agent_flow::diagnoser::{Diagnostic, FeedbackSignal, format_diagnostic};
 
     let diag = Diagnostic {
         signals: vec![FeedbackSignal::Pass, FeedbackSignal::BranchHit(5)],

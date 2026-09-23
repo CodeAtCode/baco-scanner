@@ -1,6 +1,6 @@
 //! Tests for doctor.rs - pre-flight health check suite.
 
-use baco::doctor::{check_output_dir_writable, CheckResult, CheckStatus, DoctorResults};
+use baco::doctor::{CheckResult, CheckStatus, DoctorResults, check_output_dir_writable};
 use tempfile::TempDir;
 
 #[test]
@@ -357,4 +357,107 @@ fn test_check_result_structure() {
     assert_eq!(result.name, "test_check");
     assert_eq!(result.status, CheckStatus::Ok);
     assert_eq!(result.detail, "Everything looks good");
+}
+#[tokio::test]
+async fn test_llm_reachability_mock_server_ok() {
+    let mut server = mockito::Server::new_async().await;
+    let _mock = server
+        .mock("GET", mockito::Matcher::Any)
+        .with_status(200)
+        .create();
+
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join("baco.toml");
+    let config_content = format!("[llm]\nbase_url = \"{}\"\n", server.url());
+    std::fs::write(&config_path, config_content).unwrap();
+
+    let results = baco::doctor::run_doctor_checks(Some(config_path.as_path()), None);
+    let check = results
+        .checks
+        .iter()
+        .find(|c| c.name == "llm_reachability")
+        .expect("llm_reachability check must run");
+    assert_eq!(check.status, baco::doctor::CheckStatus::Ok);
+}
+
+#[tokio::test]
+async fn test_llm_reachability_refused_warns() {
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join("baco.toml");
+    let config_content = "[llm]\nbase_url = \"http://127.0.0.1:1\"\n";
+    std::fs::write(&config_path, config_content).unwrap();
+
+    let results = baco::doctor::run_doctor_checks(Some(config_path.as_path()), None);
+    let check = results
+        .checks
+        .iter()
+        .find(|c| c.name == "llm_reachability")
+        .expect("llm_reachability check must run");
+    assert_eq!(check.status, baco::doctor::CheckStatus::Warn);
+}
+#[test]
+fn preset_resolve_unreadable_path_warns() {
+    let temp_dir = TempDir::new().unwrap();
+    let results = baco::doctor::run_doctor_checks(Some(temp_dir.path()), None);
+    let check = results
+        .checks
+        .iter()
+        .find(|c| c.name == "preset_resolve")
+        .expect("preset_resolve check must run");
+    assert_eq!(check.status, baco::doctor::CheckStatus::Warn);
+}
+
+#[test]
+fn preset_resolve_unknown_preset_fails() {
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join("baco.toml");
+    std::fs::write(
+        &config_path,
+        "[scanner]\nprofile = \"core\"\npreset = \"nonexistent-preset-xyz-123\"\n",
+    )
+    .unwrap();
+    let results = baco::doctor::run_doctor_checks(Some(config_path.as_path()), None);
+    let check = results
+        .checks
+        .iter()
+        .find(|c| c.name == "preset_resolve")
+        .expect("preset_resolve check must run");
+    assert_eq!(check.status, baco::doctor::CheckStatus::Fail);
+    assert!(check.detail.contains("nonexistent-preset-xyz-123"));
+}
+#[test]
+fn doctor_checks_without_config_path_skip_ok() {
+    let results = baco::doctor::run_doctor_checks(None, None);
+    assert!(!results.checks.is_empty());
+    for check in &results.checks {
+        if check.name == "preset_resolve"
+            || check.name == "llm_phases"
+            || check.name == "llm_reachability"
+        {
+            assert_eq!(
+                check.status,
+                baco::doctor::CheckStatus::Ok,
+                "check {} should skip-Ok without config",
+                check.name
+            );
+        }
+    }
+    // config_parse instead does CWD discovery (baco.toml/config.toml) and
+    // fails when nothing is found.
+    let config_check = results
+        .checks
+        .iter()
+        .find(|c| c.name == "config_parse")
+        .expect("config_parse check must run");
+    assert_eq!(config_check.status, baco::doctor::CheckStatus::Fail);
+}
+
+#[test]
+fn doctor_checks_missing_config_file_skip_ok() {
+    let missing = std::path::PathBuf::from("/nonexistent-baco-probe-xyz.toml");
+    let results = baco::doctor::run_doctor_checks(Some(missing.as_path()), None);
+    let names: Vec<&str> = results.checks.iter().map(|c| c.name.as_str()).collect();
+    assert!(names.contains(&"config_parse"));
+    assert!(names.contains(&"preset_resolve"));
+    assert!(names.contains(&"llm_phases"));
 }

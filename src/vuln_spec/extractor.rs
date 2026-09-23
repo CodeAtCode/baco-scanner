@@ -28,7 +28,6 @@ fn parse_patch_hunks(patch: &str) -> Vec<PatchHunk> {
     let mut hunks = Vec::new();
     let mut current_hunk = PatchHunk {
         content: String::new(),
-        line_range: (0, 0),
     };
 
     for line in patch.lines() {
@@ -36,10 +35,6 @@ fn parse_patch_hunks(patch: &str) -> Vec<PatchHunk> {
             // Save previous hunk if exists
             if !current_hunk.content.is_empty() {
                 hunks.push(current_hunk.clone());
-            }
-            // Parse line range
-            if let Some(range) = parse_hunk_header(line) {
-                current_hunk.line_range = range;
             }
             current_hunk.content.clear();
         } else {
@@ -56,25 +51,9 @@ fn parse_patch_hunks(patch: &str) -> Vec<PatchHunk> {
     hunks
 }
 
-fn parse_hunk_header(header: &str) -> Option<(u32, u32)> {
-    let re = Regex::new(r"@@ -\d+,\d+ \+(\d+),(\d+)").unwrap();
-    if let Some(caps) = re.captures(header) {
-        if let (Ok(start), Ok(len)) = (
-            caps.get(1)?.as_str().parse::<u32>(),
-            caps.get(2)?.as_str().parse::<u32>(),
-        ) {
-            return Some((start, len));
-        }
-    }
-    None
-}
-
 #[derive(Clone)]
 struct PatchHunk {
-    #[allow(dead_code)]
     content: String,
-    #[allow(dead_code)]
-    line_range: (u32, u32),
 }
 
 /// Extract a single specification from a patch hunk

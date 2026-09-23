@@ -1,11 +1,11 @@
 //! Tests for git_analysis patterns module
 
 use baco::git_analysis::{
+    RiskyPatternType, VulnerabilityPatternType,
     patterns::{
         analyze_commit_message, calculate_pattern_confidence, compile_risky_patterns,
         compile_vulnerability_patterns, get_security_keywords,
     },
-    RiskyPatternType, VulnerabilityPatternType,
 };
 
 #[test]

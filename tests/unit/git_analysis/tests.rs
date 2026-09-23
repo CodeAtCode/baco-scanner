@@ -944,9 +944,11 @@ mod git_analysis_tests {
             .find(|(_, _, desc)| desc.contains("Path traversal"))
             .unwrap();
 
-        assert!(traversal_pattern
-            .0
-            .is_match("Fix path traversal vulnerability"));
+        assert!(
+            traversal_pattern
+                .0
+                .is_match("Fix path traversal vulnerability")
+        );
         assert!(traversal_pattern.0.is_match("Directory traversal fix"));
     }
 
@@ -958,9 +960,11 @@ mod git_analysis_tests {
             .find(|(_, _, desc)| desc.contains("Security deprecation"))
             .unwrap();
 
-        assert!(deprecation_pattern
-            .0
-            .is_match("Deprecate old security method"));
+        assert!(
+            deprecation_pattern
+                .0
+                .is_match("Deprecate old security method")
+        );
         assert!(deprecation_pattern.0.is_match("Obsolete crypto algorithm"));
     }
 

@@ -1,6 +1,6 @@
 //! Unit tests for src/context/control_path.rs - ControlPath extraction
 
-use baco::context::control_path::{extract, ContextError, Language};
+use baco::context::control_path::{ContextError, Language, extract};
 
 // ============================================================================
 // Language tests
@@ -446,8 +446,8 @@ fn test_context_error_display_tree_sitter_error() {
 
 #[test]
 fn test_extract_c_function_with_branch_inline_migrated() {
-    use baco::context::control_path::extract;
     use baco::context::Language;
+    use baco::context::control_path::extract;
 
     let source = r#"
 void process(int x) {
@@ -479,8 +479,8 @@ void process(int x) {
 
 #[test]
 fn test_extract_python_with_assignment_inline_migrated() {
-    use baco::context::control_path::extract;
     use baco::context::Language;
+    use baco::context::control_path::extract;
 
     let source = r#"
 def calculate(x):
@@ -504,8 +504,8 @@ def calculate(x):
 
 #[test]
 fn test_malformed_source_returns_error_inline_migrated() {
-    use baco::context::control_path::extract;
     use baco::context::Language;
+    use baco::context::control_path::extract;
 
     // Tree-sitter is lenient, so malformed source may still parse
     // This test verifies we don't panic on edge cases
@@ -525,8 +525,8 @@ void broken( {
 
 #[test]
 fn test_empty_source_inline_migrated() {
-    use baco::context::control_path::extract;
     use baco::context::Language;
+    use baco::context::control_path::extract;
 
     let source = "";
     let control = extract(source, Language::C).expect("Empty source should parse");

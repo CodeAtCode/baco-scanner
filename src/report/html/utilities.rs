@@ -127,7 +127,6 @@ pub fn build_empty_state_message() -> String {
     r#"<div class="empty-state" style="text-align: center; padding: 60px 20px; background: #f8f9fa; border-radius: 8px; margin: 30px 0;"><h3 style="color: #6c757d; margin-bottom: 10px;">✅ No Security Issues Found</h3><p style="color: #495057;">The scan completed successfully with no vulnerabilities detected.</p></div>"#.to_string()
 }
 
-#[allow(dead_code)]
 /// Build recommendation section HTML
 pub fn build_recommendation_section(rec: &str) -> String {
     format!(

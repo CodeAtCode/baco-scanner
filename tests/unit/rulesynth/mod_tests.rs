@@ -11,7 +11,7 @@
 //! - Prompt template tests
 
 use baco::config::RuleSynthConfig;
-use baco::rulesynth::{extract_rule_id, prompt, SemgrepRule};
+use baco::rulesynth::{SemgrepRule, extract_rule_id, prompt};
 use std::path::PathBuf;
 
 // ============================================================================

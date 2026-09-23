@@ -1,7 +1,7 @@
 //! Unit tests for src/context/triple_path.rs - TriplePathContext
 
-use baco::context::triple_path::TriplePathContext;
 use baco::context::Language;
+use baco::context::triple_path::TriplePathContext;
 use baco::retrieval::CweKnowledgeBase;
 
 // ============================================================================

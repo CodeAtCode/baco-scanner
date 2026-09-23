@@ -12,14 +12,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::watch;
 
-// Type alias for phase result to reduce complexity
-#[allow(dead_code)]
-type PhaseResult = crate::error::ScanResult<(
-    Vec<VulnerabilityFinding>,
-    Vec<String>,
-    Vec<crate::scanner::phases::llm_phases::RejectedFinding>,
-)>;
-
 pub struct ScannerState {
     pub findings: Vec<VulnerabilityFinding>,
     pub current_phase: ScanPhase,
@@ -38,8 +30,6 @@ pub struct Scanner {
     pub checkpoint_path: PathBuf,
     pub force: bool,
     pub metrics_tracker: LlmMetricsTracker,
-    #[allow(dead_code)]
-    cve_entries: Vec<CveEntry>,
     pub project_stack: Option<ProjectStack>,
 }
 
@@ -60,7 +50,6 @@ impl Scanner {
 
     /// Check for early termination based on finding threshold.
     /// Returns Ok(true) if termination triggered, Ok(false) otherwise.
-    #[allow(dead_code)]
     pub async fn check_early_termination(
         &self,
         findings: &[VulnerabilityFinding],
@@ -136,7 +125,6 @@ impl Scanner {
             checkpoint_path,
             force,
             metrics_tracker: LlmMetricsTracker::new(),
-            cve_entries: Vec::new(),
             project_stack: None,
         }
     }

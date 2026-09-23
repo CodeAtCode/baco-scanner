@@ -6,10 +6,11 @@ use baco::config;
 use baco::findings::{Severity, VerificationStatus, VulnerabilityFinding};
 use baco::llm::metrics::LlmMetricsTracker;
 
-use baco::scanner::phases::{run_phase, PhaseConfig};
 use baco::scanner::Scanner;
+use baco::scanner::phases::{PhaseConfig, run_phase};
 use indicatif::ProgressBar;
 use std::path::PathBuf;
+use tempfile::TempDir;
 
 use crate::fixtures::{create_test_config, make_aggregation_finding};
 
@@ -1429,6 +1430,67 @@ async fn test_indexing_phase_with_temp_files() {
     tmp_dir.close().unwrap();
 }
 
+// ============================================================================
+// Security Agent Verification Phase Tests - None Branch
+// ============================================================================
+
+#[tokio::test]
+async fn test_security_agent_verification_llm_client_unavailable() {
+    // Test the None branch of create_llm_client_with_metrics
+    // Triggered when: agent.enabled == true AND api_key is Some() BUT
+    // create_llm_client_with_metrics returns None (incomplete LLM config - no base_url)
+    let scanner = create_test_scanner();
+    let mut config = create_test_config();
+
+    // Enable agent and set API key
+    config.agent.enabled = true;
+    config.llm.phases.security_agent_verification.api_key = Some("test-key".to_string());
+
+    // Leave base_url empty in both global and phase config to trigger phase_llm_config error
+    // This causes create_llm_client_with_metrics to return None
+    config.llm.base_url = String::new();
+    config.llm.phases.security_agent_verification.base_url = String::new();
+
+    let pb = ProgressBar::hidden();
+    let metrics_tracker = LlmMetricsTracker::new();
+    let analyzed_files: Vec<String> = vec![];
+    let target_path = PathBuf::from(".");
+    let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
+
+    let mut finding = create_test_finding("agent-llm-unavailable", Severity::High);
+    finding.title = "Test SQL Injection".to_string();
+    let findings = vec![finding];
+
+    let phase_config = PhaseConfig {
+        phase: &ScanPhase::SecurityAgentVerification,
+        findings: findings.clone(),
+        pb: &pb,
+        analyzed_files: &analyzed_files,
+        metrics_tracker: &metrics_tracker,
+        target_path: &target_path,
+        config: &config,
+        project_stack: &project_stack,
+    };
+
+    let result = run_phase(&scanner, phase_config).await;
+    assert!(
+        result.is_ok(),
+        "Phase should complete successfully even when LLM client is unavailable"
+    );
+
+    let (updated, _, _) = result.unwrap();
+
+    // The None branch returns findings unchanged
+    assert_eq!(
+        updated.len(),
+        findings.len(),
+        "Findings should be returned unchanged when LLM client is unavailable"
+    );
+
+    // Verify the finding is unchanged
+    assert_eq!(updated[0].id, findings[0].id);
+}
+
 // ConfidenceScoring with actual findings
 #[tokio::test]
 async fn test_confidence_scoring_with_findings() {
@@ -1604,4 +1666,541 @@ async fn test_unknown_phase_handling() {
 
     let result = run_phase(&scanner, phase_config).await;
     assert!(result.is_ok());
+}
+#[tokio::test]
+async fn test_llm_verification_batch_path_with_mockito() {
+    let mut server = mockito::Server::new_async().await;
+    let _mock = server
+        .mock("POST", "/v1/chat/completions")
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(
+            r#"{"choices": [{"message": {"content": "[{\"index\": 0, \"verification_status\": \"confirmed\", \"verification_notes\": \"yes\"}, {\"index\": 1, \"verification_status\": \"false_positive\", \"verification_notes\": \"no\"}]"}}]}"#,
+        )
+        .create();
+
+    let mut config = create_test_config();
+    config.llm.phases.verification.base_url = server.url();
+    config.llm.phases.verification.api_key = Some("k".to_string());
+    config.llm.phases.verification.models = vec!["mock-model".to_string()];
+    config.agent.enabled = false;
+
+    let scanner = Scanner::new(config.clone(), PathBuf::from("."), false);
+    let pb = ProgressBar::hidden();
+    let metrics_tracker = LlmMetricsTracker::new();
+    let analyzed_files: Vec<String> = vec![];
+    let target_path = PathBuf::from(".");
+    let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
+    let findings = vec![create_test_finding("test-1", Severity::High), {
+        let mut second = create_test_finding("test-2", Severity::High);
+        second.title = "Other Vulnerability".to_string();
+        second.file_path = "other.py".to_string();
+        second.line_number = Some(7);
+        second
+    }];
+    let phase = ScanPhase::LlmVerification;
+    let phase_config = PhaseConfig {
+        phase: &phase,
+        findings: findings.clone(),
+        pb: &pb,
+        analyzed_files: &analyzed_files,
+        metrics_tracker: &metrics_tracker,
+        target_path: &target_path,
+        config: &config,
+        project_stack: &project_stack,
+    };
+    let result = run_phase(&scanner, phase_config).await;
+    assert!(result.is_ok());
+    let (updated, _, rejected) = result.unwrap();
+    assert_eq!(updated.len(), 1);
+    assert_eq!(
+        updated[0].verification_status,
+        Some(VerificationStatus::Confirmed)
+    );
+    assert_eq!(rejected.len(), 1);
+    assert_eq!(rejected[0].0.id, "test-2");
+    assert_eq!(rejected[0].1, "no");
+}
+#[tokio::test]
+async fn test_llm_static_analysis_phase_with_mockito() {
+    let mut server = mockito::Server::new_async().await;
+    let _mock = server
+        .mock("POST", "/v1/chat/completions")
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(
+            r#"{"choices": [{"message": {"content": "[{\"severity\": \"high\", \"title\": \"Buffer Overflow\", \"description\": \"Potential buffer overflow\", \"line\": 2, \"cwe_id\": \"CWE-120\"}]"}}]}"#,
+        )
+        .create();
+
+    let temp = TempDir::new().unwrap();
+    std::fs::write(
+        temp.path().join("vuln.rs"),
+        "fn vuln() {\n    let x = 1;\n}\n",
+    )
+    .unwrap();
+
+    let mut config = create_test_config();
+    config.llm.phases.static_analysis.base_url = server.url();
+    config.llm.phases.static_analysis.api_key = Some("k".to_string());
+    config.llm.phases.static_analysis.models = vec!["mock-model".to_string()];
+    config.project.languages = vec!["rust".to_string()];
+    config.triage.enabled = false;
+    config.priority.enabled = false;
+    config.vuln_spec.enabled = false;
+    config.scanner.performance.enable_file_filtering = false;
+    config.output.dir = temp.path().to_string_lossy().to_string();
+
+    let scanner = Scanner::new(config.clone(), temp.path().to_path_buf(), false);
+    let pb = ProgressBar::hidden();
+    let metrics_tracker = LlmMetricsTracker::new();
+    let analyzed_files: Vec<String> = vec![];
+    let target_path = temp.path().to_path_buf();
+    let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
+    let phase = ScanPhase::LlmStaticAnalysis;
+    let phase_config = PhaseConfig {
+        phase: &phase,
+        findings: vec![],
+        pb: &pb,
+        analyzed_files: &analyzed_files,
+        metrics_tracker: &metrics_tracker,
+        target_path: &target_path,
+        config: &config,
+        project_stack: &project_stack,
+    };
+    let result = run_phase(&scanner, phase_config).await;
+    assert!(result.is_ok());
+    let (updated, _, _) = result.unwrap();
+    assert!(
+        !updated.is_empty(),
+        "static analysis should report the mocked finding"
+    );
+}
+#[tokio::test]
+async fn test_llm_discovery_enrichment_with_mockito() {
+    let mut server = mockito::Server::new_async().await;
+    let _mock = server
+        .mock("POST", "/v1/chat/completions")
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(
+            r#"{"choices": [{"message": {"content": "{\"description\": \"enriched desc\", \"fix_code\": \"patched()\"}"}}]}"#,
+        )
+        .create();
+
+    let temp = TempDir::new().unwrap();
+    let mut config = create_test_config();
+    config.llm.phases.discovery.base_url = server.url();
+    config.llm.phases.discovery.api_key = Some("k".to_string());
+    config.llm.phases.discovery.models = vec!["mock-model".to_string()];
+    config.agent.enabled = false;
+    config.prior_runs.enabled = false;
+    config.scanner.performance.enable_hunt_prompts = false;
+    config.output.dir = temp.path().to_string_lossy().to_string();
+
+    let scanner = Scanner::new(config.clone(), temp.path().to_path_buf(), false);
+    let pb = ProgressBar::hidden();
+    let metrics_tracker = LlmMetricsTracker::new();
+    let analyzed_files: Vec<String> = vec![];
+    let target_path = temp.path().to_path_buf();
+    let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
+    let mut finding = create_test_finding("test-1", Severity::High);
+    finding.evidence = Vec::new();
+    let phase = ScanPhase::LlmDiscovery;
+    let phase_config = PhaseConfig {
+        phase: &phase,
+        findings: vec![finding],
+        pb: &pb,
+        analyzed_files: &analyzed_files,
+        metrics_tracker: &metrics_tracker,
+        target_path: &target_path,
+        config: &config,
+        project_stack: &project_stack,
+    };
+    let result = run_phase(&scanner, phase_config).await;
+    assert!(result.is_ok());
+    let (updated, _, _) = result.unwrap();
+    assert_eq!(updated.len(), 1);
+    assert_eq!(updated[0].description, "enriched desc");
+    assert_eq!(updated[0].diff_hunk.as_deref(), Some("patched()"));
+}
+#[tokio::test]
+async fn test_llm_static_analysis_triage_cascade_with_mockito() {
+    let temp = TempDir::new().unwrap();
+    let vuln_path = temp.path().join("vuln.rs").to_string_lossy().to_string();
+    let safe_path = temp.path().join("safe.rs").to_string_lossy().to_string();
+    std::fs::write(
+        temp.path().join("vuln.rs"),
+        "fn vuln() {\n    let x = 1;\n}\n",
+    )
+    .unwrap();
+    std::fs::write(
+        temp.path().join("safe.rs"),
+        "fn safe() {\n    let y = 2;\n}\n",
+    )
+    .unwrap();
+
+    let mut server = mockito::Server::new_async().await;
+
+    let findings_inner = format!(
+        "{{\"findings\": [{{\"file\": \"{}\", \"summary_one_line\": \"vuln\", \"suspicion\": 0.8, \"reason\": \"test\"}}, {{\"file\": \"{}\", \"summary_one_line\": \"safe\", \"suspicion\": 0.1, \"reason\": \"test\"}}]}}",
+        vuln_path.replace('"', "\\\""),
+        safe_path.replace('"', "\\\"")
+    );
+    let triage_body = format!(
+        "{{\"choices\": [{{\"message\": {{\"content\": \"{}\"}}}}]}}",
+        findings_inner.replace('"', "\\\"")
+    );
+    let _triage_mock = server
+        .mock("POST", "/v1/chat/completions")
+        .match_body(mockito::Matcher::Regex("security triage".to_string()))
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(triage_body)
+        .create();
+
+    let analysis_body = r#"{"choices": [{"message": {"content": "[{\"severity\": \"high\", \"title\": \"Buffer Overflow\", \"description\": \"Potential buffer overflow\", \"line\": 2, \"cwe_id\": \"CWE-120\"}]"}}]}"#;
+    let _analysis_mock = server
+        .mock("POST", "/v1/chat/completions")
+        .match_body(mockito::Matcher::Regex("security expert".to_string()))
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(analysis_body)
+        .create();
+
+    let mut config = create_test_config();
+    config.llm.phases.static_analysis.base_url = server.url();
+    config.llm.phases.static_analysis.api_key = Some("k".to_string());
+    config.llm.phases.static_analysis.models = vec!["mock-model".to_string()];
+    config.project.languages = vec!["rust".to_string()];
+    config.triage.enabled = true;
+    config.triage.suspicion_threshold = 0.5;
+    config.priority.enabled = false;
+    config.vuln_spec.enabled = false;
+    config.scanner.performance.enable_file_filtering = false;
+    config.output.dir = temp.path().to_string_lossy().to_string();
+
+    let scanner = Scanner::new(config.clone(), temp.path().to_path_buf(), false);
+    let pb = ProgressBar::hidden();
+    let metrics_tracker = LlmMetricsTracker::new();
+    let analyzed_files: Vec<String> = vec![];
+    let target_path = temp.path().to_path_buf();
+    let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
+    let phase = ScanPhase::LlmStaticAnalysis;
+    let phase_config = PhaseConfig {
+        phase: &phase,
+        findings: vec![],
+        pb: &pb,
+        analyzed_files: &analyzed_files,
+        metrics_tracker: &metrics_tracker,
+        target_path: &target_path,
+        config: &config,
+        project_stack: &project_stack,
+    };
+    let result = run_phase(&scanner, phase_config).await;
+    assert!(result.is_ok());
+    let (updated, _, _) = result.unwrap();
+    assert!(
+        !updated.is_empty(),
+        "triage should pass vuln.rs to analysis and produce findings"
+    );
+    assert!(
+        updated.iter().all(|f| f.file_path.ends_with("vuln.rs")),
+        "only vuln.rs should be analyzed (safe.rs below threshold)"
+    );
+}
+
+// ============================================================================
+// Phase Mockito Tests (Validate, RuleSynthesis, ExploitSynth)
+// ============================================================================
+
+#[tokio::test]
+async fn test_validate_phase_with_mockito() {
+    let mut server = mockito::Server::new_async().await;
+    let _mock = server
+        .mock("POST", "/v1/chat/completions")
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(
+            r#"{"choices": [{"message": {"content": "{\"is_sound\": true, \"issues\": [], \"confidence_adjustment\": 0.1}"}}]}"#,
+        )
+        .create();
+
+    let mut config = create_test_config();
+    config.validate.enabled = true;
+    config.llm.phases.verification.base_url = server.url();
+    config.llm.phases.verification.api_key = Some("k".to_string());
+    config.llm.phases.verification.models = vec!["mock-model".to_string()];
+
+    let scanner = Scanner::new(config.clone(), PathBuf::from("."), false);
+    let pb = ProgressBar::hidden();
+    let metrics_tracker = LlmMetricsTracker::new();
+    let analyzed_files: Vec<String> = vec![];
+    let target_path = PathBuf::from(".");
+    let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
+    let finding = create_test_finding("test-1", Severity::High);
+    let phase = ScanPhase::Validate;
+    let phase_config = PhaseConfig {
+        phase: &phase,
+        findings: vec![finding],
+        pb: &pb,
+        analyzed_files: &analyzed_files,
+        metrics_tracker: &metrics_tracker,
+        target_path: &target_path,
+        config: &config,
+        project_stack: &project_stack,
+    };
+    let result = run_phase(&scanner, phase_config).await;
+    assert!(result.is_ok());
+    let (updated, _, _) = result.unwrap();
+    assert_eq!(updated.len(), 1);
+    assert!(
+        updated[0].confidence_score > 0.9,
+        "sound verdict should boost confidence above baseline"
+    );
+}
+
+#[tokio::test]
+async fn test_rule_synthesis_phase_with_mockito() {
+    let mut server = mockito::Server::new_async().await;
+    let _mock = server
+        .mock("POST", "/v1/chat/completions")
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(
+            r#"{"choices": [{"message": {"content": "rules:\n  - id: cwe-89-test\n    pattern: execute($X)\n    message: test\n    languages: [python]\n    severity: ERROR"}}]}"#,
+        )
+        .create();
+
+    let temp = TempDir::new().unwrap();
+    let mut config = create_test_config();
+    config.rulesynth.enabled = true;
+    config.rulesynth.mocq_mode = false;
+    config.rulesynth.output_dir = temp.path().to_path_buf();
+    config.llm.phases.discovery.base_url = server.url();
+    config.llm.phases.discovery.api_key = Some("k".to_string());
+    config.llm.phases.discovery.models = vec!["mock-model".to_string()];
+    config.project.languages = vec!["python".to_string()];
+
+    let scanner = Scanner::new(config.clone(), temp.path().to_path_buf(), false);
+    let pb = ProgressBar::hidden();
+    let metrics_tracker = LlmMetricsTracker::new();
+    let analyzed_files: Vec<String> = vec![];
+    let target_path = temp.path().to_path_buf();
+    let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
+    let finding = create_test_finding("test-1", Severity::High);
+    let phase = ScanPhase::RuleSynthesis;
+    let phase_config = PhaseConfig {
+        phase: &phase,
+        findings: vec![finding],
+        pb: &pb,
+        analyzed_files: &analyzed_files,
+        metrics_tracker: &metrics_tracker,
+        target_path: &target_path,
+        config: &config,
+        project_stack: &project_stack,
+    };
+    let result = run_phase(&scanner, phase_config).await;
+    assert!(result.is_ok());
+    let (updated, _, _) = result.unwrap();
+    assert_eq!(updated.len(), 1, "findings returned unchanged");
+}
+
+#[tokio::test]
+async fn test_exploit_synth_phase_sandbox_unavailable() {
+    let server = mockito::Server::new_async().await;
+    let mut config = create_test_config();
+    config.exploit.enabled = true;
+    config.llm.phases.discovery.base_url = server.url();
+    config.llm.phases.discovery.api_key = Some("k".to_string());
+    config.llm.phases.discovery.models = vec!["mock-model".to_string()];
+
+    let scanner = Scanner::new(config.clone(), PathBuf::from("."), false);
+    let pb = ProgressBar::hidden();
+    let metrics_tracker = LlmMetricsTracker::new();
+    let analyzed_files: Vec<String> = vec![];
+    let target_path = PathBuf::from(".");
+    let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
+    let finding = create_test_finding("test-1", Severity::High);
+    let phase = ScanPhase::ExploitSynth;
+    let phase_config = PhaseConfig {
+        phase: &phase,
+        findings: vec![finding],
+        pb: &pb,
+        analyzed_files: &analyzed_files,
+        metrics_tracker: &metrics_tracker,
+        target_path: &target_path,
+        config: &config,
+        project_stack: &project_stack,
+    };
+    let result = run_phase(&scanner, phase_config).await;
+    assert!(result.is_ok());
+    let (updated, _, _) = result.unwrap();
+    assert_eq!(
+        updated.len(),
+        1,
+        "findings returned unchanged when sandbox unavailable"
+    );
+}
+// ============================================================================
+// Security Agent Verification Skip Tests
+// ============================================================================
+
+#[tokio::test]
+async fn test_security_agent_verification_skips_when_agent_disabled() {
+    run_phase_skip_test(ScanPhase::SecurityAgentVerification, |cfg| {
+        cfg.agent.enabled = false;
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn test_security_agent_verification_skips_when_no_api_key() {
+    run_phase_skip_test(ScanPhase::SecurityAgentVerification, |cfg| {
+        cfg.agent.enabled = true;
+        cfg.llm.phases.security_agent_verification.api_key = None;
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn test_llm_static_analysis_skips_when_no_api_key() {
+    run_phase_skip_test(ScanPhase::LlmStaticAnalysis, |cfg| {
+        cfg.llm.phases.static_analysis.api_key = None;
+    })
+    .await;
+}
+
+// ============================================================================
+// PoC Compiler Phase Tests - Enabled Path Coverage
+// ============================================================================
+
+#[tokio::test]
+async fn test_poc_compiler_phase_with_poc_code_unsupported_language() {
+    // Covers run_poc_compiler lines 112-135: enabled path with poc_code set
+    // Uses unsupported language "ruby" to trigger the else branch (Failed + notes)
+    let scanner = create_test_scanner();
+    let mut config = create_test_config();
+    config.scanner.performance.enable_poc_compilation = true;
+
+    let pb = ProgressBar::hidden();
+    let metrics_tracker = LlmMetricsTracker::new();
+    let analyzed_files: Vec<String> = vec![];
+    let target_path = PathBuf::from(".");
+    let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
+
+    // Create a finding with poc_code and unsupported language
+    let mut finding = create_test_finding("poc-test-1", Severity::High);
+    finding.poc_code = Some("puts 'hello'".to_string());
+    finding.poc_format = Some("ruby".to_string());
+    let findings = vec![finding];
+
+    let phase_config = PhaseConfig {
+        phase: &ScanPhase::PocCompiler,
+        findings: findings.clone(),
+        pb: &pb,
+        analyzed_files: &analyzed_files,
+        metrics_tracker: &metrics_tracker,
+        target_path: &target_path,
+        config: &config,
+        project_stack: &project_stack,
+    };
+
+    let result = run_phase(&scanner, phase_config).await;
+    assert!(result.is_ok());
+    let (updated, _, _) = result.unwrap();
+    assert_eq!(updated.len(), findings.len());
+
+    // Verify the finding was updated with Failed status and notes
+    assert_eq!(
+        updated[0].verification_status,
+        Some(VerificationStatus::Failed)
+    );
+    assert!(updated[0].verification_notes.is_some());
+    assert!(
+        updated[0]
+            .verification_notes
+            .as_ref()
+            .unwrap()
+            .contains("PoC compilation failed")
+    );
+}
+
+#[tokio::test]
+async fn test_poc_compiler_phase_without_poc_code() {
+    // Covers run_poc_compiler: finding without poc_code (no-op path)
+    let scanner = create_test_scanner();
+    let mut config = create_test_config();
+    config.scanner.performance.enable_poc_compilation = true;
+
+    let pb = ProgressBar::hidden();
+    let metrics_tracker = LlmMetricsTracker::new();
+    let analyzed_files: Vec<String> = vec![];
+    let target_path = PathBuf::from(".");
+    let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
+
+    // Create a finding without poc_code
+    let findings = vec![create_test_finding("poc-test-2", Severity::High)];
+
+    let phase_config = PhaseConfig {
+        phase: &ScanPhase::PocCompiler,
+        findings: findings.clone(),
+        pb: &pb,
+        analyzed_files: &analyzed_files,
+        metrics_tracker: &metrics_tracker,
+        target_path: &target_path,
+        config: &config,
+        project_stack: &project_stack,
+    };
+
+    let result = run_phase(&scanner, phase_config).await;
+    assert!(result.is_ok());
+    let (updated, _, _) = result.unwrap();
+    assert_eq!(updated.len(), findings.len());
+
+    // Verify the finding was unchanged (no poc_code means no verification)
+    // Note: create_test_finding sets verification_status to Confirmed by default
+    assert_eq!(
+        updated[0].verification_status,
+        Some(VerificationStatus::Confirmed)
+    );
+}
+
+// ============================================================================
+// Variant Search Phase Tests - No-Patterns Branch Coverage
+// ============================================================================
+
+#[tokio::test]
+async fn test_variant_search_phase_no_patterns_configured() {
+    // Covers run_variant_search lines 162-173: enabled but no patterns
+    let scanner = create_test_scanner();
+    let mut config = create_test_config();
+    config.scanner.performance.enable_variant_search = true;
+    // variant_search_patterns is empty by default
+
+    let pb = ProgressBar::hidden();
+    let metrics_tracker = LlmMetricsTracker::new();
+    let analyzed_files: Vec<String> = vec![];
+    let target_path = PathBuf::from(".");
+    let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
+    let findings = vec![create_test_finding("variant-test-1", Severity::High)];
+
+    let phase_config = PhaseConfig {
+        phase: &ScanPhase::VariantSearch,
+        findings: findings.clone(),
+        pb: &pb,
+        analyzed_files: &analyzed_files,
+        metrics_tracker: &metrics_tracker,
+        target_path: &target_path,
+        config: &config,
+        project_stack: &project_stack,
+    };
+
+    let result = run_phase(&scanner, phase_config).await;
+    assert!(result.is_ok());
+    let (updated, _, _) = result.unwrap();
+    assert_eq!(updated.len(), findings.len());
+
+    // Verify finding count unchanged (early return with warning)
+    assert_eq!(updated[0].id, findings[0].id);
 }

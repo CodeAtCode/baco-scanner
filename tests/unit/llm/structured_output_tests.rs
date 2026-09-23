@@ -1,7 +1,7 @@
 //! Tests for structured JSON output (T16) and unified LLM config construction (T26)
 
 use baco::config::{LlmConfig as ConfigLlmConfig, LlmPhaseConfig, LlmPhasesConfig};
-use baco::llm::{self, chat_endpoint, JsonSchema, ResponseFormat};
+use baco::llm::{self, JsonSchema, ResponseFormat, chat_endpoint};
 
 // ============================================================================
 // T16: Structured Output Tests
@@ -75,6 +75,7 @@ fn test_phase_llm_config_uses_phase_base_url() {
     // Phase base_url is used as-is (no global fallback exists)
     let scanner_config = baco::config::ScannerConfig {
         llm: ConfigLlmConfig {
+            base_url: String::new(),
             timeout_secs: 60,
             max_retries: 5,
             retry_backoff_ms: 2000,
@@ -112,6 +113,7 @@ fn test_phase_llm_config_uses_phase_base_url() {
 fn test_phase_llm_config_applies_phase_overrides() {
     let scanner_config = baco::config::ScannerConfig {
         llm: ConfigLlmConfig {
+            base_url: String::new(),
             timeout_secs: 30,
             max_retries: 3,
             retry_backoff_ms: 1000,
@@ -150,6 +152,7 @@ fn test_phase_llm_config_no_hardcoded_temperature() {
     // Verify that temperature is never hardcoded - it always comes from config
     let scanner_config = baco::config::ScannerConfig {
         llm: ConfigLlmConfig {
+            base_url: String::new(),
             timeout_secs: 30,
             max_retries: 3,
             retry_backoff_ms: 1000,
@@ -182,6 +185,7 @@ fn test_phase_llm_config_no_hardcoded_temperature() {
 fn test_phase_llm_config_model_override() {
     let scanner_config = baco::config::ScannerConfig {
         llm: ConfigLlmConfig {
+            base_url: String::new(),
             timeout_secs: 30,
             max_retries: 3,
             retry_backoff_ms: 1000,
@@ -213,6 +217,7 @@ fn test_phase_llm_config_model_override() {
 fn test_phase_llm_config_static_analysis_uses_own_slot() {
     let scanner_config = baco::config::ScannerConfig {
         llm: ConfigLlmConfig {
+            base_url: String::new(),
             timeout_secs: 30,
             max_retries: 3,
             retry_backoff_ms: 1000,
@@ -294,6 +299,7 @@ fn test_phase_llm_config_preserves_full_model_list() {
     // Verify that models vector is NOT replaced with vec![] (the original bug)
     let scanner_config = baco::config::ScannerConfig {
         llm: ConfigLlmConfig {
+            base_url: String::new(),
             timeout_secs: 30,
             max_retries: 3,
             retry_backoff_ms: 1000,
@@ -331,6 +337,7 @@ fn test_phase_llm_config_errors_on_missing_base_url() {
     // Verify error when base_url is empty
     let scanner_config = baco::config::ScannerConfig {
         llm: ConfigLlmConfig {
+            base_url: String::new(),
             timeout_secs: 30,
             max_retries: 3,
             retry_backoff_ms: 1000,
@@ -367,6 +374,7 @@ fn test_phase_llm_config_errors_on_missing_model() {
     // Verify error when both model and models are empty
     let scanner_config = baco::config::ScannerConfig {
         llm: ConfigLlmConfig {
+            base_url: String::new(),
             timeout_secs: 30,
             max_retries: 3,
             retry_backoff_ms: 1000,
@@ -404,6 +412,7 @@ fn test_phase_llm_config_model_override_replaces_models() {
     // Verify model override takes precedence over phase models
     let scanner_config = baco::config::ScannerConfig {
         llm: ConfigLlmConfig {
+            base_url: String::new(),
             timeout_secs: 30,
             max_retries: 3,
             retry_backoff_ms: 1000,

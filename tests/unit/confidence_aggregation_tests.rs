@@ -4,8 +4,8 @@
 
 use baco::analysis_context::AnalysisContext;
 use baco::confidence_refinement::{
-    normalize_confidence, ConfidenceFactor, ConfidenceRefinementPhase, HistoricalData,
-    ProjectBaseline,
+    ConfidenceFactor, ConfidenceRefinementPhase, HistoricalData, ProjectBaseline,
+    normalize_confidence,
 };
 use baco::config::{NormalizationConfig, NormalizationTier};
 use baco::findings::{Severity, TriageVerdict, VerificationStatus, VulnerabilityFinding};
@@ -49,18 +49,22 @@ fn test_confidence_refinement_phase_new() {
     let phase = ConfidenceRefinementPhase::new();
 
     // Just verify it creates successfully
-    assert!(phase
-        .historical_data()
-        .matches_false_positive_pattern("CWE-79", "html_escape"));
+    assert!(
+        phase
+            .historical_data()
+            .matches_false_positive_pattern("CWE-79", "html_escape")
+    );
 }
 
 #[test]
 fn test_confidence_refinement_phase_default() {
     let phase = ConfidenceRefinementPhase::default();
 
-    assert!(phase
-        .historical_data()
-        .matches_false_positive_pattern("CWE-79", "html_escape"));
+    assert!(
+        phase
+            .historical_data()
+            .matches_false_positive_pattern("CWE-79", "html_escape")
+    );
 }
 
 // ============================================================================
@@ -131,9 +135,11 @@ fn test_refinement_with_verified_status_increases_confidence() {
     let refinement = results.get("f1").unwrap();
 
     assert!(refinement.refined_score > refinement.original_score);
-    assert!(refinement
-        .factors
-        .contains(&ConfidenceFactor::VerifiedByLlm));
+    assert!(
+        refinement
+            .factors
+            .contains(&ConfidenceFactor::VerifiedByLlm)
+    );
 }
 
 #[test]
@@ -149,9 +155,11 @@ fn test_refinement_with_false_positive_status_decreases_confidence() {
     let refinement = results.get("f1").unwrap();
 
     assert!(refinement.refined_score < refinement.original_score);
-    assert!(refinement
-        .factors
-        .contains(&ConfidenceFactor::FalsePositiveDetected));
+    assert!(
+        refinement
+            .factors
+            .contains(&ConfidenceFactor::FalsePositiveDetected)
+    );
 }
 
 #[test]
@@ -193,9 +201,11 @@ fn test_refinement_with_cross_file_references_increases_confidence() {
     let refinement = results.get("f1").unwrap();
 
     assert!(refinement.refined_score > refinement.original_score);
-    assert!(refinement
-        .factors
-        .contains(&ConfidenceFactor::CrossFileReachability));
+    assert!(
+        refinement
+            .factors
+            .contains(&ConfidenceFactor::CrossFileReachability)
+    );
 }
 
 #[test]
@@ -209,9 +219,11 @@ fn test_refinement_with_test_file_decreases_confidence() {
     let refinement = results.get("f1").unwrap();
 
     assert!(refinement.refined_score < refinement.original_score);
-    assert!(refinement
-        .factors
-        .contains(&ConfidenceFactor::TestCodeRelated));
+    assert!(
+        refinement
+            .factors
+            .contains(&ConfidenceFactor::TestCodeRelated)
+    );
 }
 
 #[test]
@@ -232,9 +244,11 @@ fn test_refinement_with_vendor_file_decreases_confidence() {
     let refinement = results.get("f1").unwrap();
 
     assert!(refinement.refined_score < refinement.original_score);
-    assert!(refinement
-        .factors
-        .contains(&ConfidenceFactor::ThirdPartyCode));
+    assert!(
+        refinement
+            .factors
+            .contains(&ConfidenceFactor::ThirdPartyCode)
+    );
 }
 
 #[test]
@@ -308,21 +322,23 @@ fn test_historical_data_never_submit_patterns() {
     let data = HistoricalData::new();
 
     // Should match never-submit patterns
-    assert!(data
-        .check_never_submit_pattern(
+    assert!(
+        data.check_never_submit_pattern(
             "Missing security header",
             "Content Security Policy not set",
             Some(&"CWE-693".to_string())
         )
-        .is_some());
+        .is_some()
+    );
 
-    assert!(data
-        .check_never_submit_pattern(
+    assert!(
+        data.check_never_submit_pattern(
             "Open redirect",
             "Potential open redirect vulnerability",
             Some(&"CWE-601".to_string())
         )
-        .is_some());
+        .is_some()
+    );
 }
 
 #[test]
@@ -601,9 +617,11 @@ fn test_refinement_with_triage_true_positive() {
     let refinement = results.get("f1").unwrap();
 
     assert!(refinement.refined_score > refinement.original_score);
-    assert!(refinement
-        .factors
-        .contains(&ConfidenceFactor::TriageTruePositive));
+    assert!(
+        refinement
+            .factors
+            .contains(&ConfidenceFactor::TriageTruePositive)
+    );
 }
 
 #[test]
@@ -618,9 +636,11 @@ fn test_refinement_with_triage_false_positive() {
     let refinement = results.get("f1").unwrap();
 
     assert!(refinement.refined_score < refinement.original_score);
-    assert!(refinement
-        .factors
-        .contains(&ConfidenceFactor::TriageFalsePositive));
+    assert!(
+        refinement
+            .factors
+            .contains(&ConfidenceFactor::TriageFalsePositive)
+    );
 }
 
 #[test]
@@ -636,9 +656,11 @@ fn test_refinement_with_rationale_validated() {
     let refinement = results.get("f1").unwrap();
 
     assert!(refinement.refined_score > refinement.original_score);
-    assert!(refinement
-        .factors
-        .contains(&ConfidenceFactor::RationaleValidated));
+    assert!(
+        refinement
+            .factors
+            .contains(&ConfidenceFactor::RationaleValidated)
+    );
 }
 
 #[test]
@@ -755,10 +777,12 @@ fn test_never_submit_pattern_enabled_with_default_multiplier() {
 
     // Confidence should be reduced to 10% of original (0.8 * 0.1 = 0.08)
     assert!((refinement.refined_score - 0.08).abs() < 0.01);
-    assert!(refinement
-        .factors
-        .iter()
-        .any(|f| matches!(f, ConfidenceFactor::NeverSubmitMatch { .. })));
+    assert!(
+        refinement
+            .factors
+            .iter()
+            .any(|f| matches!(f, ConfidenceFactor::NeverSubmitMatch { .. }))
+    );
 }
 
 #[test]
@@ -785,10 +809,12 @@ fn test_never_submit_pattern_disabled_no_penalty() {
     // Confidence should remain unchanged (no never-submit penalty applied)
     // and no other factors should apply
     assert_eq!(refinement.refined_score, refinement.original_score);
-    assert!(!refinement
-        .factors
-        .iter()
-        .any(|f| matches!(f, ConfidenceFactor::NeverSubmitMatch { .. })));
+    assert!(
+        !refinement
+            .factors
+            .iter()
+            .any(|f| matches!(f, ConfidenceFactor::NeverSubmitMatch { .. }))
+    );
 }
 
 #[test]
@@ -814,10 +840,12 @@ fn test_never_submit_pattern_custom_multiplier() {
 
     // Confidence should be reduced to 50% of original (0.8 * 0.5 = 0.4)
     assert!((refinement.refined_score - 0.4).abs() < 0.01);
-    assert!(refinement
-        .factors
-        .iter()
-        .any(|f| matches!(f, ConfidenceFactor::NeverSubmitMatch { .. })));
+    assert!(
+        refinement
+            .factors
+            .iter()
+            .any(|f| matches!(f, ConfidenceFactor::NeverSubmitMatch { .. }))
+    );
 }
 
 #[test]
@@ -863,8 +891,10 @@ fn test_never_submit_pattern_no_match_unchanged() {
 
     // Confidence should not be affected by never-submit filter
     // (may still be affected by other factors, but not never-submit)
-    assert!(!refinement
-        .factors
-        .iter()
-        .any(|f| matches!(f, ConfidenceFactor::NeverSubmitMatch { .. })));
+    assert!(
+        !refinement
+            .factors
+            .iter()
+            .any(|f| matches!(f, ConfidenceFactor::NeverSubmitMatch { .. }))
+    );
 }

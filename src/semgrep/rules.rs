@@ -1,9 +1,14 @@
 use crate::findings::Severity;
 
+/// Default per-run semgrep timeout (client side) in seconds.
+pub const DEFAULT_SEMGREP_TIMEOUT_SECS: u64 = 300;
+
 #[derive(Clone)]
 pub struct SemgrepRunner {
     pub rulesets: Vec<String>,
     pub exclude_rules: Vec<String>,
+    /// Per-run timeout: passed to semgrep `--timeout` and enforced client-side.
+    pub timeout_secs: u64,
     /// Inline rule YAML documents (preset `custom_rules`), materialized to
     /// temp .yml files at scan time.
     pub custom_rules: Vec<String>,
@@ -16,6 +21,7 @@ impl SemgrepRunner {
         Self {
             rulesets,
             exclude_rules,
+            timeout_secs: DEFAULT_SEMGREP_TIMEOUT_SECS,
             custom_rules: Vec::new(),
             languages: Vec::new(),
         }
@@ -24,6 +30,12 @@ impl SemgrepRunner {
     /// Builder: set project languages for default ruleset derivation
     pub fn with_languages(mut self, languages: Vec<String>) -> Self {
         self.languages = languages;
+        self
+    }
+
+    /// Builder: set per-run timeout in seconds.
+    pub fn with_timeout(mut self, timeout_secs: u64) -> Self {
+        self.timeout_secs = timeout_secs;
         self
     }
 

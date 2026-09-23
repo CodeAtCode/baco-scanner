@@ -1,9 +1,9 @@
 //! PoC compilation and auto-patching logic
 
 use crate::scanner_types::patch::PatchCandidate;
+use crate::staging::PatchValidationResult;
 use crate::staging::core::StagingArea;
 use crate::staging::error::{AutoPatchError, AutoPatchResult};
-use crate::staging::PatchValidationResult;
 use std::path::PathBuf;
 
 /// Auto-Patcher for generating and validating patches

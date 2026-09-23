@@ -62,7 +62,7 @@ fn test_dedup_same_file_lines_within_tolerance_same_cwe() {
     // All three should merge into one (highest confidence is 0.8)
     assert_eq!(findings.len(), 1);
     assert_eq!(merged, 2); // 2 findings merged
-                           // The keeper should have all sources combined
+    // The keeper should have all sources combined
     assert_eq!(findings[0].sources.len(), 3);
     assert!(findings[0].sources.contains(&"semgrep".to_string()));
     assert!(findings[0].sources.contains(&"llm".to_string()));

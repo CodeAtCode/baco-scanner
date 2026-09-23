@@ -9,8 +9,8 @@ use baco::config::{
     ScannerConfig, ScannerSettings,
 };
 use baco::findings::{Severity, VulnerabilityFinding};
-use baco::scanner::checkpoint::{Checkpoint, EarlyTerminationInfo, ScanPhase};
 use baco::scanner::Scanner;
+use baco::scanner::checkpoint::{Checkpoint, EarlyTerminationInfo, ScanPhase};
 use std::fs;
 use std::path::PathBuf;
 
@@ -199,9 +199,11 @@ fn test_checkpoint_resume_loads_completed_phases() {
     assert_eq!(loaded.completed_phases.len(), 3);
     assert!(loaded.completed_phases.contains(&ScanPhase::Indexing));
     assert!(loaded.completed_phases.contains(&ScanPhase::Semgrep));
-    assert!(loaded
-        .completed_phases
-        .contains(&ScanPhase::LlmStaticAnalysis));
+    assert!(
+        loaded
+            .completed_phases
+            .contains(&ScanPhase::LlmStaticAnalysis)
+    );
     assert_eq!(loaded.findings_so_far.len(), 1);
 
     cleanup_checkpoint("resume_completed");

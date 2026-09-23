@@ -2,7 +2,7 @@
 //! by the inline test module — parse_diff boundary conditions, multi-file
 //! diffs, and error paths through the public API.
 
-use baco::tools::diff_analysis::{analyze_diff, parse_diff, DiffAnalysisInput, DiffAnalysisOutput};
+use baco::tools::diff_analysis::{DiffAnalysisInput, DiffAnalysisOutput, analyze_diff, parse_diff};
 use std::process::Command;
 
 #[test]

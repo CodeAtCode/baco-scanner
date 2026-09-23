@@ -3,8 +3,8 @@
 //! Combines control path (AST/CFG/DFG), knowledge path (CWE rules),
 //! and semantic path (LLM summary) into a unified context block.
 
-use super::control_path::{extract, ContextError as ControlError, ControlPath, Language};
-use super::knowledge_path::{retrieve, ContextError as KnowledgeError, KnowledgePath};
+use super::control_path::{ContextError as ControlError, ControlPath, Language, extract};
+use super::knowledge_path::{ContextError as KnowledgeError, KnowledgePath, retrieve};
 use crate::retrieval::CweKnowledgeBase;
 
 /// Error types for triple path operations

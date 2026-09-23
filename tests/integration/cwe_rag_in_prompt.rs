@@ -4,7 +4,7 @@
 //! the CWE-89 specification is retrieved and included in the prompt sent to the LLM.
 
 use baco::llm::LlmConfig;
-use baco::llm_analysis::{format_cwe_specs, LlmAnalyzer};
+use baco::llm_analysis::{LlmAnalyzer, format_cwe_specs};
 use baco::prompt::loader;
 use baco::retrieval::CweKnowledgeBase;
 use std::fs;

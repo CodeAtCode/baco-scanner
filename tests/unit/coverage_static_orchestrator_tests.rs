@@ -10,7 +10,6 @@ use baco::indexer::FileInfo;
 use baco::scanner::phases::llm_phases::compute_file_priority_score;
 use baco::scanner::structural_dedup;
 use std::collections::HashMap;
-use std::path::PathBuf;
 use tempfile::TempDir;
 
 // ============================================================================
@@ -88,7 +87,14 @@ fn test_structural_dedup_empty_input() {
 
 #[test]
 fn test_structural_dedup_single_finding() {
-    let mut findings = vec![make_finding("1", "src/test.rs", 42, Some("CWE-79"), vec!["scanner1"], 0.8)];
+    let mut findings = vec![make_finding(
+        "1",
+        "src/test.rs",
+        42,
+        Some("CWE-79"),
+        vec!["scanner1"],
+        0.8,
+    )];
 
     let removed = structural_dedup(&mut findings);
 
@@ -100,9 +106,30 @@ fn test_structural_dedup_single_finding() {
 #[test]
 fn test_structural_dedup_exact_duplicates_same_file_line() {
     let mut findings = vec![
-        make_finding("1", "src/test.rs", 42, Some("CWE-79"), vec!["scanner1"], 0.8),
-        make_finding("2", "src/test.rs", 42, Some("CWE-79"), vec!["scanner2"], 0.7),
-        make_finding("3", "src/test.rs", 42, Some("CWE-79"), vec!["scanner3"], 0.9),
+        make_finding(
+            "1",
+            "src/test.rs",
+            42,
+            Some("CWE-79"),
+            vec!["scanner1"],
+            0.8,
+        ),
+        make_finding(
+            "2",
+            "src/test.rs",
+            42,
+            Some("CWE-79"),
+            vec!["scanner2"],
+            0.7,
+        ),
+        make_finding(
+            "3",
+            "src/test.rs",
+            42,
+            Some("CWE-79"),
+            vec!["scanner3"],
+            0.9,
+        ),
     ];
 
     let removed = structural_dedup(&mut findings);
@@ -117,9 +144,30 @@ fn test_structural_dedup_exact_duplicates_same_file_line() {
 #[test]
 fn test_structural_dedup_near_duplicates_same_file_consecutive_lines() {
     let mut findings = vec![
-        make_finding("1", "src/test.rs", 42, Some("CWE-79"), vec!["scanner1"], 0.8),
-        make_finding("2", "src/test.rs", 43, Some("CWE-79"), vec!["scanner2"], 0.7),
-        make_finding("3", "src/test.rs", 44, Some("CWE-79"), vec!["scanner3"], 0.9),
+        make_finding(
+            "1",
+            "src/test.rs",
+            42,
+            Some("CWE-79"),
+            vec!["scanner1"],
+            0.8,
+        ),
+        make_finding(
+            "2",
+            "src/test.rs",
+            43,
+            Some("CWE-79"),
+            vec!["scanner2"],
+            0.7,
+        ),
+        make_finding(
+            "3",
+            "src/test.rs",
+            44,
+            Some("CWE-79"),
+            vec!["scanner3"],
+            0.9,
+        ),
     ];
 
     let removed = structural_dedup(&mut findings);
@@ -133,10 +181,38 @@ fn test_structural_dedup_near_duplicates_same_file_consecutive_lines() {
 #[test]
 fn test_structural_dedup_near_duplicates_different_clusters() {
     let mut findings = vec![
-        make_finding("1", "src/test.rs", 42, Some("CWE-79"), vec!["scanner1"], 0.8),
-        make_finding("2", "src/test.rs", 43, Some("CWE-79"), vec!["scanner2"], 0.7),
-        make_finding("3", "src/test.rs", 50, Some("CWE-79"), vec!["scanner3"], 0.9),
-        make_finding("4", "src/test.rs", 51, Some("CWE-79"), vec!["scanner4"], 0.6),
+        make_finding(
+            "1",
+            "src/test.rs",
+            42,
+            Some("CWE-79"),
+            vec!["scanner1"],
+            0.8,
+        ),
+        make_finding(
+            "2",
+            "src/test.rs",
+            43,
+            Some("CWE-79"),
+            vec!["scanner2"],
+            0.7,
+        ),
+        make_finding(
+            "3",
+            "src/test.rs",
+            50,
+            Some("CWE-79"),
+            vec!["scanner3"],
+            0.9,
+        ),
+        make_finding(
+            "4",
+            "src/test.rs",
+            51,
+            Some("CWE-79"),
+            vec!["scanner4"],
+            0.6,
+        ),
     ];
 
     let removed = structural_dedup(&mut findings);
@@ -149,9 +225,30 @@ fn test_structural_dedup_near_duplicates_different_clusters() {
 #[test]
 fn test_structural_dedup_cross_file_duplicates_different_cwe() {
     let mut findings = vec![
-        make_finding("1", "src/test1.rs", 42, Some("CWE-79"), vec!["scanner1"], 0.8),
-        make_finding("2", "src/test2.rs", 42, Some("CWE-79"), vec!["scanner2"], 0.7),
-        make_finding("3", "src/test1.rs", 42, Some("CWE-89"), vec!["scanner3"], 0.9),
+        make_finding(
+            "1",
+            "src/test1.rs",
+            42,
+            Some("CWE-79"),
+            vec!["scanner1"],
+            0.8,
+        ),
+        make_finding(
+            "2",
+            "src/test2.rs",
+            42,
+            Some("CWE-79"),
+            vec!["scanner2"],
+            0.7,
+        ),
+        make_finding(
+            "3",
+            "src/test1.rs",
+            42,
+            Some("CWE-89"),
+            vec!["scanner3"],
+            0.9,
+        ),
     ];
 
     let removed = structural_dedup(&mut findings);
@@ -167,8 +264,22 @@ fn test_structural_dedup_cross_file_duplicates_different_cwe() {
 #[test]
 fn test_structural_dedup_cross_file_same_cwe() {
     let mut findings = vec![
-        make_finding("1", "src/test1.rs", 42, Some("CWE-79"), vec!["scanner1"], 0.8),
-        make_finding("2", "src/test2.rs", 42, Some("CWE-79"), vec!["scanner2"], 0.7),
+        make_finding(
+            "1",
+            "src/test1.rs",
+            42,
+            Some("CWE-79"),
+            vec!["scanner1"],
+            0.8,
+        ),
+        make_finding(
+            "2",
+            "src/test2.rs",
+            42,
+            Some("CWE-79"),
+            vec!["scanner2"],
+            0.7,
+        ),
     ];
 
     let removed = structural_dedup(&mut findings);
@@ -181,21 +292,58 @@ fn test_structural_dedup_cross_file_same_cwe() {
 #[test]
 fn test_structural_dedup_large_cluster_keeps_best() {
     let mut findings = vec![
-        make_finding("1", "src/test.rs", 40, Some("CWE-79"), vec!["scanner1"], 0.5),
-        make_finding("2", "src/test.rs", 41, Some("CWE-79"), vec!["scanner2"], 0.6),
-        make_finding("3", "src/test.rs", 42, Some("CWE-79"), vec!["scanner1", "scanner2"], 0.7),
-        make_finding("4", "src/test.rs", 43, Some("CWE-79"), vec!["scanner3"], 0.8),
-        make_finding("5", "src/test.rs", 44, Some("CWE-79"), vec!["scanner4"], 0.4),
+        make_finding(
+            "1",
+            "src/test.rs",
+            40,
+            Some("CWE-79"),
+            vec!["scanner1"],
+            0.5,
+        ),
+        make_finding(
+            "2",
+            "src/test.rs",
+            41,
+            Some("CWE-79"),
+            vec!["scanner2"],
+            0.6,
+        ),
+        make_finding(
+            "3",
+            "src/test.rs",
+            42,
+            Some("CWE-79"),
+            vec!["scanner1", "scanner2"],
+            0.7,
+        ),
+        make_finding(
+            "4",
+            "src/test.rs",
+            43,
+            Some("CWE-79"),
+            vec!["scanner3"],
+            0.8,
+        ),
+        make_finding(
+            "5",
+            "src/test.rs",
+            44,
+            Some("CWE-79"),
+            vec!["scanner4"],
+            0.4,
+        ),
     ];
 
     let removed = structural_dedup(&mut findings);
 
-    // All lines within ±2 form one cluster, keep highest sources then confidence
+    // All lines (40, 41, 42, 43, 44) are within ±2, form one cluster
+    // Keep highest sources then confidence: Finding 3 has 2 sources, Finding 4 has 1 source
+    // So Finding 3 wins with 2 sources (sources count beats confidence)
+    // Sources from ALL findings in cluster are merged: scanner1, scanner2, scanner3, scanner4 = 4
     assert_eq!(findings.len(), 1);
     assert_eq!(removed, 4);
-    // Finding 3 has 2 sources, which is the most
     assert_eq!(findings[0].id, "3");
-    assert_eq!(findings[0].sources.len(), 2);
+    assert_eq!(findings[0].sources.len(), 4);
 }
 
 #[test]
@@ -221,8 +369,22 @@ fn test_structural_dedup_preserves_original_order() {
 #[test]
 fn test_structural_dedup_sources_merged_into_best() {
     let mut findings = vec![
-        make_finding("1", "src/test.rs", 42, Some("CWE-79"), vec!["scanner1", "scanner2"], 0.8),
-        make_finding("2", "src/test.rs", 43, Some("CWE-79"), vec!["scanner3", "scanner4"], 0.9),
+        make_finding(
+            "1",
+            "src/test.rs",
+            42,
+            Some("CWE-79"),
+            vec!["scanner1", "scanner2"],
+            0.8,
+        ),
+        make_finding(
+            "2",
+            "src/test.rs",
+            43,
+            Some("CWE-79"),
+            vec!["scanner3", "scanner4"],
+            0.9,
+        ),
     ];
 
     let removed = structural_dedup(&mut findings);
@@ -242,16 +404,31 @@ fn test_structural_dedup_sources_merged_into_best() {
 #[test]
 fn test_structural_dedup_tiebreaker_by_sources_then_confidence() {
     let mut findings = vec![
-        make_finding("1", "src/test.rs", 42, Some("CWE-79"), vec!["scanner1"], 0.9),
-        make_finding("2", "src/test.rs", 43, Some("CWE-79"), vec!["scanner2", "scanner3"], 0.8),
+        make_finding(
+            "1",
+            "src/test.rs",
+            42,
+            Some("CWE-79"),
+            vec!["scanner1"],
+            0.9,
+        ),
+        make_finding(
+            "2",
+            "src/test.rs",
+            43,
+            Some("CWE-79"),
+            vec!["scanner2", "scanner3"],
+            0.8,
+        ),
     ];
 
-    let removed = structural_dedup(&mut findings);
+    structural_dedup(&mut findings);
 
     assert_eq!(findings.len(), 1);
     // Finding 2 has more sources (2 vs 1), so it wins despite lower confidence
     assert_eq!(findings[0].id, "2");
-    assert_eq!(findings[0].sources.len(), 2);
+    // Sources should be merged from both findings
+    assert_eq!(findings[0].sources.len(), 3);
 }
 
 // ============================================================================
@@ -276,8 +453,10 @@ fn test_compute_file_priority_score_entry_point_boost() {
 
     let score = compute_file_priority_score(&file_info, &priority, &hook_map);
 
-    // Entry point boost: 1.0 * 2.0 (entry_point_boost) * 1.3 (small_file_boost) = 2.6
-    assert!((score - 2.6).abs() < 0.01);
+    // Entry point + small file + recent modification boost:
+    // 1.0 * 2.0 (entry_point_boost) * 1.3 (small_file_boost) * 1.5 (git_recent_boost) = 3.9
+    // main.rs matches the built-in entry point pattern and was just created (< 7 days)
+    assert!((score - 3.9).abs() < 0.01);
 }
 
 #[test]
@@ -298,8 +477,10 @@ fn test_compute_file_priority_score_small_file_boost() {
 
     let score = compute_file_priority_score(&file_info, &priority, &hook_map);
 
-    // Small file boost: 1.0 * 1.3 = 1.3
-    assert!((score - 1.3).abs() < 0.01);
+    // Small file + recent modification boost:
+    // 1.0 * 1.3 (small_file_boost) * 1.5 (git_recent_boost) = 1.95
+    // utils.rs does NOT match entry point patterns
+    assert!((score - 1.95).abs() < 0.01);
 }
 
 #[test]
@@ -317,12 +498,17 @@ fn test_compute_file_priority_score_hook_map_boost() {
 
     let priority = make_priority_config();
     let mut hook_map: HashMap<String, Vec<String>> = HashMap::new();
-    hook_map.insert(hook_file.to_string_lossy().to_string(), vec!["hook1".to_string()]);
+    hook_map.insert(
+        hook_file.to_string_lossy().to_string(),
+        vec!["hook1".to_string()],
+    );
 
     let score = compute_file_priority_score(&file_info, &priority, &hook_map);
 
-    // Hook map boost: 1.0 * 2.0 (entry_point_boost) * 1.3 (small_file_boost) = 2.6
-    assert!((score - 2.6).abs() < 0.01);
+    // Hook map + small file + recent modification boost:
+    // 1.0 * 2.0 (entry_point_boost) * 1.3 (small_file_boost) * 1.5 (git_recent_boost) = 3.9
+    // hooks.php has hook registered AND is small (< 10KB) AND was just created
+    assert!((score - 3.9).abs() < 0.01);
 }
 
 // ============================================================================

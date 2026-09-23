@@ -331,9 +331,10 @@ criterion = "0.4"
     assert_eq!(deps.len(), 3);
     assert!(deps.iter().any(|d| d.name == "serde" && d.version == "1.0"));
     assert!(deps.iter().any(|d| d.name == "tokio" && d.version == "1.0"));
-    assert!(deps
-        .iter()
-        .any(|d| d.name == "criterion" && d.version == "0.4"));
+    assert!(
+        deps.iter()
+            .any(|d| d.name == "criterion" && d.version == "0.4")
+    );
 }
 
 #[test]
@@ -418,16 +419,19 @@ pandas==1.5.0
         .unwrap();
 
     assert_eq!(deps.len(), 4);
-    assert!(deps
-        .iter()
-        .any(|d| d.name == "requests" && d.version == "2.28.0"));
-    assert!(deps
-        .iter()
-        .any(|d| d.name == "flask" && d.version == "2.0.0"));
+    assert!(
+        deps.iter()
+            .any(|d| d.name == "requests" && d.version == "2.28.0")
+    );
+    assert!(
+        deps.iter()
+            .any(|d| d.name == "flask" && d.version == "2.0.0")
+    );
     assert!(deps.iter().any(|d| d.name == "numpy" && d.version == "*"));
-    assert!(deps
-        .iter()
-        .any(|d| d.name == "pandas" && d.version == "1.5.0"));
+    assert!(
+        deps.iter()
+            .any(|d| d.name == "pandas" && d.version == "1.5.0")
+    );
 }
 
 #[test]
@@ -476,12 +480,14 @@ require (
     let deps = bootstrapper.parse_go_mod(temp_dir.path()).unwrap();
 
     assert_eq!(deps.len(), 2);
-    assert!(deps
-        .iter()
-        .any(|d| d.name == "github.com/gin-gonic/gin" && d.version == "v1.9.0"));
-    assert!(deps
-        .iter()
-        .any(|d| d.name == "github.com/stretchr/testify" && d.version == "v1.8.0"));
+    assert!(
+        deps.iter()
+            .any(|d| d.name == "github.com/gin-gonic/gin" && d.version == "v1.9.0")
+    );
+    assert!(
+        deps.iter()
+            .any(|d| d.name == "github.com/stretchr/testify" && d.version == "v1.8.0")
+    );
 }
 
 #[test]

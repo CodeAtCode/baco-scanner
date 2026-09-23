@@ -1,8 +1,8 @@
 //! Unit tests for src/context/pacvd_extractor.rs - PacVD primitive-API abstraction
 
-use baco::context::pacvd_extractor::{auto_level, categorize, extract, tag_cwe, AbstractionLevel};
+use baco::context::pacvd_extractor::{AbstractionLevel, auto_level, categorize, extract, tag_cwe};
 
-use baco::context::callee_walker::{extract_call_sites, CallSite};
+use baco::context::callee_walker::{CallSite, extract_call_sites};
 use std::collections::BTreeSet;
 
 // ============================================================================
@@ -339,10 +339,12 @@ fn test_extract_semantic_buffer_overflow() {
 
     let vector = extract(&sites, AbstractionLevel::Semantic);
 
-    assert!(vector
-        .semantic
-        .iter()
-        .any(|(k, _)| k.contains("buffer_overflow")));
+    assert!(
+        vector
+            .semantic
+            .iter()
+            .any(|(k, _)| k.contains("buffer_overflow"))
+    );
 }
 
 #[test]
@@ -355,10 +357,12 @@ fn test_extract_semantic_command_injection() {
 
     let vector = extract(&sites, AbstractionLevel::Semantic);
 
-    assert!(vector
-        .semantic
-        .iter()
-        .any(|(k, _)| k.contains("command_injection")));
+    assert!(
+        vector
+            .semantic
+            .iter()
+            .any(|(k, _)| k.contains("command_injection"))
+    );
 }
 
 #[test]
@@ -371,10 +375,12 @@ fn test_extract_semantic_double_free() {
 
     let vector = extract(&sites, AbstractionLevel::Semantic);
 
-    assert!(vector
-        .semantic
-        .iter()
-        .any(|(k, _)| k.contains("double_free")));
+    assert!(
+        vector
+            .semantic
+            .iter()
+            .any(|(k, _)| k.contains("double_free"))
+    );
 }
 
 #[test]
@@ -400,10 +406,12 @@ fn test_extract_semantic_off_by_one() {
 
     let vector = extract(&sites, AbstractionLevel::Semantic);
 
-    assert!(vector
-        .semantic
-        .iter()
-        .any(|(k, _)| k.contains("off_by_one")));
+    assert!(
+        vector
+            .semantic
+            .iter()
+            .any(|(k, _)| k.contains("off_by_one"))
+    );
 }
 
 #[test]
@@ -788,14 +796,16 @@ fn test_extract_grouped_inline_migrated() {
 #[test]
 fn test_extract_semantic_inline_migrated() {
     let v = extract(&sample_sites(), AbstractionLevel::Semantic);
-    assert!(v
-        .semantic
-        .iter()
-        .any(|(k, _)| k.contains("buffer_overflow")));
-    assert!(v
-        .semantic
-        .iter()
-        .any(|(k, _)| k.contains("command_injection")));
+    assert!(
+        v.semantic
+            .iter()
+            .any(|(k, _)| k.contains("buffer_overflow"))
+    );
+    assert!(
+        v.semantic
+            .iter()
+            .any(|(k, _)| k.contains("command_injection"))
+    );
 }
 
 #[test]

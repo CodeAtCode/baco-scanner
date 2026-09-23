@@ -1,6 +1,6 @@
 use crate::config::ScannerConfig;
 use crate::error::ScanError;
-use crate::evidence::{classify_finding, VerificationTier};
+use crate::evidence::{VerificationTier, classify_finding};
 use crate::findings::{Severity, VulnerabilityFinding};
 
 pub fn generate_sarif_report(

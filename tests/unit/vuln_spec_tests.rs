@@ -33,10 +33,11 @@ fn test_security_specification_creation() {
     assert_eq!(spec.id, "test-spec-001");
     assert_eq!(spec.vuln_type, "CWE-79");
     assert!(matches!(spec.category, DomainCategory::General));
-    assert!(spec
-        .safe_behavior_pattern
-        .to_lowercase()
-        .contains("sanitize"));
+    assert!(
+        spec.safe_behavior_pattern
+            .to_lowercase()
+            .contains("sanitize")
+    );
 }
 
 #[test]
@@ -995,6 +996,7 @@ fn test_domain_category_serialization() {
 // ============================================================================
 
 #[test]
+#[serial]
 fn test_build_embedding_index() {
     let _guard = INDEX_LOCK.lock().unwrap();
     let specs = vec![

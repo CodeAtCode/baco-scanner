@@ -4,8 +4,8 @@ use crate::staging::error::{StagingError, StagingResult};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Applies a patch to a worktree by piping content to `git apply -`.
 /// Returns Ok(()) on success, or an error with stderr on failure.

@@ -7,8 +7,8 @@
 //! - Severity mapping unaffected by normalization
 
 use baco::findings::Severity;
-use baco::semgrep::parser::strip_rule_prefix;
 use baco::semgrep::SemgrepRunner;
+use baco::semgrep::parser::strip_rule_prefix;
 
 // ============================================================================
 // Unit tests for strip_rule_prefix function

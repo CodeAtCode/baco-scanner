@@ -13,12 +13,12 @@
 //! - Dangerous code validation
 
 use crate::fixtures::mock_llm::MockLlmClient;
+use baco::agent::AgentFinding;
 use baco::agent::sandbox::ToolSandbox;
-use baco::agent::tool_schema::{default_tools, tool_definitions, Tool, ToolRegistry};
+use baco::agent::tool_schema::{Tool, ToolRegistry, default_tools, tool_definitions};
 use baco::agent::tools::{
     FileReadTool, FileWriteTool, PatternSearchTool, TestCompileTool, TestRunTool,
 };
-use baco::agent::AgentFinding;
 use baco::findings::{Severity, VulnerabilityFinding};
 use std::path::PathBuf;
 

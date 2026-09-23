@@ -3,7 +3,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use baco::agent_scaffold::fn_lookup::{get_extensions_for_languages, FunctionLookup};
+use baco::agent_scaffold::fn_lookup::{FunctionLookup, get_extensions_for_languages};
 use baco::context::control_path::Language;
 
 static FILE_COUNTER: AtomicU64 = AtomicU64::new(0);

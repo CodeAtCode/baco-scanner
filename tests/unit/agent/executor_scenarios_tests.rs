@@ -8,12 +8,12 @@
 //! - Message flow validation
 //! - Progress callback behavior
 
+use baco::agent::ToolCall;
 use baco::agent::executor::{
-    create_audit_finding, create_empty_finding, execute_tool_calls, ProgressCallback,
+    ProgressCallback, create_audit_finding, create_empty_finding, execute_tool_calls,
 };
 use baco::agent::sandbox::ToolSandbox;
 use baco::agent::tool_schema::ToolRegistry;
-use baco::agent::ToolCall;
 use baco::findings::Severity;
 use baco::llm::{ChatMessage, ChatResponse};
 use std::sync::Arc;

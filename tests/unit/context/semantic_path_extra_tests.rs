@@ -31,7 +31,7 @@ fn test_summarize_mock_empty_source() {
 
 #[test]
 fn test_to_prompt_section_format() {
-    use baco::context::control_path::{extract, Language};
+    use baco::context::control_path::{Language, extract};
     use baco::context::knowledge_path::retrieve;
     use baco::context::triple_path::TriplePathContext;
     use baco::retrieval::CweKnowledgeBase;

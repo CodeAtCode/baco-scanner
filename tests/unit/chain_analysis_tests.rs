@@ -4,7 +4,7 @@
 //! This module tests attack chain detection, vulnerability grouping, pattern matching,
 //! and verification voting logic.
 
-use baco::chain_analysis::{apply_chain_verdicts, ChainAnalyzer, ChainResult, ChainType};
+use baco::chain_analysis::{ChainAnalyzer, ChainResult, ChainType, apply_chain_verdicts};
 use baco::crossfile::CrossFileAnalyzer;
 use baco::findings::{Severity, TriageVerdict, VulnerabilityFinding};
 use baco::root_cause_dedup::{GlobalFpStore, RootCauseDeduplicator};

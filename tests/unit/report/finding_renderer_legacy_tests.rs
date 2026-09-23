@@ -488,13 +488,12 @@ fn test_generate_html_report_very_large_number_of_findings() {
     // Test with 1000 findings to ensure no panic
     let findings: Vec<VulnerabilityFinding> = (0..1000)
         .map(|i| {
-            let f = make_finding_html(
+            make_finding_html(
                 &format!("f{}", i),
                 Severity::Low,
                 "src/test.rs",
                 Some(i as u32),
-            );
-            f
+            )
         })
         .collect();
     let output_path = "/tmp/test_large_findings.html";

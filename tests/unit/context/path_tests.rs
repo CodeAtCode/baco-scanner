@@ -4,9 +4,9 @@
 //! with coverage for edge cases and error handling.
 
 use baco::context::{
-    control_path::{extract, ContextError, Language},
-    knowledge_path::{retrieve, ContextError as KnowledgeError},
-    semantic_path::{summarize_mock, ContextError as SemanticError},
+    control_path::{ContextError, Language, extract},
+    knowledge_path::{ContextError as KnowledgeError, retrieve},
+    semantic_path::{ContextError as SemanticError, summarize_mock},
     triple_path::TriplePathContext,
 };
 use baco::retrieval::CweKnowledgeBase;

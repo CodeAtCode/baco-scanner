@@ -4,7 +4,7 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::PathBuf;
 
-use super::rules::{parse_severity, RawFinding};
+use super::rules::{RawFinding, parse_severity};
 
 /// Strip temp-file stem prefix from a Semgrep rule ID.
 ///

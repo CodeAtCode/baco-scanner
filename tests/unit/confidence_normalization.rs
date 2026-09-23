@@ -10,7 +10,7 @@
 //! - ProjectBaseline save/load roundtrip
 //! - Empty baseline handling
 
-use baco::confidence_refinement::{normalize_confidence, ProjectBaseline};
+use baco::confidence_refinement::{ProjectBaseline, normalize_confidence};
 use baco::config::{NormalizationConfig, NormalizationTier};
 use std::path::PathBuf;
 use tempfile::NamedTempFile;

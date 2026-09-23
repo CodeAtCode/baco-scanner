@@ -2,7 +2,7 @@
 //!
 //! These tests verify basic project type detection from Cargo.toml and package.json.
 
-use baco::project_type::{detect_project_type, ProjectType};
+use baco::project_type::{ProjectType, detect_project_type};
 use std::fs;
 use std::io::Write;
 

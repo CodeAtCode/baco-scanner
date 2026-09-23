@@ -1,4 +1,4 @@
-use baco::agent_scaffold::tree_sitter_parser::{get_function_name, parse_source, ParsedFile};
+use baco::agent_scaffold::tree_sitter_parser::{ParsedFile, get_function_name, parse_source};
 use baco::context::control_path::Language;
 
 #[test]

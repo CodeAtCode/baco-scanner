@@ -11,7 +11,8 @@
 
 use baco::llm::{
     AtomicModelSelector, ChatMessage, ChatResponse, ChatResponseWithModel, FunctionToolDefinition,
-    LlmClient, LlmConfig, LlmProvider, ToolSchema,
+    LlmClient, LlmConfig, LlmProvider, ToolSchema, apply_retry_backoff, backoff_delay_ms,
+    fail_fast_status_error, parse_chat_content, parse_tool_calls,
 };
 use serde_json::json;
 
@@ -930,4 +931,273 @@ fn test_json_schema_cache_key_includes_schema() {
 
     assert!(cache_key.contains("json_schema"));
     assert!(cache_key.contains("vulnerability_report"));
+}
+#[tokio::test]
+async fn test_chat_failover_to_next_model_on_retryable_error() {
+    let mut server = mockito::Server::new_async().await;
+
+    let bad_mock = server
+        .mock("POST", "/v1/chat/completions")
+        .match_body(mockito::Matcher::Regex("bad-model".to_string()))
+        .with_status(500)
+        .with_body("internal error")
+        .create();
+    let good_mock = server
+        .mock("POST", "/v1/chat/completions")
+        .match_body(mockito::Matcher::Regex("good-model".to_string()))
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(r#"{"choices": [{"message": {"content": "recovered"}}]}"#)
+        .create();
+
+    let config = LlmConfig {
+        base_url: server.url(),
+        api_key: "test".to_string(),
+        model: "bad-model".to_string(),
+        models: vec!["bad-model".to_string(), "good-model".to_string()],
+        timeout: 5,
+        max_retries: 0,
+        retry_backoff_ms: 0,
+        temperature: 0.5,
+        max_reasoning_tokens: None,
+        enable_llm_cache: false,
+        cache_dir: None,
+        max_concurrent: 4,
+        pricing: Default::default(),
+    };
+    let client = LlmClient::new(config);
+    let messages = vec![ChatMessage::user("hi")];
+
+    let result = client.chat(&messages).await;
+    assert!(result.is_ok(), "failover should succeed via good-model");
+    assert_eq!(result.unwrap().content, "recovered");
+    bad_mock.assert_async().await;
+    good_mock.assert_async().await;
+}
+#[test]
+fn backoff_delay_ms_grows_exponentially_and_caps() {
+    assert_eq!(backoff_delay_ms(100, 0), 100);
+    assert_eq!(backoff_delay_ms(100, 1), 200);
+    assert_eq!(backoff_delay_ms(100, 2), 400);
+    assert_eq!(backoff_delay_ms(1000, 20), 30_000);
+    assert_eq!(backoff_delay_ms(0, 5), 0);
+}
+
+#[test]
+fn fail_fast_status_error_only_for_non_retryable() {
+    assert!(fail_fast_status_error(400, "bad").is_some());
+    assert!(fail_fast_status_error(401, "deny").is_some());
+    assert!(fail_fast_status_error(403, "deny").is_some());
+    assert!(fail_fast_status_error(500, "boom").is_none());
+    assert!(fail_fast_status_error(429, "slow").is_none());
+}
+
+#[test]
+fn parse_chat_content_valid_and_garbage() {
+    let value: serde_json::Value =
+        serde_json::from_str(r#"{"choices": [{"message": {"content": "hi"}}]}"#).unwrap();
+    assert_eq!(parse_chat_content(&value).unwrap(), "hi");
+    let garbage: serde_json::Value = serde_json::from_str(r#"{"nope": true}"#).unwrap();
+    assert!(parse_chat_content(&garbage).is_err());
+}
+
+#[test]
+fn parse_tool_calls_present_and_absent() {
+    let message = json!({
+        "tool_calls": [
+            {"id": "c1", "function": {"name": "search", "arguments": {}}}
+        ]
+    });
+    let calls = parse_tool_calls(&message);
+    assert_eq!(calls.len(), 1);
+    assert_eq!(calls[0].name, "search");
+    let bare = json!({"content": "hi"});
+    assert!(parse_tool_calls(&bare).is_empty());
+}
+
+#[tokio::test]
+async fn apply_retry_backoff_zero_base_returns_fast_and_counts() {
+    let mut retries = 0u32;
+    apply_retry_backoff(0, 500, None, &mut retries).await;
+    assert_eq!(retries, 1);
+}
+fn failover_test_config(base_url: String, models: Vec<String>) -> LlmConfig {
+    LlmConfig {
+        base_url,
+        api_key: "test".to_string(),
+        model: models[0].clone(),
+        models,
+        timeout: 5,
+        max_retries: 0,
+        retry_backoff_ms: 0,
+        temperature: 0.5,
+        max_reasoning_tokens: None,
+        enable_llm_cache: false,
+        cache_dir: None,
+        max_concurrent: 4,
+        pricing: Default::default(),
+    }
+}
+
+#[tokio::test]
+async fn test_tools_failover_to_next_model_on_retryable_error() {
+    let mut server = mockito::Server::new_async().await;
+    let bad_mock = server
+        .mock("POST", "/v1/chat/completions")
+        .match_body(mockito::Matcher::Regex("bad-model".to_string()))
+        .with_status(500)
+        .with_body("internal error")
+        .create();
+    let good_mock = server
+        .mock("POST", "/v1/chat/completions")
+        .match_body(mockito::Matcher::Regex("good-model".to_string()))
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(r#"{"choices": [{"message": {"content": "done"}}]}"#)
+        .create();
+
+    let config = failover_test_config(
+        server.url(),
+        vec!["bad-model".to_string(), "good-model".to_string()],
+    );
+    let client = LlmClient::new(config);
+    let tools: &[ToolSchema] = &[];
+    let result = client
+        .chat_with_tools(&[ChatMessage::user("hi")], tools)
+        .await;
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap().content, "done");
+    bad_mock.assert_async().await;
+    good_mock.assert_async().await;
+}
+
+#[tokio::test]
+async fn test_chat_401_fails_fast_without_retry() {
+    let mut server = mockito::Server::new_async().await;
+    let mock = server
+        .mock("POST", "/v1/chat/completions")
+        .with_status(401)
+        .with_body("unauthorized")
+        .create();
+
+    let config = failover_test_config(server.url(), vec!["m".to_string()]);
+    let client = LlmClient::new(config);
+    let result = client.chat(&[ChatMessage::user("hi")]).await;
+    assert!(result.is_err());
+    mock.assert_async().await;
+}
+
+#[tokio::test]
+async fn test_chat_refused_connection_errors() {
+    let config = failover_test_config("http://127.0.0.1:1".to_string(), vec!["m".to_string()]);
+    let client = LlmClient::new(config);
+    let result = client.chat(&[ChatMessage::user("hi")]).await;
+    assert!(result.is_err());
+}
+#[tokio::test]
+async fn test_chat_persistent_timeout_exhausts() {
+    let config = failover_test_config("http://10.255.255.1".to_string(), vec!["m".to_string()]);
+    let client = LlmClient::new(config);
+    let result = client.chat(&[ChatMessage::user("hi")]).await;
+    assert!(result.is_err());
+}
+#[tokio::test]
+async fn test_chat_with_json_schema_ok_path() {
+    let mut server = mockito::Server::new_async().await;
+    let _mock = server
+        .mock("POST", "/v1/chat/completions")
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(r#"{"choices": [{"message": {"content": "schema-ok"}}]}"#)
+        .create();
+
+    let config = failover_test_config(server.url(), vec!["m".to_string()]);
+    let client = LlmClient::new(config);
+    let result = client
+        .chat_with_json_schema(
+            &[ChatMessage::user("hi")],
+            "probe",
+            serde_json::json!({"type": "object"}),
+        )
+        .await;
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap().content, "schema-ok");
+}
+
+#[tokio::test]
+async fn test_chat_with_metrics_tracker_ok_path() {
+    let mut server = mockito::Server::new_async().await;
+    let _mock = server
+        .mock("POST", "/v1/chat/completions")
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(r#"{"choices": [{"message": {"content": "tracked"}}]}"#)
+        .create();
+
+    let config = failover_test_config(server.url(), vec!["m".to_string()]);
+    let tracker = baco::llm::metrics::LlmMetricsTracker::new();
+    let client = LlmClient::with_metrics(config, Some(tracker));
+    let result = client.chat(&[ChatMessage::user("hi")]).await;
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap().content, "tracked");
+}
+#[tokio::test]
+async fn test_chat_with_tools_cache_miss_then_hit() {
+    let mut server = mockito::Server::new_async().await;
+    let mock = server
+        .mock("POST", "/v1/chat/completions")
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(r#"{"choices": [{"message": {"content": "cached-answer"}}]}"#)
+        .create();
+
+    let dir = tempfile::TempDir::new().unwrap();
+    let mut config = failover_test_config(server.url(), vec!["m".to_string()]);
+    config.enable_llm_cache = true;
+    config.cache_dir = Some(dir.path().to_string_lossy().to_string());
+    config.max_reasoning_tokens = Some(100);
+    let client = LlmClient::new(config);
+    let tools = vec![ToolSchema {
+        type_: "function".to_string(),
+        function: FunctionToolDefinition {
+            name: "search".to_string(),
+            description: "d".to_string(),
+            parameters: serde_json::json!({}),
+        },
+    }];
+    let messages = vec![ChatMessage::user("hi")];
+    let first = client.chat_with_tools(&messages, &tools).await.unwrap();
+    let second = client.chat_with_tools(&messages, &tools).await.unwrap();
+    assert_eq!(first.content, "cached-answer");
+    assert_eq!(second.content, "cached-answer");
+    mock.assert_async().await;
+}
+#[tokio::test]
+async fn test_tools_401_fails_fast_without_retry() {
+    let mut server = mockito::Server::new_async().await;
+    let mock = server
+        .mock("POST", "/v1/chat/completions")
+        .with_status(401)
+        .with_body("unauthorized")
+        .create();
+
+    let config = failover_test_config(server.url(), vec!["m".to_string()]);
+    let client = LlmClient::new(config);
+    let tools: &[ToolSchema] = &[];
+    let result = client
+        .chat_with_tools(&[ChatMessage::user("hi")], tools)
+        .await;
+    assert!(result.is_err());
+    mock.assert_async().await;
+}
+
+#[tokio::test]
+async fn test_tools_refused_connection_errors() {
+    let config = failover_test_config("http://127.0.0.1:1".to_string(), vec!["m".to_string()]);
+    let client = LlmClient::new(config);
+    let tools: &[ToolSchema] = &[];
+    let result = client
+        .chat_with_tools(&[ChatMessage::user("hi")], tools)
+        .await;
+    assert!(result.is_err());
 }

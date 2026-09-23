@@ -2,7 +2,7 @@
 //!
 //! Tests parse_yaml_rules and persist_rules as standalone functions.
 
-use baco::rulesynth::{parse_yaml_rules, persist_rules, SemgrepRule};
+use baco::rulesynth::{SemgrepRule, parse_yaml_rules, persist_rules};
 use std::path::PathBuf;
 use tempfile::tempdir;
 

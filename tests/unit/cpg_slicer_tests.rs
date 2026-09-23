@@ -187,9 +187,11 @@ fn test_extract_slice_from_result_with_method_field() {
 
     let slice = slicer.extract_slice_from_result(&result, &cpg).unwrap();
     assert!(!slice.is_empty());
-    assert!(slice
-        .related_functions
-        .contains(&"process_data".to_string()));
+    assert!(
+        slice
+            .related_functions
+            .contains(&"process_data".to_string())
+    );
 }
 
 #[test]

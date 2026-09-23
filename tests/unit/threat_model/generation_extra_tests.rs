@@ -8,8 +8,8 @@
 use baco::analysis_context::AnalysisContext;
 use baco::findings::VerificationStatus;
 use baco::scanner::phases::llm_phases::parse_verification_verdict;
-use baco::threat_model::generation::generate_threat_model_static;
 use baco::threat_model::ThreatModelingPhase;
+use baco::threat_model::generation::generate_threat_model_static;
 use tempfile::tempdir;
 
 // ============================================================================

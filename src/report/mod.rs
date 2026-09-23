@@ -1,5 +1,5 @@
 use crate::config::ScannerConfig;
-use crate::evidence::{classify_finding, VerificationTier};
+use crate::evidence::{VerificationTier, classify_finding};
 use crate::findings::VulnerabilityFinding;
 
 pub mod ai_aggregation;

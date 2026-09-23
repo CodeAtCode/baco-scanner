@@ -2,7 +2,7 @@
 //!
 //! Covers: calculate_file_hash, calculate_content_hash, FileHasher
 
-use baco::file_hash::{calculate_content_hash, calculate_file_hash, FileHasher};
+use baco::file_hash::{FileHasher, calculate_content_hash, calculate_file_hash};
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;

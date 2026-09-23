@@ -111,11 +111,9 @@ fn test_phase_count_matches_architecture_docs() {
     if !found_counts.is_empty() {
         for found in &found_counts {
             assert_eq!(
-                *found as usize,
-                phase_count,
+                *found as usize, phase_count,
                 "Architecture docs mention {} phases but code has {} phases (from src/scanner/checkpoint.rs)",
-                found,
-                phase_count
+                found, phase_count
             );
         }
     }

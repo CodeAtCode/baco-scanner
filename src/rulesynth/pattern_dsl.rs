@@ -78,7 +78,7 @@ pub fn parse_pattern(line: &str) -> Result<Pattern, PatternError> {
             return Err(PatternError::Malformed(format!(
                 "invalid taint source: {}",
                 s
-            )))
+            )));
         }
     };
 

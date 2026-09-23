@@ -423,3 +423,103 @@ fn test_multiple_with_phase_calls_accumulate_context() {
     assert!(display.contains("phase2"));
     assert!(display.contains("original error"));
 }
+
+// ============================================================================
+// with_phase() Coverage for All Variants
+// ============================================================================
+
+#[test]
+fn test_with_phase_wraps_all_variants() {
+    // Parse
+    let err = ScanError::Parse {
+        message: "parse failed".to_string(),
+        source: None,
+    };
+    let wrapped = err.with_phase("test_phase");
+    assert!(matches!(wrapped, ScanError::Phase { .. }));
+    assert_eq!(wrapped.phase(), Some("test_phase"));
+
+    // Timeout
+    let err = ScanError::Timeout {
+        message: "timeout failed".to_string(),
+        source: None,
+    };
+    let wrapped = err.with_phase("test_phase");
+    assert!(matches!(wrapped, ScanError::Phase { .. }));
+    assert_eq!(wrapped.phase(), Some("test_phase"));
+
+    // RateLimit
+    let err = ScanError::RateLimit {
+        message: "rate limit failed".to_string(),
+        source: None,
+    };
+    let wrapped = err.with_phase("test_phase");
+    assert!(matches!(wrapped, ScanError::Phase { .. }));
+    assert_eq!(wrapped.phase(), Some("test_phase"));
+
+    // Server
+    let err = ScanError::Server {
+        message: "server failed".to_string(),
+        source: None,
+    };
+    let wrapped = err.with_phase("test_phase");
+    assert!(matches!(wrapped, ScanError::Phase { .. }));
+    assert_eq!(wrapped.phase(), Some("test_phase"));
+
+    // MissingEnvVar
+    let err = ScanError::MissingEnvVar("API_KEY".to_string());
+    let wrapped = err.with_phase("test_phase");
+    assert!(matches!(wrapped, ScanError::Phase { .. }));
+    assert_eq!(wrapped.phase(), Some("test_phase"));
+
+    // LlmClientBuildError
+    let err = ScanError::LlmClientBuildError("build failed".to_string());
+    let wrapped = err.with_phase("test_phase");
+    assert!(matches!(wrapped, ScanError::Phase { .. }));
+    assert_eq!(wrapped.phase(), Some("test_phase"));
+
+    // IoError
+    let io_err = std::io::Error::other("io failed");
+    let err: ScanError = io_err.into();
+    let wrapped = err.with_phase("test_phase");
+    assert!(matches!(wrapped, ScanError::Phase { .. }));
+    assert_eq!(wrapped.phase(), Some("test_phase"));
+
+    // Json
+    let json_err = serde_json::from_str::<serde_json::Value>("bad").unwrap_err();
+    let err: ScanError = json_err.into();
+    let wrapped = err.with_phase("test_phase");
+    assert!(matches!(wrapped, ScanError::Phase { .. }));
+    assert_eq!(wrapped.phase(), Some("test_phase"));
+
+    // Toml
+    let toml_err = toml::from_str::<toml::Value>("bad =").unwrap_err();
+    let err: ScanError = toml_err.into();
+    let wrapped = err.with_phase("test_phase");
+    assert!(matches!(wrapped, ScanError::Phase { .. }));
+    assert_eq!(wrapped.phase(), Some("test_phase"));
+
+    // Git
+    let err = ScanError::Git("git failed".to_string());
+    let wrapped = err.with_phase("test_phase");
+    assert!(matches!(wrapped, ScanError::Phase { .. }));
+    assert_eq!(wrapped.phase(), Some("test_phase"));
+
+    // Validation
+    let err = ScanError::Validation("validation failed".to_string());
+    let wrapped = err.with_phase("test_phase");
+    assert!(matches!(wrapped, ScanError::Phase { .. }));
+    assert_eq!(wrapped.phase(), Some("test_phase"));
+
+    // Checkpoint
+    let err = ScanError::Checkpoint("checkpoint failed".to_string());
+    let wrapped = err.with_phase("test_phase");
+    assert!(matches!(wrapped, ScanError::Phase { .. }));
+    assert_eq!(wrapped.phase(), Some("test_phase"));
+
+    // Unknown
+    let err = ScanError::Unknown("unknown failed".to_string());
+    let wrapped = err.with_phase("test_phase");
+    assert!(matches!(wrapped, ScanError::Phase { .. }));
+    assert_eq!(wrapped.phase(), Some("test_phase"));
+}

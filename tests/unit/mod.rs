@@ -1,6 +1,7 @@
 //! Unit tests for baco
 //!
 //! These tests focus on isolated functionality without external dependencies.
+pub mod cli;
 pub mod common;
 mod context;
 mod exploit;
@@ -110,8 +111,8 @@ mod cost_estimate_tests;
 mod coverage_eval_helpers_tests;
 mod coverage_llm_phase_pure_tests;
 mod coverage_rulesynth_agentflow_tests;
-mod coverage_static_orchestrator_tests;
 mod coverage_small_modules_tests;
+mod coverage_static_orchestrator_tests;
 mod cpg_joern_tests;
 mod cpg_queries_tests;
 mod cpg_slice_phase_tests;
@@ -192,6 +193,7 @@ mod tools_tests;
 mod triage_rag_tests;
 mod triage_tests;
 mod truncate_code_tests;
+mod ui_tests;
 mod validation_success_path_tests;
 mod validation_tests;
 mod variant_search_edge_tests;

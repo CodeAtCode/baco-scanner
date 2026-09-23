@@ -1,7 +1,7 @@
+use crate::agent::AgentFinding;
 use crate::agent::executor::{create_audit_finding, create_empty_finding, execute_tool_calls};
 use crate::agent::sandbox::ToolSandbox;
 use crate::agent::tool_schema::ToolRegistry;
-use crate::agent::AgentFinding;
 use crate::findings::{Severity, VulnerabilityFinding};
 use crate::llm::{ChatResponse, LlmClient, ToolSchema};
 use async_trait::async_trait;
@@ -229,11 +229,7 @@ impl AgentSession {
                                 poc_format: None,
                                 llm_model: {
                                     let m = self.client.model_name();
-                                    if m.is_empty() {
-                                        None
-                                    } else {
-                                        Some(m)
-                                    }
+                                    if m.is_empty() { None } else { Some(m) }
                                 },
                                 agent_mode: true,
                                 statement_range: None,
@@ -352,7 +348,10 @@ impl AgentSession {
             "Finding to verify:\nTitle: {}\nFile: {}\nLine: {}\nSeverity: {}\nDescription: {}\n\nCreate and run a proof-of-concept test.",
             finding.title,
             finding.file_path,
-            finding.line_number.map(|l| l.to_string()).unwrap_or_default(),
+            finding
+                .line_number
+                .map(|l| l.to_string())
+                .unwrap_or_default(),
             finding.severity,
             description
         );

@@ -47,6 +47,9 @@ pub struct ScoreReport {
     pub matched: usize,
     pub missed: Vec<ExpectedFinding>,
     pub false_flags: usize,
+    pub suppressed_total: usize,
+    pub suppressed_clean: usize,
+    pub silence_rate: f32,
     pub recall: f32,
     pub precision: f32,
 }
@@ -72,6 +75,12 @@ pub struct SuiteReport {
     pub total_matched: usize,
     /// Micro-average pass rate: total matched / total expected
     pub aggregate: f32,
+    pub total_suppressed: usize,
+    pub total_suppressed_clean: usize,
+    /// Micro-average silence rate over suppressed twins
+    pub silence: f32,
+    /// Total findings on suppressed twins across targets
+    pub total_false_flags: usize,
 }
 
 /// Resolve the eval-suite floor: `BACO_EVAL_FLOOR` env override (must parse as f32
@@ -168,12 +177,24 @@ pub fn run_suite(eval_root: &Path) -> Result<SuiteReport, String> {
     if total_expected == 0 {
         return Err("Eval suite contains no expected findings".to_string());
     }
+    let total_suppressed: usize = targets.iter().map(|t| t.report.suppressed_total).sum();
+    let total_suppressed_clean: usize = targets.iter().map(|t| t.report.suppressed_clean).sum();
+    let total_false_flags: usize = targets.iter().map(|t| t.report.false_flags).sum();
+    let silence = if total_suppressed > 0 {
+        total_suppressed_clean as f32 / total_suppressed as f32
+    } else {
+        1.0
+    };
 
     Ok(SuiteReport {
         targets,
         total_expected,
         total_matched,
         aggregate: total_matched as f32 / total_expected as f32,
+        total_suppressed,
+        total_suppressed_clean,
+        silence,
+        total_false_flags,
     })
 }
 
@@ -182,16 +203,18 @@ pub fn score_findings(oracle: &OracleFile, findings: &[VulnerabilityFinding]) ->
     let expected_count = oracle.expected_findings.len();
     let mut matched_findings: Vec<bool> = vec![false; expected_count];
     let mut false_flags = 0usize;
+    let mut suppressed_hits = vec![false; oracle.expected_suppressed.len()];
 
     // Check each finding against expected and suppressed lists
     for finding in findings {
         // Check if finding is on a suppressed file (false flag)
-        let is_suppressed = oracle
+        let suppressed_idx = oracle
             .expected_suppressed
             .iter()
-            .any(|supp| finding.file_path == supp.file_path);
+            .position(|supp| finding.file_path == supp.file_path);
 
-        if is_suppressed {
+        if let Some(idx) = suppressed_idx {
+            suppressed_hits[idx] = true;
             false_flags += 1;
             continue;
         }
@@ -227,6 +250,14 @@ pub fn score_findings(oracle: &OracleFile, findings: &[VulnerabilityFinding]) ->
         .map(|(_, e)| e.clone())
         .collect();
 
+    let suppressed_total = oracle.expected_suppressed.len();
+    let suppressed_clean = suppressed_hits.iter().filter(|&&h| !h).count();
+    let silence_rate = if suppressed_total > 0 {
+        suppressed_clean as f32 / suppressed_total as f32
+    } else {
+        1.0
+    };
+
     // Calculate metrics
     let recall = if expected_count > 0 {
         matched as f32 / expected_count as f32
@@ -247,6 +278,9 @@ pub fn score_findings(oracle: &OracleFile, findings: &[VulnerabilityFinding]) ->
         matched,
         missed,
         false_flags,
+        suppressed_total,
+        suppressed_clean,
+        silence_rate,
         recall,
         precision,
     }

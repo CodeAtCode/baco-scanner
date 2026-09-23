@@ -110,7 +110,121 @@ pub fn run_doctor_checks(config_path: Option<&Path>, output_dir: Option<&Path>) 
     // Check 8: Disk space
     results.add(check_disk_space(output_path.as_deref()));
 
+    // Check 9: LLM endpoint reachability
+    results.add(check_llm_reachability(config_path));
+
     results
+}
+
+/// Check LLM endpoint reachability with a best-effort HTTP GET per unique
+/// configured base_url. Any HTTP status (even 401/404) counts as reachable;
+/// only network failure or timeout warns. Never fails the suite for being offline.
+fn check_llm_reachability(config_path: Option<&Path>) -> CheckResult {
+    let path = match config_path {
+        Some(p) => p.to_path_buf(),
+        None => {
+            return CheckResult {
+                name: "llm_reachability".to_string(),
+                status: CheckStatus::Ok,
+                detail: "No config path provided, skipping LLM reachability check".to_string(),
+            };
+        }
+    };
+    let config = match crate::config::ScannerConfig::from_file(path.to_str().unwrap_or("")) {
+        Ok(c) => c,
+        Err(_) => {
+            return CheckResult {
+                name: "llm_reachability".to_string(),
+                status: CheckStatus::Ok,
+                detail: "Config could not be parsed, skipping LLM reachability check".to_string(),
+            };
+        }
+    };
+    let mut urls = std::collections::HashSet::new();
+    if !config.llm.base_url.is_empty() {
+        urls.insert(config.llm.base_url.clone());
+    }
+    for phase in [
+        &config.llm.phases.discovery,
+        &config.llm.phases.verification,
+        &config.llm.phases.aggregation,
+        &config.llm.phases.static_analysis,
+        &config.llm.phases.security_agent_verification,
+        &config.llm.phases.threat_modeling,
+    ] {
+        if !phase.base_url.is_empty() {
+            urls.insert(phase.base_url.clone());
+        }
+    }
+    if urls.is_empty() {
+        return CheckResult {
+            name: "llm_reachability".to_string(),
+            status: CheckStatus::Ok,
+            detail: "No LLM base_url configured, skipping reachability check".to_string(),
+        };
+    }
+    // Ping on a scratch thread: block_on panics inside an existing async
+    // runtime, and doctor may run on one (e.g. under #[tokio::main]).
+    let mut urls: Vec<String> = urls.into_iter().collect();
+    urls.sort();
+    let (reachable, unreachable): (usize, Vec<String>) = match std::thread::spawn(move || {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .ok()?;
+        let mut reachable = 0usize;
+        let mut unreachable = Vec::new();
+        for url in &urls {
+            let ok = runtime.block_on(async {
+                let client = reqwest::Client::builder()
+                    .timeout(std::time::Duration::from_secs(5))
+                    .build()
+                    .ok()?;
+                client.get(url).send().await.ok().map(|_| ())
+            });
+            match ok {
+                Some(()) => reachable += 1,
+                None => unreachable.push(url.clone()),
+            }
+        }
+        Some((reachable, unreachable))
+    })
+    .join()
+    {
+        Ok(Some(pair)) => pair,
+        Ok(None) => {
+            return CheckResult {
+                name: "llm_reachability".to_string(),
+                status: CheckStatus::Warn,
+                detail: "Could not start check runtime".to_string(),
+            };
+        }
+        Err(_) => {
+            return CheckResult {
+                name: "llm_reachability".to_string(),
+                status: CheckStatus::Warn,
+                detail: "Reachability check thread panicked".to_string(),
+            };
+        }
+    };
+    if unreachable.is_empty() {
+        CheckResult {
+            name: "llm_reachability".to_string(),
+            status: CheckStatus::Ok,
+            detail: format!("{} LLM endpoint(s) reachable", reachable),
+        }
+    } else {
+        CheckResult {
+            name: "llm_reachability".to_string(),
+            status: CheckStatus::Warn,
+            detail: format!(
+                "{} reachable, {} unreachable: {}",
+                reachable,
+                unreachable.len(),
+                unreachable.join(", ")
+            ),
+        }
+    }
 }
 
 /// Check if config file parses correctly
@@ -167,7 +281,7 @@ fn check_preset_references(config_path: Option<&Path>) -> CheckResult {
                 name: "preset_resolve".to_string(),
                 status: CheckStatus::Ok,
                 detail: "No config path provided, skipping preset check".to_string(),
-            }
+            };
         }
     };
 
@@ -187,7 +301,7 @@ fn check_preset_references(config_path: Option<&Path>) -> CheckResult {
                 name: "preset_resolve".to_string(),
                 status: CheckStatus::Warn,
                 detail: format!("Could not read config for preset check: {}", e),
-            }
+            };
         }
     };
 
@@ -263,7 +377,7 @@ fn check_llm_phases(config_path: Option<&Path>) -> CheckResult {
                 name: "llm_phases".to_string(),
                 status: CheckStatus::Ok,
                 detail: "No config path provided, skipping LLM phase check".to_string(),
-            }
+            };
         }
     };
 
@@ -282,7 +396,7 @@ fn check_llm_phases(config_path: Option<&Path>) -> CheckResult {
                 name: "llm_phases".to_string(),
                 status: CheckStatus::Ok,
                 detail: "Config could not be parsed, skipping LLM phase check".to_string(),
-            }
+            };
         }
     };
 
