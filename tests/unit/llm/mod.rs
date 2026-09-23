@@ -11,6 +11,7 @@ pub mod llm_analysis_tests;
 pub mod llm_tests;
 mod metrics_legacy_tests;
 pub mod metrics_tests;
+pub mod mod_config_tests;
 pub mod model_selector_tests;
 mod phase_gating_tests;
 mod request_count_tests;

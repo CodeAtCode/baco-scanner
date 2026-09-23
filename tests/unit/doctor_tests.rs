@@ -1,6 +1,8 @@
 //! Tests for doctor.rs - pre-flight health check suite.
 
-use baco::doctor::{CheckResult, CheckStatus, DoctorResults, check_output_dir_writable};
+use baco::doctor::{
+    CheckResult, CheckStatus, DoctorResults, check_disk_space, check_output_dir_writable,
+};
 use tempfile::TempDir;
 
 #[test]
@@ -450,6 +452,309 @@ fn doctor_checks_without_config_path_skip_ok() {
         .find(|c| c.name == "config_parse")
         .expect("config_parse check must run");
     assert_eq!(config_check.status, baco::doctor::CheckStatus::Fail);
+}
+
+// ============================================================================
+// Target 1: DoctorResults::all_ok() + Default
+// ============================================================================
+
+#[test]
+fn test_doctor_results_all_ok_true() {
+    let results = DoctorResults::new();
+    assert!(results.all_ok());
+}
+
+#[test]
+fn test_doctor_results_all_ok_false_after_warn() {
+    let mut results = DoctorResults::new();
+    results.add(CheckResult {
+        name: "test".to_string(),
+        status: CheckStatus::Warn,
+        detail: "warning".to_string(),
+    });
+    assert!(!results.all_ok());
+}
+
+#[test]
+fn test_doctor_results_all_ok_false_after_fail() {
+    let mut results = DoctorResults::new();
+    results.add(CheckResult {
+        name: "test".to_string(),
+        status: CheckStatus::Fail,
+        detail: "failure".to_string(),
+    });
+    assert!(!results.all_ok());
+}
+
+#[test]
+fn test_doctor_results_default_all_ok() {
+    let results = DoctorResults::default();
+    assert!(results.all_ok());
+}
+
+#[test]
+fn test_doctor_results_default_exit_code_zero() {
+    let results = DoctorResults::default();
+    assert_eq!(results.exit_code(), 0);
+}
+
+// ============================================================================
+// Target 2: check_output_dir_writable error branches
+// ============================================================================
+
+#[test]
+fn test_check_output_dir_writable_parent_is_file() {
+    // Create a temp file, then try to create a subdir under it
+    let temp_dir = TempDir::new().unwrap();
+    let temp_file = temp_dir.path().join("temp_file");
+    std::fs::write(&temp_file, "").unwrap();
+
+    let result = check_output_dir_writable(Some(temp_file.join("sub").as_path()));
+    assert_eq!(result.status, CheckStatus::Fail);
+    assert!(result.detail.contains("Failed to create"));
+}
+
+#[test]
+fn test_check_output_dir_writable_path_is_file() {
+    // Create a temp file and pass its path directly
+    let temp_dir = TempDir::new().unwrap();
+    let temp_file = temp_dir.path().join("temp_file");
+    std::fs::write(&temp_file, "").unwrap();
+
+    let result = check_output_dir_writable(Some(temp_file.as_path()));
+    assert_eq!(result.status, CheckStatus::Fail);
+    assert!(result.detail.contains("not a directory"));
+}
+
+#[test]
+fn test_check_output_dir_writable_none_uses_default() {
+    // Call with None - should use "baco-output" in CWD
+    let result = check_output_dir_writable(None);
+    assert_eq!(result.status, CheckStatus::Ok);
+
+    // Clean up the created directory
+    let _ = std::fs::remove_dir_all("baco-output");
+}
+
+// ============================================================================
+// Target 3: check_disk_space branches
+// ============================================================================
+
+#[test]
+fn test_check_disk_space_none_uses_current_dir() {
+    let result = check_disk_space(None);
+    // On Unix, this uses df on "." - should be Ok or Warn depending on disk space
+    assert!(
+        result.status == CheckStatus::Ok || result.status == CheckStatus::Warn,
+        "Disk space check on current dir should be Ok or Warn, got {:?}",
+        result.status
+    );
+}
+
+#[test]
+fn test_check_disk_space_nonexistent_path_fallback() {
+    let result = check_disk_space(Some(std::path::Path::new("/nonexistent-xyz-abc-123")));
+    // On Unix, df fails → fallback arm (Ok + "skipped")
+    assert_eq!(result.status, CheckStatus::Ok);
+    assert!(result.detail.contains("skipped"));
+}
+
+#[test]
+fn test_check_disk_space_real_temp_dir() {
+    let temp_dir = TempDir::new().unwrap();
+    let result = check_disk_space(Some(temp_dir.path()));
+    assert_eq!(result.status, CheckStatus::Ok);
+}
+
+// ============================================================================
+// Target 4: check_preset_references Ok branch
+// ============================================================================
+
+#[test]
+fn test_check_preset_references_django_ok() {
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join("baco.toml");
+
+    let config_content = r#"
+[scanner]
+profile = "core"
+preset = "django"
+
+[llm]
+[llm.phases]
+[llm.phases.discovery]
+api_key = "test-key"
+base_url = "https://test.api/v1"
+model = "test-model"
+
+[llm.phases.verification]
+api_key = "test-key"
+base_url = "https://test.api/v1"
+model = "test-model"
+
+[llm.phases.aggregation]
+api_key = "test-key"
+base_url = "https://test.api/v1"
+model = "test-model"
+
+[llm.phases.static_analysis]
+api_key = "test-key"
+base_url = "https://test.api/v1"
+model = "test-model"
+
+[llm.phases.security_agent_verification]
+api_key = "test-key"
+base_url = "https://test.api/v1"
+model = "test-model"
+
+[llm.phases.threat_modeling]
+api_key = "test-key"
+base_url = "https://test.api/v1"
+model = "test-model"
+
+[cpg]
+enabled = false
+"#;
+
+    std::fs::write(&config_path, config_content).unwrap();
+
+    let results = baco::doctor::run_doctor_checks(Some(config_path.as_path()), None);
+
+    let preset_check = results
+        .checks
+        .iter()
+        .find(|c| c.name == "preset_resolve")
+        .expect("preset_resolve check must run");
+
+    assert_eq!(preset_check.status, CheckStatus::Ok);
+    assert!(preset_check.detail.contains("resolved successfully"));
+}
+
+// ============================================================================
+// Target 5: check_llm_phases / check_phase_config missing config
+// ============================================================================
+
+#[test]
+fn test_check_llm_phases_missing_base_url_and_model() {
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join("baco.toml");
+
+    let config_content = r#"
+[scanner]
+profile = "core"
+
+[llm]
+[llm.phases]
+[llm.phases.discovery]
+api_key = "x"
+"#;
+
+    std::fs::write(&config_path, config_content).unwrap();
+
+    let results = baco::doctor::run_doctor_checks(Some(config_path.as_path()), None);
+
+    let llm_check = results
+        .checks
+        .iter()
+        .find(|c| c.name == "llm_phases")
+        .expect("llm_phases check must run");
+
+    assert_eq!(llm_check.status, CheckStatus::Warn);
+    assert!(llm_check.detail.contains("Missing LLM config"));
+    assert!(llm_check.detail.contains("discovery"));
+}
+
+#[test]
+fn test_check_llm_phases_missing_model_only() {
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join("baco.toml");
+
+    let config_content = r#"
+[scanner]
+profile = "core"
+
+[llm]
+[llm.phases]
+[llm.phases.discovery]
+api_key = "x"
+base_url = "http://x"
+"#;
+
+    std::fs::write(&config_path, config_content).unwrap();
+
+    let results = baco::doctor::run_doctor_checks(Some(config_path.as_path()), None);
+
+    let llm_check = results
+        .checks
+        .iter()
+        .find(|c| c.name == "llm_phases")
+        .expect("llm_phases check must run");
+
+    assert_eq!(llm_check.status, CheckStatus::Warn);
+    assert!(llm_check.detail.contains("model"));
+}
+
+// ============================================================================
+// Target 6: check_joern cpg-disabled
+// ============================================================================
+
+#[test]
+fn test_check_joern_cpg_disabled_skipped() {
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join("baco.toml");
+
+    let config_content = r#"
+[scanner]
+profile = "core"
+
+[llm]
+[llm.phases]
+[llm.phases.discovery]
+api_key = "test-key"
+base_url = "https://test.api/v1"
+model = "test-model"
+
+[llm.phases.verification]
+api_key = "test-key"
+base_url = "https://test.api/v1"
+model = "test-model"
+
+[llm.phases.aggregation]
+api_key = "test-key"
+base_url = "https://test.api/v1"
+model = "test-model"
+
+[llm.phases.static_analysis]
+api_key = "test-key"
+base_url = "https://test.api/v1"
+model = "test-model"
+
+[llm.phases.security_agent_verification]
+api_key = "test-key"
+base_url = "https://test.api/v1"
+model = "test-model"
+
+[llm.phases.threat_modeling]
+api_key = "test-key"
+base_url = "https://test.api/v1"
+model = "test-model"
+
+[cpg]
+enabled = false
+"#;
+
+    std::fs::write(&config_path, config_content).unwrap();
+
+    let results = baco::doctor::run_doctor_checks(Some(config_path.as_path()), None);
+
+    let joern_check = results
+        .checks
+        .iter()
+        .find(|c| c.name == "joern")
+        .expect("joern check must run");
+
+    assert_eq!(joern_check.status, CheckStatus::Ok);
+    assert!(joern_check.detail.contains("skipped"));
 }
 
 #[test]

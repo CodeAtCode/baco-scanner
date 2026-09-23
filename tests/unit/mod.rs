@@ -152,6 +152,7 @@ mod indexer_tests;
 mod indexer_tests_new;
 mod init_tests;
 mod llm;
+pub mod llm_analysis_chunking_tests;
 mod orchestrator_integration_tests;
 mod org_context_tests;
 mod phantom_config_fields_tests;
