@@ -37,7 +37,7 @@ impl CveClient {
 
     /// Fetch CISA KEV catalog
     ///
-    /// Source: https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json
+    /// Source: <https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json>
     pub async fn fetch_kev_catalog(&self) -> Result<Vec<CveEntry>, Box<dyn std::error::Error>> {
         let url = if let Some(ref base) = self.base_url {
             format!("{}/known_exploited_vulnerabilities.json", base)
@@ -95,7 +95,7 @@ impl CveClient {
 
     /// Fetch CVEs from NVD API
     ///
-    /// Source: https://services.nvd.nist.gov/rest/json/cves/2.0
+    /// Source: <https://services.nvd.nist.gov/rest/json/cves/2.0>
     pub async fn fetch_nvd_cves(
         &self,
         vendor: &str,

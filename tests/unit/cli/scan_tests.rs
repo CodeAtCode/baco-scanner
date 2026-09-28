@@ -77,6 +77,7 @@ fn test_print_scan_summary() {
         output_dir,
         "test-project",
         false, // evidence_gate_enabled
+        None,  // config (not needed for this test)
         true,  // quiet
     );
 

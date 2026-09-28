@@ -77,8 +77,124 @@ impl PresetOverlay {
             if !scanner.semgrep.custom_rules.is_empty() {
                 base.scanner.semgrep.custom_rules = scanner.semgrep.custom_rules.clone();
             }
-            // Performance settings
-            base.scanner.performance = scanner.performance.clone();
+            // Performance settings - merge per-key to preserve user-configured values
+            // Only apply non-default values from preset (to avoid overwriting user settings)
+            if scanner.performance.enable_incremental_scan
+                != crate::config::scanner::PerformanceSettings::default().enable_incremental_scan
+            {
+                base.scanner.performance.enable_incremental_scan =
+                    scanner.performance.enable_incremental_scan;
+            }
+            // early_termination_threshold has #[serde(default)] on f32, so serde default is 0.0.
+            // We cannot distinguish "omitted" (0.0) from "explicitly 0.0" without changing to Option<f32>.
+            // Compare against serde default (0.0) to fix defect 1: omitted field preserves user value.
+            // Note: explicitly setting 0.0 in a preset will NOT be applied (same as omitting it).
+            // To support explicit 0.0, change early_termination_threshold to Option<f32> in scanner.rs.
+            if scanner.performance.early_termination_threshold != 0.0 {
+                base.scanner.performance.early_termination_threshold =
+                    scanner.performance.early_termination_threshold;
+            }
+            if scanner.performance.enable_file_filtering
+                != crate::config::scanner::PerformanceSettings::default().enable_file_filtering
+            {
+                base.scanner.performance.enable_file_filtering =
+                    scanner.performance.enable_file_filtering;
+            }
+            if scanner.performance.max_parallel_tasks
+                != crate::config::scanner::PerformanceSettings::default().max_parallel_tasks
+            {
+                base.scanner.performance.max_parallel_tasks =
+                    scanner.performance.max_parallel_tasks;
+            }
+            if scanner.performance.enable_threat_modeling
+                != crate::config::scanner::PerformanceSettings::default().enable_threat_modeling
+            {
+                base.scanner.performance.enable_threat_modeling =
+                    scanner.performance.enable_threat_modeling;
+            }
+            if scanner.performance.enable_root_cause_dedup
+                != crate::config::scanner::PerformanceSettings::default().enable_root_cause_dedup
+            {
+                base.scanner.performance.enable_root_cause_dedup =
+                    scanner.performance.enable_root_cause_dedup;
+            }
+            if scanner.performance.enable_auto_patching
+                != crate::config::scanner::PerformanceSettings::default().enable_auto_patching
+            {
+                base.scanner.performance.enable_auto_patching =
+                    scanner.performance.enable_auto_patching;
+            }
+            if scanner.performance.enable_poc_compilation
+                != crate::config::scanner::PerformanceSettings::default().enable_poc_compilation
+            {
+                base.scanner.performance.enable_poc_compilation =
+                    scanner.performance.enable_poc_compilation;
+            }
+            if scanner.performance.enable_confidence_refinement
+                != crate::config::scanner::PerformanceSettings::default()
+                    .enable_confidence_refinement
+            {
+                base.scanner.performance.enable_confidence_refinement =
+                    scanner.performance.enable_confidence_refinement;
+            }
+            if scanner.performance.enable_cve_bootstrap
+                != crate::config::scanner::PerformanceSettings::default().enable_cve_bootstrap
+            {
+                base.scanner.performance.enable_cve_bootstrap =
+                    scanner.performance.enable_cve_bootstrap;
+            }
+            if scanner.performance.enable_variant_search
+                != crate::config::scanner::PerformanceSettings::default().enable_variant_search
+            {
+                base.scanner.performance.enable_variant_search =
+                    scanner.performance.enable_variant_search;
+            }
+            if scanner.performance.enable_hunt_prompts
+                != crate::config::scanner::PerformanceSettings::default().enable_hunt_prompts
+            {
+                base.scanner.performance.enable_hunt_prompts =
+                    scanner.performance.enable_hunt_prompts;
+            }
+            if scanner.performance.never_submit_enabled
+                != crate::config::scanner::PerformanceSettings::default().never_submit_enabled
+            {
+                base.scanner.performance.never_submit_enabled =
+                    scanner.performance.never_submit_enabled;
+            }
+            if scanner.performance.never_submit_multiplier
+                != crate::config::scanner::PerformanceSettings::default().never_submit_multiplier
+            {
+                base.scanner.performance.never_submit_multiplier =
+                    scanner.performance.never_submit_multiplier;
+            }
+            if !scanner.performance.variant_search_patterns.is_empty() {
+                base.scanner.performance.variant_search_patterns =
+                    scanner.performance.variant_search_patterns.clone();
+            }
+            // VulnSpec config - merge if preset has non-default values
+            if scanner.performance.vuln_spec.enabled
+                != crate::config::scanner::PerformanceSettings::default()
+                    .vuln_spec
+                    .enabled
+            {
+                base.scanner.performance.vuln_spec.enabled = scanner.performance.vuln_spec.enabled;
+            }
+            if scanner.performance.vuln_spec.db_path
+                != crate::config::scanner::PerformanceSettings::default()
+                    .vuln_spec
+                    .db_path
+            {
+                base.scanner.performance.vuln_spec.db_path =
+                    scanner.performance.vuln_spec.db_path.clone();
+            }
+            if scanner.performance.vuln_spec.auto_extract_from_patches
+                != crate::config::scanner::PerformanceSettings::default()
+                    .vuln_spec
+                    .auto_extract_from_patches
+            {
+                base.scanner.performance.vuln_spec.auto_extract_from_patches =
+                    scanner.performance.vuln_spec.auto_extract_from_patches;
+            }
         }
 
         if let Some(ref llm) = self.llm {
@@ -88,9 +204,9 @@ impl PresetOverlay {
             if llm.max_concurrent > 0 {
                 base.llm.max_concurrent = llm.max_concurrent;
             }
-            if llm.temperature > 0.0 {
-                base.llm.temperature = llm.temperature;
-            }
+            // Apply temperature unconditionally - presence in preset means explicit value
+            // This allows 0.0 and negative temperatures to be set from presets
+            base.llm.temperature = llm.temperature;
             // Phase configs
             if !llm.phases.discovery.models.is_empty() {
                 base.llm.phases.discovery.models = llm.phases.discovery.models.clone();
@@ -175,7 +291,7 @@ impl PresetOverlay {
 
 /// Load a preset by name, resolving from:
 /// 1. Bundled presets (via include_str! at compile time)
-/// 2. User directory: ~/.config/baco/presets/<name>.toml
+/// 2. User directory: `~/.config/baco/presets/<name>.toml`
 pub fn load_preset(name: &str) -> Result<PresetOverlay, ScanError> {
     // Check bundled presets first
     if let Some(content) = get_bundled_preset(name) {

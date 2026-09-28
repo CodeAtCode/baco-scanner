@@ -411,7 +411,7 @@ async fn run_parallel_phases(
     // Re-enable progress bar and show completion
     pb.set_draw_target(indicatif::ProgressDrawTarget::stderr());
     pb.set_message("Parallel phases complete, running sequential phases...");
-    pb.set_position(300);
+    pb.set_position((PhaseSpec::parallel().len() as u64) * 100);
 
     Ok((findings, analyzed_files))
 }
@@ -743,8 +743,7 @@ pub(super) async fn run_scanner(
     }
 
     let enable_parallel = true;
-    let sequential_phase_count = 20; // 20 sequential phases including Validate
-    let total_phases = 4 + sequential_phase_count; // 4 parallel + 20 sequential = 24
+    let total_phases = PhaseSpec::total();
 
     let pb = scanner
         .progress
@@ -771,7 +770,11 @@ pub(super) async fn run_scanner(
         // Parallelization not implemented - sequential mode active
     }
 
-    let start_position = if enable_parallel { 300 } else { 0 };
+    let start_position = if enable_parallel {
+        (PhaseSpec::parallel().len() as u64) * 100
+    } else {
+        0
+    };
     let (findings, analyzed_files) = run_sequential_phases(
         scanner,
         &pb,

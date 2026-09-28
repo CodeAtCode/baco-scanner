@@ -79,6 +79,7 @@ pub async fn run_rule_synthesis(
                 Vec::new()
             };
 
+        let base = pb.position();
         for (i, cwe) in seen_cwes.iter().enumerate() {
             match run_proposer_loop(&client, cwe, &traces, config.rulesynth.max_iterations).await {
                 Some((pattern, outcome)) => {
@@ -103,11 +104,12 @@ pub async fn run_rule_synthesis(
                     tracing::warn!("MoCQ: no valid pattern produced for {}", cwe);
                 }
             }
-            pb.set_position(pb.position() + (i as u64 * 100 / total.max(1) as u64));
+            pb.set_position(base + ((i as u64 + 1) * 100 / total.max(1) as u64));
         }
     } else {
         // Original path: use old RuleSynthesizer
         let synthesizer = crate::rulesynth::RuleSynthesizer::new(&client, &config.rulesynth);
+        let base = pb.position();
 
         for (i, cwe) in seen_cwes.iter().enumerate() {
             for language in &config.project.languages {
@@ -133,11 +135,11 @@ pub async fn run_rule_synthesis(
                     }
                 }
             }
-            pb.set_position(pb.position() + (i as u64 * 100 / total.max(1) as u64));
+            pb.set_position(base + ((i as u64 + 1) * 100 / total.max(1) as u64));
         }
-    }
 
-    pb.set_position(pb.position() + 100);
+        pb.set_position(base + 100);
+    }
     Ok((findings, analyzed_files.to_vec()))
 }
 
@@ -214,6 +216,7 @@ pub async fn run_exploit_synth(
     ));
 
     let total = findings.len();
+    let base = pb.position();
     for (i, finding) in findings.iter_mut().enumerate() {
         match synth.synthesize_and_verify(finding).await {
             Ok(result) => {
@@ -247,10 +250,10 @@ pub async fn run_exploit_synth(
                 tracing::warn!("Exploit synthesis failed for finding {}: {}", finding.id, e);
             }
         }
-        pb.set_position(pb.position() + (i as u64 * 100 / total.max(1) as u64));
+        pb.set_position(base + ((i as u64 + 1) * 100 / total.max(1) as u64));
     }
 
-    pb.set_position(pb.position() + 100);
+    pb.set_position(base + 100);
     Ok((findings, analyzed_files.to_vec()))
 }
 
@@ -318,6 +321,7 @@ pub async fn run_validate(
 
     let total = findings.len();
     let mut updated: Vec<VulnerabilityFinding> = Vec::with_capacity(total);
+    let base = pb.position();
 
     for (i, finding) in findings.into_iter().enumerate() {
         match crate::llm_verification::rationale_check(&client, &finding).await {
@@ -360,10 +364,10 @@ pub async fn run_validate(
                 updated.push(finding);
             }
         }
-        pb.set_position(pb.position() + ((i as u64 + 1) * 100 / total.max(1) as u64));
+        pb.set_position(base + ((i as u64 + 1) * 100 / total.max(1) as u64));
     }
 
-    pb.set_position(pb.position() + 100);
+    pb.set_position(base + 100);
     Ok((updated, analyzed_files.to_vec()))
 }
 

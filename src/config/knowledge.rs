@@ -7,7 +7,7 @@ pub struct HookRegistryLanguageConfig {
     /// Label used to synthesize hook names when the registration pattern lacks a `hook` named capture
     #[serde(default = "default_hook_label")]
     pub hook_label: String,
-    /// Regex patterns for hook registrations; use (?P<hook>...) named capture for hook names
+    /// Regex patterns for hook registrations; use `(?P<hook>...)` named capture for hook names
     #[serde(default)]
     pub registrations: Vec<String>,
     /// Optional override for handler callable patterns; None uses built-in PHP callable forms

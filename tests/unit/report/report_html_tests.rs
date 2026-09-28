@@ -559,3 +559,147 @@ fn test_generate_html_report_creates_parent_dirs() {
     // Clean up
     let _ = fs::remove_dir_all(temp_dir.path());
 }
+
+#[test]
+fn test_model_names_escaped_in_html() {
+    use baco::config::ScannerConfig;
+    use std::io::Write;
+
+    // Create a config with malicious model name containing HTML/script payload
+    let config_content = r#"
+[llm.phases.discovery]
+models = ["<script>alert('xss')</script>", "normal-model-v1"]
+
+[llm.phases.verification]
+models = ["verification<script>evil()</script>"]
+
+[llm.phases.aggregation]
+models = ["aggregation"]
+
+[output]
+evidence_gate = false
+include_rejected = false
+"#;
+
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join("test_config.toml");
+    let mut file = std::fs::File::create(&config_path).unwrap();
+    file.write_all(config_content.as_bytes()).unwrap();
+
+    let config: ScannerConfig =
+        toml::from_str(&std::fs::read_to_string(&config_path).unwrap()).unwrap();
+
+    let findings = vec![make_finding("f1", Severity::High, "src/test.rs", Some(10))];
+    let output_path = temp_dir.path().join("report.html");
+
+    let result = baco::report::html::generate_html_report(
+        &findings,
+        output_path.to_str().unwrap(),
+        Some(&config),
+        None,
+    );
+
+    assert!(result.is_ok());
+
+    let content = fs::read_to_string(&output_path).unwrap();
+
+    // Debug: print the content around models section
+    eprintln!("\n=== DEBUG: HTML Content (first 5000 chars) ===");
+    eprintln!("{}", &content[..content.len().min(5000)]);
+    eprintln!("=== END DEBUG ===");
+
+    // Find models section
+    if let Some(start) = content.find("Discovery Models") {
+        let end = (start + 500).min(content.len());
+        eprintln!("\n=== MODELS SECTION ===");
+        eprintln!("{}", &content[start..end]);
+        eprintln!("=== END MODELS ===\n");
+    }
+
+    // The raw payload must NOT appear
+    // Find the models section and verify escaping there
+    let models_start = content
+        .find("Discovery Models")
+        .expect("Models section should exist");
+    let models_end = content
+        .find("Aggregation Models")
+        .expect("Aggregation section should exist")
+        + 100;
+    let models_section = &content[models_start..models_end];
+
+    // The model payload must be escaped in the models section
+    assert!(
+        !models_section.contains("<script>"),
+        "Model names should be escaped in models section"
+    );
+
+    // Note: The HTML includes Prism JS library which has legitimate <script> tags.
+    // What we're testing is that the MODEL NAMES are escaped.
+    // The test checks that our escaping code works for the models_html fragment.
+
+    // The escaped version MUST appear
+    assert!(
+        content.contains("&lt;script&gt;"),
+        "Model names should be HTML-escaped"
+    );
+    assert!(
+        content.contains("&lt;script&gt;evil()&lt;/script&gt;"),
+        "Verification model name should be fully escaped"
+    );
+
+    // Normal model names should still appear
+    assert!(content.contains("normal-model-v1"));
+    assert!(content.contains("aggregation"));
+
+    // Clean up
+    let _ = fs::remove_dir_all(temp_dir.path());
+}
+
+#[test]
+fn test_findings_inside_container() {
+    let findings = vec![make_finding("f1", Severity::High, "src/test.rs", Some(10))];
+    let output_path = "/tmp/test_findings_container.html";
+
+    // Clean up if exists
+    let _ = fs::remove_file(output_path);
+
+    let result = baco::report::html::generate_html_report(&findings, output_path, None, None);
+
+    assert!(result.is_ok());
+
+    let content = fs::read_to_string(output_path).unwrap();
+
+    // Find the container opening tag
+    let container_open = content
+        .find("<div class=\"container\"")
+        .expect("Container div should exist");
+
+    // Find the priority section (part of findings_html)
+    let priority_section = content
+        .find("<div class=\"priority-section\"")
+        .expect("Priority section should exist in findings_html");
+
+    // Find the footer section (comes AFTER container closes)
+    let footer_section = content
+        .find("<div class=\"footer\"")
+        .expect("Footer section should exist after container");
+
+    // Assert findings content comes AFTER container opens
+    assert!(
+        priority_section > container_open,
+        "Findings should be inside container (priority_section index {} > container_open index {})",
+        priority_section,
+        container_open
+    );
+
+    // Assert findings content comes BEFORE footer (which is outside container)
+    assert!(
+        priority_section < footer_section,
+        "Findings should be inside container (priority_section index {} < footer_section index {})",
+        priority_section,
+        footer_section
+    );
+
+    // Clean up
+    let _ = fs::remove_file(output_path);
+}

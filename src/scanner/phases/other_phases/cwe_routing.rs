@@ -112,6 +112,7 @@ pub async fn run_cpg_slice(
 
     let slicer = crate::cpg::slicer::CpgSlicer::new(&engine);
     let total = findings.len();
+    let base = pb.position();
     for (i, finding) in findings.iter_mut().enumerate() {
         let cwe_hint = finding.cwe_id.as_deref().unwrap_or("CWE-79");
         let entry_point = finding
@@ -139,9 +140,9 @@ pub async fn run_cpg_slice(
                 );
             }
         }
-        pb.set_position(pb.position() + (i as u64 * 100 / total.max(1) as u64));
+        pb.set_position(base + ((i as u64 + 1) * 100 / total.max(1) as u64));
     }
 
-    pb.set_position(pb.position() + 100);
+    pb.set_position(base + 100);
     Ok((findings, analyzed_files.to_vec()))
 }

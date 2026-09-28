@@ -53,6 +53,8 @@ enum Commands {
         input: PathBuf,
         #[arg(short, long, value_enum, default_value_t = ReportFormat::Html)]
         format: ReportFormat,
+        #[arg(long, help = "Config file path for evidence gate")]
+        config: Option<PathBuf>,
     },
     Verify {
         #[arg(short, long)]
@@ -179,12 +181,18 @@ async fn main() {
                     std::process::exit(1);
                 });
         }
-        Commands::Report { input, format } => {
+        Commands::Report {
+            input,
+            format,
+            config,
+        } => {
             info!("Generating {} report from: {:?}", format, input);
-            cli::report::run_report(&input, format, cli.quiet).unwrap_or_else(|e| {
-                tracing::error!("Report generation failed: {}", e);
-                std::process::exit(1);
-            });
+            cli::report::run_report(&input, format, config.as_deref(), cli.quiet).unwrap_or_else(
+                |e| {
+                    tracing::error!("Report generation failed: {}", e);
+                    std::process::exit(1);
+                },
+            );
         }
         Commands::Verify { input, config } => {
             info!("Verifying findings from: {:?}", input);

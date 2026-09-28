@@ -84,19 +84,31 @@ pub fn generate_html_report(
         let discovery_html = if discovery_models.is_empty() {
             "Not configured".to_string()
         } else {
-            discovery_models.join(", ")
+            discovery_models
+                .iter()
+                .map(|m| html_escape::encode_text(m).to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
         };
 
         let verification_html = if verification_models.is_empty() {
             "Not configured".to_string()
         } else {
-            verification_models.join(", ")
+            verification_models
+                .iter()
+                .map(|m| html_escape::encode_text(m).to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
         };
 
         let aggregation_html = if aggregation_models.is_empty() {
             "Not configured".to_string()
         } else {
-            aggregation_models.join(", ")
+            aggregation_models
+                .iter()
+                .map(|m| html_escape::encode_text(m).to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
         };
 
         format!(

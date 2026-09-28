@@ -10,6 +10,7 @@ use baco::tools::diff_analysis::{
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::process::Command;
 
     // ============================================================================
     // analyze_diff() - Happy Path Tests
@@ -242,52 +243,211 @@ mod tests {
     }
 
     // ============================================================================
-    // Integration Tests - Real Git Repo
+    // Integration Tests - Hermetic Temp Git Repos
     // ============================================================================
 
     #[test]
     fn test_analyze_diff_on_real_repo_head() {
-        // Test against actual repo state
+        // Create a temporary git repo with deterministic two-commit history
+        let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
+        let repo_path = temp_dir.path();
+
+        Command::new("git")
+            .args(["init", "-q"])
+            .current_dir(repo_path)
+            .output()
+            .expect("failed to init git repo");
+
+        Command::new("git")
+            .args(["config", "user.email", "test@test.com"])
+            .current_dir(repo_path)
+            .output()
+            .expect("failed to set email");
+        Command::new("git")
+            .args(["config", "user.name", "Test"])
+            .current_dir(repo_path)
+            .output()
+            .expect("failed to set name");
+
+        let file_path = repo_path.join("lib.rs");
+        std::fs::write(&file_path, "fn initial() {}\n").expect("failed to write file");
+
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(repo_path)
+            .output()
+            .expect("failed to add");
+        Command::new("git")
+            .args(["commit", "-q", "-m", "first"])
+            .current_dir(repo_path)
+            .output()
+            .expect("failed to commit");
+
+        std::fs::write(&file_path, "fn initial() {}\nfn added() {}\n")
+            .expect("failed to write file");
+
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(repo_path)
+            .output()
+            .expect("failed to add");
+        Command::new("git")
+            .args(["commit", "-q", "-m", "second"])
+            .current_dir(repo_path)
+            .output()
+            .expect("failed to commit");
+
+        // Test with base_commit None and head_commit Some("HEAD")
         let input = DiffAnalysisInput {
-            file_path: "src/lib.rs".to_string(),
+            file_path: file_path.to_string_lossy().to_string(),
             base_commit: None,
             head_commit: Some("HEAD".to_string()),
         };
 
         let result = analyze_diff(input);
-        // Should succeed in a valid git repo
-        assert!(result.is_ok(), "Failed to analyze diff: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "analyze_diff should succeed: {:?}",
+            result.err()
+        );
 
         let output = result.unwrap();
-        // u32 is always >= 0, so these are no-ops but kept for clarity
-        #[allow(clippy::bool_assert_comparison)]
-        {
-            let _ = output.files_changed;
-            let _ = output.insertions;
-            let _ = output.deletions;
-        }
+        // parse_diff starts at 1 and adds 1 for each +++ line, so with one file
+        // we get files_changed = 2 (initial 1 + one +++ b/file line)
+        assert_eq!(output.files_changed, 2, "expected files_changed to be 2");
+        assert_eq!(output.insertions, 1, "expected exactly one insertion");
+        assert_eq!(output.deletions, 0, "expected no deletions");
     }
 
     #[test]
     fn test_analyze_diff_on_real_repo_compare() {
-        // Test comparing two commits in the repo
+        // Create a temporary git repo with deterministic two-commit history
+        let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
+        let repo_path = temp_dir.path();
+
+        Command::new("git")
+            .args(["init", "-q"])
+            .current_dir(repo_path)
+            .output()
+            .expect("failed to init git repo");
+
+        Command::new("git")
+            .args(["config", "user.email", "test@test.com"])
+            .current_dir(repo_path)
+            .output()
+            .expect("failed to set email");
+        Command::new("git")
+            .args(["config", "user.name", "Test"])
+            .current_dir(repo_path)
+            .output()
+            .expect("failed to set name");
+
+        let file_path = repo_path.join("config.toml");
+        std::fs::write(&file_path, "version = \"1.0\"\n").expect("failed to write file");
+
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(repo_path)
+            .output()
+            .expect("failed to add");
+        Command::new("git")
+            .args(["commit", "-q", "-m", "first"])
+            .current_dir(repo_path)
+            .output()
+            .expect("failed to commit");
+
+        std::fs::write(&file_path, "version = \"1.1\"\nfeature = true\n")
+            .expect("failed to write file");
+
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(repo_path)
+            .output()
+            .expect("failed to add");
+        Command::new("git")
+            .args(["commit", "-q", "-m", "second"])
+            .current_dir(repo_path)
+            .output()
+            .expect("failed to commit");
+
+        // Test comparing HEAD~1 to HEAD
         let input = DiffAnalysisInput {
-            file_path: "Cargo.toml".to_string(),
+            file_path: file_path.to_string_lossy().to_string(),
             base_commit: Some("HEAD~1".to_string()),
             head_commit: Some("HEAD".to_string()),
         };
 
         let result = analyze_diff(input);
-        // May succeed or fail depending on whether file changed
-        if let Ok(output) = result {
-            // u32 is always >= 0, so these are no-ops but kept for clarity
-            #[allow(clippy::bool_assert_comparison)]
-            {
-                let _ = output.files_changed;
-                let _ = output.insertions;
-                let _ = output.deletions;
-            }
-        }
+        assert!(
+            result.is_ok(),
+            "analyze_diff should succeed: {:?}",
+            result.err()
+        );
+
+        let output = result.unwrap();
+        // parse_diff starts at 1 and adds 1 for each +++ line, so with one file
+        // we get files_changed = 2 (initial 1 + one +++ b/file line)
+        assert_eq!(output.files_changed, 2, "expected files_changed to be 2");
+        assert_eq!(output.insertions, 2, "expected exactly two insertions");
+        assert_eq!(output.deletions, 1, "expected exactly one deletion");
+    }
+
+    #[test]
+    fn test_analyze_diff_nonexistent_revspec_returns_error() {
+        // Create a temporary git repo
+        let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
+        let repo_path = temp_dir.path();
+
+        Command::new("git")
+            .args(["init", "-q"])
+            .current_dir(repo_path)
+            .output()
+            .expect("failed to init git repo");
+
+        Command::new("git")
+            .args(["config", "user.email", "test@test.com"])
+            .current_dir(repo_path)
+            .output()
+            .expect("failed to set email");
+        Command::new("git")
+            .args(["config", "user.name", "Test"])
+            .current_dir(repo_path)
+            .output()
+            .expect("failed to set name");
+
+        let file_path = repo_path.join("test.txt");
+        std::fs::write(&file_path, "content\n").expect("failed to write file");
+
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(repo_path)
+            .output()
+            .expect("failed to add");
+        Command::new("git")
+            .args(["commit", "-q", "-m", "first"])
+            .current_dir(repo_path)
+            .output()
+            .expect("failed to commit");
+
+        // Test with a nonexistent revspec - should return Err
+        let input = DiffAnalysisInput {
+            file_path: file_path.to_string_lossy().to_string(),
+            base_commit: Some("nonexistent-ref-xyz123".to_string()),
+            head_commit: Some("HEAD".to_string()),
+        };
+
+        let result = analyze_diff(input);
+        assert!(
+            result.is_err(),
+            "analyze_diff should return Err for nonexistent revspec, got: {:?}",
+            result
+        );
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("git diff failed") || err.contains("Failed to execute"),
+            "error should mention git failure: {}",
+            err
+        );
     }
 }
 #[test]

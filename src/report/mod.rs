@@ -9,6 +9,19 @@ pub mod markdown;
 pub mod presenter;
 pub mod sarif;
 
+/// Tag every finding's verification_tier if it doesn't already have one.
+/// Uses crate::evidence::classify_finding to compute the tier from evidence + confidence.
+pub fn tag_verification_tier(findings: &mut [VulnerabilityFinding]) {
+    for finding in findings {
+        if finding.verification_tier.is_none() {
+            finding.verification_tier = Some(classify_finding(
+                &finding.evidence,
+                finding.confidence_score,
+            ));
+        }
+    }
+}
+
 /// Apply evidence gate filter to findings.
 /// Returns all findings when cfg is None or evidence_gate is false.
 /// When gate is enabled, retains only Verified/Supported tiers.

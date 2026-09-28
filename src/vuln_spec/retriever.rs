@@ -13,7 +13,7 @@ use std::sync::RwLock;
 /// Static embedding index for specifications
 /// Global by design: the spec embedding index is shared across phases within a scan.
 /// Mutations are serialized via the RwLock; tests that build or clear the index must
-/// run under #[serial] (see test flake history).
+/// run under the `serial` attribute (see test flake history).
 pub static EMBEDDING_INDEX: LazyLock<RwLock<SpecEmbeddingIndex>> =
     LazyLock::new(|| RwLock::new(SpecEmbeddingIndex::new()));
 

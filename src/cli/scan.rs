@@ -34,8 +34,9 @@ pub async fn run_scan(
         config.output.evidence_gate = true;
     }
 
-    // Save evidence_gate flag before config is moved into scanner
+    // Save evidence_gate flag and config reference before config is moved into scanner
     let evidence_gate_enabled = config.output.evidence_gate;
+    let config_ref = config.clone();
 
     let output_dir = PathBuf::from(&config.output.dir);
     std::fs::create_dir_all(&output_dir)?;
@@ -109,6 +110,7 @@ pub async fn run_scan(
         &output_dir,
         &project_name,
         evidence_gate_enabled,
+        Some(&config_ref),
         quiet,
     )?;
 
@@ -285,6 +287,7 @@ pub fn print_scan_summary(
     output_dir: &std::path::Path,
     project_name: &str,
     evidence_gate_enabled: bool,
+    config: Option<&crate::config::ScannerConfig>,
     quiet: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let ui = crate::ui::Ui::new(quiet);
@@ -326,12 +329,23 @@ pub fn print_scan_summary(
 
     // Save findings to output directory
     let findings_path = output_dir.join("findings.json");
-    let json = serde_json::to_string_pretty(&findings)?;
+
+    // findings.json: ALL findings, tier-tagged when gate is on
+    let mut findings_json = findings.to_vec();
+    if evidence_gate_enabled {
+        crate::report::tag_verification_tier(&mut findings_json);
+    }
+    let json = serde_json::to_string_pretty(&findings_json)?;
     std::fs::write(&findings_path, json)?;
 
-    // Write markdown report alongside JSON
+    // findings.md: gated findings when gate is on (use real config, not None)
+    let findings_md = if evidence_gate_enabled {
+        crate::report::apply_evidence_gate(findings, config)
+    } else {
+        findings.to_vec()
+    };
     let markdown_path = output_dir.join("findings.md");
-    let md_content = crate::report::markdown::generate_markdown_report(findings, project_name);
+    let md_content = crate::report::markdown::generate_markdown_report(&findings_md, project_name);
     std::fs::write(&markdown_path, md_content)?;
 
     tracing::info!("Results saved to:");

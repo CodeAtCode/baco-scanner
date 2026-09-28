@@ -71,12 +71,6 @@ rules:
       - pattern-not: printf('...')
 ''']
 
-[scanner.performance]
-enable_caching = true
-max_workers = 4
-parallel_threshold_kb = 100
-skip_large_files_mb = 5
-
 [llm]
 temperature = 0.2
 max_concurrent = 4

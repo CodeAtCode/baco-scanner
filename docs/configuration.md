@@ -182,6 +182,30 @@ timeout_secs = 120      # Per-phase timeout override
 temperature = 0.3       # Per-phase temperature override
 ```
 
+### LLM Timeout Semantics
+
+Timeout configuration operates at two levels:
+
+| Level | Config Path | Type | Default | Behavior |
+|-------|-------------|------|---------|----------|
+| Global | `[llm] timeout_secs` | `u64` | `60` (in `config.example.toml`) | Applied to all phases without a per-phase override |
+| Per-phase | `[llm.phases.<phase>] timeout_secs` | `Option<u64>` | `None` | When set, overrides the global timeout for that phase |
+
+**Runtime behavior:**
+- HTTP request timeout: `Duration::from_secs(timeout_secs)` (source: `src/llm/mod.rs:236`)
+- Connection timeout: Fixed at 10 seconds (source: `src/llm/mod.rs:192`)
+- Default runtime timeout (if no config provided): 30 seconds (source: `src/llm/mod.rs:170`)
+
+**What value `0` means:** Setting `timeout_secs = 0` results in `Duration::from_secs(0)`, which causes an immediate timeout on every request. Use only for testing.
+
+**Retry behavior:** Failed requests (429, 5xx, network errors) are retried with exponential backoff:
+- Base delay: Configured via `[llm] retry_backoff_ms` (default: 2000ms)
+- Formula: `base_ms * 2^attempt`, capped at 30 seconds
+- Max retries: Configured via `[llm] max_retries` (default: 3)
+- Source: `src/llm/mod.rs:254-269`
+
+Retries are bounded; after exhausting retries on one model, the client fails over to the next configured model (if multiple models are specified).
+
 **Single model:**
 ```toml
 [llm.phases.discovery]
@@ -353,6 +377,8 @@ include_rejected = false
 | `LLM_STATIC_ANALYSIS_KEY` | Overrides `llm.phases.static_analysis.api_key` |
 | `LLM_SECURITY_AGENT_VERIFICATION_KEY` | Overrides `llm.phases.security_agent_verification.api_key` |
 | `LLM_THREAT_MODELING_KEY` | Overrides `llm.phases.threat_modeling.api_key` |
+| `LLM_CONFIG_PATH` | Overrides config path for `baco verify` (source: `src/cli/verify.rs:24`) |
+| `NO_COLOR` | Disables colored output (source: `src/ui.rs:46`) |
 | `TICKET_GITHUB_KEY` | Overrides `[[tickets.systems]]` api_key for GitHub |
 | `TICKET_GITLAB_KEY` | Overrides `[[tickets.systems]]` api_key for GitLab |
 
@@ -361,6 +387,57 @@ include_rejected = false
 - **findings.json**: Complete vulnerability data with all 16 fields
 - **report.html**: Visual report with severity colors, code snippets, AI summary
 - **report.sarif**: SARIF format for CI/CD integration
+
+## Scan Options
+
+### `--dry-run`
+
+The `--dry-run` flag performs indexing and prioritization without executing any LLM or semgrep phases. It prints an estimate of the resources a full scan would consume, then exits.
+
+**What it does:**
+1. Indexes the project (counts files, calculates total size, estimates tokens)
+2. Computes priority scores for each file
+3. Estimates LLM calls based on budget and triage configuration
+4. Prints the summary and exits
+
+**What it does NOT do:**
+- No LLM API calls
+- No semgrep scanning
+- No findings produced
+- No report generation
+
+**Example usage:**
+```bash
+baco scan --config baco.toml --dry-run
+```
+
+**Output example:**
+```
+[Dry Run] Project Estimate
+═══════════════════════════════════════
+Target: ./my-project
+
+Files by language:
+  python: 42 files
+  javascript: 18 files
+
+Total files: 60
+Total size: 1234567 bytes
+Estimated tokens (~4 chars/token): 308641
+
+Planned LLM calls: 45
+  (budget max: 100, normal cap: 75, high-risk: 25)
+
+Average priority score: 0.67
+```
+
+Use `--dry-run` before a full scan to:
+- Estimate costs (LLM call count, token usage)
+- Verify your configuration is correct
+- Check which files will be analyzed
+- Decide if you need to adjust budget/triage settings
+
+Source: `src/cli/scan.rs:346-478` (`run_dry_run` function).
 
 ## Aggregation Configuration
 

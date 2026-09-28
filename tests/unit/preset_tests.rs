@@ -375,6 +375,120 @@ fn collect_key_paths(
 }
 
 // ============================================================================
+// Temperature Bug Regression Tests (fix for if llm.temperature > 0.0)
+// ============================================================================
+
+#[test]
+fn test_preset_temperature_zero_is_applied() {
+    // Regression test: temperature = 0.0 from preset should be applied, not dropped
+    // This test would fail with the old `if llm.temperature > 0.0` check
+    use baco::config::LlmConfig;
+    use baco::preset::PresetOverlay;
+
+    // Create a minimal preset with temperature = 0.0
+    let preset = PresetOverlay {
+        llm: Some(LlmConfig {
+            temperature: 0.0,
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+
+    let mut config = ScannerConfig::default();
+    // Set a non-zero baseline to verify the preset changes it
+    config.llm.temperature = 0.7;
+
+    preset.clone().merge_into(&mut config);
+
+    // After merge, temperature should be 0.0 (from preset)
+    assert_eq!(
+        config.llm.temperature, 0.0,
+        "Preset temperature = 0.0 should be applied"
+    );
+}
+
+#[test]
+fn test_preset_negative_temperature_is_applied() {
+    // Negative temperatures should also survive the merge
+    use baco::config::LlmConfig;
+    use baco::preset::PresetOverlay;
+
+    let preset = PresetOverlay {
+        llm: Some(LlmConfig {
+            temperature: -0.5,
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+
+    let mut config = ScannerConfig::default();
+    preset.merge_into(&mut config);
+
+    assert_eq!(
+        config.llm.temperature, -0.5,
+        "Preset negative temperature should be applied"
+    );
+}
+
+// ============================================================================
+// Scanner Performance Per-Key Merge Tests
+// ============================================================================
+
+#[test]
+fn test_preset_performance_per_key_merge_preserves_user_settings() {
+    // Test that preset performance settings merge per-key, preserving user-configured keys
+    // This is the regression test for the bug where `base.scanner.performance = scanner.performance.clone()`
+    // replaced the entire struct instead of merging per-key
+    use baco::config::ScannerSettings;
+    use baco::preset::PresetOverlay;
+
+    // Create a preset that sets only ONE performance key to a NON-DEFAULT value
+    // enable_incremental_scan defaults to false, so setting it to true is explicit
+    let preset = PresetOverlay {
+        scanner: Some(ScannerSettings {
+            performance: baco::config::PerformanceSettings {
+                enable_incremental_scan: true, // Non-default value - explicitly set
+                ..Default::default()
+            },
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+
+    // Create user config with OTHER performance keys set to non-default values
+    let mut config = ScannerConfig::default();
+    // enable_file_filtering defaults to true, so setting to false is explicit
+    config.scanner.performance.enable_file_filtering = false;
+    // max_parallel_tasks defaults to 4, so setting to 16 is explicit
+    config.scanner.performance.max_parallel_tasks = 16;
+    // enable_threat_modeling defaults to false, so setting to false is... the default
+    // Let's use a different field: enable_root_cause_dedup defaults to true
+    config.scanner.performance.enable_root_cause_dedup = false;
+
+    preset.clone().merge_into(&mut config);
+
+    // Preset key should be applied (enable_incremental_scan defaults to false, preset sets true)
+    assert!(
+        config.scanner.performance.enable_incremental_scan,
+        "Preset enable_incremental_scan = true should be applied"
+    );
+
+    // User keys should be preserved (these are non-default values in user config)
+    assert!(
+        !config.scanner.performance.enable_file_filtering,
+        "User enable_file_filtering = false should be preserved"
+    );
+    assert_eq!(
+        config.scanner.performance.max_parallel_tasks, 16,
+        "User max_parallel_tasks = 16 should be preserved"
+    );
+    assert!(
+        !config.scanner.performance.enable_root_cause_dedup,
+        "User enable_root_cause_dedup = false should be preserved"
+    );
+}
+
+// ============================================================================
 // Overlay Merge Precedence Tests
 // ============================================================================
 
@@ -516,4 +630,126 @@ fn test_preset_explicit_override_wins() {
     // Per current implementation, preset overwrites
     assert_eq!(config.project.name, "wordpress-core");
     assert_eq!(config.scanner.max_file_size_kb, 256);
+}
+
+// ============================================================================
+// Performance Settings Merge Regression Tests (Defect 1 & 2 fixes)
+// ============================================================================
+
+#[test]
+fn test_preset_early_termination_threshold_omitted_preserves_user_value() {
+    // Regression test for Defect 1: preset that omits early_termination_threshold
+    // should leave user-configured 1000.0 untouched.
+    // The bug was comparing against literal 1000.0 instead of serde default 0.0.
+    use baco::config::ScannerSettings;
+    use baco::preset::PresetOverlay;
+
+    // Create a preset that does NOT set early_termination_threshold
+    // (it will deserialize to 0.0, the serde default for f32)
+    let preset = PresetOverlay {
+        scanner: Some(ScannerSettings {
+            performance: baco::config::PerformanceSettings {
+                early_termination_threshold: 0.0, // serde default, not explicitly set
+                ..Default::default()
+            },
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+
+    let mut config = ScannerConfig::default();
+    // User has configured 1000.0
+    config.scanner.performance.early_termination_threshold = 1000.0;
+
+    preset.clone().merge_into(&mut config);
+
+    // User value should be preserved because preset has the default value (0.0)
+    assert_eq!(
+        config.scanner.performance.early_termination_threshold, 1000.0,
+        "User-configured early_termination_threshold = 1000.0 should be preserved when preset omits it"
+    );
+}
+
+#[test]
+fn test_preset_early_termination_threshold_zero_is_not_applied_limitation() {
+    // Limitation test: preset that sets early_termination_threshold = 0.0 does NOT apply 0.0.
+    // This is a known limitation due to #[serde(default)] on f32.
+    // The serde default is 0.0, so we cannot distinguish "omitted" from "explicitly 0.0".
+    // To support explicit 0.0, change early_termination_threshold to Option<f32> in scanner.rs.
+    use baco::config::ScannerSettings;
+    use baco::preset::PresetOverlay;
+
+    let preset = PresetOverlay {
+        scanner: Some(ScannerSettings {
+            performance: baco::config::PerformanceSettings {
+                early_termination_threshold: 0.0, // explicitly set to 0.0
+                ..Default::default()
+            },
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+
+    let mut config = ScannerConfig::default();
+    // User has configured 1000.0
+    config.scanner.performance.early_termination_threshold = 1000.0;
+
+    preset.clone().merge_into(&mut config);
+
+    // Due to the limitation, 0.0 (serde default) is NOT applied
+    assert_eq!(
+        config.scanner.performance.early_termination_threshold, 1000.0,
+        "Preset early_termination_threshold = 0.0 is NOT applied due to #[serde(default)] limitation"
+    );
+}
+
+#[test]
+fn test_preset_vuln_spec_merge_does_not_wipe_user_performance_fields() {
+    // Regression test for Defect 2: preset that sets one vuln_spec field
+    // should not wipe user's other performance fields.
+    use baco::config::ScannerSettings;
+    use baco::preset::PresetOverlay;
+
+    let preset = PresetOverlay {
+        scanner: Some(ScannerSettings {
+            performance: baco::config::PerformanceSettings {
+                early_termination_threshold: 0.0, // serde default (field omitted in TOML)
+                vuln_spec: baco::vuln_spec::VulnSpecConfig {
+                    enabled: true, // explicitly set
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+
+    let mut config = ScannerConfig::default();
+    // User has configured various performance fields
+    config.scanner.performance.enable_incremental_scan = true;
+    config.scanner.performance.max_parallel_tasks = 16;
+    config.scanner.performance.early_termination_threshold = 500.0;
+
+    preset.clone().merge_into(&mut config);
+
+    // VulnSpec should be merged
+    assert!(
+        config.scanner.performance.vuln_spec.enabled,
+        "Preset vuln_spec.enabled = true should be applied"
+    );
+
+    // User performance fields should be preserved
+    assert!(
+        config.scanner.performance.enable_incremental_scan,
+        "User enable_incremental_scan = true should be preserved"
+    );
+    assert_eq!(
+        config.scanner.performance.max_parallel_tasks, 16,
+        "User max_parallel_tasks = 16 should be preserved"
+    );
+    assert_eq!(
+        config.scanner.performance.early_termination_threshold, 500.0,
+        "User early_termination_threshold = 500.0 should be preserved"
+    );
 }

@@ -52,6 +52,8 @@ fn run_diff(
         .map(|s| format!("{}..{}", s, head))
         .unwrap_or_else(|| head.to_string());
 
+    validate_revspec(&base_str)?;
+
     let output = Command::new("git")
         .args(["diff", &base_str, "--", file_path])
         .current_dir(
@@ -61,6 +63,12 @@ fn run_diff(
         )
         .output()
         .map_err(|e| format!("Failed to execute git diff: {}", e))?;
+
+    if !output.status.success() {
+        let exit_code = output.status.code().unwrap_or(-1);
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err(format!("git diff failed (exit code {}): {}", exit_code, stderr).into());
+    }
 
     let diff_output = String::from_utf8_lossy(&output.stdout).to_string();
     let (files_changed, insertions, deletions) = parse_diff(&diff_output);
@@ -127,4 +135,14 @@ pub fn matches_changed_set(file_path: &str, changed: &[std::path::PathBuf]) -> b
             || normalized.ends_with(format!("/{entry}").as_str())
             || entry.ends_with(format!("/{normalized}").as_str())
     })
+}
+
+fn validate_revspec(revspec: &str) -> Result<(), String> {
+    if revspec.starts_with('-') {
+        return Err(format!(
+            "invalid revspec '{}': cannot start with '-' (would be interpreted as git option)",
+            revspec
+        ));
+    }
+    Ok(())
 }

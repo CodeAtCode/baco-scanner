@@ -26,6 +26,7 @@ impl std::fmt::Display for ReportFormat {
 pub fn run_report(
     input: &Path,
     format: ReportFormat,
+    config_path: Option<&Path>,
     quiet: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let findings = validation::validate_findings(input)?;
@@ -42,6 +43,15 @@ pub fn run_report(
         ReportFormat::Markdown => output_dir.join("report.md"),
     };
 
+    // Load config if provided
+    let config = if let Some(cfg_path) = config_path {
+        Some(crate::config::ScannerConfig::from_file(
+            cfg_path.to_string_lossy().as_ref(),
+        )?)
+    } else {
+        None
+    };
+
     if !quiet {
         info!("Generating {} report to {:?}", format, output_path);
     }
@@ -49,8 +59,13 @@ pub fn run_report(
     match format {
         ReportFormat::Html => {
             use crate::report::html::generate_html_report;
-            generate_html_report(&findings, &output_path.to_string_lossy(), None, None)
-                .map_err(|e| format!("Failed to generate HTML report: {}", e))?;
+            generate_html_report(
+                &findings,
+                &output_path.to_string_lossy(),
+                config.as_ref(),
+                None,
+            )
+            .map_err(|e| format!("Failed to generate HTML report: {}", e))?;
         }
         ReportFormat::Json => {
             use crate::report::json::write_findings_json;
@@ -59,7 +74,7 @@ pub fn run_report(
                 &[],
                 &output_path.to_string_lossy(),
                 None,
-                None,
+                config.as_ref(),
                 None,
                 None, // scan_health
             )
@@ -68,7 +83,7 @@ pub fn run_report(
         ReportFormat::Sarif => {
             use crate::report::sarif::generate_sarif_report;
             let sarif_path = output_path.clone();
-            let sarif_json = generate_sarif_report(&findings, None)?;
+            let sarif_json = generate_sarif_report(&findings, config.as_ref())?;
             std::fs::write(&sarif_path, sarif_json)
                 .map_err(|e| format!("Failed to write SARIF report: {}", e))?;
             if !quiet {
@@ -84,7 +99,13 @@ pub fn run_report(
                 .and_then(|p| p.file_name())
                 .map(|n| n.to_string_lossy().to_string())
                 .unwrap_or_else(|| "unknown".to_string());
-            let md_content = generate_markdown_report(&findings, &project_name);
+            // Markdown does not take config, so use pre-filtered slice
+            let gated_findings = if config.as_ref().is_some_and(|c| c.output.evidence_gate) {
+                crate::report::apply_evidence_gate(&findings, config.as_ref())
+            } else {
+                findings.clone()
+            };
+            let md_content = generate_markdown_report(&gated_findings, &project_name);
             std::fs::write(&md_path, md_content)
                 .map_err(|e| format!("Failed to write markdown report: {}", e))?;
             if !quiet {

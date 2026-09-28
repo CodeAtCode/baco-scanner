@@ -64,6 +64,21 @@ After the workflow runs:
 - **Code Scanning alerts**: Navigate to **GitHub → Security → Code Scanning alerts**
 - **PR annotations**: Findings automatically appear as inline annotations on changed lines in pull requests
 
+## PR-Scoped Scans with `--diff`
+
+For pull request reviews, limit the scan to only files changed in the PR using `--diff`:
+
+```bash
+baco scan --config baco.toml --diff origin/main...HEAD
+```
+
+The `--diff <revspec>` flag filters findings to include only those in files modified in the specified git revision range. Use this for:
+- PR reviews: scan only changed files (`origin/main...HEAD`)
+- Incremental checks: compare against a specific commit (`main..feature-branch`)
+- Reducing noise: focus on recent changes rather than the entire codebase
+
+The revspec follows standard git syntax (e.g., `A...B` for changes in B not in A, `A..B` for changes reachable from B but not A).
+
 ## Other CI Systems
 
 ### Azure DevOps

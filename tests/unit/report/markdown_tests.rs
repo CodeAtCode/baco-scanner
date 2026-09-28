@@ -59,7 +59,7 @@ fn make_finding(
 #[test]
 fn test_empty_findings_valid_markdown_with_zero_count_summary() {
     let findings: Vec<baco::findings::VulnerabilityFinding> = vec![];
-    let report = generate_markdown_report(&findings, "test-project");
+    let report = generate_markdown_report(&findings, "test-project", None);
 
     // Should have title
     assert!(
@@ -105,7 +105,7 @@ fn test_two_findings_different_severities_grouped_critical_before_low() {
 
     // Intentionally create in reverse order to test grouping
     let findings = vec![low_finding, critical_finding];
-    let report = generate_markdown_report(&findings, "test-app");
+    let report = generate_markdown_report(&findings, "test-app", None);
 
     // Critical should appear before Low in the report
     let critical_pos = report

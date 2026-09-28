@@ -98,7 +98,7 @@ fn test_sandbox_resolve_safe_path_success() {
 
 #[test]
 fn test_sandbox_resolve_safe_path_path_traversal_blocked() {
-    let (sandbox, _) = create_sandbox();
+    let (sandbox, _tmpdir) = create_sandbox();
 
     let result = sandbox.resolve_safe_path("../etc/passwd");
     assert!(result.is_err());
@@ -108,7 +108,7 @@ fn test_sandbox_resolve_safe_path_path_traversal_blocked() {
 
 #[test]
 fn test_sandbox_resolve_safe_path_nonexistent_file() {
-    let (sandbox, _) = create_sandbox();
+    let (sandbox, _tmpdir) = create_sandbox();
 
     let result = sandbox.resolve_safe_path("nonexistent.txt");
     assert!(result.is_err());
@@ -126,7 +126,7 @@ fn test_sandbox_is_path_allowed_within_sandbox() {
 
 #[test]
 fn test_sandbox_is_path_allowed_outside_sandbox() {
-    let (sandbox, _) = create_sandbox();
+    let (sandbox, _tmpdir) = create_sandbox();
     let outside_path = PathBuf::from("/etc/passwd");
 
     assert!(!sandbox.is_path_allowed(&outside_path));
@@ -134,7 +134,7 @@ fn test_sandbox_is_path_allowed_outside_sandbox() {
 
 #[test]
 fn test_sandbox_validate_test_source_valid_rust() {
-    let (sandbox, _) = create_sandbox();
+    let (sandbox, _tmpdir) = create_sandbox();
     let valid_code = "fn main() { println!(\"hello\"); }";
 
     let result = sandbox.validate_test_source(valid_code);
@@ -143,7 +143,7 @@ fn test_sandbox_validate_test_source_valid_rust() {
 
 #[test]
 fn test_sandbox_validate_test_source_blocks_os_system() {
-    let (sandbox, _) = create_sandbox();
+    let (sandbox, _tmpdir) = create_sandbox();
     let malicious_code = "import os; os.system('rm -rf /')";
 
     let result = sandbox.validate_test_source(malicious_code);
@@ -153,7 +153,7 @@ fn test_sandbox_validate_test_source_blocks_os_system() {
 
 #[test]
 fn test_sandbox_validate_test_source_blocks_subprocess() {
-    let (sandbox, _) = create_sandbox();
+    let (sandbox, _tmpdir) = create_sandbox();
     let malicious_code = "import subprocess; subprocess.run(['ls'])";
 
     let result = sandbox.validate_test_source(malicious_code);
@@ -162,7 +162,7 @@ fn test_sandbox_validate_test_source_blocks_subprocess() {
 
 #[test]
 fn test_sandbox_validate_test_source_blocks_eval() {
-    let (sandbox, _) = create_sandbox();
+    let (sandbox, _tmpdir) = create_sandbox();
     let malicious_code = "eval(user_input)";
 
     let result = sandbox.validate_test_source(malicious_code);
@@ -171,7 +171,7 @@ fn test_sandbox_validate_test_source_blocks_eval() {
 
 #[test]
 fn test_sandbox_validate_test_source_blocks_exec() {
-    let (sandbox, _) = create_sandbox();
+    let (sandbox, _tmpdir) = create_sandbox();
     let malicious_code = "exec(malicious_code)";
 
     let result = sandbox.validate_test_source(malicious_code);
@@ -180,7 +180,7 @@ fn test_sandbox_validate_test_source_blocks_exec() {
 
 #[test]
 fn test_sandbox_validate_test_source_blocks_underscore_import() {
-    let (sandbox, _) = create_sandbox();
+    let (sandbox, _tmpdir) = create_sandbox();
     let malicious_code = "__import__('os')";
 
     let result = sandbox.validate_test_source(malicious_code);
@@ -189,7 +189,7 @@ fn test_sandbox_validate_test_source_blocks_underscore_import() {
 
 #[test]
 fn test_sandbox_validate_test_source_blocks_unsafe_rust() {
-    let (sandbox, _) = create_sandbox();
+    let (sandbox, _tmpdir) = create_sandbox();
     let malicious_code = "unsafe { std::process::Command::new(\"rm\") }";
 
     let result = sandbox.validate_test_source(malicious_code);
@@ -218,7 +218,7 @@ fn test_sandbox_create_temp_file_success() {
 
 #[test]
 fn test_sandbox_create_temp_file_path_traversal_blocked() {
-    let (sandbox, _) = create_sandbox();
+    let (sandbox, _tmpdir) = create_sandbox();
 
     let result = sandbox.create_temp_file("../outside.txt", "content");
     assert!(result.is_err());
@@ -227,7 +227,7 @@ fn test_sandbox_create_temp_file_path_traversal_blocked() {
 
 #[test]
 fn test_sandbox_create_temp_file_blocks_dangerous_content() {
-    let (sandbox, _) = create_sandbox();
+    let (sandbox, _tmpdir) = create_sandbox();
 
     let result = sandbox.create_temp_file("bad.py", "import os; os.system('rm')");
     assert!(result.is_err());
@@ -236,7 +236,7 @@ fn test_sandbox_create_temp_file_blocks_dangerous_content() {
 
 #[test]
 fn test_sandbox_run_with_timeout_success() {
-    let (sandbox, _) = create_sandbox();
+    let (sandbox, _tmpdir) = create_sandbox();
 
     let result = sandbox.run_with_timeout("/bin/echo", &["hello"], Some(5));
     assert!(result.is_ok());
@@ -247,7 +247,7 @@ fn test_sandbox_run_with_timeout_success() {
 
 #[test]
 fn test_sandbox_run_with_timeout_failure() {
-    let (sandbox, _) = create_sandbox();
+    let (sandbox, _tmpdir) = create_sandbox();
 
     let result = sandbox.run_with_timeout("false", &[], Some(5));
     assert!(result.is_ok());
@@ -257,7 +257,7 @@ fn test_sandbox_run_with_timeout_failure() {
 
 #[test]
 fn test_sandbox_run_with_timeout_nonexistent_command() {
-    let (sandbox, _) = create_sandbox();
+    let (sandbox, _tmpdir) = create_sandbox();
 
     let result = sandbox.run_with_timeout("nonexistent_cmd_xyz_123", &[], Some(1));
     assert!(result.is_err());
@@ -371,7 +371,7 @@ fn test_file_read_executes_successfully() {
 
 #[test]
 fn test_file_read_missing_file_error() {
-    let (sandbox, _) = create_sandbox();
+    let (sandbox, _tmpdir) = create_sandbox();
 
     let tool = FileReadTool;
     let args = serde_json::json!({ "path": "nonexistent.txt" });
@@ -383,7 +383,7 @@ fn test_file_read_missing_file_error() {
 
 #[test]
 fn test_file_read_path_traversal_blocked() {
-    let (sandbox, _) = create_sandbox();
+    let (sandbox, _tmpdir) = create_sandbox();
 
     let tool = FileReadTool;
     let args = serde_json::json!({ "path": "../etc/passwd" });
@@ -395,7 +395,7 @@ fn test_file_read_path_traversal_blocked() {
 
 #[test]
 fn test_file_read_missing_path_argument() {
-    let (sandbox, _) = create_sandbox();
+    let (sandbox, _tmpdir) = create_sandbox();
 
     let tool = FileReadTool;
     let args = serde_json::json!({});
@@ -440,7 +440,7 @@ fn test_pattern_search_within_sandbox() {
 
 #[test]
 fn test_pattern_search_outside_sandbox_blocked() {
-    let (sandbox, _) = create_sandbox();
+    let (sandbox, _tmpdir) = create_sandbox();
 
     let tool = PatternSearchTool;
     let args = serde_json::json!({ "pattern": "test", "path": "/etc" });
@@ -452,7 +452,7 @@ fn test_pattern_search_outside_sandbox_blocked() {
 
 #[test]
 fn test_pattern_search_missing_pattern_argument() {
-    let (sandbox, _) = create_sandbox();
+    let (sandbox, _tmpdir) = create_sandbox();
 
     let tool = PatternSearchTool;
     let args = serde_json::json!({ "path": "." });
@@ -464,7 +464,7 @@ fn test_pattern_search_missing_pattern_argument() {
 
 #[test]
 fn test_pattern_search_missing_path_argument() {
-    let (sandbox, _) = create_sandbox();
+    let (sandbox, _tmpdir) = create_sandbox();
 
     let tool = PatternSearchTool;
     let args = serde_json::json!({ "pattern": "test" });
@@ -503,7 +503,7 @@ fn test_file_write_executes_successfully() {
 
 #[test]
 fn test_file_write_missing_path_argument() {
-    let (sandbox, _) = create_sandbox();
+    let (sandbox, _tmpdir) = create_sandbox();
 
     let tool = FileWriteTool;
     let args = serde_json::json!({ "content": "test" });
@@ -515,7 +515,7 @@ fn test_file_write_missing_path_argument() {
 
 #[test]
 fn test_file_write_missing_content_argument() {
-    let (sandbox, _) = create_sandbox();
+    let (sandbox, _tmpdir) = create_sandbox();
 
     let tool = FileWriteTool;
     let args = serde_json::json!({ "path": "test.txt" });
@@ -614,7 +614,7 @@ fn test_test_compile_unsupported_language() {
 
 #[test]
 fn test_test_compile_missing_language_argument() {
-    let (sandbox, _) = create_sandbox();
+    let (sandbox, _tmpdir) = create_sandbox();
 
     let tool = TestCompileTool;
     let args = serde_json::json!({ "source_path": "test.rs" });
@@ -626,7 +626,7 @@ fn test_test_compile_missing_language_argument() {
 
 #[test]
 fn test_test_compile_missing_source_path_argument() {
-    let (sandbox, _) = create_sandbox();
+    let (sandbox, _tmpdir) = create_sandbox();
 
     let tool = TestCompileTool;
     let args = serde_json::json!({ "language": "rust" });
@@ -657,7 +657,7 @@ fn test_test_run_python_script() {
 
 #[test]
 fn test_test_run_missing_executable_path_argument() {
-    let (sandbox, _) = create_sandbox();
+    let (sandbox, _tmpdir) = create_sandbox();
 
     let tool = TestRunTool;
     let args = serde_json::json!({});

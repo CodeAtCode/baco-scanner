@@ -63,28 +63,3 @@ fn test_to_prompt_section_format() {
         "Prompt should contain Semantic Path header"
     );
 }
-
-/// Integration test with real LLM - requires API key
-#[test]
-#[ignore = "requires LLM_API_KEY"]
-fn test_summarize_with_real_llm() {
-    // This test requires LLM_API_KEY environment variable
-    // Run with: LLM_API_KEY=xxx cargo test test_summarize_with_real_llm -- --ignored
-
-    use std::env;
-
-    let api_key = env::var("LLM_API_KEY").ok();
-    if api_key.is_none() {
-        println!("Skipping real LLM test - no API key set");
-        return;
-    }
-
-    let _source = "fn calculate_factorial(n: u32) -> u32 { if n <= 1 { 1 } else { n * calculate_factorial(n - 1) } }";
-
-    // Note: This would need a proper LlmClient setup, skipped for now
-    // let llm = LlmClient::new(...);
-    // let result = summarize(source, &llm).await;
-    // assert!(result.is_ok());
-
-    println!("Real LLM test placeholder - needs full LlmClient setup");
-}

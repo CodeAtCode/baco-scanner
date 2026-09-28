@@ -1235,7 +1235,7 @@ use crate::config::ScannerConfig;
 
 /// Build LlmConfig for a specific phase from ScannerConfig
 /// Reads base_url/api_key/timeout/temperature/max_concurrent/max_reasoning_tokens from global config,
-/// applies [llm.phases.<phase>] overrides if present, NEVER hardcodes temperature.
+/// applies `llm.phases.<phase>` overrides if present, NEVER hardcodes temperature.
 pub fn phase_llm_config(
     scanner_config: &ScannerConfig,
     phase: &str,

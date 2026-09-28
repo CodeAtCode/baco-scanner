@@ -90,8 +90,10 @@ impl PromptEngine {
 
     /// Load prompt overrides from a TOML file
     /// The file should have the structure:
+    /// ```toml
     /// [phases]
     /// phase_name = "override prompt text"
+    /// ```
     pub fn load_overrides_from_file(
         path: &str,
     ) -> Result<HashMap<String, String>, Box<dyn std::error::Error>> {

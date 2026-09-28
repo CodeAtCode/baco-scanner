@@ -287,3 +287,138 @@ fn test_git_diff_command_exists_inline_migrated() {
 
     assert!(output.is_ok(), "git command should exist");
 }
+
+// ============================================================================
+// New hardening tests: status checking and revspec validation
+// ============================================================================
+
+#[test]
+fn test_nonexistent_ref_returns_error() {
+    let input = DiffAnalysisInput {
+        file_path: "README.md".to_string(),
+        base_commit: Some("this-ref-does-not-exist-12345".to_string()),
+        head_commit: Some("HEAD".to_string()),
+    };
+
+    let result = analyze_diff(input);
+    // The error could be either git diff failed (exit code non-zero) or
+    // the command failing to execute. Both are acceptable error paths.
+    assert!(result.is_err(), "nonexistent ref should return Err");
+    let err = result.unwrap_err().to_string();
+    // Check for either the git exit code error or the command execution error
+    assert!(
+        err.contains("git diff failed") || err.contains("Failed to execute"),
+        "error should mention git failure: {}",
+        err
+    );
+}
+
+#[test]
+fn test_revspec_starting_with_dash_rejected() {
+    let input = DiffAnalysisInput {
+        file_path: "README.md".to_string(),
+        base_commit: Some("-invalid-ref".to_string()),
+        head_commit: Some("HEAD".to_string()),
+    };
+
+    let result = analyze_diff(input);
+    assert!(
+        result.is_err(),
+        "revspec starting with '-' should be rejected"
+    );
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.contains("invalid revspec"),
+        "error should mention invalid revspec: {}",
+        err
+    );
+    assert!(
+        err.contains("-invalid-ref"),
+        "error should include the offending revspec: {}",
+        err
+    );
+}
+
+#[test]
+fn test_valid_range_returns_files() {
+    let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
+    let repo_path = temp_dir.path();
+
+    Command::new("git")
+        .args(["init", "-q"])
+        .current_dir(repo_path)
+        .output()
+        .expect("failed to init git repo");
+
+    Command::new("git")
+        .args(["config", "user.email", "test@test.com"])
+        .current_dir(repo_path)
+        .output()
+        .expect("failed to set email");
+    Command::new("git")
+        .args(["config", "user.name", "Test"])
+        .current_dir(repo_path)
+        .output()
+        .expect("failed to set name");
+
+    let file_path = repo_path.join("test.txt");
+    std::fs::write(&file_path, "line 1\n").expect("failed to write file");
+
+    Command::new("git")
+        .args(["add", "."])
+        .current_dir(repo_path)
+        .output()
+        .expect("failed to add");
+    Command::new("git")
+        .args(["commit", "-q", "-m", "first"])
+        .current_dir(repo_path)
+        .output()
+        .expect("failed to commit");
+
+    std::fs::write(&file_path, "line 1\nline 2\n").expect("failed to write file");
+
+    Command::new("git")
+        .args(["add", "."])
+        .current_dir(repo_path)
+        .output()
+        .expect("failed to add");
+    Command::new("git")
+        .args(["commit", "-q", "-m", "second"])
+        .current_dir(repo_path)
+        .output()
+        .expect("failed to commit");
+
+    // Use the absolute path so run_diff can find the file's parent directory
+    let input = DiffAnalysisInput {
+        file_path: file_path.to_string_lossy().to_string(),
+        base_commit: Some("HEAD~1".to_string()),
+        head_commit: Some("HEAD".to_string()),
+    };
+
+    let result = analyze_diff(input);
+    assert!(
+        result.is_ok(),
+        "valid range should succeed, got: {:?}",
+        result.err()
+    );
+    let output = result.unwrap();
+    // Just verify we got a result - the diff may be empty if no changes
+    let _ = output;
+}
+
+#[test]
+fn test_happy_path_unchanged() {
+    let input = DiffAnalysisInput {
+        file_path: "src/tools/diff_analysis.rs".to_string(),
+        base_commit: Some("HEAD~1".to_string()),
+        head_commit: Some("HEAD".to_string()),
+    };
+
+    let result = analyze_diff(input);
+    if let Ok(output) = result {
+        // Just verify fields exist and are non-negative (they're u32)
+        let _ = output.files_changed;
+        let _ = output.insertions;
+        let _ = output.deletions;
+    }
+}

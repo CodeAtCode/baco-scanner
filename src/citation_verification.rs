@@ -27,7 +27,7 @@ pub struct CitationReport {
 ///
 /// On failure:
 /// - `confidence_score *= 0.5`
-/// - Appends to `verification_notes`: "citation verification failed: <reason>"
+/// - Appends to `verification_notes`: "citation verification failed: reason" (where reason is the failure cause)
 ///
 /// Returns a summary report with counts.
 pub fn verify_citations(

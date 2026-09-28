@@ -3,7 +3,7 @@
 /// Extract owner and repository name from a Git URL
 ///
 /// Supports both HTTPS and SSH URL formats:
-/// - HTTPS: https://github.com/owner/repo-name.git
+/// - HTTPS: `<https://github.com/owner/repo-name.git>`
 /// - SSH: git@github.com:owner/repo-name.git
 ///
 /// Returns None if the URL format is not recognized

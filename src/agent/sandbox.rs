@@ -16,6 +16,72 @@ pub enum SandboxError {
     Timeout(u64),
 }
 
+/// Validate that a resolved path is contained within the sandbox root.
+///
+/// Checks:
+/// - Path is not absolute
+/// - No `..` components in the path
+/// - Final resolved path starts with canonicalized sandbox root
+/// - Parent directory exists (does not create directories)
+fn validate_path_containment(sandbox_root: &Path, user_path: &str) -> Result<PathBuf, String> {
+    let path = Path::new(user_path);
+
+    // Reject absolute paths
+    if path.is_absolute() {
+        return Err(format!("Absolute path not allowed: {}", user_path));
+    }
+
+    // Reject dot sequences before component analysis: encoded, spaced, and
+    // separator-mixed variants are never legitimate sandbox paths.
+    if user_path.contains("..") {
+        return Err(format!("Path traversal: {}", user_path));
+    }
+
+    // Reject any path with `..` components
+    if path
+        .components()
+        .any(|c| c == std::path::Component::ParentDir)
+    {
+        return Err(format!("Path traversal not allowed: {}", user_path));
+    }
+
+    // Join with sandbox root
+    let full = sandbox_root.join(path);
+
+    // Canonicalize the sandbox root for comparison
+    let canonical_root = sandbox_root
+        .canonicalize()
+        .map_err(|e| format!("Cannot canonicalize sandbox root {:?}: {}", sandbox_root, e))?;
+
+    // Check containment by canonicalizing the target if it exists,
+    // or verifying the parent path structure is within bounds
+    let final_check = if full.exists() {
+        full.canonicalize()
+            .map_err(|e| format!("Cannot canonicalize target {:?}: {}", full, e))?
+    } else {
+        // If the file doesn't exist, verify parent is within bounds
+        if let Some(parent) = full.parent() {
+            if parent.exists() {
+                parent
+                    .canonicalize()
+                    .map_err(|e| format!("Cannot canonicalize parent {:?}: {}", parent, e))?
+            } else {
+                // Parent doesn't exist - check path components are safe
+                // We already rejected .. and absolute, so join is safe
+                canonical_root.join(parent.strip_prefix(&canonical_root).unwrap_or(parent))
+            }
+        } else {
+            canonical_root.clone()
+        }
+    };
+
+    if !final_check.starts_with(&canonical_root) {
+        return Err(format!("Path escapes sandbox: {}", user_path));
+    }
+
+    Ok(full)
+}
+
 pub struct ToolSandbox {
     pub(super) temp_dir: PathBuf,
     pub(super) timeout_secs: u64,
@@ -26,11 +92,7 @@ impl SandboxLike for ToolSandbox {
         &self.temp_dir
     }
     fn resolve_safe_path(&self, path: &str) -> Result<PathBuf, String> {
-        // Check for path traversal before joining
-        if path.contains("..") {
-            return Err(format!("Path traversal: {}", path));
-        }
-        let full = self.temp_dir.join(path);
+        let full = validate_path_containment(&self.temp_dir, path)?;
         if !full.exists() {
             return Err(format!("Path does not exist: {}", path));
         }
@@ -87,14 +149,29 @@ impl SandboxLike for ToolSandbox {
     fn create_temp_file(&self, path: &str, content: &str) -> Result<PathBuf, String> {
         self.validate_test_source(content)
             .map_err(|e| format!("Validation failed: {}", e))?;
-        // Check path traversal by looking for ".." in the input path
-        if path.contains("..") {
-            return Err(format!("Path traversal: {}", path));
-        }
-        let full = self.temp_dir.join(path);
+
+        // Pre-condition: validate path containment before write
+        let full = validate_path_containment(&self.temp_dir, path)?;
+
+        // Write the file
         std::fs::File::create(&full)
             .and_then(|mut f| f.write_all(content.as_bytes()))
             .map_err(|e| format!("Write failed: {}", e))?;
+
+        // Post-condition: verify containment after write (catches symlink swaps)
+        let canonical_after = full
+            .canonicalize()
+            .map_err(|e| format!("Cannot canonicalize after write {:?}: {}", full, e))?;
+        let canonical_root = self
+            .temp_dir
+            .canonicalize()
+            .map_err(|e| format!("Cannot canonicalize sandbox root: {}", e))?;
+        if !canonical_after.starts_with(&canonical_root) {
+            // File was created via symlink outside sandbox - delete and error
+            let _ = std::fs::remove_file(&full);
+            return Err(format!("Path escapes sandbox after write: {}", path));
+        }
+
         Ok(full)
     }
     fn is_path_allowed(&self, path: &Path) -> bool {
@@ -151,11 +228,7 @@ impl ToolSandbox {
     }
 
     pub fn resolve_safe_path(&self, path: &str) -> Result<PathBuf, String> {
-        // Check for path traversal before joining
-        if path.contains("..") {
-            return Err(format!("Path traversal: {}", path));
-        }
-        let full = self.temp_dir.join(path);
+        let full = validate_path_containment(&self.temp_dir, path)?;
         if !full.exists() {
             return Err(format!("Path does not exist: {}", path));
         }
@@ -215,14 +288,29 @@ impl ToolSandbox {
     pub fn create_temp_file(&self, path: &str, content: &str) -> Result<PathBuf, String> {
         self.validate_test_source(content)
             .map_err(|e| format!("Validation failed: {}", e))?;
-        // Check path traversal by looking for ".." in the input path
-        if path.contains("..") {
-            return Err(format!("Path traversal: {}", path));
-        }
-        let full = self.temp_dir.join(path);
+
+        // Pre-condition: validate path containment before write
+        let full = validate_path_containment(&self.temp_dir, path)?;
+
+        // Write the file
         std::fs::File::create(&full)
             .and_then(|mut f| f.write_all(content.as_bytes()))
             .map_err(|e| format!("Write failed: {}", e))?;
+
+        // Post-condition: verify containment after write (catches symlink swaps)
+        let canonical_after = full
+            .canonicalize()
+            .map_err(|e| format!("Cannot canonicalize after write {:?}: {}", full, e))?;
+        let canonical_root = self
+            .temp_dir
+            .canonicalize()
+            .map_err(|e| format!("Cannot canonicalize sandbox root: {}", e))?;
+        if !canonical_after.starts_with(&canonical_root) {
+            // File was created via symlink outside sandbox - delete and error
+            let _ = std::fs::remove_file(&full);
+            return Err(format!("Path escapes sandbox after write: {}", path));
+        }
+
         Ok(full)
     }
 

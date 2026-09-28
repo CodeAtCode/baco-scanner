@@ -1,6 +1,5 @@
 use crate::config::ScannerConfig;
 use crate::error::ScanError;
-use crate::evidence::classify_finding;
 use crate::findings::{Severity, VulnerabilityFinding};
 use crate::llm::metrics::LlmMetrics;
 use crate::scan_health::ScanHealth;
@@ -103,14 +102,7 @@ pub fn write_findings_json(
     let mut findings_with_tier = findings.to_vec();
     if let Some(cfg) = config {
         if cfg.output.evidence_gate {
-            for finding in &mut findings_with_tier {
-                if finding.verification_tier.is_none() {
-                    finding.verification_tier = Some(classify_finding(
-                        &finding.evidence,
-                        finding.confidence_score,
-                    ));
-                }
-            }
+            crate::report::tag_verification_tier(&mut findings_with_tier);
         }
     }
 

@@ -386,23 +386,6 @@ fn test_extract_rule_id_first_match() {
 }
 
 // ============================================================================
-// RuleSynthesizer::generate requires LLM - documented #[ignore] test
-// ============================================================================
-
-#[test]
-#[ignore = "requires live LLM endpoint; run manually with LLM_API_KEY set"]
-fn test_generate_requires_llm() {
-    // Documents that generate() needs a live LLM.
-    // Constructing the synthesizer should not panic.
-    // This test is ignored because it requires a live LLM endpoint.
-    // To run manually: cargo test test_generate_requires_llm -- --ignored
-    let config = RuleSynthConfig::default();
-    // Note: We cannot create an LlmClient here without circular dependencies.
-    // The test documents the requirement but cannot instantiate a real client.
-    let _ = config; // Suppress unused warning
-}
-
-// ============================================================================
 // SemgrepRule edge-case YAML content tests
 // ============================================================================
 
