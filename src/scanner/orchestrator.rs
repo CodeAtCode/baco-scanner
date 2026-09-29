@@ -375,7 +375,7 @@ async fn run_parallel_phases(
         };
         if let Err(e) = save_checkpoint(
             &scanner.checkpoint_path,
-            &scanner.config,
+            scanner.location(),
             &findings,
             &analyzed_files,
             &ScanPhase::LlmStaticAnalysis,
@@ -396,7 +396,7 @@ async fn run_parallel_phases(
 
     if let Err(e) = save_checkpoint(
         &scanner.checkpoint_path,
-        &scanner.config,
+        scanner.location(),
         &findings,
         &analyzed_files,
         &ScanPhase::LlmStaticAnalysis,
@@ -453,7 +453,7 @@ async fn run_sequential_phases(
             // Record as completed for checkpoint consistency
             if let Err(e) = save_checkpoint(
                 &scanner.checkpoint_path,
-                &scanner.config,
+                scanner.location(),
                 &findings,
                 &analyzed_files,
                 phase,
@@ -641,7 +641,7 @@ async fn run_sequential_phases(
             };
             if let Err(e) = save_checkpoint(
                 &scanner.checkpoint_path,
-                &scanner.config,
+                scanner.location(),
                 &findings,
                 &analyzed_files,
                 phase,
@@ -662,7 +662,7 @@ async fn run_sequential_phases(
 
         if let Err(e) = save_checkpoint(
             &scanner.checkpoint_path,
-            &scanner.config,
+            scanner.location(),
             &findings,
             &analyzed_files,
             phase,
@@ -843,6 +843,8 @@ pub(super) async fn run_scanner(
             health.record_phase_skipped(&phase, &reason);
         }
     }
+    // The indexing phase records how many files the indexer matched.
+    health.set_indexed(scanner.state.borrow().files_scanned as u64);
     health.set_analyzed(analyzed_files.len() as u64);
     let llm_metrics = scanner.metrics_tracker.finalize().await;
     let (ok_calls, failed_calls) =

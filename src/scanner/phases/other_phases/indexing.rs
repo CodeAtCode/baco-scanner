@@ -6,7 +6,7 @@ use crate::scanner::phases::PhaseConfig;
 
 /// Run indexing phase (phase 1 of 23).
 pub async fn run_indexing(
-    _scanner: &crate::scanner::Scanner,
+    scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,
 ) -> ScanResult<(Vec<VulnerabilityFinding>, Vec<String>)> {
     let PhaseConfig {
@@ -131,6 +131,13 @@ pub async fn run_indexing(
     } else {
         std::collections::HashMap::new()
     };
+
+    // Record what the indexer actually matched. The summary reports this as
+    // "indexed", and the field existed but nothing ever wrote it, so the line
+    // always read 0.
+    scanner
+        .state
+        .send_modify(|s| s.files_scanned = index.files.len());
 
     // Log statistics about incremental scanning
     if _previous_hash_store.is_some() {

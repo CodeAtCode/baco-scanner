@@ -105,6 +105,10 @@ enum Commands {
 
 #[tokio::main]
 async fn main() {
+    // Inherited by every child, so a crashing external tool cannot drop a core
+    // file in the user's working directory.
+    baco::core_limit::suppress_core_dumps();
+
     let cli = Cli::parse();
 
     // Initialize logging - respect quiet mode but still set up logger

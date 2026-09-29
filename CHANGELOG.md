@@ -7,18 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-- VulnInstruct specification-guided vulnerability detection (`src/vuln_spec` module: schema, extractor, BM25+vector retriever) behind `[vuln_spec] enabled = false` default
-- `baco report --config <PATH>` to load evidence-gate config for standalone reports
-
-### Changed
-- Threat-modeling phase disabled by default (`enable_threat_modeling = false`) — it generated a static STRIDE template rather than code-derived analysis
 
 ## [1.1.0] - 2026-09-15
 
 First public release.
 
 ### Added
+- VulnInstruct specification-guided vulnerability detection (`src/vuln_spec` module: schema, extractor, BM25+vector retriever) behind `[vuln_spec] enabled = false` default
+- `baco report --config <PATH>` to load evidence-gate config for standalone reports
+
+### Changed
 - `baco doctor` pre-flight checks: config parse, per-phase LLM slot validation (warns on phases without `api_key` that will be skipped), semgrep/python3 presence, output dir writability, disk space
 - `baco eval` detection-regression suite: 10 labeled targets with ground-truth oracles, precision/recall/F1, CI gate on pass-rate (`BACO_EVAL_FLOOR`, default 0.70)
 - `baco init [PATH]` config scaffolding with language detection and preset suggestions
@@ -35,6 +33,7 @@ First public release.
 - Config-driven per-language hook registry (`[knowledge.hook_registry.<language>]`) and `required_security_primitives` verification prompts
 
 ### Changed
+- Threat-modeling phase disabled by default (`enable_threat_modeling = false`) — it generated a static STRIDE template rather than code-derived analysis
 - Pipeline defined once in a declarative PhaseSpec table (checkpoint transitions, profile filtering, progress messages and docs all derive from it)
 - Semgrep severity read from `extra.severity` first (ERROR/WARNING/INFO mapping); `check_id` keywords can only raise, never lower
 - HTML report rendered via embedded minijinja templates

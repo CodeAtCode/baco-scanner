@@ -8,72 +8,237 @@ use crate::indexer::ExcludeMatcher;
 use crate::scanner::phases::PhaseConfig;
 use std::sync::Arc;
 
-/// Run Security Agent verification phase (Phase 10/24)
-pub async fn run_security_agent_verification(
-    scanner: &crate::scanner::Scanner,
-    cfg: PhaseConfig<'_>,
+/// The three agent operations this phase performs, behind a seam.
+///
+/// The phase is mostly mapping: it hands a finding to an agent, then records
+/// what came back. That mapping is the part worth testing, and it is
+/// unreachable without a live model, a sandbox and real files. Abstracting
+/// only the three calls leaves the rest reachable from a test.
+pub trait SecurityAgentRunner {
+    fn verify_finding<'a>(
+        &'a self,
+        file_path: &'a str,
+        finding: &'a VulnerabilityFinding,
+    ) -> std::pin::Pin<
+        Box<dyn std::future::Future<Output = Result<agent::AgentFinding, String>> + Send + 'a>,
+    >;
+
+    fn run_flow<'a>(
+        &'a self,
+        harness: &'a crate::agent_flow::AgentFlowHarness,
+    ) -> std::pin::Pin<
+        Box<
+            dyn std::future::Future<Output = Result<crate::agent_flow::ExecutionResult, String>>
+                + Send
+                + 'a,
+        >,
+    >;
+
+    fn propose_rewrite<'a>(
+        &'a self,
+        diagnostic: &'a crate::agent_flow::Diagnostic,
+        harness: &'a crate::agent_flow::AgentFlowHarness,
+    ) -> std::pin::Pin<
+        Box<
+            dyn std::future::Future<Output = Result<crate::agent_flow::RewriteProposal, String>>
+                + Send
+                + 'a,
+        >,
+    >;
+}
+
+/// Production runner: a real [`agent::AgentSession`] and a real model.
+pub struct LiveSecurityAgent {
+    client: crate::llm::LlmClient,
+    agent_config: crate::config::AgentConfig,
+    target_path: std::path::PathBuf,
+}
+
+impl LiveSecurityAgent {
+    pub fn new(
+        client: crate::llm::LlmClient,
+        agent_config: &crate::config::AgentConfig,
+        target_path: &std::path::Path,
+    ) -> Self {
+        Self {
+            client,
+            agent_config: agent_config.clone(),
+            target_path: target_path.to_path_buf(),
+        }
+    }
+}
+
+impl SecurityAgentRunner for LiveSecurityAgent {
+    fn verify_finding<'a>(
+        &'a self,
+        file_path: &'a str,
+        finding: &'a VulnerabilityFinding,
+    ) -> std::pin::Pin<
+        Box<dyn std::future::Future<Output = Result<agent::AgentFinding, String>> + Send + 'a>,
+    > {
+        Box::pin(async move {
+            let session = agent::AgentSession::new(
+                self.client.clone(),
+                &self.agent_config,
+                &self.target_path,
+                Arc::new(|msg| tracing::debug!("[AGENT] {}", msg)),
+            );
+            session.verify_finding(file_path, finding).await
+        })
+    }
+
+    fn run_flow<'a>(
+        &'a self,
+        harness: &'a crate::agent_flow::AgentFlowHarness,
+    ) -> std::pin::Pin<
+        Box<
+            dyn std::future::Future<Output = Result<crate::agent_flow::ExecutionResult, String>>
+                + Send
+                + 'a,
+        >,
+    > {
+        Box::pin(async move { crate::agent_flow::execute(harness, &self.client).await })
+    }
+
+    fn propose_rewrite<'a>(
+        &'a self,
+        diagnostic: &'a crate::agent_flow::Diagnostic,
+        harness: &'a crate::agent_flow::AgentFlowHarness,
+    ) -> std::pin::Pin<
+        Box<
+            dyn std::future::Future<Output = Result<crate::agent_flow::RewriteProposal, String>>
+                + Send
+                + 'a,
+        >,
+    > {
+        Box::pin(async move {
+            crate::agent_flow::propose_rewrite(&self.client, diagnostic, harness).await
+        })
+    }
+}
+
+/// Record a completed agent verification on the finding.
+///
+/// A compiled test outranks the test source, which outranks a bare turn count,
+/// so the most concrete evidence available wins the evidence path.
+pub fn apply_agent_result(
+    finding: &mut VulnerabilityFinding,
+    result: &agent::AgentFinding,
+    scaffold_context: Option<String>,
+) {
+    if let Some(ref path) = result.compile_path {
+        finding.agent_evidence_path = Some(path.to_string_lossy().to_string());
+    } else if let Some(ref path) = result.test_source_path {
+        finding.agent_evidence_path = Some(path.to_string_lossy().to_string());
+    } else if result.agent_turns > 0 {
+        finding.agent_evidence_path = Some(format!(
+            "{} turns, {} tools",
+            result.agent_turns,
+            result.tools_used.len()
+        ));
+    }
+
+    if let Some(ref log) = result.test_log {
+        if finding.verification_notes.is_none() {
+            finding.verification_notes = Some(log.clone());
+        }
+    }
+
+    // Scaffold context is the fallback for when the agent said nothing useful.
+    if scaffold_context.is_some() && finding.verification_notes.is_none() {
+        finding.verification_notes = scaffold_context;
+    }
+
+    finding.add_evidence(
+        crate::evidence::EvidenceSource::SecurityAgentVerification("agent_verification".into()),
+        1.0,
+        format!(
+            "Agent verification result: {:?}",
+            finding.verification_status
+        ),
+    );
+
+    tracing::debug!(
+        "Security Agent verified {}: {:?} - {} turns, {} tools",
+        finding.title,
+        finding.verification_status,
+        result.agent_turns,
+        result.tools_used.len()
+    );
+}
+
+/// Record a failed agent verification on the finding.
+pub fn apply_agent_failure(
+    finding: &mut VulnerabilityFinding,
+    error: &str,
+    scaffold_context: Option<String>,
+) {
+    finding.verification_status = Some(VerificationStatus::Failed);
+    if scaffold_context.is_some() && finding.verification_notes.is_none() {
+        finding.verification_notes = scaffold_context;
+    } else {
+        finding.verification_notes = Some(format!("Agent verification failed: {}", error));
+    }
+    finding.add_evidence(
+        crate::evidence::EvidenceSource::SecurityAgentVerification("agent_verification".into()),
+        1.0,
+        format!("Agent verification result: Failed - {}", error),
+    );
+}
+
+/// Record the agent flow outcome on the finding.
+pub fn apply_flow_outcome(
+    finding: &mut VulnerabilityFinding,
+    diagnosis: Option<String>,
+    rewrite: Option<String>,
+) {
+    if let Some(ref summary) = diagnosis {
+        finding.add_evidence(
+            crate::evidence::EvidenceSource::SecurityAgentVerification(
+                "agent_flow_diagnosis".into(),
+            ),
+            1.0,
+            format!("AgentFlow diagnosis: {}", summary),
+        );
+        if finding.verification_notes.is_none() {
+            finding.verification_notes = Some(summary.clone());
+        }
+    }
+
+    if let Some(ref rewrite) = rewrite {
+        finding.add_evidence(
+            crate::evidence::EvidenceSource::SecurityAgentVerification("agent_flow_rewrite".into()),
+            1.0,
+            format!("AgentFlow proposed rewrite: {}", rewrite),
+        );
+    }
+
+    if diagnosis.is_none() && rewrite.is_none() {
+        tracing::warn!(
+            "AgentFlow produced no output for finding: {}",
+            finding.title
+        );
+    }
+}
+
+/// Internal worker that takes an injected runner.
+///
+/// This holds the body of the phase from scaffold context building through
+/// the findings loop and optional AgentFlow execution. The wrapper below
+/// handles early-exit guards and constructs the LiveSecurityAgent.
+pub async fn run_agent_blocks(
+    mut findings: Vec<VulnerabilityFinding>,
+    pb: &indicatif::ProgressBar,
+    analyzed_files: &[String],
+    target_path: &std::path::Path,
+    config: &crate::config::ScannerConfig,
+    runner: &dyn SecurityAgentRunner,
 ) -> ScanResult<(Vec<VulnerabilityFinding>, Vec<String>)> {
-    let PhaseConfig {
-        phase: _,
-        mut findings,
-        pb,
-        analyzed_files,
-        metrics_tracker: _,
-        target_path,
-        config,
-        project_stack: _,
-    } = cfg;
-
-    tracing::info!("Running Security Agent verification phase...");
-
     let phase_num =
         crate::scanner::pipeline::orchestrator::phase_index(&ScanPhase::SecurityAgentVerification);
     let total = crate::scanner::pipeline::orchestrator::total_phases();
 
     let base = pb.position();
-
-    if !config.agent.enabled {
-        tracing::debug!("Agent mode disabled, skipping Security Agent verification");
-        pb.set_message(format!(
-            "Phase {}/{}: Agent mode disabled - skipping",
-            phase_num, total
-        ));
-        pb.set_position(base + 100);
-        return Ok((findings, analyzed_files.to_vec()));
-    }
-
-    let Some(_api_key) = &config.llm.phases.security_agent_verification.api_key else {
-        tracing::debug!(
-            "No API key for security_agent_verification, skipping Security Agent verification"
-        );
-        pb.set_message(format!(
-            "Phase {}/{}: No API key - skipping",
-            phase_num, total
-        ));
-        pb.set_position(base + 100);
-        return Ok((findings, analyzed_files.to_vec()));
-    };
-
-    pb.set_message(format!(
-        "Phase {}/{}: Security Agent verification (tool-based analysis)...",
-        phase_num, total
-    ));
-
-    let total_findings = findings.len();
-
-    let client = match crate::llm::create_llm_client_with_metrics(
-        scanner,
-        "security_agent_verification",
-    ) {
-        Some(client) => client,
-        None => {
-            tracing::warn!(
-                "Security Agent verification skipped: LLM client unavailable (incomplete llm.phases.security_agent_verification config)"
-            );
-            pb.set_position(base + 100);
-            return Ok((findings, analyzed_files.to_vec()));
-        }
-    };
 
     // Agent scaffold context (P2.5) - build once before the findings loop
     let (fn_lookup_opt, call_graph_opt) = if config.agent_scaffold.enabled {
@@ -158,6 +323,8 @@ pub async fn run_security_agent_verification(
         (None, None)
     };
 
+    let total_findings = findings.len();
+
     for (i, finding) in findings.iter_mut().enumerate() {
         let progress_pct = if total_findings > 0 {
             ((i as f64 / total_findings as f64) * 100.0) as u64
@@ -236,58 +403,9 @@ pub async fn run_security_agent_verification(
             None
         };
 
-        let agent = agent::AgentSession::new(
-            client.clone(),
-            &config.agent,
-            target_path,
-            Arc::new(|msg| tracing::debug!("[AGENT] {}", msg)),
-        );
-
-        match agent.verify_finding(&finding.file_path, finding).await {
+        match runner.verify_finding(&finding.file_path, finding).await {
             Ok(agent_result) => {
-                // Store evidence path
-                if let Some(ref path) = agent_result.compile_path {
-                    finding.agent_evidence_path = Some(path.to_string_lossy().to_string());
-                } else if let Some(ref path) = agent_result.test_source_path {
-                    finding.agent_evidence_path = Some(path.to_string_lossy().to_string());
-                } else if agent_result.agent_turns > 0 {
-                    finding.agent_evidence_path = Some(format!(
-                        "{} turns, {} tools",
-                        agent_result.agent_turns,
-                        agent_result.tools_used.len()
-                    ));
-                }
-
-                // Store test log
-                if let Some(ref log) = agent_result.test_log {
-                    if finding.verification_notes.is_none() {
-                        finding.verification_notes = Some(log.clone());
-                    }
-                }
-
-                // Apply scaffold context if agent didn't set verification_notes
-                if scaffold_context.is_some() && finding.verification_notes.is_none() {
-                    finding.verification_notes = scaffold_context;
-                }
-
-                finding.add_evidence(
-                    crate::evidence::EvidenceSource::SecurityAgentVerification(
-                        "agent_verification".into(),
-                    ),
-                    1.0,
-                    format!(
-                        "Agent verification result: {:?}",
-                        finding.verification_status
-                    ),
-                );
-
-                tracing::debug!(
-                    "Security Agent verified {}: {:?} - {} turns, {} tools",
-                    finding.title,
-                    finding.verification_status,
-                    agent_result.agent_turns,
-                    agent_result.tools_used.len()
-                );
+                apply_agent_result(finding, &agent_result, scaffold_context);
             }
             Err(e) => {
                 tracing::warn!(
@@ -295,20 +413,7 @@ pub async fn run_security_agent_verification(
                     finding.title,
                     e
                 );
-                finding.verification_status = Some(VerificationStatus::Failed);
-                // Apply scaffold context on error if no verification_notes set
-                if scaffold_context.is_some() && finding.verification_notes.is_none() {
-                    finding.verification_notes = scaffold_context;
-                } else {
-                    finding.verification_notes = Some(format!("Agent verification failed: {}", e));
-                }
-                finding.add_evidence(
-                    crate::evidence::EvidenceSource::SecurityAgentVerification(
-                        "agent_verification".into(),
-                    ),
-                    1.0,
-                    format!("Agent verification result: Failed - {}", e),
-                );
+                apply_agent_failure(finding, &e, scaffold_context);
             }
         }
     }
@@ -357,7 +462,7 @@ pub async fn run_security_agent_verification(
 
             for iter in 0..max_iterations {
                 // Execute the harness
-                let execution = match crate::agent_flow::execute(&current_harness, &client).await {
+                let execution = match runner.run_flow(&current_harness).await {
                     Ok(r) => r,
                     Err(e) => {
                         tracing::warn!("AgentFlow execute iter {} failed: {}", iter, e);
@@ -393,9 +498,7 @@ pub async fn run_security_agent_verification(
                 }
 
                 // Propose a rewrite
-                match crate::agent_flow::propose_rewrite(&client, &diagnostic, &current_harness)
-                    .await
-                {
+                match runner.propose_rewrite(&diagnostic, &current_harness).await {
                     Ok(proposal) => {
                         let rationale = proposal.rationale.clone();
                         proposed_rewrite = Some(rationale);
@@ -409,40 +512,7 @@ pub async fn run_security_agent_verification(
                 }
             }
 
-            // Attach output to finding
-            let has_diagnosis = diagnosis_summary.is_some();
-            let has_rewrite = proposed_rewrite.is_some();
-
-            if let Some(summary) = diagnosis_summary {
-                finding.add_evidence(
-                    crate::evidence::EvidenceSource::SecurityAgentVerification(
-                        "agent_flow_diagnosis".into(),
-                    ),
-                    1.0,
-                    format!("AgentFlow diagnosis: {}", summary),
-                );
-                if finding.verification_notes.is_none() {
-                    finding.verification_notes = Some(summary);
-                }
-            }
-
-            if let Some(rewrite) = proposed_rewrite {
-                finding.add_evidence(
-                    crate::evidence::EvidenceSource::SecurityAgentVerification(
-                        "agent_flow_rewrite".into(),
-                    ),
-                    1.0,
-                    format!("AgentFlow proposed rewrite: {}", rewrite),
-                );
-            }
-
-            // Warn if flow produced nothing
-            if !has_diagnosis && !has_rewrite {
-                tracing::warn!(
-                    "AgentFlow produced no output for finding: {}",
-                    finding.title
-                );
-            }
+            apply_flow_outcome(finding, diagnosis_summary, proposed_rewrite);
         }
 
         pb.set_position(base + 100);
@@ -459,4 +529,74 @@ pub async fn run_security_agent_verification(
         total_findings
     );
     Ok((findings, analyzed_files.to_vec()))
+}
+
+/// Run Security Agent verification phase (Phase 10/24)
+pub async fn run_security_agent_verification(
+    scanner: &crate::scanner::Scanner,
+    cfg: PhaseConfig<'_>,
+) -> ScanResult<(Vec<VulnerabilityFinding>, Vec<String>)> {
+    let PhaseConfig {
+        phase: _,
+        findings,
+        pb,
+        analyzed_files,
+        metrics_tracker: _,
+        target_path,
+        config,
+        project_stack: _,
+    } = cfg;
+
+    tracing::info!("Running Security Agent verification phase...");
+
+    let phase_num =
+        crate::scanner::pipeline::orchestrator::phase_index(&ScanPhase::SecurityAgentVerification);
+    let total = crate::scanner::pipeline::orchestrator::total_phases();
+
+    let base = pb.position();
+
+    if !config.agent.enabled {
+        tracing::debug!("Agent mode disabled, skipping Security Agent verification");
+        pb.set_message(format!(
+            "Phase {}/{}: Agent mode disabled - skipping",
+            phase_num, total
+        ));
+        pb.set_position(base + 100);
+        return Ok((findings, analyzed_files.to_vec()));
+    }
+
+    let Some(_api_key) = &config.llm.phases.security_agent_verification.api_key else {
+        tracing::debug!(
+            "No API key for security_agent_verification, skipping Security Agent verification"
+        );
+        pb.set_message(format!(
+            "Phase {}/{}: No API key - skipping",
+            phase_num, total
+        ));
+        pb.set_position(base + 100);
+        return Ok((findings, analyzed_files.to_vec()));
+    };
+
+    pb.set_message(format!(
+        "Phase {}/{}: Security Agent verification (tool-based analysis)...",
+        phase_num, total
+    ));
+
+    let client = match crate::llm::create_llm_client_with_metrics(
+        scanner,
+        "security_agent_verification",
+    ) {
+        Some(client) => client,
+        None => {
+            tracing::warn!(
+                "Security Agent verification skipped: LLM client unavailable (incomplete llm.phases.security_agent_verification config)"
+            );
+            pb.set_position(base + 100);
+            return Ok((findings, analyzed_files.to_vec()));
+        }
+    };
+
+    let agent = LiveSecurityAgent::new(client, &config.agent, target_path);
+
+    run_agent_blocks(findings, pb, analyzed_files, target_path, config, &agent).await
 }

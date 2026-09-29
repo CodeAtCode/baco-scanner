@@ -1,4 +1,4 @@
-mod agent_verification;
+pub mod agent_verification;
 pub mod discovery;
 mod helpers;
 pub mod static_analysis;

@@ -85,6 +85,9 @@ pub struct Checkpoint {
     /// Early termination event details (added v1.1)
     #[serde(default)]
     pub early_termination: Option<EarlyTerminationInfo>,
+    /// Config file used for the original scan, so a resume reproduces its settings
+    #[serde(default)]
+    pub config_path: Option<String>,
 }
 
 /// Information about early termination event
@@ -110,6 +113,7 @@ impl Checkpoint {
             file_count: 0,
             analyzed_files: Vec::new(),
             early_termination: None,
+            config_path: None,
         }
     }
 
@@ -151,10 +155,18 @@ impl Checkpoint {
     }
 }
 
+/// Where a scan was rooted. Recorded in the checkpoint so `baco resume`
+/// re-scans the same tree with the same configuration.
+#[derive(Debug, Clone, Copy)]
+pub struct ScanLocation<'a> {
+    pub target_path: &'a std::path::Path,
+    pub config_path: Option<&'a std::path::Path>,
+}
+
 /// Save a checkpoint with findings and analyzed files
 pub async fn save_checkpoint(
     checkpoint_path: &std::path::Path,
-    config: &crate::config::ScannerConfig,
+    location: ScanLocation<'_>,
     findings: &[VulnerabilityFinding],
     analyzed_files: &[String],
     phase: &ScanPhase,
@@ -162,17 +174,28 @@ pub async fn save_checkpoint(
     early_termination_info: Option<EarlyTerminationInfo>,
 ) -> Result<(), String> {
     let scan_id = format!("scan-{}", chrono::Utc::now().format("%Y%m%d-%H%M%S"));
-    let target_path = checkpoint_path
-        .parent()
-        .unwrap_or_else(|| std::path::Path::new(""));
-    let mut checkpoint =
-        Checkpoint::new(&scan_id, &target_path.to_string_lossy(), chrono::Utc::now());
+    let mut checkpoint = Checkpoint::new(
+        &scan_id,
+        &location.target_path.to_string_lossy(),
+        chrono::Utc::now(),
+    );
+    checkpoint.config_path = location
+        .config_path
+        .map(|p| p.to_string_lossy().to_string());
 
     checkpoint.current_phase = phase.clone();
     checkpoint.findings_so_far = findings.to_vec();
     checkpoint.analyzed_files = analyzed_files.to_vec();
 
-    let json_path = format!("{}/findings.json", config.output.dir);
+    // checkpoint_path is always <output_dir>/checkpoint.json, so the output
+    // directory does not need to be passed in separately.
+    let json_path = format!(
+        "{}/findings.json",
+        checkpoint_path
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new(""))
+            .display()
+    );
     #[allow(clippy::needless_borrow)]
     let _llm_metrics = metrics_tracker.finalize().await;
     #[allow(clippy::needless_borrow)]

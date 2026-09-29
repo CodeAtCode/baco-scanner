@@ -213,17 +213,7 @@ trait WaitWithTimeout {
 
 /// Zero `RLIMIT_CORE` in the child, so a crashing fixture cannot write a multi-megabyte
 /// core file into the directory the scanner was run from.
-fn disable_core_dumps() -> std::io::Result<()> {
-    let rlim = libc::rlimit {
-        rlim_cur: 0,
-        rlim_max: 0,
-    };
-    // SAFETY: glibc's setrlimit is a bare syscall wrapper -- it takes no lock, allocates
-    // nothing and touches no global state, so it is async-signal-safe in the child
-    // between fork and exec. Failure is ignored on purpose: the child must still spawn.
-    let _ = unsafe { libc::setrlimit(libc::RLIMIT_CORE, &rlim) };
-    Ok(())
-}
+use crate::core_limit::disable_core_dumps;
 
 impl WaitWithTimeout for std::process::Child {
     fn wait_with_timeout(mut self, dur: Duration) -> Result<Output, String> {

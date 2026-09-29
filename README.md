@@ -126,7 +126,7 @@ export LLM_DISCOVERY_KEY="your-key-here"  # or LLM_API_KEY for generic fallback
 
 - **Citation verification**: Deterministic file existence + line range checks in Reporting phase; failures halve confidence + add note — see [`docs/argus-analysis.md`](docs/argus-analysis.md)
 - **Cross-run prior-findings skip lists (opt-in)**: Confirmed/FalsePositive findings from prior scans injected into discovery prompts to reduce redundancy — enable with `[prior runs]` section
-- **Domain-routed hunt prompts**: Per-attack-class modules (`prompts/hunt/`) selected by target languages; verification prompt includes skeptical self-refutation gate + untrusted-content framing — see [`docs/cloudflare-security-audit-skill-analysis.md`](docs/cloudflare-security-audit-skill-analysis.md)
+- **Domain-routed hunt prompts**: Per-attack-class modules (`prompts/hunt/`) selected by target languages; verification prompt includes skeptical self-refutation gate + untrusted-content framing
 - **Rejected-findings persistence**: `include_rejected = true` persists "rejected" array in JSON + "Investigated & Dismissed" appendix in HTML
 - **Requires-deployment-testing marker (experimental)**: Exploit synthesis marks unverifiable findings when Docker sandbox unavailable — enable with `[exploit]` section
 - **Org-context calibration (opt-in)**: Organizational policy profile (stack, infra, secret_storage, data_sensitivity, severity_rules) injected into prompts to reduce false positives — enable with `[org_context]` section
@@ -175,7 +175,6 @@ See [Research Integration](docs/research-integration.md) for per-paper details (
 - [Troubleshooting](docs/troubleshooting.md) — Common errors and fixes
 - [Argus Analysis](docs/argus-analysis.md) — Evidence verification techniques
 - [CI Integration](docs/ci-integration.md) — Continuous integration setup
-- [Cloudflare Security Audit Skill Analysis](docs/cloudflare-security-audit-skill-analysis.md) — Domain-routed hunt prompts
 
 
 ### Reading Order

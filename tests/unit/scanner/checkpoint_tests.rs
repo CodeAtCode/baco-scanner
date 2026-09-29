@@ -4,11 +4,52 @@
 //! save_checkpoint/load_checkpoint_findings functions.
 
 use baco::findings::Severity;
-use baco::scanner::checkpoint::{Checkpoint, ScanPhase};
+use baco::llm::metrics::LlmMetricsTracker;
+use baco::scanner::checkpoint::{Checkpoint, ScanLocation, ScanPhase, save_checkpoint};
 use std::fs;
 use std::path::Path;
 
 use crate::fixtures::make_finding_html;
+
+/// A resume rebuilds the scanner from the checkpoint, so the checkpoint has to
+/// carry the directory that was scanned. It used to record the output directory
+/// instead, which made `baco resume` re-run the pipeline over the report files.
+#[tokio::test]
+async fn test_save_checkpoint_records_scan_target_and_config() {
+    let target_dir = tempfile::tempdir().expect("target dir");
+    let output_dir = tempfile::tempdir().expect("output dir");
+    let config_path = target_dir.path().join("baco.toml");
+    fs::write(&config_path, "").expect("write config");
+
+    let checkpoint_path = output_dir.path().join("checkpoint.json");
+    save_checkpoint(
+        &checkpoint_path,
+        ScanLocation {
+            target_path: target_dir.path(),
+            config_path: Some(&config_path),
+        },
+        &[],
+        &[],
+        &ScanPhase::Semgrep,
+        &LlmMetricsTracker::new(),
+        None,
+    )
+    .await
+    .expect("checkpoint saves");
+
+    let loaded = Checkpoint::load(checkpoint_path.to_str().unwrap()).expect("checkpoint loads");
+
+    assert_eq!(
+        loaded.project_path,
+        target_dir.path().to_str().unwrap(),
+        "a resume must re-scan the original target, not the output directory"
+    );
+    assert_eq!(
+        loaded.config_path,
+        Some(config_path.to_str().unwrap().to_string()),
+        "a resume must reuse the config the original scan used"
+    );
+}
 
 // Note: create_test_finding() kept local due to custom modifications specific to checkpoint tests
 

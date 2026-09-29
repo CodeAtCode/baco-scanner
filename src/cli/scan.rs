@@ -83,7 +83,8 @@ pub async fn run_scan(
 
     let project_name = config.project.name.clone();
     let diff_repo = target_path.clone();
-    let scanner = crate::scanner::Scanner::new(config, target_path, force);
+    let scanner = crate::scanner::Scanner::new(config, target_path, force)
+        .with_config_path(config_path.to_path_buf());
     let mut findings = scanner.run().await?;
 
     // Diff scope: keep only findings in files changed in the revspec.
@@ -191,8 +192,12 @@ pub async fn run_resume(
 
     let prev_findings_count = checkpoint.findings_so_far.len();
 
-    // Load config from checkpoint's project path
-    let config_path = PathBuf::from(&checkpoint.project_path).join("config.toml");
+    // The checkpoint records the config the original scan used; fall back to the
+    // project root for checkpoints written before it was stored.
+    let config_path = match &checkpoint.config_path {
+        Some(p) => PathBuf::from(p),
+        None => PathBuf::from(&checkpoint.project_path).join("config.toml"),
+    };
     let config = if config_path.exists() {
         config::ScannerConfig::from_file(config_path.to_str().ok_or("Invalid config path")?)?
     } else {
@@ -216,7 +221,8 @@ pub async fn run_resume(
         target_path,
         initial_findings,
         false,
-    );
+    )
+    .with_config_path(config_path);
 
     let findings = scanner.run().await?;
 

@@ -74,7 +74,7 @@ impl Scanner {
     ) -> Result<(), String> {
         save_checkpoint(
             &self.checkpoint_path,
-            &self.config,
+            self.location(),
             findings,
             analyzed_files,
             phase,

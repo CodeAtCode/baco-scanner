@@ -31,6 +31,9 @@ pub struct Scanner {
     pub force: bool,
     pub metrics_tracker: LlmMetricsTracker,
     pub project_stack: Option<ProjectStack>,
+    /// Config file the scan was started with, recorded in the checkpoint so a
+    /// resume reproduces the same settings instead of falling back to defaults.
+    pub config_path: Option<PathBuf>,
 }
 
 impl Scanner {
@@ -98,6 +101,18 @@ impl Scanner {
         Self::with_initial_findings(config, target_path, Vec::new(), force)
     }
 
+    pub fn with_config_path(mut self, config_path: PathBuf) -> Self {
+        self.config_path = Some(config_path);
+        self
+    }
+
+    pub fn location(&self) -> super::checkpoint::ScanLocation<'_> {
+        super::checkpoint::ScanLocation {
+            target_path: &self.target_path,
+            config_path: self.config_path.as_deref(),
+        }
+    }
+
     pub fn with_initial_findings(
         config: config::ScannerConfig,
         target_path: PathBuf,
@@ -126,6 +141,7 @@ impl Scanner {
             force,
             metrics_tracker: LlmMetricsTracker::new(),
             project_stack: None,
+            config_path: None,
         }
     }
 

@@ -9,6 +9,7 @@ pub mod cli;
 pub mod confidence_refinement;
 pub mod config;
 pub mod context; // Context extraction module
+pub mod core_limit;
 pub mod cost_estimate;
 pub mod cpg; // CPG-guided slicing (T3.1)
 pub mod crossfile;

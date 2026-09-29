@@ -137,6 +137,11 @@ pub async fn run_llm_static_analysis(
         phase_config.api_key.is_some()
     );
 
+    // Declared outside the api-key branch so the return below can report the files
+    // this phase actually analysed. It starts as a copy of the input, so a phase
+    // that skips keeps whatever the earlier phases recorded.
+    let mut new_analyzed_files: Vec<String> = analyzed_files.to_vec();
+
     if let Some(_api_key) = &phase_config.api_key {
         let _discovery_timeout = phase_config.timeout_secs.unwrap_or(config.llm.timeout_secs);
 
@@ -163,7 +168,6 @@ pub async fn run_llm_static_analysis(
         );
 
         let mut llm_findings = Vec::new();
-        let mut new_analyzed_files: Vec<String> = analyzed_files.to_vec();
 
         // Initialize vuln_spec index if enabled
         if config.vuln_spec.enabled {
@@ -505,7 +509,10 @@ pub async fn run_llm_static_analysis(
         tracing::debug!("No API key for LLM analysis, skipping static analysis");
     }
 
-    Ok((findings, analyzed_files.to_vec()))
+    // Return the files this phase actually looked at, not the input list: the
+    // caller assigns this to the scan-wide `analyzed_files`, so returning the
+    // input would discard every file analysed here.
+    Ok((findings, new_analyzed_files))
 }
 
 /// Triage finding structure for structured output (T17)

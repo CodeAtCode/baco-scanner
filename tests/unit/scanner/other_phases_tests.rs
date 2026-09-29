@@ -358,6 +358,44 @@ async fn test_ticket_crossref_skips_when_empty_systems() {
 // ============================================================================
 
 #[tokio::test]
+async fn test_indexing_records_indexed_file_count() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    for name in ["a.rs", "b.rs", "c.rs"] {
+        std::fs::write(dir.path().join(name), "fn main() {}\n").expect("write source");
+    }
+
+    let mut config = create_test_config();
+    config.project.languages = vec!["rust".to_string()];
+    config.scanner.exclude_paths = vec![];
+    let scanner = Scanner::new(config.clone(), dir.path().to_path_buf(), false);
+
+    let pb = ProgressBar::hidden();
+    let metrics_tracker = LlmMetricsTracker::new();
+    let analyzed_files: Vec<String> = vec![];
+    let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
+    let phase_config = PhaseConfig {
+        phase: &ScanPhase::Indexing,
+        findings: vec![],
+        pb: &pb,
+        analyzed_files: &analyzed_files,
+        metrics_tracker: &metrics_tracker,
+        target_path: dir.path(),
+        config: &config,
+        project_stack: &project_stack,
+    };
+
+    run_phase(&scanner, phase_config)
+        .await
+        .expect("indexing runs");
+
+    assert_eq!(
+        scanner.state.borrow().files_scanned,
+        3,
+        "the summary reports this as 'indexed'; nothing wrote the field, so it always read 0"
+    );
+}
+
+#[tokio::test]
 async fn test_git_analysis_on_valid_repo() {
     // run_git_analysis returns the findings untouched both when it can read the
     // repository and when it cannot, so this needs a real repo to prove anything.

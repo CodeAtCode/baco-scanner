@@ -18,6 +18,7 @@ exclude = [
   "core*",
   "*.profraw",
   "lcov.info",
+  ".cortexkit/**",
 ]
 
 [dependencies]
