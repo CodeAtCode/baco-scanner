@@ -5,7 +5,6 @@
 
 use baco::cpg::joern::JoernEngine;
 use baco::cpg::queries::get_query_for_cwe;
-use baco::cpg::slicer::CpgSlicer;
 use baco::cpg::{CodeSlice, CpgConfig, CpgError, DataFlowNode, QueryResult};
 use std::path::PathBuf;
 
@@ -81,52 +80,41 @@ fn test_query_different_entry_points_produce_different_queries() {
 // CpgSlicer tests
 // ============================================================================
 
-#[test]
-fn test_cpg_slicer_new_creates_instance() {
-    // Create a minimal mock engine for testing
-    struct MockEngine;
-    impl baco::cpg::CpgEngine for MockEngine {
-        fn build(&self, _path: &std::path::Path) -> Result<baco::cpg::CpgHandle, CpgError> {
-            Err(CpgError::JoernNotInstalled)
-        }
-        fn run_query(
-            &self,
-            _cpg: &baco::cpg::CpgHandle,
-            _query: &str,
-        ) -> Result<QueryResult, CpgError> {
-            Ok(QueryResult { nodes: vec![] })
-        }
-        fn is_available(&self) -> bool {
-            false
-        }
-    }
-
-    let engine = MockEngine;
-    let _slicer = CpgSlicer::new(&engine);
-
-    // Just verify we can create the slicer
-    assert_eq!(true, true); // Construction test
-}
-
 // ============================================================================
 // JoernEngine tests
 // ============================================================================
 
 #[test]
-#[allow(clippy::bool_assert_comparison)]
 fn test_joern_engine_new_with_none_path() {
-    let _engine = JoernEngine::new(None);
-    // Construction test
-    assert_eq!(true, true);
+    let engine = JoernEngine::new(None);
+    // Verify engine was created successfully and can search for joern
+    // This test verifies construction doesn't panic
+    let result = engine.find_joern();
+    // Joern not installed in CI/test environment - verify it returns an error
+    assert!(
+        result.is_err(),
+        "Expected error when joern is not installed"
+    );
+    // Verify the error message mentions joern
+    if let Err(e) = result {
+        let msg = format!("{}", e);
+        assert!(
+            msg.contains("Joern"),
+            "Error message should mention Joern: {}",
+            msg
+        );
+    }
 }
 
 #[test]
-#[allow(clippy::bool_assert_comparison)]
 fn test_joern_engine_new_with_some_path() {
     let path = PathBuf::from("/usr/local/bin/joern");
-    let _engine = JoernEngine::new(Some(path));
-    // Construction test
-    assert_eq!(true, true);
+    let engine = JoernEngine::new(Some(path.clone()));
+    // Verify engine was created with the specified path
+    // The path doesn't need to exist for construction to succeed
+    let result = engine.find_joern();
+    // Should fail since /usr/local/bin/joern likely doesn't exist
+    assert!(result.is_err());
 }
 
 // ============================================================================

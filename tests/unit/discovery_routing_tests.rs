@@ -270,13 +270,16 @@ fn test_cwe_routing_empty_findings() {
     let router = CweRouter::default();
     let findings: Vec<VulnerabilityFinding> = vec![];
 
-    // Should not panic on empty list
+    // Empty findings list should produce no routing results
+    let mut routed_count = 0;
     for finding in &findings {
         if let Some(cwe) = finding.cwe_id.as_deref() {
-            let _route = router.route_cwe(cwe);
+            let route = router.route_cwe(cwe);
+            assert!(route.domain.is_some() || route.domain.is_none());
+            routed_count += 1;
         }
     }
-    // Test passes if no panic
+    assert_eq!(routed_count, 0, "Empty findings should produce no routes");
 }
 
 /// Test registry-driven routing for multiple CWE categories

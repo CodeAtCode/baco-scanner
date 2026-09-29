@@ -545,6 +545,9 @@ fn test_template_variables_is_empty_behavior() {
 #[test]
 fn test_default_prompts_all_fields_non_empty() {
     assert_all_prompts_non_empty();
+    // Helper asserts all prompts are non-empty
+    let prompts = get_all_defaults();
+    assert!(!prompts.indexing.is_empty());
 }
 
 #[test]

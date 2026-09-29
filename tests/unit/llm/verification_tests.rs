@@ -344,6 +344,10 @@ fn test_project_type_enum_variants() {
     let _desktop = ProjectType::Desktop;
     let _game = ProjectType::Game;
     let _unknown = ProjectType::Unknown;
+
+    // Verify they can be compared (they implement PartialEq)
+    assert_eq!(ProjectType::Web, ProjectType::Web);
+    assert_ne!(ProjectType::Web, ProjectType::CLI);
 }
 
 #[test]

@@ -372,15 +372,15 @@ fn make_llm_config(models: Vec<&str>) -> LlmConfig {
 }
 
 #[test]
-fn test_deduplication_service_creation() {
-    let config = make_llm_config(vec!["test-model"]);
-    let _service = DeduplicationService::new(&config);
-}
-
-#[test]
 fn test_deduplication_empty_findings() {
     let config = make_llm_config(vec![]);
-    let _service = DeduplicationService::new(&config);
+    let service = DeduplicationService::new(&config);
+
+    // With empty models, deduplication should return empty findings
+    let findings: Vec<VulnerabilityFinding> = vec![];
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let deduped = rt.block_on(service.deduplicate(&findings));
+    assert!(deduped.is_empty());
 }
 
 // ============================================================================
@@ -390,15 +390,30 @@ fn test_deduplication_empty_findings() {
 #[test]
 fn test_enrichment_service_creation_with_config() {
     let config = make_llm_config(vec!["test-model"]);
-    let _service = EnrichmentService::new(&config);
+    let service = EnrichmentService::new(&config);
+
+    // A configured but unreachable endpoint (base_url "http://test" does not resolve)
+    // must never cost us a finding.
+    let findings = vec![make_finding("f1", Severity::High, "src/test.rs", Some(10))];
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let (enriched, _llm_failed) = rt.block_on(service.enrich_findings(&findings));
+
+    assert_eq!(enriched.len(), 1, "a finding must never be dropped");
 }
 
 #[test]
 fn test_enrichment_service_creation_without_config() {
     let config = make_llm_config(vec![]);
+    let service = EnrichmentService::new(&config);
 
-    let _service = EnrichmentService::new(&config);
-    // Service creation succeeds without LLM config
+    // With empty models, enrichment should leave findings unchanged
+    let findings = vec![make_finding("f1", Severity::High, "src/test.rs", Some(10))];
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let (enriched, llm_failed) = rt.block_on(service.enrich_findings(&findings));
+
+    // Without LLM client, findings are returned unchanged and llm_failed is false
+    assert_eq!(enriched.len(), 1);
+    assert!(!llm_failed);
 }
 
 #[test]

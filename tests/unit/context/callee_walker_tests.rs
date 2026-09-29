@@ -227,8 +227,10 @@ fn test_rust_method_call() {
     let source = "vec.push(1)";
     let sites = extract_call_sites(source);
 
-    // Implementation may detect vec or push - just verify no panic
-    let _ = sites;
+    // The regex-based scanner extracts "vec" as a call (no args) since it sees "vec."
+    // followed by "push(1)" - it may or may not extract "push" depending on the ":" handling
+    // At minimum, we should detect at least one call site
+    assert!(!sites.is_empty(), "Should detect at least the method call");
 }
 
 // ============================================================================
@@ -251,8 +253,10 @@ fn test_call_with_nested_parens() {
     let source = "func((a + b))";
     let sites = extract_call_sites(source);
 
-    // Implementation may vary - just verify we detect calls or accept empty
-    let _ = sites;
+    // Should detect the function call
+    assert_eq!(sites.len(), 1);
+    let site = sites.iter().next().unwrap();
+    assert_eq!(site.callee, "func");
 }
 
 #[test]
@@ -379,9 +383,15 @@ fn test_call_in_string_literal() {
     let source = r#"let s = "foo(1)";"#;
     let sites = extract_call_sites(source);
 
-    // May or may not detect - this is expected behavior for regex-based scanning
-    // Just verify we don't panic
-    let _ = sites;
+    // The regex scanner will detect "foo(1)" even in a string literal
+    // This is expected behavior for a syntactic scanner
+    assert!(
+        sites.contains(&CallSite {
+            callee: "foo".to_string(),
+            arg_count: 1
+        }),
+        "Should detect foo(1) even in string literal (scanner limitation)"
+    );
 }
 
 #[test]
@@ -390,8 +400,15 @@ fn test_call_in_comment() {
     let source = "// foo(1)";
     let sites = extract_call_sites(source);
 
-    // May or may not detect - expected for regex-based scanning
-    let _ = sites;
+    // The regex scanner will detect "foo(1)" even in a comment
+    // This is expected behavior for a syntactic scanner
+    assert!(
+        sites.contains(&CallSite {
+            callee: "foo".to_string(),
+            arg_count: 1
+        }),
+        "Should detect foo(1) even in comment (scanner limitation)"
+    );
 }
 
 #[test]
@@ -399,8 +416,15 @@ fn test_unicode_identifiers() {
     let source = "函数 (1)";
     let sites = extract_call_sites(source);
 
-    // Unicode identifiers may or may not be detected depending on implementation
-    let _ = sites;
+    // Unicode identifiers are supported by the scanner
+    // The Chinese characters should be recognized as part of the identifier
+    assert!(
+        sites.contains(&CallSite {
+            callee: "函数".to_string(),
+            arg_count: 1
+        }),
+        "Should detect Unicode identifier call"
+    );
 }
 
 // ============================================================================
@@ -419,8 +443,16 @@ fn main() {
 
     let sites = extract_call_sites(source);
 
-    // Implementation may vary for real code - just verify no panic
-    let _ = sites;
+    // Scanner extracts regular function calls (not macros with !)
+    // Detects: main(), push()
+    assert!(sites.contains(&CallSite {
+        callee: "main".to_string(),
+        arg_count: 0
+    }));
+    assert!(sites.contains(&CallSite {
+        callee: "push".to_string(),
+        arg_count: 1
+    }));
 }
 
 #[test]

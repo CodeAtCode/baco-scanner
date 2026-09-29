@@ -1,9 +1,41 @@
 use crate::agent::ToolResult;
 use crate::agent::tool_schema::SandboxLike;
 use std::io::Write;
+use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::time::{Duration, Instant};
+
+/// Reject source that shells out, scoped to the target language.
+///
+/// The real containment controls are path checks, the enforced process timeout and
+/// core-dump suppression; this text filter is a secondary guard. Rust is exempt because
+/// a harness for code that legitimately uses `unsafe` or `process::Command` must be
+/// writable, and this tool exists to analyse exactly that kind of code.
+fn validate_test_source_content(path: &str, content: &str) -> Result<(), String> {
+    let dangerous_patterns: &[&str] = match Path::new(path).extension().and_then(|e| e.to_str()) {
+        Some("py") => &["os.system", "subprocess.", "eval(", "exec(", "__import__"],
+        Some("sh") => &["| sh", "| bash", "|sh", "|bash"],
+        Some("rs") => &[],
+        _ => &[
+            "os.system",
+            "subprocess.",
+            "eval(",
+            "exec(",
+            "__import__",
+            "| sh",
+            "| bash",
+            "|sh",
+            "|bash",
+        ],
+    };
+    for pat in dangerous_patterns {
+        if content.contains(pat) {
+            return Err(format!("Dangerous pattern: {}", pat));
+        }
+    }
+    Ok(())
+}
 
 /// Error type for sandbox operations
 #[derive(Debug, thiserror::Error)]
@@ -105,12 +137,15 @@ impl SandboxLike for ToolSandbox {
         timeout_secs: Option<u64>,
     ) -> Result<ToolResult, String> {
         let dur = Duration::from_secs(timeout_secs.unwrap_or(self.timeout_secs));
-        let child = Command::new(cmd)
-            .args(args)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| format!("spawn {}: {}", cmd, e))?;
+        let child = unsafe {
+            Command::new(cmd)
+                .args(args)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .pre_exec(disable_core_dumps)
+                .spawn()
+        }
+        .map_err(|e| format!("spawn {}: {}", cmd, e))?;
         let dur = child
             .wait_with_timeout(dur)
             .map_err(|e| format!("timeout/err: {}", e))?;
@@ -127,27 +162,11 @@ impl SandboxLike for ToolSandbox {
             output: out.trim().to_string(),
         })
     }
-    fn validate_test_source(&self, content: &str) -> Result<(), String> {
-        let dangerous_patterns = [
-            "os.system",
-            "subprocess.",
-            "eval(",
-            "exec(",
-            "__import__",
-            "| sh",
-            "|bash",
-            "unsafe",
-            "process::Command",
-        ];
-        for pat in &dangerous_patterns {
-            if content.contains(pat) {
-                return Err(format!("Dangerous pattern: {}", pat));
-            }
-        }
-        Ok(())
+    fn validate_test_source(&self, path: &str, content: &str) -> Result<(), String> {
+        validate_test_source_content(path, content)
     }
     fn create_temp_file(&self, path: &str, content: &str) -> Result<PathBuf, String> {
-        self.validate_test_source(content)
+        self.validate_test_source(path, content)
             .map_err(|e| format!("Validation failed: {}", e))?;
 
         // Pre-condition: validate path containment before write
@@ -191,23 +210,79 @@ impl SandboxLike for ToolSandbox {
 trait WaitWithTimeout {
     fn wait_with_timeout(self, dur: Duration) -> Result<Output, String>;
 }
+
+/// Zero `RLIMIT_CORE` in the child, so a crashing fixture cannot write a multi-megabyte
+/// core file into the directory the scanner was run from.
+fn disable_core_dumps() -> std::io::Result<()> {
+    let rlim = libc::rlimit {
+        rlim_cur: 0,
+        rlim_max: 0,
+    };
+    // SAFETY: glibc's setrlimit is a bare syscall wrapper -- it takes no lock, allocates
+    // nothing and touches no global state, so it is async-signal-safe in the child
+    // between fork and exec. Failure is ignored on purpose: the child must still spawn.
+    let _ = unsafe { libc::setrlimit(libc::RLIMIT_CORE, &rlim) };
+    Ok(())
+}
+
 impl WaitWithTimeout for std::process::Child {
     fn wait_with_timeout(mut self, dur: Duration) -> Result<Output, String> {
-        if !dur.is_zero() {
-            let deadline = Instant::now() + dur;
-            while self.try_wait().map(|r| r.is_none()).unwrap_or(false) && Instant::now() < deadline
-            {
-                std::thread::sleep(Duration::from_millis(100));
+        // Zero timeout means "no timeout" — fall through to wait_with_output
+        if dur.is_zero() {
+            return self
+                .wait_with_output()
+                .map_err(|e| format!("wait_with_output: {}", e));
+        }
+
+        let deadline = Instant::now() + dur;
+
+        // Take ownership of the pipes
+        let mut stdout = self.stdout.take().expect("stdout should be piped");
+        let mut stderr = self.stderr.take().expect("stderr should be piped");
+
+        // Spawn threads to drain output while we poll (prevents pipe deadlock)
+        let stdout_handle = std::thread::spawn(move || {
+            let mut buf = Vec::new();
+            let _ = std::io::Read::read_to_end(&mut stdout, &mut buf);
+            buf
+        });
+        let stderr_handle = std::thread::spawn(move || {
+            let mut buf = Vec::new();
+            let _ = std::io::Read::read_to_end(&mut stderr, &mut buf);
+            buf
+        });
+
+        // Poll for completion until deadline
+        loop {
+            if let Some(status) = self.try_wait().map_err(|e| format!("try_wait: {}", e))? {
+                // Child exited normally or by signal before timeout
+                let stdout_buf = stdout_handle.join().unwrap_or_default();
+                let stderr_buf = stderr_handle.join().unwrap_or_default();
+                return Ok(Output {
+                    status,
+                    stdout: stdout_buf,
+                    stderr: stderr_buf,
+                });
             }
+
+            if Instant::now() >= deadline {
+                // Timeout: kill the child
+                let _ = self.kill();
+                let _ = self.wait();
+
+                let stdout_buf = stdout_handle.join().unwrap_or_default();
+                let stderr_buf = stderr_handle.join().unwrap_or_default();
+
+                return Err(format!(
+                    "timeout after {}s (killed, stdout={} bytes, stderr={} bytes)",
+                    dur.as_secs(),
+                    stdout_buf.len(),
+                    stderr_buf.len()
+                ));
+            }
+
+            std::thread::sleep(Duration::from_millis(50));
         }
-        // Use wait_with_output to capture stdout/stderr
-        let output = self
-            .wait_with_output()
-            .map_err(|e| format!("wait_with_output: {}", e))?;
-        if output.status.code() == Some(-15) {
-            return Err("timeout".to_string());
-        }
-        Ok(output)
     }
 }
 
@@ -242,12 +317,15 @@ impl ToolSandbox {
         timeout_secs: Option<u64>,
     ) -> Result<ToolResult, String> {
         let dur = Duration::from_secs(timeout_secs.unwrap_or(self.timeout_secs));
-        let child = Command::new(cmd)
-            .args(args)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| format!("spawn {}: {}", cmd, e))?;
+        let child = unsafe {
+            Command::new(cmd)
+                .args(args)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .pre_exec(disable_core_dumps)
+                .spawn()
+        }
+        .map_err(|e| format!("spawn {}: {}", cmd, e))?;
         let dur = child
             .wait_with_timeout(dur)
             .map_err(|e| format!("timeout/err: {}", e))?;
@@ -265,28 +343,12 @@ impl ToolSandbox {
         })
     }
 
-    pub fn validate_test_source(&self, content: &str) -> Result<(), String> {
-        let dangerous_patterns = [
-            "os.system",
-            "subprocess.",
-            "eval(",
-            "exec(",
-            "__import__",
-            "| sh",
-            "|bash",
-            "unsafe",
-            "process::Command",
-        ];
-        for pat in &dangerous_patterns {
-            if content.contains(pat) {
-                return Err(format!("Dangerous pattern: {}", pat));
-            }
-        }
-        Ok(())
+    pub fn validate_test_source(&self, path: &str, content: &str) -> Result<(), String> {
+        validate_test_source_content(path, content)
     }
 
     pub fn create_temp_file(&self, path: &str, content: &str) -> Result<PathBuf, String> {
-        self.validate_test_source(content)
+        self.validate_test_source(path, content)
             .map_err(|e| format!("Validation failed: {}", e))?;
 
         // Pre-condition: validate path containment before write

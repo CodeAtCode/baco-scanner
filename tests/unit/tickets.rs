@@ -12,22 +12,13 @@ use mockito::Server;
 #[test]
 fn test_ticket_searcher_new_empty_systems() {
     let systems = vec![];
-    let _searcher = TicketSearcher::new(systems);
+    let searcher = TicketSearcher::new(systems);
 
-    // Just test that creation doesn't panic
-}
-
-#[test]
-fn test_ticket_searcher_new_with_systems() {
-    let systems = vec![TicketSystem {
-        name: "GitHub".to_string(),
-        system_type: "github".to_string(),
-        url: "https://github.com".to_string(),
-        credentials: None,
-    }];
-    let _searcher = TicketSearcher::new(systems);
-
-    // Just test that creation doesn't panic
+    // With zero systems, search returns Ok(vec![]) with no network access
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let result = rt.block_on(searcher.search_for_finding("test"));
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap().len(), 0);
 }
 
 #[test]
@@ -45,19 +36,6 @@ fn test_ticket_system_default_values() {
 }
 
 #[test]
-fn test_ticket_searcher_with_gitlab_system() {
-    let systems = vec![TicketSystem {
-        name: "GitLab".to_string(),
-        system_type: "gitlab".to_string(),
-        url: "https://gitlab.com".to_string(),
-        credentials: None,
-    }];
-    let _searcher = TicketSearcher::new(systems);
-
-    // Just test that creation doesn't panic
-}
-
-#[test]
 fn test_ticket_searcher_with_unknown_system_type() {
     let systems = vec![TicketSystem {
         name: "Unknown".to_string(),
@@ -65,9 +43,13 @@ fn test_ticket_searcher_with_unknown_system_type() {
         url: "https://jira.example.com".to_string(),
         credentials: None,
     }];
-    let _searcher = TicketSearcher::new(systems);
+    let searcher = TicketSearcher::new(systems);
 
-    // Just test that creation doesn't panic
+    // With unknown system type, search returns Ok(vec![]) with no network access
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let result = rt.block_on(searcher.search_for_finding("test"));
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap().len(), 0);
 }
 
 #[test]
@@ -1080,21 +1062,6 @@ async fn test_search_gitlab_with_authentication_keyword() {
     assert_eq!(results[0].ticket_id, "993");
 
     mock.assert_async().await;
-}
-
-#[test]
-fn test_ticket_searcher_new() {
-    use baco::tickets::{TicketSearcher, TicketSystem};
-
-    let systems = vec![TicketSystem {
-        name: "GitHub".to_string(),
-        system_type: "github".to_string(),
-        url: "https://github.com".to_string(),
-        credentials: Some("token".to_string()),
-    }];
-
-    let _searcher = TicketSearcher::new(systems);
-    // Just verify it doesn't panic
 }
 
 #[tokio::test]

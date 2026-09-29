@@ -9,26 +9,39 @@ use baco::context::control_path::{ContextError, Language, extract};
 #[test]
 fn test_language_ts_language_c() {
     let lang = Language::C;
-    // Just verify it doesn't panic - actual tree-sitter language check is internal
-    let _ts_lang = lang.ts_language();
+    // Verify ts_language() returns a valid tree-sitter language
+    let ts_lang = lang.ts_language();
+    // The language should be usable - verify by formatting it
+    let lang_str = format!("{:?}", ts_lang);
+    // The formatted string should not be empty
+    assert!(!lang_str.is_empty());
 }
 
 #[test]
 fn test_language_ts_language_rust() {
     let lang = Language::Rust;
-    let _ts_lang = lang.ts_language();
+    let ts_lang = lang.ts_language();
+    // Verify the language can be used
+    let lang_str = format!("{:?}", ts_lang);
+    assert!(!lang_str.is_empty());
 }
 
 #[test]
 fn test_language_ts_language_python() {
     let lang = Language::Python;
-    let _ts_lang = lang.ts_language();
+    let ts_lang = lang.ts_language();
+    // Verify the language can be used
+    let lang_str = format!("{:?}", ts_lang);
+    assert!(!lang_str.is_empty());
 }
 
 #[test]
 fn test_language_ts_language_javascript() {
     let lang = Language::JavaScript;
-    let _ts_lang = lang.ts_language();
+    let ts_lang = lang.ts_language();
+    // Verify the language can be used
+    let lang_str = format!("{:?}", ts_lang);
+    assert!(!lang_str.is_empty());
 }
 
 // ============================================================================
@@ -314,9 +327,12 @@ void broken( {
 "#;
 
     let result = extract(source, Language::C);
-    // Tree-sitter is lenient - may still produce parse tree
-    // Just verify we don't panic
-    assert!(result.is_ok() || result.is_err());
+    // Bug 2 fix: parse-error guard now fires for malformed C
+    assert!(result.is_err(), "Malformed C should be rejected");
+    assert!(matches!(
+        result.unwrap_err(),
+        ContextError::ParseError { .. }
+    ));
 }
 
 #[test]
@@ -507,19 +523,16 @@ fn test_malformed_source_returns_error_inline_migrated() {
     use baco::context::Language;
     use baco::context::control_path::extract;
 
-    // Tree-sitter is lenient, so malformed source may still parse
-    // This test verifies we don't panic on edge cases
+    // Bug 2 fix: parse-error guard now fires for malformed C
     let source = r#"
 void broken( {
     int x = ;
 "#;
 
     let result = extract(source, Language::C);
-    // Tree-sitter may still produce a parse tree for malformed code
-    // Just verify we get a result without panicking
     assert!(
-        result.is_ok() || result.is_err(),
-        "Should handle malformed source gracefully"
+        result.is_err(),
+        "Malformed C should be rejected by parse-error guard"
     );
 }
 

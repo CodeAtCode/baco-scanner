@@ -26,8 +26,9 @@ mod tests {
         };
 
         let result = analyze_diff(input);
-        // Should execute git diff (may succeed or fail depending on repo state)
-        assert!(result.is_ok() || result.is_err());
+        // These revspecs do not resolve in this repository (no tags, single commit), so
+        // analyze_diff must reject them rather than report an empty diff as success.
+        assert!(result.is_err(), "unresolvable revspec should be rejected");
     }
 
     #[test]
@@ -40,7 +41,9 @@ mod tests {
         };
 
         let result = analyze_diff(input);
-        assert!(result.is_ok() || result.is_err());
+        // These revspecs do not resolve in this repository (no tags, single commit), so
+        // analyze_diff must reject them rather than report an empty diff as success.
+        assert!(result.is_err(), "unresolvable revspec should be rejected");
     }
 
     #[test]
@@ -53,7 +56,9 @@ mod tests {
         };
 
         let result = analyze_diff(input);
-        assert!(result.is_ok() || result.is_err());
+        // These revspecs do not resolve in this repository (no tags, single commit), so
+        // analyze_diff must reject them rather than report an empty diff as success.
+        assert!(result.is_err(), "unresolvable revspec should be rejected");
     }
 
     // ============================================================================
@@ -85,8 +90,8 @@ mod tests {
         };
 
         let result = analyze_diff(input);
-        // Git may still run but produce empty diff or error
-        assert!(result.is_ok() || result.is_err());
+        // HEAD~1 does not exist in a single-commit repository.
+        assert!(result.is_err(), "an unresolvable range should be rejected");
     }
 
     // ============================================================================

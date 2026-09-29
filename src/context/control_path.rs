@@ -61,8 +61,11 @@ pub fn extract(source: &str, language: Language) -> Result<ControlPath, ContextE
 
     let root = tree.root_node();
 
-    if root.has_error() && root.kind() != "translation_unit" {
-        return Err(ContextError::ParseError { line: 1 });
+    // Check for parse errors - if the tree has errors, reject the source
+    if root.has_error() {
+        // Find the first error's position for a better error message
+        let error_line = find_first_error_line(&root);
+        return Err(ContextError::ParseError { line: error_line });
     }
 
     let ast_text = verbalize_ast(&root, source);
@@ -74,6 +77,38 @@ pub fn extract(source: &str, language: Language) -> Result<ControlPath, ContextE
         cfg_text,
         dfg_text,
     })
+}
+
+/// Find the line number of the first ERROR node in the AST.
+fn find_first_error_line(root: &tree_sitter::Node) -> usize {
+    let mut cursor = root.walk();
+
+    // BFS to find first error node
+    let mut queue = Vec::new();
+    if root.child_count() > 0 {
+        for child in root.children(&mut cursor) {
+            queue.push(child);
+        }
+    }
+
+    let mut idx = 0;
+    while idx < queue.len() {
+        let node = &queue[idx];
+        idx += 1;
+
+        if node.is_error() || node.is_missing() {
+            return node.start_position().row + 1;
+        }
+
+        if node.child_count() > 0 {
+            for child in node.children(&mut cursor) {
+                queue.push(child);
+            }
+        }
+    }
+
+    // Fallback to line 1 if no error found (shouldn't happen if has_error() is true)
+    1
 }
 
 /// Walk AST and emit textual representation

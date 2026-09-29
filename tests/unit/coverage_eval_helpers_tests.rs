@@ -311,13 +311,17 @@ fn eval_floor_out_of_range() {
     assert!(result.unwrap_err().contains("must be between 0.0 and 1.0"));
 }
 
+// eval_floor reads BACO_EVAL_FLOOR, which other tests mutate process-wide, so these
+// must hold the same lock as the tests that set it.
 #[test]
+#[serial]
 fn eval_floor_zero_valid() {
     let result = eval_floor(0.0);
     assert!(result.is_ok());
 }
 
 #[test]
+#[serial]
 fn eval_floor_one_valid() {
     let result = eval_floor(1.0);
     assert!(result.is_ok());

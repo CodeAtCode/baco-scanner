@@ -98,9 +98,20 @@ fn test_enrichment_service_new_with_valid_config_creates_client() {
     let config = create_valid_config();
     let service = EnrichmentService::new(&config);
 
-    // Service should be created successfully
-    // The client creation depends on internal implementation
-    let _ = service;
+    // A configured service must never lose a finding, whether or not the endpoint
+    // answers. Asserting only the count keeps this deterministic on a developer
+    // machine that happens to run Ollama on 11434.
+    let findings = vec![VulnerabilityFinding {
+        id: "f1".to_string(),
+        severity: baco::findings::Severity::High,
+        file_path: "src/test.rs".to_string(),
+        line_number: Some(10),
+        ..Default::default()
+    }];
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let (enriched, _llm_failed) = rt.block_on(service.enrich_findings(&findings));
+
+    assert_eq!(enriched.len(), findings.len());
 }
 
 #[test]
@@ -121,7 +132,15 @@ fn test_enrichment_service_new_with_empty_api_key_no_client() {
         pricing: Default::default(),
     };
     let service = EnrichmentService::new(&config);
-    let _ = service;
+
+    // Service created with empty API key - client should be None
+    // Verify through behavior: enrich_findings returns unenriched findings
+    let findings = vec![create_finding("f1", "Test", Severity::High, "src/test.rs")];
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let (enriched, llm_failed) = rt.block_on(service.enrich_findings(&findings));
+
+    assert_eq!(enriched.len(), 1);
+    assert!(!llm_failed);
 }
 
 #[test]
@@ -142,14 +161,28 @@ fn test_enrichment_service_new_with_empty_base_url_no_client() {
         pricing: Default::default(),
     };
     let service = EnrichmentService::new(&config);
-    let _ = service;
+
+    // Service created with empty base_url - client should be None
+    let findings = vec![create_finding("f1", "Test", Severity::High, "src/test.rs")];
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let (enriched, llm_failed) = rt.block_on(service.enrich_findings(&findings));
+
+    assert_eq!(enriched.len(), 1);
+    assert!(!llm_failed);
 }
 
 #[test]
 fn test_enrichment_service_new_with_both_empty_no_client() {
     let config = create_empty_config();
     let service = EnrichmentService::new(&config);
-    let _ = service;
+
+    // Service created with both empty - client should be None
+    let findings = vec![create_finding("f1", "Test", Severity::High, "src/test.rs")];
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let (enriched, llm_failed) = rt.block_on(service.enrich_findings(&findings));
+
+    assert_eq!(enriched.len(), 1);
+    assert!(!llm_failed);
 }
 
 // ============================================================================

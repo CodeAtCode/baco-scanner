@@ -8,7 +8,7 @@ Grounded in 36 surveyed papers (16 integrated) from [Awesome-LLMs-for-Vulnerabil
 [![CI](https://github.com/CodeAtCode/baco-scanner/actions/workflows/ci.yml/badge.svg)](https://github.com/CodeAtCode/baco-scanner/actions/workflows/ci.yml)
 [![Coverage](https://codecov.io/gh/CodeAtCode/baco-scanner/branch/master/graph/badge.svg)](https://app.codecov.io/gh/CodeAtCode/baco-scanner)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Rust](https://img.shields.io/badge/rust-1.74+-orange.svg)](https://www.rust-lang.org)
+[![Rust](https://img.shields.io/badge/rust-1.85+-orange.svg)](https://www.rust-lang.org)
 
 [![Example Report](docs/example-report-screenshot.png)](example-report.html)
 
@@ -16,7 +16,7 @@ Grounded in 36 surveyed papers (16 integrated) from [Awesome-LLMs-for-Vulnerabil
 
 ## Prerequisites
 
-- **Rust** 1.74+ (`rustup`)
+- **Rust** 1.85+ (`rustup`)
 - **An LLM API key** (Mistral, OpenAI, or any OpenAI-compatible endpoint)
 - **Semgrep** installed on PATH (`pip install semgrep` or [see install options](https://semgrep.dev/docs/getting-started/))
 
@@ -41,7 +41,7 @@ export LLM_DISCOVERY_KEY="your-key-here"  # or LLM_API_KEY for generic fallback
 ./target/release/baco doctor
 
 # 5. Scan
-./target/release/baco scan --config config.toml
+./target/release/baco scan --config /path/to/project/baco.toml
 ```
 
 ### Additional subcommands
@@ -54,7 +54,8 @@ export LLM_DISCOVERY_KEY="your-key-here"  # or LLM_API_KEY for generic fallback
 ./target/release/baco eval --target /path/to/fixtures --ground-truth eval/oracles/target.json
 
 # Generate report
-./target/release/baco report --input findings.json --format html
+# Use --config only when the evidence gate must apply to a standalone report
+./target/release/baco report --input findings.json --format html --config config.toml
 
 # Verify findings
 ./target/release/baco verify --input findings.json
@@ -72,6 +73,8 @@ export LLM_DISCOVERY_KEY="your-key-here"  # or LLM_API_KEY for generic fallback
 ./target/release/baco scan --config my.toml --dry-run   # Print estimate and exit
 ./target/release/baco scan --config my.toml --target /path  # Override target path
 ./target/release/baco scan --config my.toml --force     # Force full rescan
+./target/release/baco scan --config my.toml --diff main...HEAD  # Limit report to files changed in git revspec
+./target/release/baco scan --config my.toml -q          # Suppress non-essential output (global flag)
 ```
 
 - **Phases**: 4 parallel (Indexing, Semgrep, CpgSlice, LlmStaticAnalysis) + 19 sequential phases — some disabled by default (see [Configuration](docs/configuration.md))
@@ -81,13 +84,13 @@ export LLM_DISCOVERY_KEY="your-key-here"  # or LLM_API_KEY for generic fallback
 ## Features
 
 - **Pipeline profiles**: `core` (default) runs essential phases; `all` enables experimental phases (still individually flag-gated) — set with `scanner.profile = "core" | "all"`
-- **Pipeline phases**: Indexing → Semgrep → CpgSlice (`[cpg]` section, requires Joern) → LlmStaticAnalysis → CweRouting (`router.enabled`) → RuleSynthesis (experimental) → LlmDiscovery → LlmVerification → Validate (opt-in) → SecurityAgentVerification (opt-in) → TicketCrossRef → GitAnalysis → CrossFileAnalysis → ConfidenceScoring → AiAggregation → ThreatModeling (`enable_threat_modeling`) → RootCauseDedup → MultiVerifier (`enable_multi_verifier`, experimental) → AutoPatching (`enable_auto_patching`, opt-in) → CveBootstrap → PocCompiler (`enable_poc_compilation`, opt-in) → ExploitSynth (`[exploit]` section, experimental) → VariantSearch → Reporting
+- **Pipeline phases**: Indexing → Semgrep → CpgSlice (`[cpg]` section, requires Joern) → LlmStaticAnalysis → CweRouting (`router.enabled`) → RuleSynthesis (experimental) → LlmDiscovery → LlmVerification → Validate (opt-in) → SecurityAgentVerification (opt-in) → TicketCrossRef → GitAnalysis → CrossFileAnalysis → ConfidenceScoring → AiAggregation → ThreatModeling (`enable_threat_modeling`) → RootCauseDedup → AutoPatching (`enable_auto_patching`, opt-in) → CveBootstrap → PocCompiler (`enable_poc_compilation`, opt-in) → ExploitSynth (`[exploit]` section, experimental) → VariantSearch → Reporting
 - **Parallel execution**: Indexing, Semgrep, CpgSlice, and LlmStaticAnalysis run concurrently; 19 sequential phases follow
 - **CWE-aware MoE (opt-in)**: BM25 RAG retrieval from CWE knowledge base, routes to specialized analysis paths — enable with `router.enabled = true`
 - **Research-backed**: 16 academic papers integrated (VulTriage, VulIn, MoCQ, MoEVD, AgentFlow) — see [Research Integration](docs/research-integration.md)
 - **Checkpoint/resume**: Crash recovery after each phase
 - **Pre-flight checks**: `baco doctor` validates config, presets, LLM phases, semgrep, python3, Joern (if CPG enabled), output dir, and disk space
-- **Multiple outputs**: JSON, HTML, SARIF
+- **Multiple outputs**: JSON, HTML, SARIF, Markdown
 - **Config-driven**: TOML config with env var overrides
 - **Ticket systems**: Configurable via `[[tickets.systems]]` TOML blocks (supports any system type via `system_type` field) — see [Configuration](docs/configuration.md) for setup
 
@@ -149,6 +152,7 @@ export LLM_DISCOVERY_KEY="your-key-here"  # or LLM_API_KEY for generic fallback
 - `findings.json` — complete vulnerability data (all fields, machine-readable)
 - `report.html` — interactive report with severity filtering, code highlighting, confidence/CWE badges
 - `report.sarif` — SARIF 2.1 for CI/CD integration (GitHub Code Scanning, Azure DevOps)
+- `findings.md` — Markdown summary of findings (written alongside JSON)
 
 ## Architecture
 
@@ -169,6 +173,9 @@ See [Research Integration](docs/research-integration.md) for per-paper details (
 - [Operator Tuning](docs/operator-tuning.md) — Performance flags and scenario-based tuning
 - [Output Interpretation](docs/output-interpretation.md) — Reading findings, confidence, triage verdicts
 - [Troubleshooting](docs/troubleshooting.md) — Common errors and fixes
+- [Argus Analysis](docs/argus-analysis.md) — Evidence verification techniques
+- [CI Integration](docs/ci-integration.md) — Continuous integration setup
+- [Cloudflare Security Audit Skill Analysis](docs/cloudflare-security-audit-skill-analysis.md) — Domain-routed hunt prompts
 
 
 ### Reading Order

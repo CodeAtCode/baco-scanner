@@ -129,10 +129,8 @@ fn test_atomic_model_selector_round_robin() {
 fn test_atomic_model_selector_empty() {
     // Empty case handled at LlmClient level - selector is None
     // This test verifies the type exists and compiles
-    fn _type_check() {
-        let _selector = AtomicModelSelector::new(vec!["test".to_string()]);
-    }
-    _type_check();
+    let selector = AtomicModelSelector::new(vec![]);
+    assert!(selector.all_models().is_empty());
 }
 
 // ============================================================================

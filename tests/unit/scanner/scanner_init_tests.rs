@@ -51,8 +51,8 @@ fn test_scanner_force_flag() {
     let config = create_test_config();
     let scanner = Scanner::new(config, "/tmp/test-project".into(), true);
 
-    // Force flag is internal, just verify scanner created
-    let _ = scanner.target_path();
+    // Verify force flag is set
+    assert!(scanner.force);
 }
 
 #[test]

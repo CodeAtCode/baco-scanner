@@ -4,7 +4,7 @@ use crate::error::ScanResult;
 use crate::findings::VulnerabilityFinding;
 use crate::scanner::phases::PhaseConfig;
 
-/// Run indexing phase (phase 1 of 24).
+/// Run indexing phase (phase 1 of 23).
 pub async fn run_indexing(
     _scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,

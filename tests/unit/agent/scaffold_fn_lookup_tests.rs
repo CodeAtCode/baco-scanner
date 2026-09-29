@@ -135,6 +135,9 @@ fn test_index_unreadable_file() {
     let mut lookup = FunctionLookup::new();
     let invalid_path = PathBuf::from("/nonexistent/file.rs");
     lookup.index_file(&invalid_path, Language::Rust);
+
+    // Indexing an unreadable file should not add any functions
+    assert!(!lookup.contains("any_function"));
 }
 
 #[test]

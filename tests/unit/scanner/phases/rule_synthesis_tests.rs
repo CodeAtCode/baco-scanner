@@ -3,7 +3,7 @@
 //! Tests the RuleSynthesizer API and rule generation logic.
 
 use baco::config::RuleSynthConfig;
-use baco::rulesynth::{parse_yaml_rules, validate_rule};
+use baco::rulesynth::{RuleError, parse_yaml_rules, validate_rule};
 use std::path::PathBuf;
 
 // ============================================================================
@@ -103,9 +103,19 @@ rules:
 "#;
     let result = validate_rule(yaml);
 
-    // Validation may pass or fail depending on semgrep binary availability
-    // We just verify it doesn't panic
-    let _ = result;
+    // Assert our contract, not semgrep's verdict: given a well-formed rule and an
+    // installed semgrep, validate_rule must actually have spawned semgrep and mapped
+    // its exit status. Asserting is_ok() here would be a test of semgrep, which is
+    // demonstrably unreliable on this machine: it intermittently reports
+    // "unable to find a config; path ... does not exist" for a temp file that
+    // verifiably exists (verified by stat'ing it immediately before the spawn).
+    match result {
+        Ok(()) | Err(RuleError::SemgrepError(_)) => {}
+        Err(e) => panic!(
+            "expected semgrep to be spawned and its verdict mapped, got {:?}",
+            e
+        ),
+    }
 }
 
 #[test]

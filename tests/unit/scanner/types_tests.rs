@@ -7,9 +7,6 @@
 //! - Dependency, DependencyEcosystem, ProjectStack, MajorityVerdict
 //! - SeverityRubric, AccessType, BlastRadius, V3Severity, RubricDimensions, RubricScore
 
-use crate::fixtures::{
-    verify_access_weights, verify_blast_radius_weights, verify_severity_mapping_boundaries,
-};
 use baco::scanner_types::{
     AccessType, BlastRadius, CveCluster, CveEntry, CveSource, Dependency, DependencyEcosystem,
     MajorityVerdict, PatchCandidate, PatchValidationResult, PoCCompileResult, ProjectStack,
@@ -529,13 +526,25 @@ fn assert_enum_variants_distinct<T: PartialEq + std::fmt::Debug>(variants: &[T],
 
 #[test]
 fn test_blast_radius_all_variants() {
-    let variants = vec![
-        BlastRadius::Low,
-        BlastRadius::Medium,
-        BlastRadius::High,
+    // Test that all BlastRadius variants map to their expected weights via SeverityRubric
+    let rubric_low = SeverityRubric::new(0.5, 0.5, 0.5, false, AccessType::Read, BlastRadius::Low);
+    let rubric_medium =
+        SeverityRubric::new(0.5, 0.5, 0.5, false, AccessType::Read, BlastRadius::Medium);
+    let rubric_high =
+        SeverityRubric::new(0.5, 0.5, 0.5, false, AccessType::Read, BlastRadius::High);
+    let rubric_critical = SeverityRubric::new(
+        0.5,
+        0.5,
+        0.5,
+        false,
+        AccessType::Read,
         BlastRadius::Critical,
-    ];
-    assert_enum_variants_distinct(&variants, "BlastRadius");
+    );
+
+    assert_eq!(rubric_low.blast_radius_weight(), 0.3);
+    assert_eq!(rubric_medium.blast_radius_weight(), 0.6);
+    assert_eq!(rubric_high.blast_radius_weight(), 0.85);
+    assert_eq!(rubric_critical.blast_radius_weight(), 1.0);
 }
 
 #[test]
@@ -559,6 +568,7 @@ fn test_v3_severity_default_is_low() {
 
 #[test]
 fn test_v3_severity_all_variants() {
+    // Test that all V3Severity variants are distinct and can be created
     let variants = vec![
         V3Severity::Low,
         V3Severity::Medium,
@@ -634,12 +644,42 @@ fn test_severity_rubric_auth_factor() {
 
 #[test]
 fn test_severity_rubric_access_weight() {
-    verify_access_weights();
+    // Test the access control weight component of the severity rubric
+    // Verify that access types maintain proper ordering in rubric scores
+    let rubric_read =
+        SeverityRubric::new(0.5, 0.5, 0.5, false, AccessType::Read, BlastRadius::Medium);
+    let rubric_write =
+        SeverityRubric::new(0.5, 0.5, 0.5, false, AccessType::Write, BlastRadius::Medium);
+    let rubric_both =
+        SeverityRubric::new(0.5, 0.5, 0.5, false, AccessType::Both, BlastRadius::Medium);
+
+    assert_eq!(rubric_read.access_weight(), 0.5);
+    assert_eq!(rubric_write.access_weight(), 0.8);
+    assert_eq!(rubric_both.access_weight(), 1.0);
 }
 
 #[test]
 fn test_severity_rubric_blast_radius_weight() {
-    verify_blast_radius_weights();
+    // Test the blast radius weight component of the severity rubric
+    // Verify that blast radius levels maintain proper ordering in rubric scores
+    let rubric_low = SeverityRubric::new(0.5, 0.5, 0.5, false, AccessType::Read, BlastRadius::Low);
+    let rubric_medium =
+        SeverityRubric::new(0.5, 0.5, 0.5, false, AccessType::Read, BlastRadius::Medium);
+    let rubric_high =
+        SeverityRubric::new(0.5, 0.5, 0.5, false, AccessType::Read, BlastRadius::High);
+    let rubric_critical = SeverityRubric::new(
+        0.5,
+        0.5,
+        0.5,
+        false,
+        AccessType::Read,
+        BlastRadius::Critical,
+    );
+
+    assert_eq!(rubric_low.blast_radius_weight(), 0.3);
+    assert_eq!(rubric_medium.blast_radius_weight(), 0.6);
+    assert_eq!(rubric_high.blast_radius_weight(), 0.85);
+    assert_eq!(rubric_critical.blast_radius_weight(), 1.0);
 }
 
 #[test]
@@ -729,7 +769,35 @@ fn test_rubric_score_severity_without_override() {
 
 #[test]
 fn test_rubric_score_map_to_severity() {
-    verify_severity_mapping_boundaries();
+    // Test the mapping from rubric scores to severity levels
+    // Verify boundary conditions per RubricScore::map_to_severity:
+    // >=0.8 Critical, >=0.5 High, >=0.2 Medium, else Low
+    let dimensions = RubricDimensions::from(SeverityRubric::default());
+
+    assert_eq!(
+        RubricScore::new(0.19, dimensions.clone(), None).severity(),
+        V3Severity::Low
+    );
+    assert_eq!(
+        RubricScore::new(0.2, dimensions.clone(), None).severity(),
+        V3Severity::Medium
+    );
+    assert_eq!(
+        RubricScore::new(0.49, dimensions.clone(), None).severity(),
+        V3Severity::Medium
+    );
+    assert_eq!(
+        RubricScore::new(0.5, dimensions.clone(), None).severity(),
+        V3Severity::High
+    );
+    assert_eq!(
+        RubricScore::new(0.79, dimensions.clone(), None).severity(),
+        V3Severity::High
+    );
+    assert_eq!(
+        RubricScore::new(0.8, dimensions.clone(), None).severity(),
+        V3Severity::Critical
+    );
 }
 
 #[test]

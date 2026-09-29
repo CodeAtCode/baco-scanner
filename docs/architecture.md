@@ -30,7 +30,7 @@ BACO uses a **data-driven PhaseGraph** (`src/scanner/pipeline/orchestrator.rs`) 
 | 11 | Ticket Cross-Reference | `tickets.systems` non-empty |
 | 12 | Git Analysis | Target is a git repository |
 | 13 | Cross-File Analysis | Always-on |
-| 14 | Confidence Scoring | `normalization.enabled=false` |
+| 14 | Confidence Scoring | `scanner.performance.enable_confidence_refinement=false` |
 | 15 | AI Aggregation | `llm.phases.aggregation` (API key present) |
 | 16 | Threat Modeling | `scanner.performance.enable_threat_modeling=false` |
 | 17 | Root Cause Deduplication | `scanner.performance.enable_root_cause_dedup=true` |
@@ -67,7 +67,7 @@ flowchart LR
 
     subgraph PostProcessing["Post-Processing"]
         direction TB
-        E1[Root Cause Dedup] --> E2[Multi-Verifier] --> E3[Auto-Patch] --> E4[CVE Bootstrap] --> E5[PoC Compiler] --> E6[Variant Search]
+        E1[Root Cause Dedup] --> E2[Auto-Patch] --> E3[CVE Bootstrap] --> E4[PoC Compiler] --> E5[Variant Search]
     end
 
     subgraph Output["Output"]
@@ -79,7 +79,7 @@ flowchart LR
     B3 --> C1
     C5 --> D1
     D2 --> E1
-    E6 --> F1
+    E5 --> F1
 
     classDef parallel fill:#e1f5fe
     classDef discovery fill:#fff3e0
@@ -100,7 +100,7 @@ The pipeline includes several verification gates and calibration layers that aug
 
 Before rendering the final report, deterministic checks verify that all citations (file paths + line ranges) match the scanned source tree. Findings failing this check have their confidence score halved and a note added explaining the discrepancy.
 
-Configured via `[citation_verification] enabled = true`.
+Configured via `[citation_verification] enabled = false` (disabled by default).
 
 ### Prior-Runs Store (Discovery Phase)
 
@@ -132,5 +132,5 @@ When the Docker sandbox is unavailable, unverifiable findings are marked with `r
 
 ### Eval Harness (External)
 
-Known-answer oracle scoring under `eval/` with labeled vulnerable/secure fixture pairs and oracle files. Recall/precision scoring via `src/eval.rs`; end-to-end runs require `BACO_EVAL=1` + LLM key. See [`eval/README.md`](../eval/README.md).
+Known-answer oracle scoring under `eval/` with labeled vulnerable/secure fixture pairs and oracle files. Recall/precision scoring via `src/eval.rs`; end-to-end runs use `BACO_EVAL_FLOOR` env var. See [`eval/README.md`](../eval/README.md).
 

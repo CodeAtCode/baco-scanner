@@ -446,11 +446,14 @@ fn test_staging_area_is_created_flag() {
         is_created: true,
     };
 
-    let _staging_not_created = StagingArea {
+    let staging_not_created = StagingArea {
         worktree_path: temp_dir.clone(),
         original_repo_path: temp_dir.clone(),
         is_created: false,
     };
+
+    // Verify is_created field is set correctly
+    assert!(!staging_not_created.is_created);
 
     cleanup_temp_dir(&temp_dir);
 }
@@ -461,11 +464,13 @@ fn test_staging_area_drop_auto_cleanup() {
 
     // Create a staging area that will be dropped
     {
-        let _staging = StagingArea {
+        let staging = StagingArea {
             worktree_path: temp_dir.clone(),
             original_repo_path: temp_dir.clone(),
             is_created: false, // Set to false to avoid actual git operations
         };
+        // Verify is_created before drop
+        assert!(!staging.is_created);
         // Drop happens here
     }
 
@@ -526,10 +531,14 @@ fn test_staging_path_contains_timestamp() {
 #[test]
 fn test_autopatcher_new() {
     let temp_dir = create_temp_rust_project();
-    let _autopatcher = AutoPatcher::new(temp_dir.clone());
+    let autopatcher = AutoPatcher::new(temp_dir.clone());
 
-    // Just verify autopatcher was created successfully
-    // repo_path is private, so we can't assert on it directly
+    // Verify autopatcher was created by calling a public method
+    let patch = autopatcher
+        .generate_patch("test", "code", "test.rs")
+        .unwrap();
+    assert_eq!(patch.file_path, "test.rs");
+    assert!(!patch.diff.is_empty());
 
     cleanup_temp_dir(&temp_dir);
 }
@@ -985,13 +994,25 @@ fn test_autopatcher_apply_and_validate_sets_applied_flag() {
     let autopatcher = AutoPatcher::new(temp_dir.clone());
 
     let mut candidate = PatchCandidate::new("diff", "test.rs");
-    assert!(!candidate.applied);
+    assert!(
+        !candidate.applied,
+        "candidate should start with applied=false"
+    );
 
-    // Validation will fail without git, but we test the flow
-    let _ = autopatcher.apply_and_validate(&mut candidate);
+    // Validation will fail without git worktree, but apply_and_validate always sets validation_result
+    let result = autopatcher.apply_and_validate(&mut candidate);
 
-    // applied flag may or may not be set depending on validation result
-    // we're just testing the code path executes
+    // Result should be Ok (error handling path)
+    assert!(
+        result.is_ok(),
+        "apply_and_validate should return Ok even on validation failure"
+    );
+
+    // The applied flag should remain false since validation fails without git
+    assert!(
+        !candidate.applied,
+        "applied should remain false when validation fails"
+    );
 
     cleanup_temp_dir(&temp_dir);
 }
@@ -1002,12 +1023,31 @@ fn test_autopatcher_apply_and_validate_sets_validation_result() {
     let autopatcher = AutoPatcher::new(temp_dir.clone());
 
     let mut candidate = PatchCandidate::new("diff", "test.rs");
-    assert!(candidate.validation_result.is_none());
+    assert!(
+        candidate.validation_result.is_none(),
+        "candidate should start with no validation_result"
+    );
 
-    let _ = autopatcher.apply_and_validate(&mut candidate);
+    let result = autopatcher.apply_and_validate(&mut candidate);
 
-    // validation_result should be set even on failure
-    // (this is the key behavior we're testing)
+    // Result should be Ok (error handling path)
+    assert!(
+        result.is_ok(),
+        "apply_and_validate should return Ok even on validation failure"
+    );
+
+    // validation_result should be set even on failure - this is the key behavior
+    assert!(
+        candidate.validation_result.is_some(),
+        "validation_result must be set after apply_and_validate"
+    );
+
+    // The validation result should indicate failure (since we have no git worktree)
+    let validation = candidate.validation_result.as_ref().unwrap();
+    assert!(
+        !validation.compiles || !validation.tests_pass || validation.error_message.is_some(),
+        "validation should reflect failure when git worktree is unavailable"
+    );
 
     cleanup_temp_dir(&temp_dir);
 }
@@ -1341,7 +1381,9 @@ fn test_apply_patch_with_empty_diff() {
     // Empty patch - function should handle gracefully
     // Without actual git worktree, this will fail but not panic
     let result = staging.apply_patch("");
-    let _ = result; // We're testing it doesn't panic
+    // Verify it returns a result - the key is that it doesn't panic
+    // and returns a proper error when worktree is not created
+    assert!(result.is_err()); // Should fail because is_created=true but no real worktree
 
     cleanup_temp_dir(&temp_dir);
 }
@@ -1390,7 +1432,8 @@ fn test_rollback_with_created_staging() {
 
     // Rollback should execute without panic
     let result = staging.rollback();
-    let _ = result; // Testing code path, not success
+    // Rollback executes without error even without real worktree
+    assert!(result.is_ok());
 
     cleanup_temp_dir(&temp_dir);
 }
@@ -1617,10 +1660,14 @@ fn test_patch_validation_result_all_fields() {
 #[test]
 fn test_auto_patcher_repo_path_storage() {
     let temp_dir = create_temp_rust_project();
-    let _autopatcher = AutoPatcher::new(temp_dir.clone());
+    let autopatcher = AutoPatcher::new(temp_dir.clone());
 
-    // repo_path is private, but we can verify the autopatcher was created
-    // (test exists to cover the AutoPatcher::new code path)
+    // Verify autopatcher stores the repo path by using it
+    let patch = autopatcher
+        .generate_patch("test vuln", "unsafe code", "src/test.rs")
+        .unwrap();
+    assert!(patch.file_path.contains("test.rs"));
+    assert!(patch.diff.contains("--- a/src/test.rs"));
 
     cleanup_temp_dir(&temp_dir);
 }
@@ -2174,8 +2221,10 @@ fn test_staging_validate_success_path() {
     // Validate should succeed if staging was created
     let result = staging.validate();
 
-    // May succeed or fail depending on worktree state, but shouldn't panic
-    assert!(result.is_ok() || result.is_err());
+    assert!(
+        result.is_ok(),
+        "a freshly created staging area should validate"
+    );
 }
 
 #[test]
@@ -2282,7 +2331,7 @@ fn test_staging_validate_with_modified_files() {
     // Validation should handle various repo states gracefully
     let result = staging.validate();
 
-    assert!(result.is_ok() || result.is_err());
+    assert!(result.is_ok(), "an unmodified staging area should validate");
 }
 
 #[test]
@@ -2552,8 +2601,14 @@ fn test_autopatch_error_variants_display() {
 fn test_staging_apply_patch_code_path() {
     let repo_path = create_temp_git_repo();
     let staging = StagingArea::create(&repo_path).unwrap();
-    let result = staging.apply_patch("--- a/x\n+++ b/x\n@@ -1 +1 @@\n-a\n+b\n");
-    let _ = result;
+    // Apply a patch to src/lib.rs which exists in the repo
+    let result = staging.apply_patch("--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -1,3 +1,3 @@\n pub fn add(a: i32, b: i32) -> i32 {\n-    a + b\n+    a + b // patched\n }\n");
+    // Apply should succeed with valid git repo and proper diff
+    assert!(
+        result.is_ok(),
+        "Patch should apply successfully: {:?}",
+        result.err()
+    );
     let mut staging = staging;
     let _ = staging.cleanup();
     cleanup_temp_dir(&repo_path);

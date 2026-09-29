@@ -17,11 +17,23 @@ use baco::retrieval::CweKnowledgeBase;
 
 #[test]
 fn test_language_ts_language_mapping() {
-    // Verify each language maps correctly (just ensure no panic)
-    let _c_lang = Language::C;
-    let _rust_lang = Language::Rust;
-    let _python_lang = Language::Python;
-    let _js_lang = Language::JavaScript;
+    // Verify each language maps correctly to tree-sitter language
+    let c_lang = Language::C.ts_language();
+    let rust_lang = Language::Rust.ts_language();
+    let python_lang = Language::Python.ts_language();
+    let js_lang = Language::JavaScript.ts_language();
+
+    // Verify all languages can be formatted (they're valid tree-sitter languages)
+    let c_str = format!("{:?}", c_lang);
+    let rust_str = format!("{:?}", rust_lang);
+    let python_str = format!("{:?}", python_lang);
+    let js_str = format!("{:?}", js_lang);
+
+    // All formatted strings should be non-empty
+    assert!(!c_str.is_empty());
+    assert!(!rust_str.is_empty());
+    assert!(!python_str.is_empty());
+    assert!(!js_str.is_empty());
 }
 
 #[test]
@@ -263,9 +275,8 @@ int add(int a, int b) {
     let kb = CweKnowledgeBase::load_embedded().expect("Should load CWE data");
 
     let result = TriplePathContext::build(source, Language::C, &kb, 3);
-    // May succeed or fail depending on code complexity
-    // Just verify no panic
-    assert!(result.is_ok() || result.is_err());
+    // C code with function parses successfully
+    assert!(result.is_ok(), "Valid C function should build context");
 }
 
 #[test]
@@ -345,8 +356,11 @@ fn test_triple_path_error_handling() {
     let kb = CweKnowledgeBase::load_embedded().expect("Should load CWE data");
 
     let result = TriplePathContext::build(source, Language::C, &kb, 3);
-    // Empty source may fail at knowledge path retrieval
-    assert!(result.is_ok() || result.is_err());
+    // Empty source fails at knowledge path retrieval (empty query)
+    assert!(
+        result.is_err(),
+        "Empty source should fail with EmptyQuery error"
+    );
 }
 
 // ============================================================================

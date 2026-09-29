@@ -3,6 +3,7 @@
 //! Migrated from src/agent/sandbox.rs inline tests
 
 use baco::agent::sandbox::ToolSandbox;
+use std::fs;
 use std::path::PathBuf;
 
 #[test]
@@ -27,23 +28,24 @@ fn test_is_path_allowed_blocks_traversal() {
 fn test_validate_test_source_valid_rust() {
     let sandbox = ToolSandbox::new(PathBuf::new(), 30);
     let valid_code = "fn main() { println!(\"hello\"); }";
-    let result = sandbox.validate_test_source(valid_code);
+    let result = sandbox.validate_test_source("test.rs", valid_code);
     assert!(result.is_ok());
 }
 
 #[test]
 fn test_validate_test_source_blocks_unsafe() {
     let sandbox = ToolSandbox::new(PathBuf::new(), 30);
-    let malicious_code = "unsafe { std::process::Command::new(\"rm\") }";
-    let result = sandbox.validate_test_source(malicious_code);
-    assert!(result.is_err());
+    // unsafe is now allowed in Rust files
+    let code = "unsafe { std::process::Command::new(\"rm\") }";
+    let result = sandbox.validate_test_source("test.rs", code);
+    assert!(result.is_ok()); // Rust files allow unsafe
 }
 
 #[test]
 fn test_validate_test_source_valid_python() {
     let sandbox = ToolSandbox::new(PathBuf::new(), 30);
     let valid_code = "def hello(): pass";
-    let result = sandbox.validate_test_source(valid_code);
+    let result = sandbox.validate_test_source("test.py", valid_code);
     assert!(result.is_ok());
 }
 
@@ -51,7 +53,7 @@ fn test_validate_test_source_valid_python() {
 fn test_validate_test_source_blocks_system() {
     let sandbox = ToolSandbox::new(PathBuf::new(), 30);
     let malicious_code = "import os; os.system(\"rm -rf /\")";
-    let result = sandbox.validate_test_source(malicious_code);
+    let result = sandbox.validate_test_source("test.py", malicious_code);
     assert!(result.is_err());
 }
 
@@ -200,7 +202,7 @@ fn test_create_temp_file_with_subdirectory() {
 fn test_validate_test_source_blocks_eval() {
     let sandbox = ToolSandbox::new(PathBuf::new(), 30);
     let malicious_code = "eval('print(1)')";
-    let result = sandbox.validate_test_source(malicious_code);
+    let result = sandbox.validate_test_source("test.py", malicious_code);
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("Dangerous pattern"));
 }
@@ -209,7 +211,7 @@ fn test_validate_test_source_blocks_eval() {
 fn test_validate_test_source_blocks_exec() {
     let sandbox = ToolSandbox::new(PathBuf::new(), 30);
     let malicious_code = "exec('code')";
-    let result = sandbox.validate_test_source(malicious_code);
+    let result = sandbox.validate_test_source("test.py", malicious_code);
     assert!(result.is_err());
 }
 
@@ -217,7 +219,7 @@ fn test_validate_test_source_blocks_exec() {
 fn test_validate_test_source_blocks_import() {
     let sandbox = ToolSandbox::new(PathBuf::new(), 30);
     let malicious_code = "__import__('os')";
-    let result = sandbox.validate_test_source(malicious_code);
+    let result = sandbox.validate_test_source("test.py", malicious_code);
     assert!(result.is_err());
 }
 
@@ -250,4 +252,100 @@ fn test_is_path_allowed_root_path() {
     // Root path should not be allowed (not within tempdir)
     let allowed = sandbox.is_path_allowed(&PathBuf::from("/"));
     assert!(!allowed);
+}
+
+// ============================================================================
+// Test: Core dump prevention
+// Verify that child processes spawned via run_with_timeout do not create
+// core dump files, even when they crash (e.g., via os.abort() in Python)
+// ============================================================================
+
+#[test]
+fn test_no_core_dump_on_child_crash() {
+    // Get the current working directory to check for core files
+    let cwd = std::env::current_dir().unwrap();
+
+    // Count existing core files before the test
+    let core_files_before: Vec<_> = fs::read_dir(&cwd)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_name().to_string_lossy().starts_with("core."))
+        .collect();
+
+    let tmpdir = tempfile::tempdir().unwrap();
+    let sandbox = ToolSandbox::new(tmpdir.path().to_path_buf(), 30);
+
+    // Run a Python script that calls os.abort() to trigger a crash
+    // The child process should NOT be able to write a core dump
+    let result = sandbox.run_with_timeout("python3", &["-c", "import os; os.abort()"], Some(10));
+
+    // The child should crash (non-zero exit), but the call itself should succeed
+    assert!(
+        result.is_ok(),
+        "run_with_timeout should handle child crash gracefully"
+    );
+    let tool_result = result.unwrap();
+    assert!(!tool_result.success, "Child process should have crashed");
+
+    // Count core files after the test
+    let core_files_after: Vec<_> = fs::read_dir(&cwd)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_name().to_string_lossy().starts_with("core."))
+        .collect();
+
+    // No new core files should have been created
+    assert_eq!(
+        core_files_before.len(),
+        core_files_after.len(),
+        "No new core dump files should be created when child crashes"
+    );
+}
+// ============================================================================
+// Bug 1 tests: extension-aware denylist
+// ============================================================================
+
+#[test]
+fn test_validate_test_source_allows_unsafe_rust() {
+    // Bug 1 fix: Rust files should allow unsafe blocks
+    let sandbox = ToolSandbox::new(PathBuf::new(), 30);
+    let code = "unsafe { std::ptr::null::<u8>() }";
+    let result = sandbox.validate_test_source("test.rs", code);
+    assert!(result.is_ok(), "Rust files should allow unsafe blocks");
+}
+
+#[test]
+fn test_validate_test_source_allows_process_command_in_rust() {
+    // Bug 1 fix: Rust files should allow process::Command for legitimate harnesses
+    let sandbox = ToolSandbox::new(PathBuf::new(), 30);
+    let code = "std::process::Command::new(\"echo\").output()";
+    let result = sandbox.validate_test_source("test.rs", code);
+    assert!(result.is_ok(), "Rust files should allow process::Command");
+}
+
+#[test]
+fn test_validate_test_source_blocks_os_system_in_python() {
+    // Python files should still block os.system
+    let sandbox = ToolSandbox::new(PathBuf::new(), 30);
+    let code = "import os; os.system('ls')";
+    let result = sandbox.validate_test_source("test.py", code);
+    assert!(result.is_err(), "Python files should block os.system");
+}
+
+#[test]
+fn test_validate_test_source_blocks_pipe_bash_in_shell() {
+    // Shell files should still block | bash
+    let sandbox = ToolSandbox::new(PathBuf::new(), 30);
+    let code = "echo test | bash";
+    let result = sandbox.validate_test_source("test.sh", code);
+    assert!(result.is_err(), "Shell files should block | bash");
+}
+
+#[test]
+fn test_validate_test_source_blocks_eval_in_unknown_extension() {
+    // Unknown extensions should block common dangerous patterns
+    let sandbox = ToolSandbox::new(PathBuf::new(), 30);
+    let code = "eval('malicious')";
+    let result = sandbox.validate_test_source("test.xyz", code);
+    assert!(result.is_err(), "Unknown extensions should block eval");
 }

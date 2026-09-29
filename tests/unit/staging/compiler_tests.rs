@@ -327,11 +327,11 @@ fn test_patch_candidate_validation_result_field() {
 
 #[test]
 fn test_auto_patcher_repo_path_field() {
-    let _patcher = AutoPatcher::new(PathBuf::from("/my/repo/path"));
+    let patcher = AutoPatcher::new(PathBuf::from("/my/repo/path"));
 
-    // Access the private field via a method or test through behavior
-    // Since repo_path is private, we test via the behavior it enables
-    let _ = AutoPatcher::new(PathBuf::from("/another/path"));
+    // repo_path is private, so we verify through the public API
+    // that the patcher was created successfully
+    assert_eq!(patcher.repo_path, PathBuf::from("/my/repo/path"));
 }
 
 #[test]

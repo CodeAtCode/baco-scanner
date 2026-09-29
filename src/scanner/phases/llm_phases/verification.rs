@@ -384,7 +384,7 @@ pub async fn verify_findings_batched<C: LlmChatClient>(
     (all_results, total_fallback_count)
 }
 
-/// Run LLM verification phase (phase 8 of 24).
+/// Run LLM verification phase (phase 8 of 23).
 pub async fn run_llm_verification(
     scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,

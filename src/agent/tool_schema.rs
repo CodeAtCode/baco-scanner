@@ -11,7 +11,7 @@ pub trait SandboxLike: Send + Sync {
         args: &[&str],
         timeout_secs: Option<u64>,
     ) -> Result<ToolResult, String>;
-    fn validate_test_source(&self, content: &str) -> Result<(), String>;
+    fn validate_test_source(&self, path: &str, content: &str) -> Result<(), String>;
     fn create_temp_file(&self, path: &str, content: &str) -> Result<std::path::PathBuf, String>;
     fn is_path_allowed(&self, path: &std::path::Path) -> bool;
 }

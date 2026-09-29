@@ -395,46 +395,38 @@ fn test_score_precision_with_false_flags() {
 }
 
 // ============================================================================
-// End-to-End Test (requires LLM key)
+// Oracle Scoring E2E Test
 // ============================================================================
 
-/// E2E test: run eval against actual scanner output
+/// Verify oracle parsing and scoring with a synthetic finding.
 ///
-/// This test requires:
-/// - BACO_EVAL=1 environment variable
-/// - LLM_API_KEY environment variable set
-///
-/// Run with: BACO_EVAL=1 LLM_API_KEY=key cargo test test_eval_e2e -- --ignored
-#[tokio::test]
-#[ignore]
-async fn test_eval_e2e() {
-    // This test verifies the full eval pipeline:
-    // 1. Load oracle from JSON file
-    // 2. Run scanner against fixtures
-    // 3. Score findings against oracle
-    // 4. Verify recall/precision are computed
-
-    // Skip if BACO_EVAL not set (normal CI runs)
-    if std::env::var("BACO_EVAL").is_err() {
-        println!("Skipping e2e test: BACO_EVAL not set");
-        return;
-    }
-
+/// This test loads the py-sqli oracle, scores a matching finding to verify
+/// perfect recall/precision, then scores a non-matching finding to confirm
+/// the scoring logic actually computes metrics (not constants).
+#[test]
+fn test_eval_oracle_scoring() {
     // Load oracle
     let oracle_path = oracle_path("py-sqli");
     let content = std::fs::read_to_string(&oracle_path).expect("Should read oracle");
     let oracle = parse_oracle(&content).expect("Should parse oracle");
 
-    // In a real e2e test, we would:
-    // 1. Run the scanner on eval/fixtures/py-sqli/
-    // 2. Collect findings
-    // 3. Call score_findings(&oracle, &findings)
-    // 4. Assert recall > 0.5 and precision > 0.5
-
-    // For now, just verify the oracle loads and scoring works with synthetic data
-    let findings = vec![make_finding("vulnerable.py", 15, "CWE-89")];
-    let report = score_findings(&oracle, &findings);
+    // Case 1: Finding matches oracle expectation (vulnerable.py:15, CWE-89)
+    let matching_findings = vec![make_finding("vulnerable.py", 15, "CWE-89")];
+    let report = score_findings(&oracle, &matching_findings);
 
     assert_eq!(report.recall, 1.0, "Should find the SQL injection");
     assert_eq!(report.precision, 1.0, "Should have no false flags");
+
+    // Case 2: Finding does NOT match (wrong file) - proves scoring isn't constant
+    let non_matching_findings = vec![make_finding("other.py", 15, "CWE-89")];
+    let report = score_findings(&oracle, &non_matching_findings);
+
+    assert_eq!(
+        report.recall, 0.0,
+        "Missing expected finding should drop recall"
+    );
+    assert!(
+        report.recall < 1.0,
+        "Scoring must compute real metrics, not return constants"
+    );
 }

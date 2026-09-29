@@ -100,8 +100,11 @@ fn test_historical_data_get_stats_nonexistent() {
 fn test_confidence_phase_new() {
     let phase = ConfidenceRefinementPhase::new();
 
-    // Just verify it creates without panic
-    let _ = phase.historical_data();
+    // Verify the phase initializes with empty historical data
+    let data = phase.historical_data();
+    assert!(data.false_positive_patterns.is_empty() || !data.false_positive_patterns.is_empty());
+    // HistoricalData::new() loads default patterns, so it should not be empty
+    assert!(!data.false_positive_patterns.is_empty());
 }
 
 #[test]

@@ -483,6 +483,7 @@ fn test_semgrep_rule_json_roundtrip_complex() {
     assert_eq!(original.id, roundtrip.id);
     assert_eq!(original.language, roundtrip.language);
     assert_eq!(original.yaml, roundtrip.yaml);
+    assert!(json.contains("cwe-89-sql-injection"));
 }
 
 // ============================================================================
@@ -629,7 +630,9 @@ fn test_rule_error_display_all_variants() {
     ];
 
     for (error, expected) in errors {
-        assert_eq!(format!("{}", error), expected);
+        let display_str = format!("{}", error);
+        assert_eq!(display_str, expected);
+        assert!(!display_str.is_empty());
     }
 }
 
@@ -754,7 +757,9 @@ fn test_full_rule_generation_flow_simulation() {
     // Simulate the flow: build_prompt -> parse_yaml_rules -> extract_rule_id
 
     // Step 1: Build prompt (use local copy since prompt module is private)
-    let _prompt = build_prompt("CWE-79", "python", 2);
+    let prompt = build_prompt("CWE-79", "python", 2);
+    assert!(prompt.contains("CWE: CWE-79"));
+    assert!(prompt.contains("Language: python"));
 
     // Step 2: Simulate LLM response with YAML rules
     let simulated_response = r#"---
@@ -812,6 +817,10 @@ fn test_config_persistence_simulation() {
         filepath,
         PathBuf::from("/tmp/test_rules/cwe-79-test_python_0.yml")
     );
+
+    // Verify config fields are accessible
+    assert!(config.enabled);
+    assert_eq!(config.max_rules_per_cwe, 3);
 }
 
 // ============================================================================
@@ -906,14 +915,18 @@ fn test_semgrep_rule_trait_implementations() {
     };
 
     // Debug
-    let _debug = format!("{:?}", rule);
+    let debug_str = format!("{:?}", rule);
+    assert!(debug_str.contains("trait-test"));
 
     // Clone
-    let _cloned = rule.clone();
+    let cloned = rule.clone();
+    assert_eq!(cloned.id, "trait-test");
 
     // Serialize/Deserialize (via serde)
     let json = serde_json::to_string(&rule).unwrap();
-    let _deserialized: SemgrepRule = serde_json::from_str(&json).unwrap();
+    let deserialized: SemgrepRule = serde_json::from_str(&json).unwrap();
+    assert_eq!(deserialized.id, "trait-test");
+    assert_eq!(deserialized.language, "python");
 }
 
 #[test]
@@ -921,16 +934,20 @@ fn test_rule_error_trait_implementations() {
     let err = RuleError::LlmError("trait test".to_string());
 
     // Display
-    let _display = format!("{}", err);
+    let display_str = format!("{}", err);
+    assert_eq!(display_str, "LLM error: trait test");
 
     // Debug
-    let _debug = format!("{:?}", err);
+    let debug_str = format!("{:?}", err);
+    assert!(debug_str.contains("LlmError"));
 
     // Clone
-    let _cloned = err.clone();
+    let cloned = err.clone();
+    assert_eq!(format!("{}", cloned), format!("{}", err));
 
     // Error trait (via std::error::Error)
-    let _error: &dyn std::error::Error = &err;
+    let error: &dyn std::error::Error = &err;
+    assert!(error.source().is_none());
 }
 
 #[test]
@@ -945,14 +962,19 @@ fn test_rulesynth_config_trait_implementations() {
     };
 
     // Debug
-    let _debug = format!("{:?}", config);
+    let debug_str = format!("{:?}", config);
+    assert!(debug_str.contains("enabled"));
 
     // Clone
-    let _cloned = config.clone();
+    let cloned = config.clone();
+    assert!(cloned.enabled);
+    assert_eq!(cloned.max_rules_per_cwe, 5);
 
     // Serialize/Deserialize
     let json = serde_json::to_string(&config).unwrap();
-    let _deserialized: RuleSynthConfig = serde_json::from_str(&json).unwrap();
+    let deserialized: RuleSynthConfig = serde_json::from_str(&json).unwrap();
+    assert!(deserialized.enabled);
+    assert_eq!(deserialized.output_dir, PathBuf::from("/test"));
 }
 
 // ============================================================================
@@ -1021,6 +1043,7 @@ fn test_semgrep_rule_clone_and_debug_complex_yaml() {
     let debug_str = format!("{:?}", rule);
     assert!(debug_str.contains("complex-rule"));
     assert!(debug_str.contains("python"));
+    assert!(!debug_str.is_empty());
 }
 
 // ============================================================================
@@ -1108,7 +1131,7 @@ fn test_persist_rules_nested_directory_creation() {
     let nested_dir = temp_base.join("level1").join("level2").join("level3");
     let _ = std::fs::remove_dir_all(&temp_base); // Clean up if exists
 
-    let _rule = SemgrepRule {
+    let rule = SemgrepRule {
         id: "nested-dir-test".to_string(),
         language: "python".to_string(),
         yaml: r#"rules:
@@ -1120,6 +1143,11 @@ fn test_persist_rules_nested_directory_creation() {
 "#
         .to_string(),
     };
+
+    // Verify the rule is created correctly
+    assert_eq!(rule.id, "nested-dir-test");
+    assert_eq!(rule.language, "python");
+    assert!(rule.yaml.contains("nested-dir-test"));
 
     // Note: This test documents the expected behavior.
     // The actual persist_rules function would need to be called here.

@@ -1,6 +1,6 @@
 //! Unit tests for control path extraction.
 
-use baco::context::control_path::{Language, extract};
+use baco::context::control_path::{ContextError, Language, extract};
 
 #[test]
 fn test_c_function_with_branch_cfg() {
@@ -55,18 +55,35 @@ def calculate(x):
     );
 }
 
+/// Characterisation test for the FIXED behaviour.
+///
+/// `extract` now properly rejects malformed source when `has_error()` is true,
+/// regardless of the root node kind. The previous guard `root.kind() !=
+/// "translation_unit"` was always false for C files, making the check dead code.
 #[test]
-fn test_malformed_source_returns_error() {
+fn test_malformed_c_source_is_rejected() {
     let source = r#"
 void broken( {
     int x = ;
 "#;
 
     let result = extract(source, Language::C);
+
     assert!(
-        result.is_ok() || result.is_err(),
-        "Should handle malformed source gracefully without panicking"
+        result.is_err(),
+        "malformed C should now return Err because the parse-error guard is fixed"
     );
+
+    // Verify it's specifically a ParseError
+    match result {
+        Err(ContextError::ParseError { line }) => {
+            assert_eq!(
+                line, 2,
+                "Error should be reported at line 2 where the syntax error occurs"
+            );
+        }
+        _ => panic!("Expected ParseError, got {:?}", result),
+    }
 }
 
 #[test]

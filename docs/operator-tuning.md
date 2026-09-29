@@ -69,13 +69,6 @@ max_concurrent = 2
 | `enable_file_filtering` | bool | true | Filters low-value files (minified, vendor) |
 | `enable_threat_modeling` | bool | false | STRIDE-based threat analysis |
 | `enable_root_cause_dedup` | bool | true | Collapses findings with same root cause |
-| Flag | Type | Default | Effect |
-|------|------|---------|--------|
-| `enable_incremental_scan` | bool | false | Skips unchanged files via SHA256 hash comparison |
-| `max_parallel_tasks` | int | 4 | Max concurrent scan tasks |
-| `enable_file_filtering` | bool | true | Filters low-value files (minified, vendor) |
-| `enable_threat_modeling` | bool | false | STRIDE-based threat analysis |
-| `enable_root_cause_dedup` | bool | true | Collapses findings with same root cause |
 | `enable_auto_patching` | bool | false | Generates fix patches — opt-in |
 | `enable_poc_compilation` | bool | false | Compiles PoC exploits — opt-in |
 | `enable_confidence_refinement` | bool | true | Re-calibrates confidence scores |
@@ -88,7 +81,7 @@ max_concurrent = 2
 | Setting | Section | Default | Effect |
 |---------|---------|---------|--------|
 | `max_file_size_kb` | `[scanner]` | 512 | Skip larger files |
-| `exclude_paths` | `[scanner]` | `["tests/", "docs/", "target/"]` | Glob patterns to skip |
+| `exclude_paths` | `[scanner]` | `[]` (nothing is excluded) | Glob patterns to skip |
 | `exclude_rules` | `[scanner.semgrep]` | `[]` | Semgrep rule IDs to skip |
 | `custom_rules` | `[scanner.semgrep]` | `[]` | Inline semgrep YAML `rules:` blocks shipped in presets; materialized to temp files at scan time |
 

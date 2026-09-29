@@ -1,7 +1,7 @@
 //! Single source of truth for the BACO 23-phase pipeline definition.
 //!
 //! This module defines the canonical pipeline structure: 4 parallel phases
-//! followed by 20 sequential phases. All phase-related queries (order,
+//! followed by 19 sequential phases. All phase-related queries (order,
 //! grouping, profile filtering, resume transitions, progress messages)
 //! derive from this table — no redundant definitions elsewhere.
 
@@ -34,7 +34,7 @@ pub struct PhaseSlot {
 /// The canonical 23-phase pipeline table.
 ///
 /// Order: 4 parallel phases (Indexing, Semgrep, CpgSlice, LlmStaticAnalysis)
-/// followed by 20 sequential phases (CweRouting through Reporting).
+/// followed by 19 sequential phases (CweRouting through Reporting).
 pub struct PhaseSpec;
 
 impl PhaseSpec {
@@ -51,7 +51,7 @@ impl PhaseSpec {
         &SLOTS
     }
 
-    /// Return all phases in execution order (24 total).
+    /// Return all phases in execution order (23 total).
     pub fn all() -> &'static [ScanPhase; 23] {
         &ALL_PHASES
     }

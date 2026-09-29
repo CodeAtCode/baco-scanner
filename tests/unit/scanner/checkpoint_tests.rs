@@ -487,27 +487,42 @@ fn test_scan_phase_debug() {
 
 #[test]
 fn test_scan_phase_all_variants_exist() {
-    // Verify all phase variants can be created
-    let _ = ScanPhase::Indexing;
-    let _ = ScanPhase::Semgrep;
-    let _ = ScanPhase::LlmStaticAnalysis;
-    let _ = ScanPhase::LlmDiscovery;
-    let _ = ScanPhase::LlmVerification;
-    let _ = ScanPhase::TicketCrossRef;
-    let _ = ScanPhase::GitAnalysis;
-    let _ = ScanPhase::CrossFileAnalysis;
-    let _ = ScanPhase::ConfidenceScoring;
-    let _ = ScanPhase::AiAggregation;
-    let _ = ScanPhase::Reporting;
-    let _ = ScanPhase::ThreatModeling;
-    let _ = ScanPhase::RootCauseDedup;
-    let _ = ScanPhase::AutoPatching;
-    let _ = ScanPhase::CveBootstrap;
-    let _ = ScanPhase::PocCompiler;
-    let _ = ScanPhase::VariantSearch;
-    let _ = ScanPhase::SecurityAgentVerification;
-    let _ = ScanPhase::Complete;
-    let _ = ScanPhase::Error;
+    // Verify all phase variants can be created and have expected debug names
+    assert_eq!(format!("{:?}", ScanPhase::Indexing), "Indexing");
+    assert_eq!(format!("{:?}", ScanPhase::Semgrep), "Semgrep");
+    assert_eq!(
+        format!("{:?}", ScanPhase::LlmStaticAnalysis),
+        "LlmStaticAnalysis"
+    );
+    assert_eq!(format!("{:?}", ScanPhase::LlmDiscovery), "LlmDiscovery");
+    assert_eq!(
+        format!("{:?}", ScanPhase::LlmVerification),
+        "LlmVerification"
+    );
+    assert_eq!(format!("{:?}", ScanPhase::TicketCrossRef), "TicketCrossRef");
+    assert_eq!(format!("{:?}", ScanPhase::GitAnalysis), "GitAnalysis");
+    assert_eq!(
+        format!("{:?}", ScanPhase::CrossFileAnalysis),
+        "CrossFileAnalysis"
+    );
+    assert_eq!(
+        format!("{:?}", ScanPhase::ConfidenceScoring),
+        "ConfidenceScoring"
+    );
+    assert_eq!(format!("{:?}", ScanPhase::AiAggregation), "AiAggregation");
+    assert_eq!(format!("{:?}", ScanPhase::Reporting), "Reporting");
+    assert_eq!(format!("{:?}", ScanPhase::ThreatModeling), "ThreatModeling");
+    assert_eq!(format!("{:?}", ScanPhase::RootCauseDedup), "RootCauseDedup");
+    assert_eq!(format!("{:?}", ScanPhase::AutoPatching), "AutoPatching");
+    assert_eq!(format!("{:?}", ScanPhase::CveBootstrap), "CveBootstrap");
+    assert_eq!(format!("{:?}", ScanPhase::PocCompiler), "PocCompiler");
+    assert_eq!(format!("{:?}", ScanPhase::VariantSearch), "VariantSearch");
+    assert_eq!(
+        format!("{:?}", ScanPhase::SecurityAgentVerification),
+        "SecurityAgentVerification"
+    );
+    assert_eq!(format!("{:?}", ScanPhase::Complete), "Complete");
+    assert_eq!(format!("{:?}", ScanPhase::Error), "Error");
 }
 
 // ============================================================================
@@ -631,7 +646,40 @@ fn test_resume_from_all_phases_inline_migrated() {
         let temp_path = format!("/tmp/test_resume_{:?}.json", phase);
         checkpoint.save(&temp_path).unwrap();
 
-        let _next_phase = Checkpoint::resume_from(&temp_path).unwrap();
+        let next_phase = Checkpoint::resume_from(&temp_path).unwrap();
+        // Verify resume_from returns a valid phase (not Error or incomplete state)
+        assert!(
+            matches!(
+                next_phase,
+                ScanPhase::Indexing
+                    | ScanPhase::Semgrep
+                    | ScanPhase::CpgSlice
+                    | ScanPhase::LlmStaticAnalysis
+                    | ScanPhase::CweRouting
+                    | ScanPhase::RuleSynthesis
+                    | ScanPhase::LlmDiscovery
+                    | ScanPhase::LlmVerification
+                    | ScanPhase::Validate
+                    | ScanPhase::SecurityAgentVerification
+                    | ScanPhase::TicketCrossRef
+                    | ScanPhase::GitAnalysis
+                    | ScanPhase::CrossFileAnalysis
+                    | ScanPhase::ConfidenceScoring
+                    | ScanPhase::AiAggregation
+                    | ScanPhase::ThreatModeling
+                    | ScanPhase::RootCauseDedup
+                    | ScanPhase::AutoPatching
+                    | ScanPhase::CveBootstrap
+                    | ScanPhase::PocCompiler
+                    | ScanPhase::ExploitSynth
+                    | ScanPhase::VariantSearch
+                    | ScanPhase::Reporting
+                    | ScanPhase::Complete
+            ),
+            "Resume from {:?} should return a valid phase, got {:?}",
+            phase,
+            next_phase
+        );
 
         let _ = fs::remove_file(&temp_path);
     }

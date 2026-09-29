@@ -380,12 +380,15 @@ mod tests {
 
         let client = LlmClient::new(llm_config);
         let _metrics_tracker = Arc::new(LlmMetricsTracker::new());
-        let _analyzer = LlmAnalyzer::new(
+        let analyzer = LlmAnalyzer::new(
             client,
             languages.clone(),
             1024,
             &baco::config::ScannerConfig::default(),
         )
         .with_context_prefix("RAG context here");
+
+        // Verify analyzer was created with context prefix (public API check)
+        assert!(analyzer.should_analyze(std::path::Path::new("test.c")));
     }
 }

@@ -4,7 +4,7 @@ use crate::error::ScanResult;
 use crate::findings::VulnerabilityFinding;
 use crate::scanner::phases::PhaseConfig;
 
-/// Run threat modeling phase (phase 16 of 24).
+/// Run threat modeling phase (phase 16 of 23).
 pub async fn run_threat_modeling(
     scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,
@@ -110,7 +110,7 @@ pub async fn run_threat_modeling(
     }
 }
 
-/// Run root cause deduplication phase (phase 17 of 24).
+/// Run root cause deduplication phase (phase 17 of 23).
 pub async fn run_root_cause_dedup(
     _scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,

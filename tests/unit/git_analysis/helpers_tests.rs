@@ -437,7 +437,7 @@ fn test_git_analysis_result_default_values() {
 
 #[test]
 fn test_risky_pattern_type_coverage() {
-    // Verify all risky pattern types are covered
+    // Verify all risky pattern types can be created
     let _large_change = RiskyPatternType::LargeChange;
     let _hotfix = RiskyPatternType::Hotfix;
     let _revert = RiskyPatternType::Revert;
@@ -446,12 +446,16 @@ fn test_risky_pattern_type_coverage() {
     let _emergency = RiskyPatternType::EmergencyCommit;
     let _security_bypass = RiskyPatternType::SecurityBypass;
 
-    // Just verify they compile - actual usage tested elsewhere
+    // Verify they are all distinct by checking equality
+    assert_ne!(_large_change, _hotfix);
+    assert_ne!(_revert, _merge_with_conflicts);
+    assert_ne!(_new_author, _emergency);
+    assert_ne!(_security_bypass, _large_change);
 }
 
 #[test]
 fn test_vulnerability_pattern_type_coverage() {
-    // Verify all vulnerability pattern types are covered
+    // Verify all vulnerability pattern types can be created
     let _security_vulnerability = VulnerabilityPatternType::SecurityVulnerability;
     let _security_fix = VulnerabilityPatternType::SecurityFix;
     let _security_todo = VulnerabilityPatternType::SecurityTodo;
@@ -462,5 +466,9 @@ fn test_vulnerability_pattern_type_coverage() {
     let _crypto_misuse = VulnerabilityPatternType::CryptoMisuse;
     let _custom = VulnerabilityPatternType::Custom("test".to_string());
 
-    // Just verify they compile
+    // Verify they are all distinct (except Custom which we can't compare directly)
+    assert_ne!(_security_vulnerability, _security_fix);
+    assert_ne!(_security_todo, _security_deprecation);
+    assert_ne!(_vulnerable_dependency, _injection_risk);
+    assert_ne!(_auth_issue, _crypto_misuse);
 }

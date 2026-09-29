@@ -137,7 +137,7 @@ fn test_sandbox_validate_test_source_valid_rust() {
     let (sandbox, _tmpdir) = create_sandbox();
     let valid_code = "fn main() { println!(\"hello\"); }";
 
-    let result = sandbox.validate_test_source(valid_code);
+    let result = sandbox.validate_test_source("test.rs", valid_code);
     assert!(result.is_ok());
 }
 
@@ -146,7 +146,7 @@ fn test_sandbox_validate_test_source_blocks_os_system() {
     let (sandbox, _tmpdir) = create_sandbox();
     let malicious_code = "import os; os.system('rm -rf /')";
 
-    let result = sandbox.validate_test_source(malicious_code);
+    let result = sandbox.validate_test_source("bad.py", malicious_code);
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("Dangerous pattern"));
 }
@@ -156,7 +156,7 @@ fn test_sandbox_validate_test_source_blocks_subprocess() {
     let (sandbox, _tmpdir) = create_sandbox();
     let malicious_code = "import subprocess; subprocess.run(['ls'])";
 
-    let result = sandbox.validate_test_source(malicious_code);
+    let result = sandbox.validate_test_source("bad.py", malicious_code);
     assert!(result.is_err());
 }
 
@@ -165,7 +165,7 @@ fn test_sandbox_validate_test_source_blocks_eval() {
     let (sandbox, _tmpdir) = create_sandbox();
     let malicious_code = "eval(user_input)";
 
-    let result = sandbox.validate_test_source(malicious_code);
+    let result = sandbox.validate_test_source("bad.py", malicious_code);
     assert!(result.is_err());
 }
 
@@ -174,7 +174,7 @@ fn test_sandbox_validate_test_source_blocks_exec() {
     let (sandbox, _tmpdir) = create_sandbox();
     let malicious_code = "exec(malicious_code)";
 
-    let result = sandbox.validate_test_source(malicious_code);
+    let result = sandbox.validate_test_source("bad.py", malicious_code);
     assert!(result.is_err());
 }
 
@@ -183,17 +183,18 @@ fn test_sandbox_validate_test_source_blocks_underscore_import() {
     let (sandbox, _tmpdir) = create_sandbox();
     let malicious_code = "__import__('os')";
 
-    let result = sandbox.validate_test_source(malicious_code);
+    let result = sandbox.validate_test_source("bad.py", malicious_code);
     assert!(result.is_err());
 }
 
 #[test]
-fn test_sandbox_validate_test_source_blocks_unsafe_rust() {
+fn test_sandbox_validate_test_source_allows_unsafe_rust() {
+    // Bug 1 fix: Rust files now allow unsafe blocks
     let (sandbox, _tmpdir) = create_sandbox();
-    let malicious_code = "unsafe { std::process::Command::new(\"rm\") }";
+    let code = "unsafe { std::process::Command::new(\"rm\") }";
 
-    let result = sandbox.validate_test_source(malicious_code);
-    assert!(result.is_err());
+    let result = sandbox.validate_test_source("test.rs", code);
+    assert!(result.is_ok(), "Rust files should allow unsafe blocks");
 }
 
 #[test]

@@ -1,11 +1,11 @@
 use crate::agent::AgentFinding;
 use crate::agent::executor::{create_audit_finding, create_empty_finding, execute_tool_calls};
 use crate::agent::sandbox::ToolSandbox;
-use crate::agent::tool_schema::ToolRegistry;
+use crate::agent::tool_schema::{ToolRegistry, default_tools};
 use crate::findings::{Severity, VulnerabilityFinding};
 use crate::llm::{ChatResponse, LlmClient, ToolSchema};
 use async_trait::async_trait;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 pub type ProgressCallback = Arc<dyn Fn(String) + Send + Sync>;
@@ -52,21 +52,32 @@ impl AgentSession {
         project_root: &std::path::Path,
         progress_cb: ProgressCallback,
     ) -> Self {
-        let mut tool_registry = ToolRegistry::new();
-        tool_registry.register(Box::new(crate::agent::tools::FileReadTool));
-        tool_registry.register(Box::new(crate::agent::tools::PatternSearchTool));
-        tool_registry.register(Box::new(crate::agent::tools::FileWriteTool));
-        tool_registry.register(Box::new(crate::agent::tools::TestCompileTool));
-        tool_registry.register(Box::new(crate::agent::tools::TestRunTool));
-
         Self {
             client: Box::new(client),
-            tool_registry,
+            tool_registry: default_tools(),
             sandbox: ToolSandbox::new(project_root.to_path_buf(), config.tool_timeout_secs),
             max_turns: config.max_turns,
             progress_cb,
             project_root: project_root.to_path_buf(),
         }
+    }
+
+    /// Configuration the session was built with, exposed so callers and tests can
+    /// confirm the supplied `AgentConfig` was actually honoured.
+    pub fn max_turns(&self) -> u32 {
+        self.max_turns
+    }
+
+    pub fn project_root(&self) -> &Path {
+        &self.project_root
+    }
+
+    pub fn tool_registry(&self) -> &ToolRegistry {
+        &self.tool_registry
+    }
+
+    pub fn tool_timeout_secs(&self) -> u64 {
+        self.sandbox.timeout_secs()
     }
 
     pub async fn analyze_file(&self, file_path: &str) -> Result<AgentFinding, String> {

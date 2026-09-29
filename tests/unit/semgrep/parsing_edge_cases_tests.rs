@@ -193,10 +193,8 @@ fn test_invalid_line_number_zero() {
         .parse_json_output(mock_json.to_string().as_bytes())
         .unwrap();
 
-    // Line 0 is technically invalid but serde_json parses it as u64
-    // The parser should handle it (may produce a finding at line 0)
-    // This tests that we don't panic on zero
-    assert!(findings.len() <= 1, "Should handle zero line without panic");
+    // Line 0 is parsed as valid u64, so one finding is produced
+    assert_eq!(findings.len(), 1, "Line 0 produces exactly one finding");
 }
 
 #[test]

@@ -213,9 +213,14 @@ fn test_poc_format_all_variants() {
         PoCFormat::Go,
     ];
 
+    // Assert each format serializes and deserializes correctly
     for format in formats {
-        // Just ensure we can create and compare them
-        let _ = format;
+        let json = serde_json::to_string(&format).unwrap();
+        let deserialized: PoCFormat = serde_json::from_str(&json).unwrap();
+        assert_eq!(
+            deserialized, format,
+            "Format should round-trip through JSON"
+        );
     }
 }
 
@@ -478,31 +483,33 @@ fn test_generate_unknown_cwe() {
     assert!(!result.errors.is_empty());
 }
 
-fn assert_severity_handling(severity: Severity, note: &str) {
+#[test]
+fn test_generate_low_severity_filtered() {
     let engine = PoCGenerationEngine::new();
-    let finding = create_test_finding("CWE-89", severity);
+    let finding = create_test_finding("CWE-89", Severity::Low);
     let context = AnalysisContext::default();
 
     let result = engine.generate(&[finding], &context, &[PoCFormat::Python]);
-    assert!(
-        result.errors.is_empty(),
-        "{note}: generation produced errors"
-    );
-}
 
-#[test]
-fn test_generate_low_severity_filtered() {
-    assert_severity_handling(
-        Severity::Low,
-        "Low severity without confirmation may be filtered",
+    // Low severity without confirmation should be filtered (no proofs generated)
+    assert!(
+        result.proofs.is_empty(),
+        "Low severity findings should be filtered out"
     );
 }
 
 #[test]
 fn test_generate_medium_severity() {
-    assert_severity_handling(
-        Severity::Medium,
-        "Medium severity may or may not be included",
+    let engine = PoCGenerationEngine::new();
+    let finding = create_test_finding("CWE-89", Severity::Medium);
+    let context = AnalysisContext::default();
+
+    let result = engine.generate(&[finding], &context, &[PoCFormat::Python]);
+
+    // Medium severity without confirmation should be filtered
+    assert!(
+        result.proofs.is_empty(),
+        "Medium severity findings should be filtered out"
     );
 }
 
@@ -631,33 +638,42 @@ fn test_result_serialization() {
 // Category-based Generation Tests
 // ============================================================================
 
-fn assert_category_generation(category: IssueCategory, format: PoCFormat, note: &str) {
-    let engine = PoCGenerationEngine::new();
-    let finding = create_test_finding_with_category(category, Severity::High);
-    let context = AnalysisContext::default();
-
-    let result = engine.generate(&[finding], &context, &[format]);
-    assert!(
-        result.errors.is_empty(),
-        "{note}: generation produced errors"
-    );
-}
-
 #[test]
 fn test_generate_from_category_injection() {
-    assert_category_generation(
-        IssueCategory::Injection,
-        PoCFormat::Python,
-        "Category-based fallback should work",
+    let engine = PoCGenerationEngine::new();
+    let finding = create_test_finding_with_category(IssueCategory::Injection, Severity::High);
+    let context = AnalysisContext::default();
+
+    let result = engine.generate(&[finding], &context, &[PoCFormat::Python]);
+
+    // Injection category should produce injection-flavored PoC (SQL injection template)
+    assert!(
+        !result.proofs.is_empty(),
+        "Injection category should generate PoC"
+    );
+    assert!(
+        result.proofs[0].code.contains("SELECT") || result.proofs[0].code.contains("query"),
+        "Injection PoC should contain SQL injection pattern"
     );
 }
 
 #[test]
 fn test_generate_from_category_memory_corruption() {
-    assert_category_generation(
-        IssueCategory::MemoryCorruption,
-        PoCFormat::Rust,
-        "Memory corruption handling",
+    let engine = PoCGenerationEngine::new();
+    let finding =
+        create_test_finding_with_category(IssueCategory::MemoryCorruption, Severity::High);
+    let context = AnalysisContext::default();
+
+    let result = engine.generate(&[finding], &context, &[PoCFormat::Rust]);
+
+    // Memory corruption category should produce Rust PoC with unsafe code
+    assert!(
+        !result.proofs.is_empty(),
+        "Memory corruption category should generate PoC"
+    );
+    assert!(
+        result.proofs[0].code.contains("unsafe") || result.proofs[0].code.contains("buf"),
+        "Memory corruption PoC should contain unsafe code pattern"
     );
 }
 
@@ -971,24 +987,33 @@ fn test_complete_template_coverage() {
 
     // Test that we have templates for major CWEs in Python
     let major_cwes = vec![
-        "CWE-89",  // SQL Injection
-        "CWE-78",  // Command Injection
-        "CWE-79",  // XSS
-        "CWE-22",  // Path Traversal
-        "CWE-502", // Unsafe YAML
-        "CWE-95",  // Eval Injection
-        "CWE-611", // XXE
-        "CWE-798", // Hardcoded Credentials
-        "CWE-327", // Weak Hash
-        "CWE-338", // Insecure Random
+        ("CWE-89", true),  // SQL Injection - should have template
+        ("CWE-78", true),  // Command Injection - should have template
+        ("CWE-79", true),  // XSS - should have template
+        ("CWE-22", true),  // Path Traversal - should have template
+        ("CWE-502", true), // Unsafe YAML - should have template
+        ("CWE-95", true),  // Eval Injection - should have template
+        ("CWE-611", true), // XXE - should have template
+        ("CWE-798", true), // Hardcoded Credentials - should have template
+        ("CWE-327", true), // Weak Hash - should have template
+        ("CWE-338", true), // Insecure Random - should have template
     ];
 
-    for cwe in major_cwes {
+    let mut found_count = 0;
+    for (cwe, should_have) in major_cwes {
         let key = format!("{}:Python", cwe);
         let has_template = engine.templates.contains_key(&key);
-        // Some may not have templates, that's okay
-        let _ = has_template;
+        if has_template {
+            found_count += 1;
+        }
+        // Verify expected templates exist
+        if should_have {
+            assert!(has_template, "Should have template for {}", cwe);
+        }
     }
+
+    // At least 10 major CWEs should have templates
+    assert!(found_count >= 10, "Should have templates for major CWEs");
 }
 // ============================================================================
 // Additional PoCGeneration Tests

@@ -12,6 +12,14 @@ keywords = ["security", "vulnerability", "scanner", "sast", "llm"]
 categories = ["command-line-utilities", "development-tools"]
 rust-version = "1.85"
 
+
+exclude = [
+  "baco-output/**",
+  "core*",
+  "*.profraw",
+  "lcov.info",
+]
+
 [dependencies]
 # Async trait support
 async-trait = "0.1"
@@ -71,6 +79,7 @@ dirs = "5"
 thiserror = "1.0"
 tempfile = "3"
 regex = "1"
+libc = "0.2"
 
 # Tree-sitter for AST parsing
 tree-sitter = "0.26"

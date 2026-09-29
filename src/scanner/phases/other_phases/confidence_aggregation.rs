@@ -7,7 +7,7 @@ use crate::scanner::phases::PhaseConfig;
 /// Project baseline file name.
 const PROJECT_BASELINE_FILE: &str = "project-baseline.json";
 
-/// Run confidence scoring phase (phase 14 of 24).
+/// Run confidence scoring phase (phase 14 of 23).
 pub async fn run_confidence_scoring(
     _scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,
@@ -108,7 +108,7 @@ pub async fn run_confidence_scoring(
     Ok((updated_findings, analyzed_files.to_vec()))
 }
 
-/// Run AI aggregation phase (phase 15 of 24).
+/// Run AI aggregation phase (phase 15 of 23).
 pub async fn run_ai_aggregation(
     _scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,
@@ -143,7 +143,7 @@ pub async fn run_ai_aggregation(
     Ok((enriched_findings, analyzed_files.to_vec()))
 }
 
-/// Run reporting phase (phase 24 of 24).
+/// Run reporting phase (phase 24 of 23).
 pub async fn run_reporting(
     scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,

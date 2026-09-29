@@ -155,9 +155,15 @@ fn main() {
 
     let file_path = tmp_path.to_string_lossy().to_string();
 
-    // The retrieval should not panic even if no matches found
-    // (it will return empty string)
-    let _ = retrieve_cwe_specs_for_test(&file_path, content);
+    // The retrieval should return some CWE specs (the search always returns results)
+    let result = retrieve_cwe_specs_for_test(&file_path, content);
+
+    // Verify the function returns a valid string (not empty if KB loaded successfully)
+    // The search algorithm will return top-k results regardless of relevance
+    assert!(
+        !result.is_empty(),
+        "Should return CWE specs (search returns top-k regardless of relevance)"
+    );
 }
 
 // Helper function to safely retrieve CWE specs for testing

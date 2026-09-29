@@ -1,4 +1,4 @@
-/// Run LLM static analysis phase (phase 4 of 24).
+/// Run LLM static analysis phase (phase 4 of 23).
 use crate::checkpoint::ScanPhase;
 use crate::context::callee_walker::extract_call_sites;
 use crate::context::pacvd_extractor::{self, AbstractionLevel};

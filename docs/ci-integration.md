@@ -1,6 +1,6 @@
 # CI Integration Guide
 
-BACO outputs SARIF 2.1 format (`report.sarif`), which GitHub Code Scanning, Azure DevOps, and other CI tools can ingest to display findings as PR annotations and security alerts.
+A scan writes `findings.json`, `findings.md` and `report.html` to the output directory. SARIF 2.1 is produced separately, with `baco report --format sarif`, and that file (`report.sarif`) is what GitHub Code Scanning, Azure DevOps and other CI tools ingest to display findings as PR annotations and security alerts.
 
 ## GitHub Actions Setup
 
@@ -32,8 +32,11 @@ jobs:
 
       - name: Run BACO Scan
         env:
-          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
         run: ./target/release/baco scan --config baco.toml
+
+      - name: Generate SARIF
+        run: ./target/release/baco report --input baco-output/findings.json --format sarif --config baco.toml
 
       - name: Upload SARIF to GitHub Code Scanning
         uses: github/codeql-action/upload-sarif@v3
@@ -41,7 +44,9 @@ jobs:
           sarif_file: baco-output/report.sarif
 ```
 
-**Required:** Set `MISTRAL_API_KEY` (or your LLM provider key) as a GitHub repository secret.
+**Required:** Set `LLM_API_KEY` as a GitHub repository secret. Without it the LLM phases are skipped and the scan falls back to the non-LLM phases only.
+
+**Note on `baco report --config`:** The `baco report` command accepts a `--config` flag to apply the evidence gate to report output. Without `--config`, the evidence gate is not applied to `baco report` output.
 
 ## Configuration
 

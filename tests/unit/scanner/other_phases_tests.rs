@@ -122,6 +122,9 @@ async fn test_semgrep_phase_error_handling() {
     };
     let result = run_phase(&scanner, phase_config).await;
     assert!(result.is_ok());
+    let (updated, _, _) = result.unwrap();
+    // Verify findings are preserved when semgrep path doesn't exist
+    assert_eq!(updated.len(), findings.len());
 }
 
 // ============================================================================
@@ -356,17 +359,35 @@ async fn test_ticket_crossref_skips_when_empty_systems() {
 
 #[tokio::test]
 async fn test_git_analysis_on_valid_repo() {
+    // run_git_analysis returns the findings untouched both when it can read the
+    // repository and when it cannot, so this needs a real repo to prove anything.
+    let repo = tempfile::tempdir().expect("temp dir");
+    let git = |args: &[&str]| {
+        let out = std::process::Command::new("git")
+            .args(args)
+            .current_dir(repo.path())
+            .output()
+            .expect("git runs");
+        assert!(out.status.success(), "git {:?} failed: {:?}", args, out);
+    };
+    git(&["init", "-q"]);
+    git(&["config", "user.email", "test@baco.local"]);
+    git(&["config", "user.name", "test"]);
+    // The finding reports "test.py", so the commit has to touch that exact path
+    // for the analyzer to attach a reference.
+    std::fs::create_dir_all(repo.path().join("src")).unwrap();
+    std::fs::write(repo.path().join("src/test.py"), "def f():\n    pass\n").unwrap();
+    git(&["add", "."]);
+    git(&["commit", "-q", "-m", "add test file"]);
+
     let scanner = create_test_scanner();
     let config = create_test_config();
     let pb = ProgressBar::hidden();
     let metrics_tracker = LlmMetricsTracker::new();
     let analyzed_files: Vec<String> = vec![];
-    let target_path = PathBuf::from(".");
+    let target_path = repo.path().to_path_buf();
     let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
-    let findings = vec![
-        create_test_finding("git-1", Severity::High),
-        create_test_finding("git-2", Severity::Medium),
-    ];
+    let findings = vec![create_test_finding("git-1", Severity::High)];
     let phase_config = PhaseConfig {
         phase: &ScanPhase::GitAnalysis,
         findings: findings.clone(),
@@ -381,6 +402,14 @@ async fn test_git_analysis_on_valid_repo() {
     assert!(result.is_ok());
     let (updated, _, _) = result.unwrap();
     assert_eq!(updated.len(), findings.len());
+    let commit_ref = updated[0]
+        .commit_reference
+        .as_deref()
+        .expect("the analyzer must attach a reference to the commit touching test.py");
+    assert!(
+        !commit_ref.is_empty(),
+        "commit reference should carry the hash and message"
+    );
 }
 
 // ============================================================================

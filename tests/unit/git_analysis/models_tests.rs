@@ -74,6 +74,11 @@ fn test_risky_pattern_type_variants() {
     let _new_author = RiskyPatternType::NewAuthor;
     let _emergency = RiskyPatternType::EmergencyCommit;
     let _security_bypass = RiskyPatternType::SecurityBypass;
+
+    // Verify they are distinct
+    assert_ne!(_large, _hotfix);
+    assert_ne!(_revert, _merge);
+    assert_ne!(_new_author, _emergency);
 }
 
 #[test]

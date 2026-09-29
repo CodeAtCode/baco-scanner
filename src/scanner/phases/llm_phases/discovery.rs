@@ -58,7 +58,7 @@ Respond with ONLY JSON:
     )
 }
 
-/// Run LLM discovery phase (phase 7 of 24).
+/// Run LLM discovery phase (phase 7 of 23).
 pub async fn run_llm_discovery(
     scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,

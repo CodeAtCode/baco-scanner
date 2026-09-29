@@ -8,6 +8,7 @@ mod mock_llm_tests;
 mod sandbox_path_tests;
 mod sandbox_scenarios_tests;
 mod sandbox_tests;
+mod sandbox_timeout_tests;
 mod scaffold_call_graph_paths_tests;
 mod scaffold_core_tests;
 mod scaffold_fn_lookup_tests;

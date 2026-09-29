@@ -44,6 +44,24 @@ languages = ["c", "cpp", "python"]
 
 The `[scanner.performance]` section controls incremental scanning and which optional analysis phases run. Each phase flag defaults to a safe value; side-effect-heavy phases (auto-patching, PoC compilation) are opt-in.
 
+### Pipeline profile
+
+`[scanner] profile` selects which phases the pipeline is allowed to run. It is a gate applied *before* the individual phase flags.
+
+| Value | Phases run | Notes |
+|-------|-----------|-------|
+| `core` (default) | 14 of 23 | The essential phases |
+| `all` | 23 of 23 | Includes the experimental phases, each still subject to its own flag |
+
+The 9 phases excluded by the `core` profile are `CpgSlice`, `RuleSynthesis`, `Validate`, `SecurityAgentVerification`, `ThreatModeling`, `AutoPatching`, `PocCompiler`, `ExploitSynth` and `VariantSearch`.
+
+Setting a flag for one of these, for example `[agent] enabled = true` for `SecurityAgentVerification`, has no effect while the profile is `core`. Use `profile = "all"` to reach them.
+
+```toml
+[scanner]
+profile = "all"
+```
+
 ```toml
 [scanner.performance]
 # Skip unchanged files based on SHA256 hash comparison (hashes persisted to output dir)
@@ -199,7 +217,7 @@ Timeout configuration operates at two levels:
 **What value `0` means:** Setting `timeout_secs = 0` results in `Duration::from_secs(0)`, which causes an immediate timeout on every request. Use only for testing.
 
 **Retry behavior:** Failed requests (429, 5xx, network errors) are retried with exponential backoff:
-- Base delay: Configured via `[llm] retry_backoff_ms` (default: 2000ms)
+- Base delay: Configured via `[llm] retry_backoff_ms` (default: 1000ms)
 - Formula: `base_ms * 2^attempt`, capped at 30 seconds
 - Max retries: Configured via `[llm] max_retries` (default: 3)
 - Source: `src/llm/mod.rs:254-269`
@@ -276,11 +294,6 @@ BACO uses prompt templates for each phase loaded from markdown files at runtime.
 - `prompts/phases/llm_static_analysis.md`
 - `prompts/phases/llm_discovery.md`
 - `prompts/phases/llm_verification.md`
-- `prompts/phases/ticket_crossref.md`
-- `prompts/phases/git_analysis.md`
-- `prompts/phases/cross_file_analysis.md`
-- `prompts/phases/confidence_scoring.md`
-- `prompts/phases/ai_aggregation.md`
 - `prompts/phases/reporting.md`
 
 View the [full prompt templates on GitHub](prompts/phases/) to understand default behavior.
@@ -353,8 +366,9 @@ credentials.token = "${GITHUB_TOKEN}"
 # Directory where reports and checkpoints will be written
 dir = "./baco-output"
 # Evidence gate (default: false). When true, only findings classified as
-# verified or supported reach report.html and report.sarif; findings.json
-# always contains every finding with its verification_tier attached.
+# verified or supported reach report.html, report.sarif, and report.md;
+# findings.json always contains every finding with its verification_tier attached
+# and is never filtered.
 evidence_gate = false
 # Include rejected findings (investigated & dismissed) in JSON/HTML reports
 include_rejected = false
@@ -363,7 +377,7 @@ include_rejected = false
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `dir` | str | `"./baco-output"` | Output directory for reports and checkpoints |
-| `evidence_gate` | bool | `false` | When true, only findings classified as verified or supported by the evidence gate reach report.html and the SARIF output. findings.json always contains every finding with its verification_tier attached. |
+| `evidence_gate` | bool | `false` | When true, only findings classified as verified or supported by the evidence gate reach report.html, report.sarif, and report.md. findings.json is never filtered and always contains every finding with its verification_tier attached. |
 | `include_rejected` | bool | `false` | When true, rejected findings (investigated & dismissed) are persisted in the JSON report's `rejected` array and shown in the HTML report's "Investigated & Dismissed" appendix. |
 
 ## Environment Variables
@@ -384,9 +398,9 @@ include_rejected = false
 
 ## Output Formats
 
-- **findings.json**: Complete vulnerability data with all 16 fields
+- **findings.json**: Complete vulnerability data, 32 fields per finding. Never filtered by the evidence gate; it carries a `verification_tier` so you can filter it yourself
 - **report.html**: Visual report with severity colors, code snippets, AI summary
-- **report.sarif**: SARIF format for CI/CD integration
+- **report.sarif**: SARIF format for CI/CD integration, written by `baco report --format sarif` (a scan does not produce it)
 
 ## Scan Options
 
@@ -437,7 +451,7 @@ Use `--dry-run` before a full scan to:
 - Check which files will be analyzed
 - Decide if you need to adjust budget/triage settings
 
-Source: `src/cli/scan.rs:346-478` (`run_dry_run` function).
+Source: `src/cli/scan.rs:360-492` (`run_dry_run` function).
 
 ## Aggregation Configuration
 
@@ -664,8 +678,6 @@ enable_hunt_prompts = false
 
 Available modules: `injection.md`, `auth.md`, `authz_absence.md`, `xss.md`, `path_traversal.md`, `crypto.md`, `resource.md`, `deserialization.md`, `memory_safety.md`.
 
-See [`docs/cloudflare-security-audit-skill-analysis.md`](cloudflare-security-audit-skill-analysis.md) for the technique rationale.
-
 ### AgentFlow Multi-Agent Harness Synthesis (P5) — arXiv:2605.11835
 
 Represents the harness as a typed graph DSL with a search loop. Most invasive
@@ -726,8 +738,8 @@ Presets are bundled TOML overlays that pre-configure BACO for a target project
 type. They set language lists, exclude paths, semgrep rulesets, triage, budget,
 and per-CWE false-positive patterns in one step.
 
-**Loading order:** built-in defaults → user `config.toml` → preset file → CLI flags.
-Presets are applied on top of the user config and take precedence. Note that `[scanner.performance]` is wholesale-replaced by the preset (not merged).
+**Loading order:** built-in defaults → preset file → user `config.toml` → environment → CLI flags.
+A key set in your `config.toml` wins over the same key in the preset, so a preset is a starting point rather than an override. Only the keys a preset actually declares are touched; `[scanner.performance]` is merged key by key.
 
 ### Built-in Presets
 
@@ -834,7 +846,7 @@ tool_timeout_secs = 60
 ### Custom Presets
 
 Drop a `*.toml` file in `~/.config/baco/presets/` and it appears in
-`baco presets` and is loadable via `--preset <name>`:
+`baco preset list` and is loadable via `--preset <name>`:
 
 ```bash
 mkdir -p ~/.config/baco/presets

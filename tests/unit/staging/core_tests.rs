@@ -11,7 +11,22 @@
 
 use baco::staging::core::StagingArea;
 use baco::staging::error::StagingError;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
+
+// ============================================================================
+// Helper for hermetic temp directories
+// ============================================================================
+
+fn create_temp_path(prefix: &str) -> PathBuf {
+    std::env::temp_dir().join(format!(
+        "{}-{:x}",
+        prefix,
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ))
+}
 
 // ============================================================================
 // StagingArea Tests
@@ -20,14 +35,15 @@ use std::path::{Path, PathBuf};
 #[test]
 fn test_staging_area_struct_fields() {
     // Verify the struct has the expected fields
-    let temp_path = Path::new("/tmp/test-repo");
+    let temp_path = create_temp_path("test-repo");
+    let worktree_path = create_temp_path("staging-test");
     let staging = StagingArea {
-        worktree_path: PathBuf::from("/tmp/staging-test"),
-        original_repo_path: temp_path.to_path_buf(),
+        worktree_path: worktree_path.clone(),
+        original_repo_path: temp_path.clone(),
         is_created: false,
     };
 
-    assert_eq!(staging.worktree_path, PathBuf::from("/tmp/staging-test"));
+    assert_eq!(staging.worktree_path, worktree_path);
     assert_eq!(staging.original_repo_path, temp_path);
     assert!(!staging.is_created);
 }
@@ -35,8 +51,8 @@ fn test_staging_area_struct_fields() {
 #[test]
 fn test_staging_area_not_created_error() {
     let mut staging = StagingArea {
-        worktree_path: PathBuf::from("/tmp/staging-test"),
-        original_repo_path: PathBuf::from("/tmp/test-repo"),
+        worktree_path: create_temp_path("staging-test"),
+        original_repo_path: create_temp_path("test-repo"),
         is_created: false,
     };
 
@@ -72,8 +88,8 @@ fn test_staging_area_not_created_error() {
 #[test]
 fn test_staging_area_rollback_not_created() {
     let mut staging = StagingArea {
-        worktree_path: PathBuf::from("/tmp/staging-test"),
-        original_repo_path: PathBuf::from("/tmp/test-repo"),
+        worktree_path: create_temp_path("staging-test"),
+        original_repo_path: create_temp_path("test-repo"),
         is_created: false,
     };
 
@@ -85,18 +101,16 @@ fn test_staging_area_rollback_not_created() {
 
 #[test]
 fn test_patch_path_construction() {
+    let worktree_path = create_temp_path("staging-test");
     let staging = StagingArea {
-        worktree_path: PathBuf::from("/tmp/staging-test"),
-        original_repo_path: PathBuf::from("/tmp/test-repo"),
+        worktree_path: worktree_path.clone(),
+        original_repo_path: create_temp_path("test-repo"),
         is_created: true,
     };
 
     // Verify patch path would be constructed correctly
     let expected_patch_path = staging.worktree_path.join("patch.diff");
-    assert_eq!(
-        expected_patch_path,
-        PathBuf::from("/tmp/staging-test/patch.diff")
-    );
+    assert_eq!(expected_patch_path, worktree_path.join("patch.diff"));
 }
 
 #[test]
@@ -104,8 +118,8 @@ fn test_staging_area_drop_cleanup() {
     // Create a staging area that will be dropped
     {
         let mut staging = StagingArea {
-            worktree_path: PathBuf::from("/tmp/staging-drop-test"),
-            original_repo_path: PathBuf::from("/tmp/test-repo"),
+            worktree_path: create_temp_path("staging-drop-test"),
+            original_repo_path: create_temp_path("test-repo"),
             is_created: true,
         };
 
@@ -139,8 +153,8 @@ fn test_staging_area_temp_dir_path() {
 #[test]
 fn test_cleanup_when_not_created_returns_ok() {
     let mut staging = StagingArea {
-        worktree_path: PathBuf::from("/tmp/staging-test"),
-        original_repo_path: PathBuf::from("/tmp/test-repo"),
+        worktree_path: create_temp_path("staging-test"),
+        original_repo_path: create_temp_path("test-repo"),
         is_created: false,
     };
 
@@ -152,15 +166,13 @@ fn test_cleanup_when_not_created_returns_ok() {
 #[test]
 fn test_rollback_when_created_calls_cleanup() {
     let mut staging = StagingArea {
-        worktree_path: PathBuf::from("/tmp/staging-rollback-test"),
-        original_repo_path: PathBuf::from("/tmp/test-repo"),
+        worktree_path: create_temp_path("staging-rollback-test"),
+        original_repo_path: create_temp_path("test-repo"),
         is_created: true,
     };
 
     // Rollback when created should attempt reset and cleanup
-    let result = staging.rollback();
-    // Result depends on actual git state, but is_created should be false after
-    assert!(result.is_ok() || result.is_err());
+    let _result = staging.rollback();
     assert!(!staging.is_created);
 }
 
@@ -233,11 +245,13 @@ fn test_drop_implements_auto_cleanup() {
     // Verify Drop trait is implemented by checking the impl exists
     // The actual cleanup behavior is tested via cleanup()
     // StagingArea implements Drop for auto-cleanup
-    let _staging = StagingArea {
+    let staging = StagingArea {
         worktree_path: PathBuf::from("/tmp"),
         original_repo_path: PathBuf::from("/tmp"),
         is_created: false,
     };
+    // Verify staging area was created
+    assert!(!staging.is_created);
 }
 
 #[test]

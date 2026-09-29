@@ -287,8 +287,10 @@ fn test_path_traversal_dotdot_in_filename() {
         // If blocked, verify it's not a false positive for legitimate filenames
         eprintln!("Path 'file..txt' was blocked - may need to adjust sandbox logic");
     }
-    // For now, just verify the call doesn't panic
-    assert!(result.is_ok() || result.is_err()); // Always passes, just logging
+    // File with ".." in name is ambiguous - current implementation blocks any ".."
+    // This is a false positive for legitimate filenames like "file..txt"
+    // The test documents the current behavior
+    let _ = result; // Just verify it doesn't panic
 }
 
 // ============================================================================
@@ -327,20 +329,19 @@ fn test_is_path_allowed_valid_relative() {
 fn test_is_path_allowed_empty_path() {
     let (sandbox, _temp_dir) = setup_sandbox();
 
-    // Empty path handling
+    // Empty path - current implementation returns Ok (resolves to sandbox root)
     let result = sandbox.resolve_safe_path("");
-    // Empty path should either error or resolve to temp_dir itself
-    // Current behavior: it will check if temp_dir exists (which it does)
-    assert!(result.is_ok() || result.is_err());
+    // Empty string resolves within the sandbox - document actual behavior
+    assert!(result.is_ok());
 }
 
 #[test]
 fn test_is_path_allowed_just_dots() {
     let (sandbox, _temp_dir) = setup_sandbox();
 
-    // Just "." - current directory
+    // Just "." - current directory should resolve to sandbox root
     let result = sandbox.resolve_safe_path(".");
-    // "." doesn't contain ".." so it passes the first check
-    // But it may fail the existence check depending on implementation
-    assert!(result.is_ok() || result.is_err());
+    // "." resolves to current directory - should be allowed if it's within sandbox
+    // Current implementation: "." is allowed as it's within the sandbox
+    assert!(result.is_ok());
 }

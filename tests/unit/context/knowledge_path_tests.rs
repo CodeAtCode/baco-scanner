@@ -226,8 +226,8 @@ fn test_retrieve_with_valid_code() {
     assert!(result.is_ok());
 
     let knowledge = result.unwrap();
-    // May or may not have results depending on KB content
-    let _ = knowledge;
+    // With common terms, may get empty results or some matches
+    assert!(knowledge.retrieved_rules.len() <= 3); // Respects top-k limit
 }
 
 #[test]
@@ -308,8 +308,13 @@ fn test_retrieve_with_sql_keywords() {
     assert!(result.is_ok());
 
     let knowledge = result.unwrap();
-    // May find CWE-89 (SQL injection) related rules
-    let _ = knowledge;
+    // SQL keywords should potentially match CWE-89 rules
+    // Verify we got a valid result (may be empty or have matches)
+    assert!(knowledge.retrieved_rules.len() <= 3); // Respects top-k limit
+    // If we got results, verify they have valid structure
+    for rule in &knowledge.retrieved_rules {
+        assert!(!rule.rule_id.is_empty());
+    }
 }
 
 #[test]
@@ -321,8 +326,13 @@ fn test_retrieve_with_command_injection_keywords() {
     assert!(result.is_ok());
 
     let knowledge = result.unwrap();
-    // May find CWE-78 (command injection) related rules
-    let _ = knowledge;
+    // Command injection keywords should potentially match CWE-78 rules
+    // Verify we got a valid result (may be empty or have matches)
+    assert!(knowledge.retrieved_rules.len() <= 3); // Respects top-k limit
+    // If we got results, verify they have valid structure
+    for rule in &knowledge.retrieved_rules {
+        assert!(!rule.rule_id.is_empty());
+    }
 }
 
 // ============================================================================

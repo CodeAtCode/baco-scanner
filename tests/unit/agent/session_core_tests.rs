@@ -60,30 +60,52 @@ fn create_test_session(max_turns: u32) -> AgentSession {
 
 #[test]
 fn test_session_creation_with_mock_client() {
-    let _session = create_test_session(10);
+    let session = create_test_session(10);
 
-    // Session created successfully
+    // A session built with a mock client is still fully wired: the five tools the
+    // agent depends on must be retrievable by name.
+    for tool in [
+        "file_read",
+        "pattern_search",
+        "file_write",
+        "test_compile",
+        "test_run",
+    ] {
+        assert!(
+            session.tool_registry().get(tool).is_some(),
+            "{} should be registered on a fresh session",
+            tool
+        );
+    }
+    assert_eq!(session.max_turns(), 10);
 }
 
 #[test]
 fn test_session_creation_with_custom_max_turns() {
-    let _session = create_test_session(50);
-
-    // Session created with custom max_turns
+    let session = create_test_session(50);
+    assert_eq!(session.max_turns(), 50);
 }
 
 #[test]
 fn test_session_creation_with_minimal_max_turns() {
-    let _session = create_test_session(1);
-
-    // Session created with minimal max_turns
+    let session = create_test_session(1);
+    assert_eq!(session.max_turns(), 1);
 }
 
 #[test]
 fn test_session_uses_provided_project_root() {
-    let _session = create_test_session(10);
+    let mock_client = MockLlmClient::new(vec![]);
+    let config = create_test_config(10);
+    let temp_dir = create_temp_dir();
+    let progress_cb: ProgressCallback = Arc::new(|_| {});
 
-    // Session created with project root
+    let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
+
+    assert_eq!(
+        session.project_root(),
+        temp_dir.path(),
+        "the session must keep the project root it was constructed with"
+    );
 }
 
 #[test]
@@ -100,19 +122,67 @@ fn test_session_creation_with_custom_timeout() {
 
     let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
 
-    // Session should use the configured timeout
-    let _ = session; // Just verify it creates successfully
+    assert_eq!(
+        session.tool_timeout_secs(),
+        60,
+        "the configured tool timeout must reach the sandbox"
+    );
 }
-
-// ============================================================================
-// Tool Registry Tests
-// ============================================================================
 
 #[test]
 fn test_session_has_tool_registry() {
-    let _session = create_test_session(10);
+    let session = create_test_session(10);
 
-    // Tool registry is initialized (verified by successful session creation)
+    let present = [
+        "file_read",
+        "pattern_search",
+        "file_write",
+        "test_compile",
+        "test_run",
+    ]
+    .iter()
+    .filter(|t| session.tool_registry().get(t).is_some())
+    .count();
+    assert_eq!(
+        present, 5,
+        "every tool the agent executor can dispatch must be registered"
+    );
+    assert!(
+        session.tool_registry().get("no_such_tool").is_none(),
+        "an unknown tool name must not resolve"
+    );
+}
+
+#[test]
+fn test_session_advertises_tool_schemas_to_the_llm() {
+    let session = create_test_session(10);
+    let definitions = session.tool_registry().get_definitions();
+
+    let names: Vec<&str> = definitions
+        .iter()
+        .filter_map(|d| d.pointer("/function/name").and_then(|n| n.as_str()))
+        .collect();
+
+    for expected in [
+        "file_read",
+        "pattern_search",
+        "file_write",
+        "test_compile",
+        "test_run",
+    ] {
+        assert!(
+            names.contains(&expected),
+            "the LLM must be offered {}, got {:?}",
+            expected,
+            names
+        );
+    }
+    assert!(
+        definitions
+            .iter()
+            .all(|d| d.pointer("/function/parameters").is_some()),
+        "every advertised tool needs a parameter schema or the model cannot call it"
+    );
 }
 
 // ============================================================================
@@ -1198,13 +1268,19 @@ async fn test_verify_finding_with_mock_llm() {
 #[test]
 fn test_progress_callback_type() {
     // Verify that ProgressCallback can be created and called
-    let cb: ProgressCallback = Arc::new(|_msg| {
+    let _cb: ProgressCallback = Arc::new(|_msg| {
         // Note: This test demonstrates the limitation - the closure cannot modify outer vars
         // In real usage, ProgressCallback would use channels or other mechanisms
     });
 
+    let called = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let called_clone = called.clone();
+    let cb: ProgressCallback = Arc::new(move |_msg| {
+        called_clone.store(true, std::sync::atomic::Ordering::SeqCst);
+    });
+
     cb("test message".to_string());
-    // Just verify the callback can be created and invoked without panicking
+    assert!(called.load(std::sync::atomic::Ordering::SeqCst));
 }
 
 #[test]

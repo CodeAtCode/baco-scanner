@@ -106,6 +106,19 @@ mod tests {
         // .and_then(|v| v.as_array()) on missing "results" → None → unwrap_or(&vec![]) → []
         // .and_then(|v| v.as_u64())  → Some if line present, else None → continue
         // .and_then(|v| v.as_str())  → Some if check_id present, else None → continue
-        // parse_json_output contains continue paths for missing fields
+
+        // Verify the pattern exists by testing that missing fields result in empty/default values
+        let binding = vec![];
+        let value: serde_json::Value = serde_json::json!({"results": [{"other_field": "value"}]});
+        let results = value
+            .get("results")
+            .and_then(|r| r.as_array())
+            .unwrap_or(&binding);
+        // When "results" exists but has no expected fields, we get an empty array after processing
+        assert_eq!(
+            results.len(),
+            1,
+            "Results array has one element with missing fields"
+        );
     }
 }

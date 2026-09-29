@@ -3,7 +3,7 @@ use crate::error::ScanResult;
 use crate::findings::VulnerabilityFinding;
 use crate::scanner::phases::PhaseConfig;
 
-/// Run rule synthesis phase (phase 6 of 24).
+/// Run rule synthesis phase (phase 6 of 23).
 ///
 /// Generates semgrep rules from CWE identifiers using LLM synthesis (MoCQ paper).
 /// No-op when `config.rulesynth.enabled` is false or no API key is configured.
@@ -143,7 +143,7 @@ pub async fn run_rule_synthesis(
     Ok((findings, analyzed_files.to_vec()))
 }
 
-/// Run exploit synthesis phase (phase 22 of 24).
+/// Run exploit synthesis phase (phase 22 of 23).
 ///
 /// Generates sandbox-verified exploits for confirmed findings (QRS paper).
 /// No-op when `config.exploit.enabled` is false or Docker sandbox unavailable.

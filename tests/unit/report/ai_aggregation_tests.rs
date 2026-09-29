@@ -163,19 +163,41 @@ async fn test_ai_aggregation_generate_risk_assessment() {
 #[test]
 fn test_ai_aggregation_phase_new_with_config() {
     let config = make_config();
-    let _phase = AiAggregationPhase::new(config);
+    let phase = AiAggregationPhase::new(config);
+
+    // Verify phase was created - run with empty findings to check it works
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let context = AnalysisContext::default();
+    let result = rt.block_on(phase.run(vec![], &context));
+    assert_eq!(result.unified_reports.len(), 0);
 }
 
 #[test]
 fn test_ai_aggregation_phase_new_with_empty_config() {
     let config = make_config_empty();
-    let _phase = AiAggregationPhase::new(config);
+    let phase = AiAggregationPhase::new(config);
+
+    // Verify phase was created even with empty config
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let context = AnalysisContext::default();
+    let result = rt.block_on(phase.run(vec![], &context));
+    assert_eq!(result.unified_reports.len(), 0);
 }
 
 #[test]
 fn test_async_compatible() {
     let config = make_config();
-    let _phase = AiAggregationPhase::new(config);
+    let phase = AiAggregationPhase::new(config);
+
+    // Verify phase creation is compatible with async context
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let context = AnalysisContext::default();
+    let result = rt.block_on(phase.run(vec![], &context));
+    assert!(
+        result
+            .executive_summary
+            .contains("Total Unique Findings: 0")
+    );
 }
 
 // ============================================================================
@@ -1287,17 +1309,34 @@ use baco::report::ai_aggregation::enrichment::EnrichmentService;
 #[test]
 fn test_enrichment_service_new_with_valid_config() {
     let config = make_config();
-    let _service = EnrichmentService::new(&config);
+    let service = EnrichmentService::new(&config);
 
-    // Service should be created successfully
+    // Service created successfully - verify it can be used
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let (enriched, llm_failed) = rt.block_on(service.enrich_findings(&[]));
+    assert!(enriched.is_empty());
+    assert!(!llm_failed);
 }
 
 #[test]
 fn test_enrichment_service_new_with_empty_config() {
     let config = make_config_empty();
-    let _service = EnrichmentService::new(&config);
+    let service = EnrichmentService::new(&config);
 
-    // Service should be created successfully (LLM client will be None)
+    // Service created with empty config - LLM client is None
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let findings = vec![make_aggregation_finding(
+        "f1",
+        Severity::High,
+        0.8,
+        "src/main.rs",
+        Some(42),
+        Some("CWE-79"),
+        None,
+    )];
+    let (enriched, llm_failed) = rt.block_on(service.enrich_findings(&findings));
+    assert_eq!(enriched.len(), 1);
+    assert!(!llm_failed);
 }
 
 #[tokio::test]
@@ -1389,17 +1428,32 @@ use baco::report::ai_aggregation::deduplication::DeduplicationService;
 #[test]
 fn test_deduplication_service_new() {
     let config = make_config();
-    let _service = DeduplicationService::new(&config);
+    let service = DeduplicationService::new(&config);
 
-    // Service should be created successfully
+    // Service created successfully - verify it can deduplicate
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let result = rt.block_on(service.deduplicate(&[]));
+    assert!(result.is_empty());
 }
 
 #[test]
 fn test_deduplication_service_new_with_empty_config() {
     let config = make_config_empty();
-    let _service = DeduplicationService::new(&config);
+    let service = DeduplicationService::new(&config);
 
-    // Service should be created successfully
+    // Service created with empty config
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let findings = vec![make_aggregation_finding(
+        "f1",
+        Severity::High,
+        0.8,
+        "src/main.rs",
+        Some(42),
+        Some("CWE-79"),
+        None,
+    )];
+    let result = rt.block_on(service.deduplicate(&findings));
+    assert_eq!(result.len(), 1);
 }
 
 #[tokio::test]

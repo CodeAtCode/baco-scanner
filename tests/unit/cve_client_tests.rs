@@ -18,19 +18,6 @@ use baco::scanner_types::severity::V3Severity;
 // CveClient instantiation tests
 // ============================================================================
 
-#[test]
-fn test_cve_client_creation() {
-    let client = CveClient::new();
-    // Just verify it creates successfully
-    drop(client);
-}
-
-#[test]
-fn test_cve_client_default() {
-    let client = CveClient::default();
-    drop(client);
-}
-
 // ============================================================================
 // Deduplication tests - KEV priority
 // ============================================================================
@@ -345,18 +332,6 @@ fn test_cve_entry_minimal() {
 // ============================================================================
 
 #[test]
-fn test_cve_source_kev() {
-    let source = CveSource::KEV;
-    assert_eq!(source, CveSource::KEV);
-}
-
-#[test]
-fn test_cve_source_nvd() {
-    let source = CveSource::NVD;
-    assert_eq!(source, CveSource::NVD);
-}
-
-#[test]
 fn test_cve_source_default_is_nvd() {
     let default_source = CveSource::default();
     assert_eq!(default_source, CveSource::NVD);
@@ -365,30 +340,6 @@ fn test_cve_source_default_is_nvd() {
 // ============================================================================
 // V3Severity tests
 // ============================================================================
-
-#[test]
-fn test_v3_severity_all_variants() {
-    let variants = [
-        V3Severity::Low,
-        V3Severity::Medium,
-        V3Severity::High,
-        V3Severity::Critical,
-    ];
-
-    assert_eq!(variants.len(), 4);
-}
-
-#[test]
-fn test_v3_severity_default_is_low() {
-    let default_severity = V3Severity::default();
-    assert_eq!(default_severity, V3Severity::Low);
-}
-
-#[test]
-fn test_v3_severity_equality() {
-    assert_eq!(V3Severity::High, V3Severity::High);
-    assert_ne!(V3Severity::High, V3Severity::Medium);
-}
 
 // ============================================================================
 // NVD parsing edge cases

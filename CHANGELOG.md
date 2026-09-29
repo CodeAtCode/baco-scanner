@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - VulnInstruct specification-guided vulnerability detection (`src/vuln_spec` module: schema, extractor, BM25+vector retriever) behind `[vuln_spec] enabled = false` default
+- `baco report --config <PATH>` to load evidence-gate config for standalone reports
 
 ### Changed
 - Threat-modeling phase disabled by default (`enable_threat_modeling = false`) — it generated a static STRIDE template rather than code-derived analysis

@@ -35,10 +35,14 @@ fn test_agent_enabled_with_mock() {
         MockLlmClient::mock_final_response("[]"),
     ];
     let _mock_client = MockLlmClient::new(responses);
-    let _project_root = PathBuf::from("/tmp");
-    let _config = AgentConfig::default();
-    let _sandbox =
-        baco::agent::sandbox::ToolSandbox::new(_project_root.clone(), _config.tool_timeout_secs);
+    let project_root = PathBuf::from("/tmp");
+    let config = AgentConfig::default();
+    let sandbox =
+        baco::agent::sandbox::ToolSandbox::new(project_root.clone(), config.tool_timeout_secs);
+
+    // Assert sandbox was created with correct configuration
+    assert_eq!(sandbox.temp_dir(), &project_root);
+    assert_eq!(sandbox.timeout_secs(), config.tool_timeout_secs);
 }
 
 #[test]

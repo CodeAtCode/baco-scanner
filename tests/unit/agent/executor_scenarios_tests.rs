@@ -882,11 +882,15 @@ async fn test_message_content_formatting() {
 #[test]
 fn test_progress_callback_type_compatibility() {
     // Verify the progress callback type works with Arc
-    let cb: ProgressCallback = Arc::new(|msg| {
+    let called = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let called_clone = called.clone();
+    let cb: ProgressCallback = Arc::new(move |msg| {
         let _ = msg; // Use the parameter
+        called_clone.store(true, std::sync::atomic::Ordering::SeqCst);
     });
 
     cb("test message".to_string());
+    assert!(called.load(std::sync::atomic::Ordering::SeqCst));
 }
 
 #[test]

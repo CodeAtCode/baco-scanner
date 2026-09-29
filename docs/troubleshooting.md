@@ -6,7 +6,7 @@ Common issues and solutions for the Baco SAST scanner.
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| `[SCANNER] analysis skipped: LLM not configured (set LLM_API_KEY or llm.api_key)` | Missing API key | Add `api_key` inside each `[llm.phases.<slot>]` (discovery, verification, aggregation, static_analysis, security_agent_verification, threat_modeling) or set per-slot env vars (`LLM_DISCOVERY_KEY`, `LLM_VERIFICATION_KEY`, `LLM_AGGREGATION_KEY`, etc.) |
+| `No API key configured - skipping ...` | Missing API key | Add `api_key` inside each `[llm.phases.<slot>]` (discovery, verification, aggregation, static_analysis, security_agent_verification, threat_modeling) or set per-slot env vars (`LLM_DISCOVERY_KEY`, `LLM_VERIFICATION_KEY`, `LLM_AGGREGATION_KEY`, etc.) |
 | Phases show "No API key configured - skipping" | LLM API key not set | Set per-phase API keys via `[llm.phases.discovery.api_key]` or env vars (`LLM_DISCOVERY_KEY`, `LLM_VERIFICATION_KEY`, etc.) |
 | Duplicate LLM API calls during scan | Cache disabled by default | Set `enable_llm_cache = true` in `[llm]` section of config.toml |
 | Threat modeling output is static STRIDE template | Feature disabled by default | Set `enable_threat_modeling = true` in config.toml (documentation-only output) |
@@ -18,7 +18,6 @@ Common issues and solutions for the Baco SAST scanner.
 | Scan hangs during CPG slicing | Joern binary not installed | Install Joern: `curl -L https://github.com/joernio/joern/releases/latest/download/joern-cli-linux-x64.zip -o joern.zip && unzip joern.zip && sudo mv joern-cli /usr/local/bin/` |
 | CPG slicing phase shows "skipped" | Joern dependency missing | Install Joern binary (see above) or skip CPG analysis |
 | Scan takes unusually long | Large codebase, no caching | Enable `enable_llm_cache = true` to avoid duplicate API calls |
-| TGI phase shows "skipped" | TGI removed from project | This is expected; TGI support was removed entirely |
 
 ## Incremental Scan Surprises
 
@@ -47,35 +46,11 @@ Common issues and solutions for the Baco SAST scanner.
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| "unknown key in [llm.phases]" error | Invalid config.toml key | Unknown keys are silently ignored. Valid keys per phase: `model`, `models`, `temperature`, `timeout_secs`, `api_key`, `base_url` |
+| Config parse errors at startup | Malformed TOML | Validate config.toml syntax; check for missing brackets or quotes. Serde silently ignores unknown keys. |
 | "missing [project] path" error | Required field absent | Add `project.path = "src/"` to config.toml |
 | Config parse errors at startup | Malformed TOML | Validate config.toml syntax; check for missing brackets or quotes |
 
 ## Common Error Messages
-
-### LLM Not Configured
-```
-[SCANNER] analysis skipped: LLM not configured (set LLM_API_KEY or llm.api_key)
-```
-
-**When this appears:** During any phase that requires LLM assistance (code analysis, threat modeling, report generation).
-
-**Why:** The scanner checks for API credentials at startup. Per-phase API keys must be set in `[llm.phases.<slot>]` sections (discovery, verification, aggregation, static_analysis, security_agent_verification, threat_modeling) or via per-slot environment variables (`LLM_DISCOVERY_KEY`, `LLM_VERIFICATION_KEY`, `LLM_AGGREGATION_KEY`, etc.).
-
-**Solution:** Configure per-phase API keys:
-- In config.toml:
-  ```toml
-  [llm.phases.discovery]
-  api_key = "sk-..."
-  
-  [llm.phases.verification]
-  api_key = "sk-..."
-  ```
-- Or via environment variables (per-slot):
-  ```bash
-  export LLM_DISCOVERY_KEY=sk-...
-  export LLM_VERIFICATION_KEY=sk-...
-  ```
 
 ### Scan Failed
 ```

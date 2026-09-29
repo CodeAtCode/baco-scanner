@@ -5,7 +5,6 @@
 
 use baco::analysis_context::AnalysisContext;
 use baco::project_type::ProjectType;
-use std::path::PathBuf;
 
 // ============================================================================
 // save tests
@@ -238,12 +237,20 @@ fn test_roundtrip_preserves_string_content() {
 // ============================================================================
 
 #[test]
-fn test_save_returns_error_for_readonly_directory() {
-    // This test may fail on some systems, so we just check the result
-    let result = AnalysisContext::default().save(PathBuf::from("/").as_path());
-    // On most systems, this should fail due to permissions
-    // We don't assert failure because it might succeed in some environments
-    let _ = result;
+fn test_save_returns_error_when_parent_is_a_file() {
+    // save() calls create_dir_all, so a missing parent would simply be created.
+    // A regular file in the path makes create_dir_all fail with ENOTDIR on every
+    // platform and for every user, including root in a CI container.
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let file_path = tmp_dir.path().join("not-a-directory");
+    std::fs::write(&file_path, b"x").unwrap();
+
+    let result = AnalysisContext::default().save(&file_path.join("child"));
+
+    assert!(
+        result.is_err(),
+        "save should fail when a path component is a regular file"
+    );
 }
 
 #[test]
@@ -262,14 +269,15 @@ fn test_load_error_for_invalid_json() {
 fn test_load_error_for_malformed_json() {
     let tmp_dir = tempfile::tempdir().unwrap();
 
-    // Create a JSON file with wrong structure
+    // Create a JSON file with wrong structure - missing required fields
     let context_path = tmp_dir.path().join("context.json");
     std::fs::write(&context_path, r#"{"invalid": "structure"}"#).unwrap();
 
     let result = AnalysisContext::load(tmp_dir.path());
-    // This might succeed (with defaults) or fail depending on serde behavior
-    // We just verify we get a Result
-    assert!(result.is_ok() || result.is_err());
+    assert!(
+        result.is_err(),
+        "Load should fail for JSON with missing required fields"
+    );
 }
 
 // ============================================================================

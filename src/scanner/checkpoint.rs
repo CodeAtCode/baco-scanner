@@ -194,7 +194,7 @@ pub async fn save_checkpoint(
     }
 
     // Get completed phases (all phases up to and including current)
-    // Must match the pipeline order: 4 parallel + 20 sequential, Reporting last
+    // Must match the pipeline order: 4 parallel + 19 sequential, Reporting last
     let all_phases = [
         ScanPhase::Indexing,
         ScanPhase::Semgrep,

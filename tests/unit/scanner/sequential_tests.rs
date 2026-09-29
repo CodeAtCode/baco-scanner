@@ -386,7 +386,7 @@ fn test_finding_with_all_phases() {
     ];
 
     for phase in phases {
-        let _finding = VulnerabilityFinding {
+        let finding = VulnerabilityFinding {
             id: format!("{:?}", phase),
             title: format!("Finding for {:?}", phase),
             description: "Test".to_string(),
@@ -420,6 +420,11 @@ fn test_finding_with_all_phases() {
             evidence: vec![],
             verification_tier: None,
         };
+
+        // Verify the finding has the expected phase in its id and sources
+        assert_eq!(finding.id, format!("{:?}", phase));
+        assert_eq!(finding.sources.len(), 1);
+        assert_eq!(finding.sources[0], format!("{:?}", phase));
     }
 }
 

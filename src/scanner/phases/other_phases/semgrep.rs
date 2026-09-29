@@ -3,7 +3,7 @@ use crate::error::ScanResult;
 use crate::findings::VulnerabilityFinding;
 use crate::scanner::phases::PhaseConfig;
 
-/// Run Semgrep phase (phase 2 of 24).
+/// Run Semgrep phase (phase 2 of 23).
 pub async fn run_semgrep(
     _scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,

@@ -389,6 +389,13 @@ fn test_error_source_chain_for_wrapped_errors() {
 
     // Error should be usable as dyn Error
     let _dyn_err: &dyn std::error::Error = &err;
+
+    let chained = std::error::Error::source(&err).expect("Network variant carries a source");
+    assert!(
+        chained.to_string().contains("underlying error"),
+        "the wrapped cause must survive into the error chain, got {:?}",
+        chained.to_string()
+    );
 }
 
 // ============================================================================

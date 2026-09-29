@@ -183,6 +183,15 @@ fn test_scan_error_debug() {
 fn test_scan_error_is_error() {
     let err = ScanError::Unknown("test".to_string());
     let _: &dyn std::error::Error = &err;
+
+    assert!(
+        format!("{:?}", err).contains("Unknown"),
+        "Debug should name the variant so logs stay diagnosable"
+    );
+    assert!(
+        std::error::Error::source(&err).is_none(),
+        "a leaf error carries no source"
+    );
 }
 
 #[test]

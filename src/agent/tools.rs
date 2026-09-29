@@ -93,7 +93,7 @@ impl Tool for FileWriteTool {
             .as_str()
             .ok_or("Missing 'content' argument")?;
         sandbox
-            .validate_test_source(content)
+            .validate_test_source(path, content)
             .map_err(|e| format!("Validation failed: {}", e))?;
         let _ = sandbox
             .create_temp_file(path, content)

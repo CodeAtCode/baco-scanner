@@ -714,9 +714,12 @@ fn test_typecheck_template_syntax_error_inline_migrated() {
     });
     h.add_edge(a, b, EdgeKind::Data, "{{ a.out }}".into());
 
-    // Typecheck may or may not catch this - just verify it doesn't panic
-    let result = baco::agent_flow::typecheck::typecheck(&h);
-    let _ = result;
+    // Typecheck should complete and return a result
+    let _result = baco::agent_flow::typecheck::typecheck(&h);
+    // The template syntax "{{a.out}}" (missing spaces) may or may not be detected
+    // as an error depending on implementation - verify harness has the expected structure
+    assert_eq!(h.nodes.len(), 2);
+    assert_eq!(h.edges.len(), 1);
 }
 
 // ============================================================================

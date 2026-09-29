@@ -4,7 +4,7 @@ use crate::error::ScanResult;
 use crate::findings::VulnerabilityFinding;
 use crate::scanner::phases::PhaseConfig;
 
-/// Run CWE routing phase (phase 5 of 24).
+/// Run CWE routing phase (phase 5 of 23).
 pub async fn run_cwe_routing(
     _scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,
@@ -50,7 +50,7 @@ pub async fn run_cwe_routing(
     Ok((findings, analyzed_files.to_vec()))
 }
 
-/// Run CPG slice phase (phase 3 of 24).
+/// Run CPG slice phase (phase 3 of 23).
 ///
 /// Uses Joern to build a Code Property Graph and extract code slices around
 /// suspected vulnerabilities, reducing LLM context size (LLMxCPG, Usenix 2025).

@@ -58,16 +58,17 @@ fn test_validate_config_invalid_toml() {
 #[test]
 fn test_validate_config_valid_file() {
     let mut temp_file = NamedTempFile::new().unwrap();
-    // Write a minimal valid config
-    let config_content = r#"
-[detector]
-semgrep_enabled = true
-"#;
+    // `ScannerConfig::validate` requires `project.path` to exist, so point it at a real
+    // directory rather than leaving it empty.
+    let project_dir = tempfile::tempdir().unwrap();
+    let config_content = format!(
+        "[project]\npath = {:?}\n",
+        project_dir.path().to_string_lossy()
+    );
     temp_file.write_all(config_content.as_bytes()).unwrap();
 
     let result = validate_config(temp_file.path());
-    // May fail validation but should parse
-    assert!(result.is_ok() || result.is_err());
+    assert!(result.is_ok(), "valid config should validate: {:?}", result);
 }
 
 // ============================================================================
@@ -143,13 +144,20 @@ fn test_validate_checkpoint_nonexistent() {
 #[test]
 fn test_validate_checkpoint_valid_file() {
     let mut temp_file = NamedTempFile::new().unwrap();
-    // Write minimal valid checkpoint JSON
-    let checkpoint = r#"{"version": 1, "findings": [], "invariants": []}"#;
+    // `Checkpoint` requires these fields; an unrelated shape fails to deserialize.
+    let checkpoint = r#"{
+  "scan_id": "test-scan",
+  "project_path": "/tmp/example",
+  "started_at": "2026-01-01T00:00:00Z",
+  "current_phase": "Indexing",
+  "completed_phases": [],
+  "findings_so_far": [],
+  "file_count": 0
+}"#;
     temp_file.write_all(checkpoint.as_bytes()).unwrap();
 
     let result = validate_checkpoint(temp_file.path());
-    // May fail due to missing required fields but should parse
-    assert!(result.is_ok() || result.is_err());
+    assert!(result.is_ok(), "valid checkpoint should load: {:?}", result);
 }
 
 #[test]
@@ -211,8 +219,8 @@ fn test_validate_findings_with_null_id() {
     temp_file.write_all(findings.as_bytes()).unwrap();
 
     let result = validate_findings(temp_file.path());
-    // null id should be handled
-    assert!(result.is_ok() || result.is_err());
+    // `id` is a String, so a JSON null cannot deserialize
+    assert!(result.is_err(), "a null id should be rejected");
 }
 
 #[test]
@@ -282,8 +290,8 @@ fn test_validate_findings_with_negative_line_number() {
     temp_file.write_all(findings.as_bytes()).unwrap();
 
     let result = validate_findings(temp_file.path());
-    // JSON number may be parsed as unsigned, so this may fail at parse time
-    assert!(result.is_ok() || result.is_err());
+    // `line_number` is an unsigned integer, so -1 cannot deserialize
+    assert!(result.is_err(), "a negative line number should be rejected");
 }
 
 #[test]

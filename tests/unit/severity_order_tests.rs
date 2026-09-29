@@ -53,9 +53,16 @@ fn test_severity_sort_consistency_with_reverse() {
 
 #[test]
 fn test_severity_copy_and_debug_derives() {
-    // Verify Severity derives Copy and Debug (needed for tests)
     let s: Severity = Severity::Critical;
     let _copy1 = s;
     let _copy2 = s; // Should compile if Copy is derived
     let _debug_str = format!("{:?}", s); // Should compile if Debug is derived
+
+    assert_eq!(
+        format!("{:?}", s),
+        "Critical",
+        "Debug output is relied on by logs and by serde round-trips"
+    );
+    assert_eq!(_copy1, s, "Copy must yield an equal value, not a move");
+    assert_eq!(_copy2, s);
 }

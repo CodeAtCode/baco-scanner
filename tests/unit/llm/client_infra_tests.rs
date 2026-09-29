@@ -132,9 +132,11 @@ fn test_llm_client_rate_limiter_config() {
         pricing: Default::default(),
     };
 
-    let _client = LlmClient::with_metrics(config, None);
+    let client = LlmClient::with_metrics(config, None);
     // Construction must succeed and wire the rate limiter with max_concurrent;
     // the limiter itself is internal, so successful creation is the check.
+    // Verify the client was created by checking a field
+    assert_eq!(client.config.model, "test-model");
 }
 
 /// Test cache key computation is deterministic

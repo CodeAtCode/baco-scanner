@@ -55,17 +55,18 @@ fn test_file_write_valid_content() {
 }
 
 #[test]
-fn test_file_write_rejects_malicious_rust() {
+fn test_file_write_allows_rust_unsafe() {
+    // Bug 1 fix: Rust files now allow unsafe blocks for legitimate test harnesses
     let tmpdir = tempfile::tempdir().unwrap();
     let tool = FileWriteTool;
     let args = serde_json::json!({
-        "path": "malicious.rs",
+        "path": "test.rs",
         "content": "unsafe { std::process::Command::new(\"rm\") }"
     });
     let sandbox = Box::new(ToolSandbox::new(tmpdir.path().to_path_buf(), 30));
 
     let result = tool.execute(args, &*sandbox);
-    assert!(result.is_err());
+    assert!(result.is_ok(), "Rust files should allow unsafe blocks");
 }
 
 #[test]

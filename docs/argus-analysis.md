@@ -1,9 +1,7 @@
 # Research: argusappsec/argus → baco adoption analysis
 
 Source: https://github.com/argusappsec/argus (Go daemon, Apache-2.0, pre-1.0,
-24 ADRs + design docs). Analyzed 2026-09-01. Companion analysis:
-docs/cloudflare-security-audit-skill-analysis.md (5 items from that report
-already implemented in commit 61e2c80 — not repeated here).
+24 ADRs + design docs). Analyzed 2026-09-01.
 
 ## Summary
 

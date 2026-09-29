@@ -24,22 +24,18 @@ use tempfile::TempDir;
 // ============================================================================
 
 #[test]
-fn test_cve_bootstrapper_new() {
-    let bootstrapper = CveBootstrapper::new("/tmp/test-project".to_string());
-    // Just verify it creates successfully
-    drop(bootstrapper);
-}
-
-#[test]
 fn test_detect_project_stack_empty_directory() {
     let temp_dir = TempDir::new().unwrap();
 
     let bootstrapper = CveBootstrapper::new(temp_dir.path().to_str().unwrap().to_string());
     let stack = bootstrapper.detect_project_stack().unwrap();
 
-    // Note: empty directory may still detect some default languages
-    // Just verify it doesn't panic
-    drop(stack);
+    assert!(
+        stack.languages.is_empty(),
+        "an empty directory has no manifest, so no language should be detected: {:?}",
+        stack.languages
+    );
+    assert!(stack.dependencies.is_empty());
 }
 
 #[test]
@@ -60,8 +56,17 @@ tokio = "1.0"
     let bootstrapper = CveBootstrapper::new(temp_dir.path().to_str().unwrap().to_string());
     let stack = bootstrapper.detect_project_stack().unwrap();
 
-    // Just verify the bootstrapper doesn't panic
-    drop(stack);
+    assert!(
+        stack.languages.contains(&"Rust".to_string()),
+        "Cargo.toml should yield Rust, got {:?}",
+        stack.languages
+    );
+    let dep_names: Vec<&str> = stack.dependencies.iter().map(|d| d.name.as_str()).collect();
+    assert!(
+        dep_names.contains(&"serde") && dep_names.contains(&"tokio"),
+        "both declared dependencies should be parsed, got {:?}",
+        dep_names
+    );
 }
 
 #[test]
@@ -82,8 +87,17 @@ fn test_detect_project_stack_javascript_project() {
     let bootstrapper = CveBootstrapper::new(temp_dir.path().to_str().unwrap().to_string());
     let stack = bootstrapper.detect_project_stack().unwrap();
 
-    // Note: JavaScript detection may have issues - just verify no panic
-    drop(stack);
+    assert!(
+        stack.languages.contains(&"JavaScript".to_string()),
+        "package.json should yield JavaScript, got {:?}",
+        stack.languages
+    );
+    let dep_names: Vec<&str> = stack.dependencies.iter().map(|d| d.name.as_str()).collect();
+    assert!(
+        dep_names.iter().any(|n| n.contains("react")),
+        "react should be recorded as a dependency, got {:?}",
+        dep_names
+    );
 }
 
 #[test]
@@ -101,8 +115,17 @@ numpy
     let bootstrapper = CveBootstrapper::new(temp_dir.path().to_str().unwrap().to_string());
     let stack = bootstrapper.detect_project_stack().unwrap();
 
-    // Note: Python detection may have issues - just verify no panic
-    drop(stack);
+    assert!(
+        stack.languages.contains(&"Python".to_string()),
+        "requirements.txt should yield Python, got {:?}",
+        stack.languages
+    );
+    let dep_names: Vec<&str> = stack.dependencies.iter().map(|d| d.name.as_str()).collect();
+    assert!(
+        dep_names.iter().any(|n| n.contains("flask")),
+        "flask should be recorded as a dependency, got {:?}",
+        dep_names
+    );
 }
 
 #[test]
@@ -335,9 +358,22 @@ fn test_generate_threat_intel_with_findings() {
 // ============================================================================
 
 #[test]
-fn test_cve_client_new() {
-    let client = CveClient::new();
-    drop(client);
+fn test_file_hasher_new() {
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("hasher.txt");
+    fs::write(&file_path, b"content").unwrap();
+
+    let mut hasher = FileHasher::new();
+    let first = hasher.hash_file(&file_path).unwrap();
+
+    let mut fresh = FileHasher::default();
+    let second = fresh.hash_file(&file_path).unwrap();
+
+    assert_eq!(
+        first, second,
+        "a fresh hasher and a default hasher must agree on the same file"
+    );
+    assert_eq!(hasher.hash_file(&file_path).unwrap(), first);
 }
 
 #[test]
@@ -472,15 +508,18 @@ fn test_calculate_file_hash_nonexistent_file() {
 }
 
 #[test]
-fn test_file_hasher_new() {
-    let hasher = FileHasher::new();
-    drop(hasher);
-}
+fn test_file_hasher_default_matches_new() {
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("hasher_default.txt");
+    fs::write(&file_path, b"other content").unwrap();
 
-#[test]
-fn test_file_hasher_default() {
-    let hasher = FileHasher::default();
-    drop(hasher);
+    let mut from_new = FileHasher::new();
+    let mut from_default = FileHasher::default();
+
+    assert_eq!(
+        from_new.hash_file(&file_path).unwrap(),
+        from_default.hash_file(&file_path).unwrap()
+    );
 }
 
 #[test]

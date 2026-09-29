@@ -115,9 +115,11 @@ Enable with `[output] evidence_gate = true` in your config or `--evidence-gate` 
 
 | Output | Behavior when gate is on |
 |--------|--------------------------|
-| `findings.json` | All findings kept; each gets `verification_tier` attached |
-| `report.html` | Main body shows verified + supported only; unverified findings listed in an appendix section |
+| `findings.json` | All findings kept (never filtered); each gets `verification_tier` attached |
+| `findings.md` | Only verified + supported findings |
+| `report.html` | Main body shows verified + supported only; unverified findings listed in "Appendix: Unverified Findings" |
 | `report.sarif` | Only verified + supported findings emitted |
+| `report.md` (from `baco report`) | Only verified + supported findings |
 | CLI | Summary line: `Evidence gate: N verified, M supported, K unverified (excluded from reports)` |
 
 With the gate off (default), all outputs contain all findings unchanged.
@@ -141,7 +143,7 @@ Combine severity and confidence to decide what to fix first:
 
 ## Scan Health Summary
 
-At end-of-scan, baco writes a console summary and includes a `scan_health` section in the JSON report when `output.include_rejected = true`.
+At end-of-scan, baco writes a console summary.
 
 **Console summary shows:**
 - Phases run/skipped
@@ -151,21 +153,26 @@ At end-of-scan, baco writes a console summary and includes a `scan_health` secti
 **Zero-LLM-calls warning**: If no LLM calls were made during the scan, a warning is emitted.
 
 **JSON report nuance**: The JSON output structure depends on `output.include_rejected`:
-- When `include_rejected = true`: JSON is an object with `findings`, `rejected`, `summary`, and `scan_health` fields
+- When `include_rejected = true`: JSON is an object with `findings`, `rejected`, and `summary` fields
 - When `include_rejected = false`: JSON is a top-level array of findings
+
+**Note:** The `scan_health` section is documented but not currently emitted by the JSON writer — only the console summary is produced.
 
 ## Report Artifacts
 
-baco generates three output files:
+baco generates output files:
 
 | File | Purpose |
 |------|---------|
-| `findings.json` | Full JSON data. When `include_rejected = true`, object with `findings`, `rejected`, `summary`, `scan_health`. Otherwise, top-level array. With evidence gating on, each entry includes its `verification_tier`. |
+| `findings.json` | Full JSON data. When `include_rejected = true`, object with `findings`, `rejected`, `summary`. Otherwise, top-level array. With evidence gating on, each entry includes its `verification_tier`. |
+| `findings.md` | Markdown summary of findings. |
 | `report.html` | Human-readable HTML report with severity breakdown, charts, and clickable finding details. With evidence gating on, shows verified + supported findings and an appendix of unverified ones. |
-| `report.sarif` | SARIF output for CI/CD integration. With evidence gating on, contains only verified + supported findings. |
+| `report.sarif` | SARIF output for CI/CD integration (generated via `baco report --format sarif`). With evidence gating on, contains only verified + supported findings. |
 | `checkpoint.json` | Internal state for resuming interrupted scans. Do not edit manually. |
 
-All files are written to the output directory specified in your config or CLI flags.
+All files are written to the output directory specified in your config. The SARIF file is generated separately via `baco report --format sarif`.
+
+**Note on `baco report --config`:** The `baco report` command accepts a `--config` flag to apply the evidence gate to report output. Without `--config`, the evidence gate is not applied to `baco report` output.
 
 ---
 
