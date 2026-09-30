@@ -3,10 +3,12 @@ use std::path::PathBuf;
 
 /// Aggregation configuration including false positive store settings
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct AggregationConfig {}
 
 /// Rule synthesis configuration (MoCQ: LLM→semgrep rule generation)
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RuleSynthConfig {
     /// Whether rules synthesis is enabled
     #[serde(default)]
@@ -94,6 +96,7 @@ pub enum NormalizationTier {
 
 /// Configuration for confidence normalization.
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct NormalizationConfig {
     /// Whether normalization is enabled.
     pub enabled: bool,
@@ -172,6 +175,7 @@ pub struct ValidateConfig {
 /// Augments LLM input with control path (AST/CFG/DFG), knowledge path
 /// (CWE pattern RAG), and semantic path (function summary) before judgement.
 #[derive(Debug, Clone, Default, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct VultriageConfig {
     /// Whether triple-path context augmentation is enabled
     #[serde(default)]
@@ -185,6 +189,7 @@ pub struct VultriageConfig {
 /// First pass: cheap model triage per file to filter out non-suspicious files.
 /// Second pass: deep analysis only on files that pass the suspicion threshold.
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct TriageConfig {
     /// Whether triage cascade is enabled (default: false)
     #[serde(default)]
@@ -214,6 +219,7 @@ impl Default for TriageConfig {
 /// Configuration for file prioritization (T18).
 /// Scores files based on recency, entry-point status, and size to prioritize LLM budget.
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct PriorityConfig {
     /// Whether prioritization is enabled (default: false)
     #[serde(default)]
@@ -251,6 +257,7 @@ impl Default for PriorityConfig {
 /// Configuration for LLM budget enforcement (T18).
 /// Limits total LLM calls and reserves budget for high-risk files.
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct BudgetConfig {
     /// Whether budget enforcement is enabled (default: false)
     #[serde(default)]
@@ -277,6 +284,7 @@ impl Default for BudgetConfig {
 /// Queries the LLM N times to get a CWE candidate set ("policy"),
 /// then a final call with the policy as context to pick one label.
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct PolicySamplingConfig {
     /// Whether policy-based generation is enabled
     #[serde(default)]
@@ -298,6 +306,7 @@ impl Default for PolicySamplingConfig {
 /// Configuration for the VulnLLM-R agent scaffold (P2.5).
 /// Builds 3-path call-graph context + function-lookup tool per target.
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct AgentScaffoldConfig {
     /// Whether the agent scaffold is enabled
     #[serde(default)]
@@ -325,6 +334,7 @@ impl Default for AgentScaffoldConfig {
 /// LLM prompt. With `auto_level = true`, the level is chosen based on
 /// the configured model name.
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct PacvdConfig {
     /// Whether PacVD abstraction is enabled
     #[serde(default)]

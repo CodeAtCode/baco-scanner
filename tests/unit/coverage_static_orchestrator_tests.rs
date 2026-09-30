@@ -6,6 +6,7 @@
 //! - should_analyze_file: triage decision (boundary cases not in other test files)
 
 use baco::findings::{Severity, VulnerabilityFinding};
+use baco::hook_registry::HookRegistration;
 use baco::indexer::FileInfo;
 use baco::scanner::phases::llm_phases::compute_file_priority_score;
 use baco::scanner::structural_dedup;
@@ -449,7 +450,7 @@ fn test_compute_file_priority_score_entry_point_boost() {
     };
 
     let priority = make_priority_config();
-    let hook_map: HashMap<String, Vec<String>> = HashMap::new();
+    let hook_map: HashMap<String, Vec<HookRegistration>> = HashMap::new();
 
     let score = compute_file_priority_score(&file_info, &priority, &hook_map);
 
@@ -473,7 +474,7 @@ fn test_compute_file_priority_score_small_file_boost() {
     };
 
     let priority = make_priority_config();
-    let hook_map: HashMap<String, Vec<String>> = HashMap::new();
+    let hook_map: HashMap<String, Vec<HookRegistration>> = HashMap::new();
 
     let score = compute_file_priority_score(&file_info, &priority, &hook_map);
 
@@ -497,10 +498,13 @@ fn test_compute_file_priority_score_hook_map_boost() {
     };
 
     let priority = make_priority_config();
-    let mut hook_map: HashMap<String, Vec<String>> = HashMap::new();
+    let mut hook_map: HashMap<String, Vec<HookRegistration>> = HashMap::new();
     hook_map.insert(
         hook_file.to_string_lossy().to_string(),
-        vec!["hook1".to_string()],
+        vec![HookRegistration {
+            hook: "wp_ajax_save".to_string(),
+            handler: "hook1".to_string(),
+        }],
     );
 
     let score = compute_file_priority_score(&file_info, &priority, &hook_map);

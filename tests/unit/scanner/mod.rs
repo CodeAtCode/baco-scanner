@@ -2,6 +2,7 @@
 //!
 //! Tests cover Scanner initialization and scan phases.
 
+mod hook_primitive_phase_tests;
 mod scanner_init_tests;
 
 // Scanner phase tests
@@ -16,4 +17,5 @@ mod parallel_tests;
 mod phases;
 mod sequential_tests;
 mod static_analysis_tests;
+mod triage_discard_fallback_tests;
 mod types_tests;

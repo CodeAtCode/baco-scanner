@@ -814,6 +814,26 @@ cp presets/wordpress-core.toml ~/.config/baco/presets/my-project.toml
 baco scan --config my.toml --preset my-project
 ```
 
+Name the preset in the config instead of on the command line:
+
+```toml
+preset = "my-project"
+
+[project]
+name = "my-project"
+path = "."
+```
+
+`--preset` wins when both are present, since passing it is a deliberate
+override. A name that does not resolve fails the load and names the preset,
+rather than quietly scanning with no preset applied.
+
+Presets matter more than the flag suggests: they carry
+`required_security_primitives` and the hook registry, which is what the
+entry-point primitive check reads. A scan run without the WordPress preset
+finds no missing-nonce findings, because it has no list of nonce functions to
+check against.
+
 ### Fields a Preset Can Override
 
 | Section      | Key fields                                                                 |
@@ -861,15 +881,22 @@ enabled = false
 
 ## Citation verification
 
-The `[citation_verification]` section controls verification that finding citations (file + line) actually resolve in the target source, downgrading unverifiable findings.
+The `[citation_verification]` section controls verification that finding citations (file + line) actually resolve in the target source.
+
+A citation that does not resolve gets `verification_status = failed` and a note
+in `verification_notes`. The finding is kept and its confidence is left alone:
+confidence is the model's own estimate, and multiplying it by a constant
+corrupts that estimate without saying anything about how wrong the citation is.
+Whether failed findings reach the report is decided by
+`[output] evidence_gate`; `include_rejected` keeps them visible when it is on.
 
 | Key       | Type | Default | Description                                          |
 | --------- | ---- | ------- | ---------------------------------------------------- |
-| `enabled` | bool | `false` | Verify finding citations against source files        |
+| `enabled` | bool | `true`  | Verify finding citations against source files        |
 
 ```toml
 [citation_verification]
-enabled = false
+enabled = true
 ```
 
 ## Prior runs

@@ -15,6 +15,7 @@ pub enum ScanPipelineProfile {
 
 /// Pattern configuration for variant search
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct VariantSearchPattern {
     /// Type of vulnerability (e.g., "command_injection", "sql_injection")
     #[serde(default)]
@@ -28,6 +29,7 @@ pub struct VariantSearchPattern {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ScannerSettings {
     #[serde(default = "default_max_file_size_kb")]
     pub max_file_size_kb: u64,
@@ -55,6 +57,7 @@ impl Default for ScannerSettings {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SemgrepSettings {
     #[serde(default)]
     pub rulesets: Vec<String>,
@@ -68,6 +71,7 @@ pub struct SemgrepSettings {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PerformanceSettings {
     /// Early termination threshold: scan stops when Medium-and-above finding count exceeds this value.
     /// Info findings are NOT counted toward the threshold (flood-resistant). Default: 1000.0.
@@ -138,6 +142,7 @@ impl Default for PerformanceSettings {
 
 /// Router configuration for MoE per-CWE / per-language routing
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RouterConfig {
     /// Whether the router is enabled
     #[serde(default)]
@@ -149,6 +154,7 @@ pub struct RouterConfig {
 
 /// Prompt specification for router overrides
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct PromptSpec {
     /// Optional model override for this prompt
     pub model_override: Option<String>,

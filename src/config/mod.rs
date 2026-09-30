@@ -23,6 +23,7 @@ use std::path::PathBuf;
 
 /// Eval-suite settings (`[eval]` section).
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct EvalConfig {
     /// Minimum aggregate pass-rate for `baco eval` (0.0..=1.0).
     #[serde(default = "default_eval_floor")]
@@ -42,6 +43,7 @@ impl Default for EvalConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct ScannerConfig {
     #[serde(default)]
     pub project: ProjectConfig,
@@ -215,17 +217,45 @@ impl ScannerConfig {
     /// Load with a preset applied UNDER the user file: defaults → preset →
     /// user-explicit-keys (TOML deep merge, arrays replaced wholesale).
     /// User config wins over preset; explicit `temperature = 0.0` applies.
+    ///
+    /// The preset can be named two ways: with the `preset` argument, which is
+    /// what the `--preset` flag supplies, or with a `preset = "name"` key in the
+    /// config file. The flag wins when both are present, because passing it is a
+    /// deliberate override.
     pub fn from_file_with_preset(
         path: &str,
         preset: Option<crate::preset::PresetOverlay>,
     ) -> Result<Self, ConfigError> {
+        let content = fs::read_to_string(path)?;
+        let expanded = expand_env_vars(&content);
+        let mut user_val: toml::Value = toml::from_str(&expanded)?;
+
+        // `preset` is a directive, not a configuration field. It is taken out
+        // here because deserialisation denies unknown keys, and it has to be
+        // read before the user file is merged so the layering below still sees
+        // only real settings.
+        let preset_from_config: Option<String> = user_val
+            .as_table_mut()
+            .and_then(|t| t.remove("preset"))
+            .and_then(|v| v.as_str().map(str::to_string));
+
+        let preset = match preset {
+            Some(explicit) => Some(explicit),
+            None => match preset_from_config {
+                Some(name) => Some(crate::preset::load_preset(&name).map_err(|e| {
+                    ConfigError::Validation {
+                        field: "preset".to_string(),
+                        message: format!("preset `{name}` could not be loaded: {e}"),
+                    }
+                })?),
+                None => None,
+            },
+        };
+
         let mut base = ScannerConfig::default();
         if let Some(overlay) = preset {
             overlay.merge_into(&mut base);
         }
-        let content = fs::read_to_string(path)?;
-        let expanded = expand_env_vars(&content);
-        let user_val: toml::Value = toml::from_str(&expanded)?;
         let mut base_val = toml::Value::try_from(&base).map_err(|e| ConfigError::Parse {
             message: e.to_string(),
             line: None,
@@ -349,6 +379,7 @@ impl ScannerConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct ProjectConfig {
     #[serde(default)]
     pub name: String,
@@ -359,6 +390,7 @@ pub struct ProjectConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct OutputConfig {
     #[serde(default)]
     pub dir: String,
@@ -370,10 +402,20 @@ pub struct OutputConfig {
 
 /// Citation verification gate: deterministic checks that report citations
 /// (file existence, line ranges) match the scanned tree before rendering.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(default)]
+///
+/// On by default. It is local file I/O and no LLM call, and its absence is not
+/// visible: a finding citing line 3894 of a 326-line file is simply wrong, and
+/// nothing downstream catches it unless this runs.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, default)]
 pub struct CitationVerificationConfig {
     pub enabled: bool,
+}
+
+impl Default for CitationVerificationConfig {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
 }
 
 /// Prior-runs store: cross-run findings history used for skip directives

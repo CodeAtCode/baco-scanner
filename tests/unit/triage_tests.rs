@@ -10,6 +10,7 @@
 //! arrays and local arithmetic, so they passed no matter what the product did.
 //! They are gone rather than rewritten, because the real coverage is elsewhere.
 
+use baco::config::ScannerConfig;
 use baco::config::phases::TriageConfig;
 
 #[test]
@@ -33,11 +34,17 @@ fn test_triage_default_disabled() {
 fn test_triage_defaults_are_accepted_from_toml() {
     // The defaults above are only useful if they also survive parsing, since
     // that is how every user reaches them.
+    // Parse through ScannerConfig, not TriageConfig. `[triage]` is a section, so
+    // its key is `triage`, which does not exist inside TriageConfig itself.
+    // Deserialising the section body directly passed for years because the
+    // parser ignored the unknown key -- the test exercised a shape no user
+    // can actually write.
     let toml_str = r#"
         [triage]
     "#;
-    let config: TriageConfig = toml::from_str(toml_str).expect("triage defaults must parse");
-    assert!(!config.enabled);
-    assert_eq!(config.batch_size, 8);
-    assert!((config.suspicion_threshold - 0.35).abs() < 0.001);
+    let config: ScannerConfig = toml::from_str(toml_str).expect("triage defaults must parse");
+    let triage = &config.triage;
+    assert!(!triage.enabled);
+    assert_eq!(triage.batch_size, 8);
+    assert!((triage.suspicion_threshold - 0.35).abs() < 0.001);
 }

@@ -26,8 +26,17 @@ pub struct CitationReport {
 /// - If `line_number` is Some(n), reads the file and requires n <= total line count
 ///
 /// On failure:
-/// - `confidence_score *= 0.5`
+/// - `verification_status = Failed`
 /// - Appends to `verification_notes`: "citation verification failed: reason" (where reason is the failure cause)
+///
+/// The finding is kept, not dropped. Two reasons: `include_rejected` exists so a
+/// user can ask to see everything, and deleting here would be a second filter
+/// that does not respect it. The status is the signal, and whether it is
+/// filtered is `apply_evidence_gate`'s decision.
+///
+/// Confidence is deliberately left alone. `classify_finding` tiers on it, so
+/// scaling it by a constant corrupts the model's own estimate with a number
+/// that says nothing about how wrong the finding is.
 ///
 /// Returns a summary report with counts.
 pub fn verify_citations(
@@ -49,7 +58,7 @@ pub fn verify_citations(
 
         // Reject absolute paths and path traversal attempts
         if finding.file_path.starts_with('/') || finding.file_path.contains("..") {
-            finding.confidence_score *= 0.5;
+            finding.verification_status = Some(crate::findings::VerificationStatus::Failed);
             let note = format!(
                 "citation verification failed: path traversal rejected: {}",
                 finding.file_path
@@ -63,7 +72,7 @@ pub fn verify_citations(
         let file_content = match fs::read_to_string(&file_path) {
             Ok(content) => content,
             Err(_) => {
-                finding.confidence_score *= 0.5;
+                finding.verification_status = Some(crate::findings::VerificationStatus::Failed);
                 let note = format!(
                     "citation verification failed: file not found or unreadable: {}",
                     finding.file_path
@@ -78,7 +87,7 @@ pub fn verify_citations(
         if let Some(line_num) = finding.line_number {
             // Line 0 is invalid (lines are 1-indexed)
             if line_num == 0 {
-                finding.confidence_score *= 0.5;
+                finding.verification_status = Some(crate::findings::VerificationStatus::Failed);
                 let note = format!(
                     "citation verification failed: line 0 is invalid (1-indexed): {}",
                     finding.file_path
@@ -91,7 +100,7 @@ pub fn verify_citations(
             let line_count = file_content.lines().count();
 
             if line_num as usize > line_count {
-                finding.confidence_score *= 0.5;
+                finding.verification_status = Some(crate::findings::VerificationStatus::Failed);
                 let note = format!(
                     "citation verification failed: line {} out of range (file has {} lines): {}",
                     line_num, line_count, finding.file_path

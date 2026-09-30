@@ -100,7 +100,7 @@ The pipeline includes several verification gates and calibration layers that aug
 
 Before rendering the final report, deterministic checks verify that all citations (file paths + line ranges) match the scanned source tree. Findings failing this check have their confidence score halved and a note added explaining the discrepancy.
 
-Configured via `[citation_verification] enabled = false` (disabled by default).
+Configured via `[citation_verification] enabled = true` (enabled by default).
 
 ### Prior-Runs Store (Discovery Phase)
 

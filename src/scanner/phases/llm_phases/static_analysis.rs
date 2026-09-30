@@ -181,7 +181,7 @@ pub async fn run_llm_static_analysis(
         // The triage pass gets its own client so `triage.model` selects the
         // model that actually classifies the files. Reusing the phase client
         // made the key a no-op: it was passed here and never read.
-        let (files_to_analyze, skipped_files) = if config.triage.enabled {
+        let (mut files_to_analyze, mut skipped_files) = if config.triage.enabled {
             match llm::phase_llm_config(config, "static_analysis", Some(&config.triage.model)) {
                 Ok(cfg) => {
                     let triage_client =
@@ -210,14 +210,47 @@ pub async fn run_llm_static_analysis(
             (files.iter().collect(), Vec::new())
         };
 
+        // Triage is a cost filter, so it is allowed to drop files. It is not
+        // allowed to drop almost everything while looking like it worked: a
+        // batch where the model marked most files uninteresting leaves the scan
+        // with nothing to look at, and the only record is a debug line naming
+        // files the caller never sees. When the discard rate crosses the
+        // threshold the triage result is treated as untrustworthy and the
+        // batch is analysed anyway, with a warning, because a false negative
+        // here costs a whole file of coverage and a warning costs nothing.
         if !skipped_files.is_empty() {
+            let total = files_to_analyze.len() + skipped_files.len();
             tracing::info!(
-                "[Triage] Skipped {} files (suspicion < {} threshold)",
+                "[Triage] Skipped {} of {} files (suspicion < {} threshold)",
                 skipped_files.len(),
+                total,
                 config.triage.suspicion_threshold
             );
-            for f in &skipped_files {
-                tracing::debug!("[Triage] Skipped: {}", f);
+            if should_distrust_triage(files_to_analyze.len(), skipped_files.len()) {
+                tracing::warn!(
+                    "[Triage] Discarded {}/{} files, above the {:.0}% limit; \
+                     analysing them anyway rather than reporting an empty scan",
+                    skipped_files.len(),
+                    total,
+                    TRIAGE_MAX_DISCARD_RATIO * 100.0
+                );
+                for path in &skipped_files {
+                    if let Some(file_info) =
+                        files.iter().find(|f| f.path.to_string_lossy() == *path)
+                    {
+                        if !files_to_analyze
+                            .iter()
+                            .any(|f| f.path.to_string_lossy() == *path)
+                        {
+                            files_to_analyze.push(file_info);
+                        }
+                    }
+                }
+                skipped_files.clear();
+            } else {
+                for f in &skipped_files {
+                    tracing::debug!("[Triage] Skipped: {}", f);
+                }
             }
         }
 
@@ -553,6 +586,27 @@ struct TriageResponse {
 /// raising it is visible wherever it is discussed.
 pub const TRIAGE_SNIPPET_LINES: usize = 30;
 
+/// Fraction of files triage may discard before the result is distrusted.
+///
+/// Triage saves LLM calls, so discarding is its job. But a scan that ends up
+/// analysing almost nothing looks exactly like a clean target, and the triage
+/// verdict that caused it is only a debug line. Past this ratio the filter has
+/// stopped being a cost saving and become the whole result.
+pub const TRIAGE_MAX_DISCARD_RATIO: f64 = 0.5;
+
+/// Whether a triage result should be distrusted and the batch analysed anyway.
+///
+/// Split out from the phase so the boundary is testable without an LLM client:
+/// the decision is a comparison, and a comparison asserted only in a test is a
+/// comparison that can drift.
+pub fn should_distrust_triage(kept: usize, skipped: usize) -> bool {
+    let total = kept + skipped;
+    if total == 0 {
+        return false;
+    }
+    skipped as f64 / total as f64 > TRIAGE_MAX_DISCARD_RATIO
+}
+
 /// First `max_lines` lines of a file, flattened, for the triage prompt.
 ///
 /// A file we cannot read is an error, not an empty file. Returning `""` let
@@ -739,7 +793,7 @@ Files to analyze:
 pub fn compute_file_priority_score(
     file_info: &crate::indexer::FileInfo,
     priority: &crate::config::PriorityConfig,
-    hook_map: &std::collections::HashMap<String, Vec<String>>,
+    hook_map: &std::collections::HashMap<String, Vec<crate::hook_registry::HookRegistration>>,
 ) -> f32 {
     let mut score = 1.0;
     let path_str = file_info.path.to_string_lossy().to_string();

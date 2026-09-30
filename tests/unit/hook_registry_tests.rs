@@ -1,9 +1,293 @@
 //! Config-driven hook registry tests
 
 use baco::config::knowledge::HookRegistryLanguageConfig;
-use baco::hook_registry;
+use baco::hook_registry::{self, HookRegistration, find_unprotected_hooks};
 use std::collections::HashMap;
 use tempfile::TempDir;
+
+fn php_primitives() -> Vec<String> {
+    [
+        "wp_verify_nonce",
+        "check_admin_referer",
+        "check_ajax_referer",
+        "current_user_can",
+        "user_can",
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect()
+}
+
+fn reg(hook: &str, handler: &str) -> HookRegistration {
+    HookRegistration {
+        hook: hook.to_string(),
+        handler: handler.to_string(),
+    }
+}
+
+#[test]
+fn test_primitive_in_a_callee_protects_the_entry_point() {
+    // The delegation shape: an entry point that does nothing itself and calls a
+    // helper which authorises. Reading only the handler body reports this as
+    // unprotected, which is the false positive this check exists to remove.
+    let content = r#"<?php
+function pay4payment_rated_ajax_handler() {
+    do_something();
+}
+
+function do_something() {
+    check_admin_referer('pay4payment');
+    $wpdb->update( $wpdb->prefix . 'orders', array( 'status' => 'paid' ) );
+}
+"#;
+    let out = find_unprotected_hooks(
+        content,
+        &[reg(
+            "wp_ajax_nopriv_pay4payment_rated",
+            "pay4payment_rated_ajax_handler",
+        )],
+        &php_primitives(),
+    );
+    assert!(
+        out.is_empty(),
+        "a primitive reachable from a callee must protect the handler, got {:?}",
+        out
+    );
+
+    // Control: the same delegation shape with the primitive removed must be
+    // reported. Without this, the assertion above also passes when the whole
+    // check is a no-op -- finding nothing is exactly what a broken check does.
+    let control_source = r#"<?php
+function pay4payment_rated_ajax_handler() {
+    do_something();
+}
+
+function do_something() {
+    $wpdb->update( $wpdb->prefix . 'orders', array( 'status' => 'paid' ) );
+}
+"#;
+    let control = find_unprotected_hooks(
+        control_source,
+        &[reg(
+            "wp_ajax_nopriv_pay4payment_rated",
+            "pay4payment_rated_ajax_handler",
+        )],
+        &php_primitives(),
+    );
+    assert_eq!(
+        control.len(),
+        1,
+        "removing the primitive must make it reportable, got {:?}",
+        control
+    );
+}
+
+#[test]
+fn test_primitive_two_callee_levels_deep_still_protects() {
+    let content = r#"<?php
+function handler_a() {
+    check_permission();
+}
+
+function check_permission() {
+    guard();
+}
+
+function guard() {
+    current_user_can('manage_options');
+}
+"#;
+    let out = find_unprotected_hooks(content, &[reg("wp_ajax_x", "handler_a")], &php_primitives());
+    assert!(
+        out.is_empty(),
+        "depth 2 must reach the primitive, got {:?}",
+        out
+    );
+
+    // Control: the same chain with no primitive anywhere must be reported, so
+    // this test fails if the walk stops returning a verdict at all.
+    let chain_without = r#"<?php
+function handler_a() {
+    check_permission();
+}
+
+function check_permission() {
+    guard();
+}
+
+function guard() {
+    $wpdb->insert( $wpdb->prefix . 'x', array() );
+}
+"#;
+    let control = find_unprotected_hooks(
+        chain_without,
+        &[reg("wp_ajax_x", "handler_a")],
+        &php_primitives(),
+    );
+    assert_eq!(control.len(), 1, "got {:?}", control);
+}
+
+#[test]
+fn test_nopriv_entry_point_without_primitive_is_unauthenticated() {
+    let content = r#"<?php
+function save_item() {
+    $wpdb->insert( $wpdb->prefix . 'items', array( 'name' => $_POST['name'] ) );
+}
+"#;
+    let out = find_unprotected_hooks(
+        content,
+        &[reg("wp_ajax_nopriv_save_item", "save_item")],
+        &php_primitives(),
+    );
+    assert_eq!(out.len(), 1, "expected one unprotected hook, got {:?}", out);
+    assert!(
+        out[0].unauthenticated,
+        "wp_ajax_nopriv_ must be flagged unauthenticated"
+    );
+    assert_eq!(out[0].handler, "save_item");
+}
+
+#[test]
+fn test_authenticated_entry_point_without_primitive_is_not_unauthenticated() {
+    let content = r#"<?php
+function save_item() {
+    $wpdb->insert( $wpdb->prefix . 'items', array( 'name' => $_POST['name'] ) );
+}
+"#;
+    let out = find_unprotected_hooks(
+        content,
+        &[reg("wp_ajax_save_item", "save_item")],
+        &php_primitives(),
+    );
+    assert_eq!(out.len(), 1, "expected one unprotected hook, got {:?}", out);
+    assert!(
+        !out[0].unauthenticated,
+        "wp_ajax_ requires a logged-in user, so this is a CSRF surface, not an unauthenticated one"
+    );
+}
+
+#[test]
+fn test_same_handler_on_two_hooks_yields_two_severities() {
+    // One finding per handler, but severity comes from the hook. Two hooks on
+    // the same function are two different risks, so they must not collapse.
+    let content = r#"<?php
+function save_item() {
+    $wpdb->delete( $wpdb->prefix . 'items', array( 'id' => $_POST['id'] ) );
+}
+"#;
+    let out = find_unprotected_hooks(
+        content,
+        &[
+            reg("wp_ajax_save_item", "save_item"),
+            reg("wp_ajax_nopriv_save_item", "save_item"),
+        ],
+        &php_primitives(),
+    );
+    assert_eq!(out.len(), 2, "expected one finding per hook, got {:?}", out);
+    let unauth = out.iter().filter(|u| u.unauthenticated).count();
+    assert_eq!(unauth, 1, "exactly one of the two is unauthenticated");
+}
+
+#[test]
+fn test_primitive_in_the_handler_body_directly_protects() {
+    let content = r#"<?php
+function save_item() {
+    check_ajax_referer( 'save_item', 'nonce' );
+    $wpdb->insert( $wpdb->prefix . 'items', array() );
+}
+"#;
+    let out = find_unprotected_hooks(
+        content,
+        &[reg("wp_ajax_nopriv_save_item", "save_item")],
+        &php_primitives(),
+    );
+    assert!(
+        out.is_empty(),
+        "a primitive in the handler protects it, got {:?}",
+        out
+    );
+
+    // Control: same handler shape with the primitive removed, must be reported.
+    let stripped = r#"<?php
+function save_item() {
+    $wpdb->insert( $wpdb->prefix . 'items', array() );
+}
+"#;
+    let control = find_unprotected_hooks(
+        stripped,
+        &[reg("wp_ajax_nopriv_save_item", "save_item")],
+        &php_primitives(),
+    );
+    assert_eq!(control.len(), 1, "got {:?}", control);
+}
+
+#[test]
+fn test_handler_not_declared_in_this_file_is_not_reported() {
+    // The hook may point at a method or a function in another file. Reporting it
+    // here would be a finding with no evidence behind it.
+    let content = r#"<?php
+function unrelated() {
+    return 1;
+}
+"#;
+    let out = find_unprotected_hooks(
+        content,
+        &[reg("wp_ajax_nopriv_thing", "defined_elsewhere")],
+        &php_primitives(),
+    );
+    assert!(
+        out.is_empty(),
+        "an unresolvable handler must not be reported"
+    );
+}
+
+#[test]
+fn test_brace_inside_a_string_does_not_end_the_function_body() {
+    // The body has to be found by brace matching with lexical state, not by a
+    // regex: a `}` inside a string would truncate it, and the check would then
+    // look at a fragment and miss the primitive that follows.
+    let content = r#"<?php
+function save_item() {
+    $msg = "a closing brace } is not the end";
+    check_ajax_referer( 'save_item', 'nonce' );
+    $wpdb->insert( $wpdb->prefix . 'items', array() );
+}
+"#;
+    let out = find_unprotected_hooks(
+        content,
+        &[reg("wp_ajax_nopriv_save_item", "save_item")],
+        &php_primitives(),
+    );
+    assert!(
+        out.is_empty(),
+        "a `}}` inside a string literal must not truncate the body, got {:?}",
+        out
+    );
+}
+
+#[test]
+fn test_handler_line_is_the_declaration_line() {
+    let content = "<?php\n\nfunction save_item() {\n    do_something();\n}\n";
+    let out = find_unprotected_hooks(
+        content,
+        &[reg("wp_ajax_nopriv_save_item", "save_item")],
+        &php_primitives(),
+    );
+    assert_eq!(out.len(), 1);
+    assert_eq!(out[0].line, 3, "the finding must point at the declaration");
+}
+
+#[test]
+fn test_no_primitives_configured_reports_nothing() {
+    // With no primitives for the language there is nothing to be missing, and
+    // reporting anyway would flood a scan that simply did not opt in.
+    let content = "<?php\nfunction save_item() { $wpdb->insert('x'); }\n";
+    let out = find_unprotected_hooks(content, &[reg("wp_ajax_nopriv_x", "save_item")], &[]);
+    assert!(
+        out.is_empty(),
+        "no primitives configured must mean no findings"
+    );
+}
 
 /// Helper to build a WordPress PHP hook config matching the preset
 fn wp_php_config() -> HookRegistryLanguageConfig {
@@ -99,8 +383,16 @@ fn test_hook_map_round_trip_and_missing_file() {
     let tempdir = TempDir::new().expect("Failed to create temp dir");
     let path = tempdir.path().join("hook_map.json");
 
+    // Keyed by file path, as in production: the value is the list of hook
+    // registrations found in that file, each carrying its hook name.
     let mut map = HashMap::new();
-    map.insert("wp_ajax_test".to_string(), vec!["test_handler".to_string()]);
+    map.insert(
+        "/wp-content/plugins/x.php".to_string(),
+        vec![HookRegistration {
+            hook: "wp_ajax_test".to_string(),
+            handler: "test_handler".to_string(),
+        }],
+    );
 
     // Save
     hook_registry::save_hook_map(&path, &map).expect("Failed to save hook map");
@@ -109,8 +401,19 @@ fn test_hook_map_round_trip_and_missing_file() {
     let loaded = hook_registry::load_hook_map(&path);
     assert_eq!(loaded.len(), 1);
     assert_eq!(
-        loaded.get("wp_ajax_test").unwrap(),
-        &vec!["test_handler".to_string()]
+        loaded.get("/wp-content/plugins/x.php").unwrap(),
+        &vec![HookRegistration {
+            hook: "wp_ajax_test".to_string(),
+            handler: "test_handler".to_string(),
+        }]
+    );
+
+    // The hook name has to survive the round trip: it is what separates an
+    // authenticated entry point from an unauthenticated one, and the primitive
+    // check sets severity from it.
+    assert_eq!(
+        loaded.get("/wp-content/plugins/x.php").unwrap()[0].hook,
+        "wp_ajax_test"
     );
 
     // Missing file → empty map
@@ -136,7 +439,13 @@ fn test_corrupt_hook_map_does_not_panic_and_leaves_no_temporary_behind() {
 
     // The atomic write must not leave its temporary next to the target.
     let mut map = HashMap::new();
-    map.insert("wp_ajax_b".to_string(), vec!["handler_b".to_string()]);
+    map.insert(
+        "/b.php".to_string(),
+        vec![HookRegistration {
+            hook: "wp_ajax_b".to_string(),
+            handler: "handler_b".to_string(),
+        }],
+    );
     hook_registry::save_hook_map(&path, &map).expect("Failed to save over a corrupt file");
 
     let reloaded = hook_registry::load_hook_map(&path);
@@ -165,17 +474,29 @@ fn test_hook_map_save_replaces_a_populated_file() {
     let path = tempdir.path().join("hook_map.json");
 
     let mut first = HashMap::new();
-    first.insert("wp_ajax_old".to_string(), vec!["old_handler".to_string()]);
+    first.insert(
+        "/old.php".to_string(),
+        vec![HookRegistration {
+            hook: "wp_ajax_old".to_string(),
+            handler: "old_handler".to_string(),
+        }],
+    );
     hook_registry::save_hook_map(&path, &first).expect("Failed to save first map");
 
     let mut second = HashMap::new();
-    second.insert("wp_ajax_new".to_string(), vec!["new_handler".to_string()]);
+    second.insert(
+        "/new.php".to_string(),
+        vec![HookRegistration {
+            hook: "wp_ajax_new".to_string(),
+            handler: "new_handler".to_string(),
+        }],
+    );
     hook_registry::save_hook_map(&path, &second).expect("Failed to save second map");
 
     let loaded = hook_registry::load_hook_map(&path);
     assert_eq!(loaded.len(), 1, "the second save must replace, not merge");
     assert!(
-        loaded.contains_key("wp_ajax_new"),
+        loaded.contains_key("/new.php"),
         "the new map must be what survives, got {:?}",
         loaded
     );
@@ -214,12 +535,18 @@ fn test_priority_boost_for_hook_files() {
     };
 
     let priority = PriorityConfig::default();
-    let hook_map_with_entry: HashMap<String, Vec<String>> = {
+    let hook_map_with_entry: HashMap<String, Vec<HookRegistration>> = {
         let mut m = HashMap::new();
-        m.insert("src/handler.php".to_string(), vec!["handler".to_string()]);
+        m.insert(
+            "src/handler.php".to_string(),
+            vec![HookRegistration {
+                hook: "wp_ajax_save".to_string(),
+                handler: "handler".to_string(),
+            }],
+        );
         m
     };
-    let hook_map_empty: HashMap<String, Vec<String>> = HashMap::new();
+    let hook_map_empty: HashMap<String, Vec<HookRegistration>> = HashMap::new();
 
     let score_with = compute_file_priority_score(&file, &priority, &hook_map_with_entry);
     let score_without = compute_file_priority_score(&file, &priority, &hook_map_empty);

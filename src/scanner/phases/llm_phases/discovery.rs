@@ -344,13 +344,13 @@ pub async fn run_llm_discovery(
                     crate::hook_registry::load_hook_map(&crate::hook_registry::hook_map_path(
                         std::path::PathBuf::from(&config.output.dir).as_path(),
                     ));
-                if let Some(handlers) = hook_map.get(&finding.file_path) {
-                    if !handlers.is_empty() {
+                if let Some(registrations) = hook_map.get(&finding.file_path) {
+                    if !registrations.is_empty() {
                         user_prompt
                             .push_str("\n\n=== REGISTERED ENTRY POINT HOOKS (this file) ===\n");
                         user_prompt.push_str("This file registers these request entry points:\n");
-                        for handler in handlers {
-                            user_prompt.push_str(&format!("- {}\n", handler));
+                        for reg in registrations {
+                            user_prompt.push_str(&format!("- {} -> {}\n", reg.hook, reg.handler));
                         }
                         user_prompt.push_str("Treat these handlers as reachable via HTTP requests when reasoning about reachability and attack surface.");
                     }

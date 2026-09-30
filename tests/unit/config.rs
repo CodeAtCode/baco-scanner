@@ -188,8 +188,6 @@ fn test_parse_full_config() {
         exclude_paths = ["tests/", "vendor/", "node_modules/"]
 
         [scanner.semgrep]
-        enabled = true
-        cache_dir = "/tmp/semgrep-cache"
         exclude_rules = ["rust-security.insecure-crypto"]
 
         [scanner.performance]
@@ -226,13 +224,11 @@ fn test_parse_full_config() {
         system_type = "github"
         url = "https://github.com/example/repo"
         api_key = "ghp-test"
-        project = "example"
 
         [[tickets.systems]]
         system_type = "jira"
         url = "https://example.atlassian.net"
         api_key = "jira-token"
-        project = "SEC"
 
         [agent]
         enabled = true
@@ -500,7 +496,6 @@ fn test_ticket_env_overrides_github() {
         [[tickets.systems]]
         system_type = "github"
         url = "https://github.com/org/repo"
-        project = "myproject"
     "#;
 
     let mut config: ScannerConfig = toml::from_str(toml_str).unwrap();
@@ -551,7 +546,6 @@ fn test_ticket_env_overrides_gitlab() {
         [[tickets.systems]]
         system_type = "gitlab"
         url = "https://gitlab.com/group/project"
-        project = "myproject"
     "#;
 
     let mut config: ScannerConfig = toml::from_str(toml_str).unwrap();
@@ -603,7 +597,6 @@ fn test_ticket_env_overrides_explicit_takes_precedence() {
         system_type = "github"
         url = "https://github.com/org/repo"
         api_key = "explicit-token"
-        project = "myproject"
     "#;
 
     let mut config: ScannerConfig = toml::from_str(toml_str).unwrap();
@@ -654,7 +647,6 @@ fn test_ticket_env_overrides_no_env_var() {
         [[tickets.systems]]
         system_type = "github"
         url = "https://github.com/org/repo"
-        project = "myproject"
     "#;
 
     let mut config: ScannerConfig = toml::from_str(toml_str).unwrap();
@@ -702,7 +694,6 @@ fn test_ticket_env_overrides_unknown_system_type() {
         [[tickets.systems]]
         system_type = "jira"
         url = "https://company.atlassian.net"
-        project = "SEC"
     "#;
 
     let mut config: ScannerConfig = toml::from_str(toml_str).unwrap();
@@ -752,12 +743,10 @@ fn test_ticket_env_overrides_multiple_systems() {
         [[tickets.systems]]
         system_type = "github"
         url = "https://github.com/org/repo"
-        project = "github-project"
 
         [[tickets.systems]]
         system_type = "gitlab"
         url = "https://gitlab.com/group/project"
-        project = "gitlab-project"
     "#;
 
     let mut config: ScannerConfig = toml::from_str(toml_str).unwrap();
@@ -814,12 +803,10 @@ fn test_ticket_env_overrides_mixed_explicit_and_env() {
         system_type = "github"
         url = "https://github.com/org/repo"
         api_key = "explicit-github-token"
-        project = "github-project"
 
         [[tickets.systems]]
         system_type = "gitlab"
         url = "https://gitlab.com/group/project"
-        project = "gitlab-project"
     "#;
 
     let mut config: ScannerConfig = toml::from_str(toml_str).unwrap();
@@ -878,7 +865,6 @@ fn test_ticket_env_overrides_invalid_system_type_ignored() {
         [[tickets.systems]]
         system_type = "unknown_system"
         url = "https://unknown.example.com"
-        project = "unknown-project"
     "#;
 
     let mut config: ScannerConfig = toml::from_str(toml_str).unwrap();
@@ -976,6 +962,104 @@ fn test_eval_floor_custom() {
 // ============================================================================
 // Validation Tests
 // ============================================================================
+
+#[test]
+fn test_unknown_config_key_is_rejected_with_its_name() {
+    // deny_unknown_fields is the chokepoint: a config key that no struct owns
+    // used to parse cleanly and then do nothing, which is how 17 phantom keys
+    // survived. It has to fail here, and it has to name the key, because a user
+    // who mistypes or carries over a removed key gets no other signal.
+    let toml_str = r#"
+        [project]
+        name = "x"
+        path = "/tmp"
+
+        [output]
+        dir = "./out"
+
+        [scanner]
+        max_file_size_kb = 100
+
+        [llm]
+        timeout_secs = 30
+        max_retries = 2
+        retry_backoff_ms = 1000
+
+        [llm.phases.discovery]
+        base_url = "http://test"
+        api_key = "k"
+        model = "test"
+
+        [llm.phases.verification]
+        base_url = "http://test"
+        model = "test"
+
+        [llm.phases.aggregation]
+        base_url = "http://test"
+        model = "test"
+
+        [a_section_that_does_not_exist]
+        whatever = 1
+    "#;
+    let err = toml::from_str::<ScannerConfig>(toml_str)
+        .expect_err("an unknown top-level section must be rejected");
+    let msg = format!("{err}");
+    assert!(
+        msg.contains("a_section_that_does_not_exist"),
+        "the error must name the offending key, got: {msg}"
+    );
+}
+
+#[test]
+fn test_unknown_nested_key_is_rejected_with_its_name() {
+    // Same guarantee one level down. A nested key is the case that actually bit
+    // the presets: `[scanner.semgrep] enabled` parsed for years because
+    // SemgrepSettings has rulesets, exclude_rules and custom_rules, and no
+    // `enabled` to complain about.
+    let toml_str = r#"
+        [project]
+        name = "x"
+        path = "/tmp"
+
+        [output]
+        dir = "./out"
+
+        [scanner]
+        max_file_size_kb = 100
+
+        [scanner.semgrep]
+        enabled = true
+
+        [llm]
+        timeout_secs = 30
+        max_retries = 2
+        retry_backoff_ms = 1000
+
+        [llm.phases.discovery]
+        base_url = "http://test"
+        api_key = "k"
+        model = "test"
+
+        [llm.phases.verification]
+        base_url = "http://test"
+        model = "test"
+
+        [llm.phases.aggregation]
+        base_url = "http://test"
+        model = "test"
+    "#;
+    let err = toml::from_str::<ScannerConfig>(toml_str)
+        .expect_err("an unknown nested key must be rejected");
+    let msg = format!("{err}");
+    assert!(
+        msg.contains("enabled"),
+        "the error must name the offending nested key, got: {msg}"
+    );
+    assert!(
+        msg.contains("rulesets"),
+        "the error must list the keys the section does accept, got: {msg}"
+    );
+}
 
 #[test]
 fn test_prompt_overrides_reject_phases_that_never_read_them() {

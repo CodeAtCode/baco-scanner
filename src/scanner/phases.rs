@@ -6,7 +6,7 @@ use crate::llm::metrics::LlmMetricsTracker;
 use indicatif::ProgressBar;
 
 pub mod llm_phases;
-mod other_phases;
+pub mod other_phases;
 
 /// Configuration for run_phase execution
 pub struct PhaseConfig<'a> {

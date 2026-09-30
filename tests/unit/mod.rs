@@ -163,6 +163,7 @@ mod pipeline_test_helpers;
 mod pipeline_tests;
 mod poc_compiler_tests;
 mod poc_generation_tests;
+mod preset_from_config_tests;
 mod preset_tests;
 mod project_type;
 mod prompt_test_fixtures;

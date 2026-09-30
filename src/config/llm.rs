@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct LlmConfig {
     /// Global endpoint used by any phase without its own `base_url`.
     #[serde(default)]
@@ -36,6 +37,7 @@ fn default_enable_llm_cache() -> bool {
 
 /// Pricing for a specific LLM model (per 1K tokens)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct ModelPricing {
     /// Cost per 1K prompt tokens (in USD or currency unit of choice)
     #[serde(default)]
@@ -54,6 +56,7 @@ impl ModelPricing {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct LlmPhasesConfig {
     #[serde(default)]
     pub discovery: LlmPhaseConfig,
@@ -74,6 +77,7 @@ pub struct LlmPhasesConfig {
 impl LlmPhasesConfig {}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct LlmPhaseConfig {
     #[serde(default)]
     pub base_url: String,
@@ -107,6 +111,7 @@ impl LlmPhaseConfig {
 
 /// AgentFlow phase configuration
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct AgentFlowPhaseConfig {
     /// Gate: run AgentFlow harness synthesis
     #[serde(default)]
@@ -121,12 +126,14 @@ fn default_agent_flow_max_iterations() -> u32 {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct PromptOverrides {
     #[serde(default, rename = "phases")]
     pub phase_overrides: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct AgentConfig {
     #[serde(default)]
     pub enabled: bool,

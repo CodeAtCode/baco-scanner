@@ -51,7 +51,15 @@ fn test_missing_file() {
     assert_eq!(report.checked, 1);
     assert_eq!(report.passed, 0);
     assert_eq!(report.failed, 1);
-    assert_eq!(findings[0].confidence_score, original_confidence * 0.5);
+    assert_eq!(
+        findings[0].verification_status,
+        Some(baco::findings::VerificationStatus::Failed),
+        "a citation that does not resolve must be marked Failed"
+    );
+    assert_eq!(
+        findings[0].confidence_score, original_confidence,
+        "the model's own confidence must not be scaled by a constant"
+    );
     assert!(findings[0].verification_notes.is_some());
     assert!(
         findings[0]
@@ -79,7 +87,15 @@ fn test_line_beyond_eof() {
     assert_eq!(report.checked, 1);
     assert_eq!(report.passed, 0);
     assert_eq!(report.failed, 1);
-    assert_eq!(findings[0].confidence_score, original_confidence * 0.5);
+    assert_eq!(
+        findings[0].verification_status,
+        Some(baco::findings::VerificationStatus::Failed),
+        "a citation that does not resolve must be marked Failed"
+    );
+    assert_eq!(
+        findings[0].confidence_score, original_confidence,
+        "the model's own confidence must not be scaled by a constant"
+    );
     assert!(findings[0].verification_notes.is_some());
     assert!(
         findings[0]
@@ -210,7 +226,15 @@ fn test_path_traversal_rejection() {
     assert_eq!(report.checked, 1);
     assert_eq!(report.passed, 0);
     assert_eq!(report.failed, 1);
-    assert_eq!(findings[0].confidence_score, original_confidence * 0.5);
+    assert_eq!(
+        findings[0].verification_status,
+        Some(baco::findings::VerificationStatus::Failed),
+        "a citation that does not resolve must be marked Failed"
+    );
+    assert_eq!(
+        findings[0].confidence_score, original_confidence,
+        "the model's own confidence must not be scaled by a constant"
+    );
     assert!(findings[0].verification_notes.is_some());
 }
 
@@ -233,7 +257,15 @@ fn test_absolute_path_rejection() {
     assert_eq!(report.checked, 1);
     assert_eq!(report.passed, 0);
     assert_eq!(report.failed, 1);
-    assert_eq!(findings[0].confidence_score, original_confidence * 0.5);
+    assert_eq!(
+        findings[0].verification_status,
+        Some(baco::findings::VerificationStatus::Failed),
+        "a citation that does not resolve must be marked Failed"
+    );
+    assert_eq!(
+        findings[0].confidence_score, original_confidence,
+        "the model's own confidence must not be scaled by a constant"
+    );
 }
 
 #[test]
@@ -315,7 +347,15 @@ fn test_line_number_zero() {
     assert_eq!(report.checked, 1);
     assert_eq!(report.passed, 0);
     assert_eq!(report.failed, 1);
-    assert_eq!(findings[0].confidence_score, original_confidence * 0.5);
+    assert_eq!(
+        findings[0].verification_status,
+        Some(baco::findings::VerificationStatus::Failed),
+        "a citation that does not resolve must be marked Failed"
+    );
+    assert_eq!(
+        findings[0].confidence_score, original_confidence,
+        "the model's own confidence must not be scaled by a constant"
+    );
 }
 
 #[test]
@@ -359,7 +399,15 @@ fn test_line_one_beyond_eof() {
     assert_eq!(report.checked, 1);
     assert_eq!(report.passed, 0);
     assert_eq!(report.failed, 1);
-    assert_eq!(findings[0].confidence_score, original_confidence * 0.5);
+    assert_eq!(
+        findings[0].verification_status,
+        Some(baco::findings::VerificationStatus::Failed),
+        "a citation that does not resolve must be marked Failed"
+    );
+    assert_eq!(
+        findings[0].confidence_score, original_confidence,
+        "the model's own confidence must not be scaled by a constant"
+    );
     assert!(
         findings[0]
             .verification_notes

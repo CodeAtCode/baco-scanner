@@ -3,6 +3,7 @@ use std::collections::HashMap;
 
 /// Per-language hook registry configuration
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct HookRegistryLanguageConfig {
     /// Label used to synthesize hook names when the registration pattern lacks a `hook` named capture
     #[serde(default = "default_hook_label")]
@@ -21,6 +22,7 @@ fn default_hook_label() -> String {
 
 /// Knowledge configuration: per-CWE false-positive indicator patterns
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct KnowledgeConfig {
     /// CWE id ("CWE-79") -> literal code substrings indicating a likely false positive
     #[serde(default)]

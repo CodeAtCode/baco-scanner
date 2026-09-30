@@ -1,6 +1,6 @@
 mod confidence_aggregation;
 mod cwe_routing;
-mod indexing;
+pub mod indexing;
 mod patching;
 mod semgrep;
 mod synthesis;
