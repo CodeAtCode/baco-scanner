@@ -331,20 +331,24 @@ pub struct ChunkRange {
     pub text: String,
 }
 
-/// Map a reported line to an absolute file line.
+/// Map a reported line to an absolute file line, or `None` when it does not map.
 ///
 /// Models sometimes echo the prompt's annotated absolute range and sometimes
-/// count from 1 within the excerpt; treat an in-range value as absolute, a
-/// chunk-relative value as offset by `start_line`, and clamp the rest.
-pub fn map_chunk_line(reported: i64, start_line: usize, end_line: usize) -> u32 {
+/// count from 1 within the excerpt, so both are accepted. A value that fits
+/// neither has no honest answer: clamping it to the start of the chunk puts the
+/// finding on the first line of a region the model was looking at somewhere
+/// else, which reads as a precise citation and points at a different function.
+/// `None` says what the previous version would not -- that the position is not
+/// known.
+pub fn map_chunk_line(reported: i64, start_line: usize, end_line: usize) -> Option<u32> {
     let start = start_line as i64;
     let end = end_line as i64;
     if reported >= start && reported <= end {
-        reported.max(1) as u32
+        Some(reported.max(1) as u32)
     } else if reported >= 1 && reported + start - 1 <= end {
-        (reported + start - 1) as u32
+        Some((reported + start - 1) as u32)
     } else {
-        start.max(1) as u32
+        None
     }
 }
 
@@ -771,17 +775,38 @@ impl LlmAnalyzer {
             };
 
             match parsed {
-                Ok(mut findings) => {
-                    for finding in &mut findings {
+                Ok(findings) => {
+                    // A finding whose line cannot be placed in the file keeps a
+                    // null line rather than being moved to the start of the
+                    // chunk: a wrong line is worse than an absent one, because
+                    // a reader trusts it and it names the wrong function.
+                    let (placed, unplaceable): (Vec<_>, Vec<_>) =
+                        findings.into_iter().partition(|f| match f.line_number {
+                            None => true,
+                            Some(line) => {
+                                map_chunk_line(i64::from(line), chunk.start_line, chunk.end_line)
+                                    .is_some()
+                            }
+                        });
+                    if !unplaceable.is_empty() {
+                        tracing::warn!(
+                            "{} of {} findings for chunk {}:{}-{} reported a line \
+                             outside the chunk; kept without a line number",
+                            unplaceable.len(),
+                            placed.len() + unplaceable.len(),
+                            file_path,
+                            chunk.start_line,
+                            chunk.end_line,
+                        );
+                    }
+                    let mut placed = placed;
+                    for finding in &mut placed {
                         if let Some(line) = finding.line_number {
-                            finding.line_number = Some(map_chunk_line(
-                                i64::from(line),
-                                chunk.start_line,
-                                chunk.end_line,
-                            ));
+                            finding.line_number =
+                                map_chunk_line(i64::from(line), chunk.start_line, chunk.end_line);
                         }
                     }
-                    all_findings.extend(findings);
+                    all_findings.extend(placed);
                 }
                 Err(e) => {
                     tracing::warn!(

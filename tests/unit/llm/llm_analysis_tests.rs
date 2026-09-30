@@ -597,12 +597,14 @@ fn chunk_file_with_ranges_unknown_language_empty() {
     assert!(chunks.is_empty());
 }
 #[test]
-fn map_chunk_line_absolute_relative_and_clamped() {
+fn map_chunk_line_absolute_relative_and_refused() {
     use baco::llm_analysis::map_chunk_line;
-    assert_eq!(map_chunk_line(15, 10, 20), 15);
-    assert_eq!(map_chunk_line(3, 10, 20), 12);
-    assert_eq!(map_chunk_line(99, 10, 20), 10);
-    assert_eq!(map_chunk_line(0, 10, 20), 10);
+    assert_eq!(map_chunk_line(15, 10, 20), Some(15));
+    assert_eq!(map_chunk_line(3, 10, 20), Some(12));
+    // Past the chunk, and 0: neither maps, and inventing a line is what this
+    // function used to do instead of admitting it did not know.
+    assert_eq!(map_chunk_line(99, 10, 20), None);
+    assert_eq!(map_chunk_line(0, 10, 20), None);
 }
 #[tokio::test]
 async fn analyze_file_chunked_path_with_mockito() {

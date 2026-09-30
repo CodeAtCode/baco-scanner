@@ -178,19 +178,52 @@ fn language_for_extension_maps_bundled_chunkers() {
 
 #[test]
 fn map_chunk_line_treats_in_range_as_absolute() {
-    assert_eq!(baco::llm_analysis::map_chunk_line(150, 100, 200), 150);
-    assert_eq!(baco::llm_analysis::map_chunk_line(100, 100, 200), 100);
-    assert_eq!(baco::llm_analysis::map_chunk_line(200, 100, 200), 200);
+    assert_eq!(baco::llm_analysis::map_chunk_line(150, 100, 200), Some(150));
+    assert_eq!(baco::llm_analysis::map_chunk_line(100, 100, 200), Some(100));
+    assert_eq!(baco::llm_analysis::map_chunk_line(200, 100, 200), Some(200));
 }
 
 #[test]
 fn map_chunk_line_offsets_relative_reports() {
-    assert_eq!(baco::llm_analysis::map_chunk_line(1, 100, 200), 100);
-    assert_eq!(baco::llm_analysis::map_chunk_line(50, 100, 200), 149);
+    assert_eq!(baco::llm_analysis::map_chunk_line(1, 100, 200), Some(100));
+    assert_eq!(baco::llm_analysis::map_chunk_line(50, 100, 200), Some(149));
 }
 
 #[test]
-fn map_chunk_line_clamps_out_of_range() {
-    assert_eq!(baco::llm_analysis::map_chunk_line(500, 100, 200), 100);
-    assert_eq!(baco::llm_analysis::map_chunk_line(0, 100, 200), 100);
+fn map_chunk_line_refuses_to_invent_a_line() {
+    // The previous version returned the chunk's first line for anything it
+    // could not place, which is a precise-looking citation pointing at a
+    // different function than the one the model was reading. A value that fits
+    // neither the absolute nor the chunk-relative reading has no honest answer.
+    assert_eq!(
+        baco::llm_analysis::map_chunk_line(500, 100, 200),
+        None,
+        "a line past the chunk must not be clamped to its start"
+    );
+    assert_eq!(
+        baco::llm_analysis::map_chunk_line(0, 100, 200),
+        None,
+        "line 0 is 1-indexed and cannot map"
+    );
+    assert_eq!(
+        baco::llm_analysis::map_chunk_line(-5, 100, 200),
+        None,
+        "a negative report cannot map"
+    );
+}
+
+#[test]
+fn map_chunk_line_absolute_reading_wins_the_overlap() {
+    // In [start, start+1] both readings are plausible: 101 is the absolute line
+    // 101, and the relative line 1 of a chunk starting at 100. The absolute
+    // reading is tried first, so the overlap resolves to it deterministically
+    // rather than depending on which branch is written first.
+    assert_eq!(
+        baco::llm_analysis::map_chunk_line(101, 100, 200),
+        Some(101),
+        "the absolute reading must win the overlap"
+    );
+    assert_eq!(baco::llm_analysis::map_chunk_line(1, 100, 200), Some(100));
+    // Just below the overlap the relative reading is the only one available.
+    assert_eq!(baco::llm_analysis::map_chunk_line(99, 100, 200), Some(198));
 }
