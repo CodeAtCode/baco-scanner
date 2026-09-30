@@ -49,7 +49,11 @@ pub async fn run_semgrep(
             Ok((findings, analyzed_files.to_vec()))
         }
         Err(e) => {
-            // Loud failure: emit error and record that semgrep failed
+            // The scan continues: the orchestrator keeps the findings gathered
+            // by the phases that did run. But the failure is propagated rather
+            // than folded into a success, so the health report can say this
+            // phase died. Returning Ok here is what made a dead Semgrep run
+            // indistinguishable from a clean target.
             tracing::error!("Semgrep phase failed: {}", e);
             pb.set_message(format!(
                 "Phase {}/{}: Semgrep failed - see error log",
@@ -57,8 +61,11 @@ pub async fn run_semgrep(
             ));
             pb.set_position(pb.position() + 100);
 
-            // Return findings as-is (do not abort scan)
-            Ok((findings, analyzed_files.to_vec()))
+            Err(crate::error::ScanError::Phase {
+                message: e,
+                phase: "semgrep".to_string(),
+                source: None,
+            })
         }
     }
 }

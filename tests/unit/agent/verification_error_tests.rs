@@ -25,7 +25,6 @@ fn create_session(
         enabled: false,
         max_turns,
         tool_timeout_secs,
-        trusted_paths: vec![],
     };
     let tmpdir = tempfile::tempdir().unwrap();
     let progress_cb: ProgressCallback = Arc::new(|_| {});

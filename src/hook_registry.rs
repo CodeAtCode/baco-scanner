@@ -115,22 +115,60 @@ pub fn hook_map_path(output_dir: &Path) -> PathBuf {
 }
 
 /// Save hook map to JSON file
+///
+/// Writes to a sibling temporary file and renames it into place. A plain
+/// `fs::write` truncates the target first, so an interrupted scan left a
+/// half-written file that then deserialised to an empty map on resume.
 pub fn save_hook_map(path: &Path, map: &HashMap<String, Vec<String>>) -> std::io::Result<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
     let json = serde_json::to_string_pretty(map).map_err(std::io::Error::other)?;
-    std::fs::write(path, json)
+
+    let tmp = path.with_extension("json.tmp");
+    std::fs::write(&tmp, json)?;
+    match std::fs::rename(&tmp, path) {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            // Do not leave the temporary behind on a failed rename.
+            let _ = std::fs::remove_file(&tmp);
+            Err(e)
+        }
+    }
 }
 
 /// Load hook map from JSON file
-/// Missing file returns empty map
+///
+/// A missing file is legitimately empty. A file that exists but cannot be read
+/// or parsed is a different condition: it used to come back as an empty map
+/// with no warning, so a corrupt map -- which an interrupted save could
+/// produce -- silently erased every registered entry point from the scan.
 pub fn load_hook_map(path: &Path) -> HashMap<String, Vec<String>> {
     if !path.exists() {
         return HashMap::new();
     }
-    match std::fs::read_to_string(path) {
-        Ok(content) => serde_json::from_str(&content).unwrap_or_else(|_| HashMap::new()),
-        Err(_) => HashMap::new(),
+    let content = match std::fs::read_to_string(path) {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::warn!(
+                "Hook map at {} could not be read ({}); proceeding with no hooks. \
+                 Registered entry points will be missing from this scan.",
+                path.display(),
+                e
+            );
+            return HashMap::new();
+        }
+    };
+    match serde_json::from_str(&content) {
+        Ok(map) => map,
+        Err(e) => {
+            tracing::warn!(
+                "Hook map at {} is not valid JSON ({}); proceeding with no hooks. \
+                 Registered entry points will be missing from this scan.",
+                path.display(),
+                e
+            );
+            HashMap::new()
+        }
     }
 }

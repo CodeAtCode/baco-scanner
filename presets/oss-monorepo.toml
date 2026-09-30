@@ -39,7 +39,6 @@ exclude_paths = [
 ]
 
 [scanner.performance]
-enable_incremental_scan = true
 
 [llm]
 enable_llm_cache = true
@@ -101,11 +100,5 @@ sink_patterns = [
 [budget]
 enabled = true
 max_llm_calls = 1000
-
-[agent_flow]
-enabled = false
-requires_instrumented_target = false
-
 [agent]
 enabled = false
-trusted_paths = []

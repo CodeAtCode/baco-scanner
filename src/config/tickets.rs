@@ -12,6 +12,4 @@ pub struct TicketSystemConfig {
     pub url: String,
     #[serde(default)]
     pub api_key: Option<String>,
-    #[serde(default)]
-    pub project: Option<String>,
 }

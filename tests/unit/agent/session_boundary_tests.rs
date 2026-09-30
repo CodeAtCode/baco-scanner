@@ -27,7 +27,6 @@ fn create_session(mock_client: MockLlmClient, max_turns: u32) -> (AgentSession, 
         enabled: false,
         max_turns,
         tool_timeout_secs: 30,
-        trusted_paths: vec![],
     };
     let tmpdir = tempfile::tempdir().unwrap();
     let progress_cb: ProgressCallback = Arc::new(|_| {});

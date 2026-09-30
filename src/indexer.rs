@@ -26,16 +26,8 @@ impl FileIndex {
         languages: &[String],
         max_size: u64,
         excludes: &[String],
-        enable_file_filtering: bool,
     ) -> Result<Self, std::io::Error> {
-        Self::index_project_with_incremental(
-            project_path,
-            languages,
-            max_size,
-            excludes,
-            None,
-            enable_file_filtering,
-        )
+        Self::index_project_with_incremental(project_path, languages, max_size, excludes, None)
     }
 
     pub fn index_project_with_incremental(
@@ -44,7 +36,6 @@ impl FileIndex {
         max_size: u64,
         excludes: &[String],
         previous_hash_store: Option<FileHashStore>,
-        _enable_file_filtering: bool,
     ) -> Result<Self, std::io::Error> {
         let mut files = Vec::new();
         let mut total_size = 0u64;
@@ -143,7 +134,6 @@ impl FileIndex {
         max_size: u64,
         excludes: &[String],
         pb: Option<&indicatif::ProgressBar>,
-        enable_file_filtering: bool,
     ) -> Result<(Self, FileHashStore), std::io::Error> {
         if !std::path::Path::new(project_path).exists() {
             tracing::error!("\u{1B}[31m[INDEXING]\u{1B}[0m ERROR: Path does not exist!");
@@ -157,7 +147,6 @@ impl FileIndex {
         let mut total_size = 0u64;
 
         let lang_extensions = get_language_extensions(languages);
-        let _enable_file_filtering = enable_file_filtering; // Capture parameter for use in loop
 
         // Canonicalize the scan root once for symlink containment check
         let canonical_root =

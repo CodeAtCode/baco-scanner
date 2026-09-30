@@ -56,7 +56,6 @@ fn test_index_project_single_file() {
         &["c".to_string()],
         1024 * 1024,
         &[],
-        false,
     )
     .unwrap();
 
@@ -74,7 +73,6 @@ fn test_index_project_empty_directory() {
         &["c".to_string()],
         1024 * 1024,
         &[],
-        false,
     )
     .unwrap();
 
@@ -111,7 +109,6 @@ fn test_index_project_multiple_languages() {
         ],
         1024 * 1024,
         &[],
-        false,
     )
     .unwrap();
 
@@ -131,7 +128,6 @@ fn test_index_project_excludes_non_matching_extensions() {
         &["c".to_string()],
         1024 * 1024,
         &[],
-        false,
     )
     .unwrap();
 
@@ -153,7 +149,6 @@ fn test_index_project_with_excludes() {
         &["c".to_string()],
         1024 * 1024,
         &["tests/".to_string()],
-        false,
     )
     .unwrap();
 
@@ -173,7 +168,6 @@ fn test_index_project_over_size_limit() {
         &["c".to_string()],
         1000,
         &[],
-        false,
     )
     .unwrap();
 
@@ -187,7 +181,6 @@ fn test_index_project_invalid_path() {
         &["c".to_string()],
         1024 * 1024,
         &[],
-        false,
     );
 
     assert!(result.is_err());
@@ -209,7 +202,6 @@ fn test_index_project_subdirectories() {
         &["c".to_string()],
         1024 * 1024,
         &[],
-        false,
     )
     .unwrap();
 
@@ -361,7 +353,6 @@ fn test_total_size_calculated_correctly() {
         &["c".to_string()],
         1024 * 1024,
         &[],
-        false,
     )
     .unwrap();
 
@@ -388,7 +379,6 @@ fn test_index_cpp_extensions() {
         &["cpp".to_string()],
         1024 * 1024,
         &[],
-        false,
     )
     .unwrap();
 
@@ -414,7 +404,6 @@ fn test_index_typescript_extensions() {
         &["typescript".to_string()],
         1024 * 1024,
         &[],
-        false,
     )
     .unwrap();
 
@@ -440,7 +429,6 @@ fn test_index_javascript_extensions() {
         &["javascript".to_string()],
         1024 * 1024,
         &[],
-        false,
     )
     .unwrap();
 
@@ -465,7 +453,6 @@ fn test_index_csharp_extension() {
         &["csharp".to_string()],
         1024 * 1024,
         &[],
-        false,
     )
     .unwrap();
 
@@ -491,7 +478,6 @@ fn test_index_excludes_case_insensitive() {
         &["c".to_string()],
         1024 * 1024,
         &["tests/".to_string()],
-        false,
     )
     .unwrap();
 
@@ -552,7 +538,6 @@ fn test_index_single_file() {
         &["c".to_string()],
         1024 * 1024,
         &[],
-        true,
     )
     .unwrap();
 
@@ -575,7 +560,6 @@ fn test_index_empty_directory() {
         &["c".to_string()],
         1024 * 1024,
         &[],
-        true,
     )
     .unwrap();
 
@@ -621,7 +605,6 @@ fn test_index_multiple_files() {
         ],
         1024 * 1024,
         &[],
-        true,
     )
     .unwrap();
 
@@ -647,7 +630,6 @@ fn test_index_excludes_directories() {
         &["c".to_string()],
         1024 * 1024,
         &[],
-        true,
     )
     .unwrap();
 
@@ -664,14 +646,8 @@ fn test_index_over_size_limit() {
     let large_file = temp_dir.join("large.c");
     std::fs::write(&large_file, "0".repeat(2000).as_str()).unwrap();
 
-    let index = FileIndex::index_project(
-        temp_dir.to_str().unwrap(),
-        &["c".to_string()],
-        1000,
-        &[],
-        false,
-    )
-    .unwrap();
+    let index = FileIndex::index_project(temp_dir.to_str().unwrap(), &["c".to_string()], 1000, &[])
+        .unwrap();
 
     assert_eq!(index.files.len(), 0);
 
@@ -692,7 +668,6 @@ fn test_index_with_excludes() {
         &["c".to_string()],
         1024 * 1024,
         &["tests/".to_string()],
-        false,
     )
     .unwrap();
 
@@ -708,7 +683,6 @@ fn test_index_invalid_path() {
         &["c".to_string()],
         1024 * 1024,
         &[],
-        false,
     );
     assert!(result.is_err());
 }
@@ -735,7 +709,6 @@ fn test_extension_map_includes_csharp_ruby_go_java() {
         ],
         1024 * 1024,
         &[],
-        false,
     )
     .unwrap();
 
@@ -762,7 +735,6 @@ fn test_size_boundary_exact_limit() {
         &["c".to_string()],
         1000,
         &[],
-        false,
     )
     .unwrap();
 
@@ -785,7 +757,6 @@ fn test_size_boundary_one_byte_over() {
         &["c".to_string()],
         1000,
         &[],
-        false,
     )
     .unwrap();
 
@@ -806,7 +777,6 @@ fn test_incremental_select_changed_files() {
         &["c".to_string()],
         1024 * 1024,
         &[],
-        true,
     )
     .unwrap();
 
@@ -821,7 +791,6 @@ fn test_incremental_select_changed_files() {
         1024 * 1024,
         &[],
         None,
-        true,
     )
     .unwrap();
 
@@ -838,7 +807,6 @@ fn test_incremental_select_new_files() {
         &["c".to_string()],
         1024 * 1024,
         &[],
-        true,
     )
     .unwrap();
 
@@ -850,7 +818,6 @@ fn test_incremental_select_new_files() {
         1024 * 1024,
         &[],
         None,
-        true,
     )
     .unwrap();
 
@@ -868,7 +835,6 @@ fn test_incremental_select_removed_files() {
         &["c".to_string()],
         1024 * 1024,
         &[],
-        true,
     )
     .unwrap();
 
@@ -880,7 +846,6 @@ fn test_incremental_select_removed_files() {
         1024 * 1024,
         &[],
         None,
-        true,
     )
     .unwrap();
 
@@ -908,7 +873,6 @@ fn test_should_analyze_binary_file_excluded() {
         &["c".to_string()],
         1024 * 1024,
         &[],
-        false,
     )
     .unwrap();
 

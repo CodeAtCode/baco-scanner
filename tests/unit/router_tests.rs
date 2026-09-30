@@ -64,20 +64,16 @@ fn test_router_from_scanner_config() {
     cwe_overrides.insert(
         "CWE-123".to_string(),
         PromptSpec {
-            prompt_template: "llm_static_analysis".to_string(),
             model_override: None,
         },
     );
 
     let config = RouterConfig {
         enabled: true,
-        default_prompt: "scanner_default".to_string(),
         cwe_overrides,
-        language_overrides: HashMap::new(),
     };
 
     let router = CweRouter::from_scanner_config(&config);
-    assert_eq!(router.default_prompt(), "scanner_default");
 
     let route = router.route_cwe("CWE-123");
     // CWE-123 has no domain mapping, so returns no domain
@@ -120,37 +116,18 @@ fn test_router_route_by_cwe_with_various_formats() {
 }
 
 #[test]
-fn test_router_default_prompt_variations() {
-    let config_default = RouterConfig::default();
-    let router_default = CweRouter::from_config(&config_default);
-    assert_eq!(router_default.default_prompt(), "llm_static_analysis");
-
-    let config_custom = RouterConfig {
-        enabled: true,
-        default_prompt: "my_custom_prompt".to_string(),
-        cwe_overrides: HashMap::new(),
-        language_overrides: HashMap::new(),
-    };
-    let router_custom = CweRouter::from_config(&config_custom);
-    assert_eq!(router_custom.default_prompt(), "my_custom_prompt");
-}
-
-#[test]
 fn test_router_with_model_override_propagation() {
     let mut cwe_overrides = HashMap::new();
     cwe_overrides.insert(
         "CWE-78".to_string(),
         PromptSpec {
-            prompt_template: "llm_static_analysis".to_string(),
             model_override: Some("special-model-v2".to_string()),
         },
     );
 
     let config = RouterConfig {
         enabled: true,
-        default_prompt: "default".to_string(),
         cwe_overrides,
-        language_overrides: HashMap::new(),
     };
 
     let router = CweRouter::from_config(&config);
@@ -189,18 +166,16 @@ fn test_multiple_domains_mapping() {
 }
 
 #[test]
-fn test_router_empty_cwe_overrides_uses_default() {
+fn test_router_empty_cwe_overrides_registers_no_model_override() {
     let config = RouterConfig {
         enabled: true,
-        default_prompt: "only_default".to_string(),
         cwe_overrides: HashMap::new(),
-        language_overrides: HashMap::new(),
     };
 
     let router = CweRouter::from_config(&config);
 
-    // Empty overrides means router uses default prompt
-    assert_eq!(router.default_prompt(), "only_default");
+    // No overrides registered, so even a mapped CWE carries no model override.
+    assert_eq!(router.route_cwe("CWE-78").model_override, None);
 }
 
 #[test]

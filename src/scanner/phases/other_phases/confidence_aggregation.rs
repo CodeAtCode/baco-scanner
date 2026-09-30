@@ -104,6 +104,34 @@ pub async fn run_confidence_scoring(
         );
     }
 
+    // Post-hoc calibration. This runs after the baseline has been recorded on
+    // purpose: storing calibrated scores back into the baseline would let the
+    // calibration feed on its own output and drift. The verification tier is
+    // recomputed here because it is derived from the score, and classifying
+    // the pre-calibration value would rank a finding against the wrong number.
+    // Disabled by default, so this is a no-op and findings pass through as-is.
+    if config.normalization.enabled {
+        let norm_config = &config.normalization;
+        for finding in &mut updated_findings {
+            let calibrated = crate::confidence_refinement::normalize_confidence(
+                finding.confidence_score,
+                norm_config,
+                &baseline,
+            );
+            if calibrated != finding.confidence_score {
+                finding.confidence_score = calibrated;
+                finding.verification_tier = Some(crate::evidence::classify_finding(
+                    &finding.evidence,
+                    finding.confidence_score,
+                ));
+            }
+        }
+        tracing::info!(
+            "Applied confidence normalization (tier: {:?})",
+            norm_config.normalization_tier
+        );
+    }
+
     pb.set_position(pb.position() + 100);
     Ok((updated_findings, analyzed_files.to_vec()))
 }

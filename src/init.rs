@@ -262,8 +262,6 @@ enabled = false
 max_turns = 10
 # Tool timeout (seconds)
 tool_timeout_secs = 30
-# Trusted paths for agent operations
-trusted_paths = ["."]
 {}
 "#,
         project_name, project_path, languages_str, preset_comment

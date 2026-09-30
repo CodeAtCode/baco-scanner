@@ -90,7 +90,6 @@ fn create_test_config_with_static_analysis() -> baco::config::ScannerConfig {
         policy_sampling: Default::default(),
         agent_scaffold: Default::default(),
         pacvd: Default::default(),
-        agent_flow: Default::default(),
         vuln_spec: Default::default(),
         citation_verification: Default::default(),
         prior_runs: Default::default(),

@@ -79,12 +79,6 @@ severity: WARNING
 
 #[test]
 fn test_validate_valid_minimal_rule() {
-    // If semgrep is available, test a valid minimal rule
-    if which("semgrep").is_err() {
-        println!("semgrep not installed, skipping valid rule test");
-        return;
-    }
-
     let valid_rule = r#"rules:
   - id: test-minimal-rule
     pattern: $X
@@ -93,6 +87,17 @@ fn test_validate_valid_minimal_rule() {
       - python
     severity: WARNING
 "#;
+
+    if which("semgrep").is_err() {
+        // Returning early made this pass green on any machine without semgrep
+        // while checking nothing. Assert the contract we do own instead: the
+        // missing binary has to be noticed and named.
+        assert!(
+            matches!(validate_rule(valid_rule), Err(RuleError::SemgrepNotFound)),
+            "without semgrep on PATH, validate_rule must report SemgrepNotFound"
+        );
+        return;
+    }
 
     let result = validate_rule(valid_rule);
 
@@ -109,8 +114,17 @@ fn test_validate_valid_minimal_rule() {
 #[test]
 fn test_validate_tempfile_cleanup() {
     // Verify that temp files are created and cleaned up properly
-    let _temp = NamedTempFile::new().expect("Failed to create temp file");
-    // Temp file is cleaned up on drop
+    let temp = NamedTempFile::new().expect("Failed to create temp file");
+    let path = temp.path().to_path_buf();
+    assert!(
+        path.exists(),
+        "a freshly created temp file must exist on disk before drop"
+    );
+    drop(temp);
+    assert!(
+        !path.exists(),
+        "the temp file must be removed once the guard is dropped"
+    );
 }
 
 #[test]

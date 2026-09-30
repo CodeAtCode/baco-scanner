@@ -9,24 +9,19 @@ fn config_with_override(cwe: &str, model: Option<&str>) -> RouterConfig {
     cwe_overrides.insert(
         cwe.to_string(),
         PromptSpec {
-            prompt_template: "llm_static_analysis".to_string(),
             model_override: model.map(|m| m.to_string()),
         },
     );
     RouterConfig {
         enabled: true,
-        default_prompt: "llm_static_analysis".to_string(),
         cwe_overrides,
-        language_overrides: HashMap::new(),
     }
 }
 
 fn empty_config() -> RouterConfig {
     RouterConfig {
         enabled: false,
-        default_prompt: "llm_static_analysis".to_string(),
         cwe_overrides: HashMap::new(),
-        language_overrides: HashMap::new(),
     }
 }
 

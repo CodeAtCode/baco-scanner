@@ -106,14 +106,7 @@ reserve_percent_for_high_risk = 20
 
 [knowledge.required_security_primitives]
 "cpp" = ["bounds check", "size validation", "std::string", "at()", "length()"]
-
-[agent_flow]
-enabled = false
-max_iterations = 10
-requires_instrumented_target = false
-
 [agent]
 enabled = false
 max_turns = 15
 tool_timeout_secs = 300
-trusted_paths = []

@@ -19,14 +19,6 @@ Common issues and solutions for the Baco SAST scanner.
 | CPG slicing phase shows "skipped" | Joern dependency missing | Install Joern binary (see above) or skip CPG analysis |
 | Scan takes unusually long | Large codebase, no caching | Enable `enable_llm_cache = true` to avoid duplicate API calls |
 
-## Incremental Scan Surprises
-
-| Symptom | Cause | Fix |
-|---------|-------|-----|
-| Files skipped during incremental scan | Stale hash store | Delete output directory to force full rescan: `rm -rf <output-dir>/` |
-| Changed files not re-analyzed | Hash mismatch in checkpoint.json | Remove checkpoint.json and file_hashes.json, then rescan |
-| Incremental scan slower than full scan | Hash validation overhead | Accept overhead or force full scan by clearing output dir |
-
 ## Report/Output Issues
 
 | Symptom | Cause | Fix |

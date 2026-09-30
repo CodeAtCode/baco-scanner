@@ -134,8 +134,6 @@ pub struct AgentConfig {
     pub max_turns: u32,
     #[serde(default = "crate::config::default_tool_timeout")]
     pub tool_timeout_secs: u64,
-    #[serde(default = "crate::config::default_trusted_paths")]
-    pub trusted_paths: Vec<String>,
 }
 
 impl Default for AgentConfig {
@@ -144,7 +142,6 @@ impl Default for AgentConfig {
             enabled: false,
             max_turns: crate::config::default_max_turns(),
             tool_timeout_secs: crate::config::default_tool_timeout(),
-            trusted_paths: crate::config::default_trusted_paths(),
         }
     }
 }

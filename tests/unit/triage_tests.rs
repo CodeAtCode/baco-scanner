@@ -1,4 +1,14 @@
 //! Triage estimator tests
+//!
+//! The threshold decision itself lives in `should_analyze_file` and is covered
+//! in `scanner/static_analysis_tests.rs`, `coverage_llm_phase_pure_tests.rs`,
+//! `coverage_static_orchestrator_tests.rs` and `triage_rag_tests.rs`, including
+//! the boundary at the threshold. The model actually reaching the triage
+//! request is covered in `scanner/other_phases_tests.rs`.
+//!
+//! Three tests that used to live here reimplemented that logic against local
+//! arrays and local arithmetic, so they passed no matter what the product did.
+//! They are gone rather than rewritten, because the real coverage is elsewhere.
 
 use baco::config::phases::TriageConfig;
 
@@ -20,59 +30,14 @@ fn test_triage_default_disabled() {
 }
 
 #[test]
-fn test_triage_suspicion_threshold_scoring() {
-    // Test that files above threshold get deep analysis
-    let config = TriageConfig {
-        enabled: true,
-        model: "test-model".to_string(),
-        batch_size: 8,
-        suspicion_threshold: 0.5,
-    };
-
-    // Simulate triage scores
-    let scores = [0.2, 0.4, 0.5, 0.6, 0.8];
-    let deep_analysis_count = scores
-        .iter()
-        .filter(|&&s| s >= config.suspicion_threshold)
-        .count();
-
-    assert_eq!(deep_analysis_count, 3, "3 files should pass threshold 0.5");
-}
-
-#[test]
-fn test_triage_batch_size_limit() {
-    // Test that batch size limits concurrent requests
-    let config = TriageConfig {
-        enabled: true,
-        model: "test-model".to_string(),
-        batch_size: 4,
-        suspicion_threshold: 0.3,
-    };
-
-    // 10 files pass triage, but batch_size is 4
-    let files_passing_triage = 10;
-    let batches_needed = (files_passing_triage as f32 / config.batch_size as f32).ceil() as usize;
-
-    assert_eq!(
-        batches_needed, 3,
-        "10 files with batch_size 4 needs 3 batches"
-    );
-}
-
-#[test]
-fn test_triage_custom_model() {
-    // Test custom model configuration
-    let config = TriageConfig {
-        enabled: true,
-        model: "custom-model".to_string(),
-        batch_size: 16,
-        suspicion_threshold: 0.25,
-    };
-
-    assert_eq!(config.model, "custom-model");
-    assert_eq!(config.batch_size, 16);
-    assert!(
-        (config.suspicion_threshold - 0.25).abs() < 0.001,
-        "Custom threshold should be 0.25"
-    );
+fn test_triage_defaults_are_accepted_from_toml() {
+    // The defaults above are only useful if they also survive parsing, since
+    // that is how every user reaches them.
+    let toml_str = r#"
+        [triage]
+    "#;
+    let config: TriageConfig = toml::from_str(toml_str).expect("triage defaults must parse");
+    assert!(!config.enabled);
+    assert_eq!(config.batch_size, 8);
+    assert!((config.suspicion_threshold - 0.35).abs() < 0.001);
 }

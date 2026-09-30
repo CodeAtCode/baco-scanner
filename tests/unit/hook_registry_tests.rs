@@ -120,6 +120,69 @@ fn test_hook_map_round_trip_and_missing_file() {
 }
 
 #[test]
+fn test_corrupt_hook_map_does_not_panic_and_leaves_no_temporary_behind() {
+    let tempdir = TempDir::new().expect("Failed to create temp dir");
+    let path = tempdir.path().join("hook_map.json");
+
+    // A truncated file, which is what an interrupted plain `fs::write` leaves
+    // behind. Loading it must not panic, and must not invent hooks either.
+    std::fs::write(&path, "{\"wp_ajax_a\": [\"hand").expect("Failed to write corrupt file");
+    let loaded = hook_registry::load_hook_map(&path);
+    assert!(
+        loaded.is_empty(),
+        "a corrupt map must not yield partial hooks, got {:?}",
+        loaded
+    );
+
+    // The atomic write must not leave its temporary next to the target.
+    let mut map = HashMap::new();
+    map.insert("wp_ajax_b".to_string(), vec!["handler_b".to_string()]);
+    hook_registry::save_hook_map(&path, &map).expect("Failed to save over a corrupt file");
+
+    let reloaded = hook_registry::load_hook_map(&path);
+    assert_eq!(
+        reloaded.len(),
+        1,
+        "the corrupt file must be replaced wholesale"
+    );
+
+    let leftover: Vec<_> = std::fs::read_dir(tempdir.path())
+        .expect("Failed to list temp dir")
+        .filter_map(|e| e.ok())
+        .map(|e| e.file_name().to_string_lossy().to_string())
+        .filter(|n| n.ends_with(".tmp"))
+        .collect();
+    assert!(
+        leftover.is_empty(),
+        "atomic write left a temporary behind: {:?}",
+        leftover
+    );
+}
+
+#[test]
+fn test_hook_map_save_replaces_a_populated_file() {
+    let tempdir = TempDir::new().expect("Failed to create temp dir");
+    let path = tempdir.path().join("hook_map.json");
+
+    let mut first = HashMap::new();
+    first.insert("wp_ajax_old".to_string(), vec!["old_handler".to_string()]);
+    hook_registry::save_hook_map(&path, &first).expect("Failed to save first map");
+
+    let mut second = HashMap::new();
+    second.insert("wp_ajax_new".to_string(), vec!["new_handler".to_string()]);
+    hook_registry::save_hook_map(&path, &second).expect("Failed to save second map");
+
+    let loaded = hook_registry::load_hook_map(&path);
+    assert_eq!(loaded.len(), 1, "the second save must replace, not merge");
+    assert!(
+        loaded.contains_key("wp_ajax_new"),
+        "the new map must be what survives, got {:?}",
+        loaded
+    );
+    assert!(!loaded.contains_key("wp_ajax_old"));
+}
+
+#[test]
 fn test_extract_with_empty_registrations() {
     let content = r#"add_action('wp_ajax_test', 'test_handler');"#;
     let cfg = HookRegistryLanguageConfig {

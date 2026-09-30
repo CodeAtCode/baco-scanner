@@ -58,14 +58,12 @@ impl RouterRegistry {
 #[derive(Debug, Clone)]
 pub struct CweRouter {
     registry: RouterRegistry,
-    default_prompt: String,
 }
 
 impl Default for CweRouter {
     fn default() -> Self {
         Self {
             registry: RouterRegistry::new(),
-            default_prompt: "llm_static_analysis".to_string(),
         }
     }
 }
@@ -78,10 +76,7 @@ impl CweRouter {
         for (domain, dc) in config.to_registry().domains {
             registry.add_domain(domain, dc);
         }
-        Self {
-            registry,
-            default_prompt: config.default_prompt.clone(),
-        }
+        Self { registry }
     }
 
     /// Create a router from the scanner config's RouterConfig
@@ -144,11 +139,6 @@ impl CweRouter {
             domain: None,
             model_override: None,
         }
-    }
-
-    /// Get the default prompt template name
-    pub fn default_prompt(&self) -> &str {
-        &self.default_prompt
     }
 }
 

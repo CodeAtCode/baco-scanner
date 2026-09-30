@@ -132,7 +132,14 @@ async fn run_parallel_phases(
     mut findings: Vec<VulnerabilityFinding>,
     mut analyzed_files: Vec<String>,
     completed_phases: &[ScanPhase],
-) -> Result<(Vec<VulnerabilityFinding>, Vec<String>), String> {
+) -> Result<
+    (
+        Vec<VulnerabilityFinding>,
+        Vec<String>,
+        Vec<(ScanPhase, String)>,
+    ),
+    String,
+> {
     let is_phase_completed = |phase: &ScanPhase| completed_phases.contains(phase);
     let profile = scanner.config.scanner.profile;
 
@@ -308,14 +315,28 @@ async fn run_parallel_phases(
     let parallel_duration = start_time.elapsed();
     tracing::info!("Parallel phases completed in {:?}", parallel_duration);
 
-    if let Some(Ok((mut index_findings, _, _))) = indexing_result {
-        findings.append(&mut index_findings);
+    // Parallel phases that died. `health` is built further down, once the
+    // phase plan is known, so the failures are collected here and recorded
+    // there -- otherwise an Err is dropped and a dead phase reads as a clean one.
+    let mut parallel_failures: Vec<(ScanPhase, String)> = Vec::new();
+
+    if let Some(result) = indexing_result {
+        match result {
+            Ok((mut index_findings, _, _)) => findings.append(&mut index_findings),
+            Err(e) => parallel_failures.push((ScanPhase::Indexing, e.to_string())),
+        }
     }
-    if let Some(Ok((mut semgrep_findings, _, _))) = semgrep_result {
-        findings.append(&mut semgrep_findings);
+    if let Some(result) = semgrep_result {
+        match result {
+            Ok((mut semgrep_findings, _, _)) => findings.append(&mut semgrep_findings),
+            Err(e) => parallel_failures.push((ScanPhase::Semgrep, e.to_string())),
+        }
     }
-    if let Some(Ok((mut cpg_findings, _, _))) = cpg_slice_result {
-        findings.append(&mut cpg_findings);
+    if let Some(result) = cpg_slice_result {
+        match result {
+            Ok((mut cpg_findings, _, _)) => findings.append(&mut cpg_findings),
+            Err(e) => parallel_failures.push((ScanPhase::CpgSlice, e.to_string())),
+        }
     }
     log_and_aggregate_llm_results(&llm_static_result, &mut findings, &mut analyzed_files);
 
@@ -391,7 +412,7 @@ async fn run_parallel_phases(
             medium_plus_count, threshold
         ));
         pb.finish();
-        return Ok((findings, analyzed_files));
+        return Ok((findings, analyzed_files, parallel_failures));
     }
 
     if let Err(e) = save_checkpoint(
@@ -413,7 +434,7 @@ async fn run_parallel_phases(
     pb.set_message("Parallel phases complete, running sequential phases...");
     pb.set_position((PhaseSpec::parallel().len() as u64) * 100);
 
-    Ok((findings, analyzed_files))
+    Ok((findings, analyzed_files, parallel_failures))
 }
 
 /// Return the list of sequential scan phases
@@ -757,10 +778,13 @@ pub(super) async fn run_scanner(
     pb.set_style(style);
     pb.set_message("Initializing BACO security scan...");
 
+    // Phases that died inside the parallel block. Empty on the serial path,
+    // which runs no parallel phases to fail.
+    let mut parallel_failures: Vec<(ScanPhase, String)> = Vec::new();
     if enable_parallel {
         tracing::info!("\u{1B}[34m[SCANNER]\u{1B}[0m Parallel mode ENABLED");
 
-        (findings, analyzed_files) =
+        (findings, analyzed_files, parallel_failures) =
             run_parallel_phases(scanner, &pb, findings, analyzed_files, &completed_phases).await?;
     } else {
         // Sequential execution for backward compatibility
@@ -845,6 +869,17 @@ pub(super) async fn run_scanner(
     }
     // The indexing phase records how many files the indexer matched.
     health.set_indexed(scanner.state.borrow().files_scanned as u64);
+
+    // Phases that errored are not runs and not skips: say so in the report.
+    for (phase, reason) in parallel_failures {
+        tracing::warn!(
+            "Phase {} failed: {}",
+            crate::scan_health::phase_name(&phase),
+            reason
+        );
+        health.mark_phase_failed(&phase, &reason);
+    }
+
     health.set_analyzed(analyzed_files.len() as u64);
     let llm_metrics = scanner.metrics_tracker.finalize().await;
     let (ok_calls, failed_calls) =

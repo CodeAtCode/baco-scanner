@@ -97,7 +97,6 @@ rules:
 ''']
 
 [scanner.performance]
-enable_incremental_scan = true
 enable_variant_search = true
 enable_cve_bootstrap = true
 
@@ -206,11 +205,5 @@ handler_patterns = [
   '''^[ \t]*\[\s*[a-zA-Z_\x5c][a-zA-Z0-9_\x5c]*::class\s*,\s*[\x27\x22]([a-zA-Z_][a-zA-Z0-9_]*)[\x27\x22]\s*\]''',
   '''^[ \t]*[\x27\x22]([a-zA-Z_\x5c][a-zA-Z0-9_\x5c]*@[a-zA-Z_][a-zA-Z0-9_]*)[\x27\x22]''',
 ]
-
-[agent_flow]
-enabled = false
-requires_instrumented_target = false
-
 [agent]
 enabled = false
-trusted_paths = []

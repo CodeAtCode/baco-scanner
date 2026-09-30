@@ -16,9 +16,7 @@ api_key = "${MISTRAL_API_KEY}"
 model = "mistral-small"
 
 [scanner.performance]
-enable_incremental_scan = false
 max_parallel_tasks = 4
-enable_file_filtering = true
 ```
 
 **Experimental sections** (disabled by default):
@@ -26,7 +24,6 @@ enable_file_filtering = true
 - `[validate]` — LLM-as-judge rationale validation
 - `[vuln_spec]` — VulTriage triple-path, policy sampling, agent scaffold
 - `[agent_scaffold]` — Agent-assisted analysis
-- `[agent_flow]` — Multi-agent harness synthesis
 - `[threat_modeling]` — STRIDE threat modeling (now under `[scanner.performance]`)
 
 Enable only after reviewing the detailed sections below.
@@ -65,11 +62,9 @@ profile = "all"
 ```toml
 [scanner.performance]
 # Skip unchanged files based on SHA256 hash comparison (hashes persisted to output dir)
-enable_incremental_scan = false
 # Maximum number of parallel tasks for scanning operations
 max_parallel_tasks = 4
 # Enable file filtering to reduce false positives
-enable_file_filtering = true
 
 # --- Semgrep configuration ---
 [scanner.semgrep]
@@ -154,25 +149,17 @@ The `[router]` section configures the Mixture-of-Experts routing for per-CWE and
 ```toml
 [router]
 enabled = false
-default_prompt = "llm_static_analysis"
 
-# CWE-specific prompt/model overrides
+# CWE-specific model overrides
 [router.cwe_overrides]
-"CWE-79" = { prompt_template = "xss_analysis", model_override = "mistral-small" }
-"CWE-89" = { prompt_template = "sqli_analysis", model_override = "qwen35" }
-
-# Language-specific prompt/model overrides
-[router.language_overrides]
-"php" = { prompt_template = "php_security", model_override = null }
-"python" = { prompt_template = "python_security", model_override = null }
+"CWE-79" = { model_override = "mistral-small" }
+"CWE-89" = { model_override = "qwen35" }
 ```
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `enabled` | bool | `false` | Enable MoE routing |
-| `default_prompt` | str | `"llm_static_analysis"` | Default prompt template name |
-| `cwe_overrides` | map | `{}` | CWE ID → PromptSpec overrides |
-| `language_overrides` | map | `{}` | Language → PromptSpec overrides |
+| `cwe_overrides` | map | `{}` | CWE ID → model override for that CWE's domain |
 
 ## LLM Configuration
 
@@ -356,7 +343,7 @@ Prompts are validated (max 10,000 characters, no null bytes) before use.
 [[tickets.systems]]
 system_type = "github"
 url = "https://api.github.com"
-credentials.token = "${GITHUB_TOKEN}"
+api_key = "${GITHUB_TOKEN}"
 ```
 
 ## Output Configuration
@@ -493,15 +480,11 @@ before the vulnerability judgement.
 | Field          | Type | Default | Description                          |
 |----------------|------|---------|--------------------------------------|
 | `enabled`      | bool | false   | Enable triple-path augmentation      |
-| `control_path` | bool | true    | Include AST/CFG/DFG verbalisation    |
-| `knowledge_path`| bool | true    | Include CWE pattern RAG              |
 | `semantic_path`| bool | true    | Include function summary             |
 
 ```toml
 [vultriage]
 enabled = false
-control_path = true
-knowledge_path = true
 semantic_path = true
 ```
 
@@ -678,24 +661,6 @@ enable_hunt_prompts = false
 
 Available modules: `injection.md`, `auth.md`, `authz_absence.md`, `xss.md`, `path_traversal.md`, `crypto.md`, `resource.md`, `deserialization.md`, `memory_safety.md`.
 
-### AgentFlow Multi-Agent Harness Synthesis (P5) — arXiv:2605.11835
-
-Represents the harness as a typed graph DSL with a search loop. Most invasive
-integration — static harness only until P5.5.
-
-| Field                      | Type | Default | Description                    |
-|----------------------------|------|---------|--------------------------------|
-| `enabled`                  | bool | false   | Enable AgentFlow harness       |
-| `max_iterations`           | int  | 10      | Max synthesis iterations       |
-| `requires_instrumented_target`| bool | false | Require instrumented target   |
-
-```toml
-[agent_flow]
-enabled = false
-max_iterations = 10
-requires_instrumented_target = false
-```
-
 ### Exploit Synthesis (T3.2)
 
 Automated exploit generation to verify findings. Runs in sandboxed Docker containers.
@@ -705,14 +670,12 @@ Automated exploit generation to verify findings. Runs in sandboxed Docker contai
 | `enabled`                    | bool | false   | Enable exploit synthesis       |
 | `sandbox_image`              | str  | "python:3.11-slim" | Docker image for sandbox |
 | `timeout_secs`               | int  | 30      | Timeout for exploit execution  |
-| `max_exploits_per_finding`   | int  | 1       | Max attempts per finding       |
 
 ```toml
 [exploit]
 enabled = false
 sandbox_image = "python:3.11-slim"
 timeout_secs = 30
-max_exploits_per_finding = 1
 ```
 
 ### Confidence Normalization
@@ -788,7 +751,6 @@ rules:
 ''']
 
 [scanner.performance]
-enable_incremental_scan = true
 enable_root_cause_dedup = true
 enable_variant_search = true
 
@@ -834,9 +796,6 @@ registrations = [
     '''(?si)register_rest_route\s*\([^;]*?[\x27\x22]callback[\x27\x22]\s*=>\s*''',
 ]
 
-[agent_flow]
-enabled = false
-
 [agent]
 enabled = false
 max_turns = 10
@@ -865,7 +824,7 @@ baco scan --config my.toml --preset my-project
 | `triage`     | `enabled`, `model`, `batch_size`, `suspicion_threshold`                   |
 | `priority`   | `enabled`, `git_recent_boost`, `entry_point_boost`, `small_file_boost`    |
 | `budget`     | `enabled`, `max_llm_calls`, `reserve_percent_for_high_risk`               |
-| `agent_flow` | `enabled`, `max_iterations`, `requires_instrumented_target`                |
+| `agent_flow` | `enabled`, `max_iterations`                                                |
 | `agent`      | `enabled`, `max_turns`, `tool_timeout_secs`               |
 | `knowledge`  | `fp_patterns` (map of CWE → list of false-positive indicator strings), `required_security_primitives` (map of language → list of required primitives), `hook_registry` (map of language → HookRegistryLanguageConfig with `hook_label`, `registrations` regexes with optional `(?P<hook>)` capture, `handler_patterns` override) |
 

@@ -145,8 +145,6 @@ pub struct ExploitConfig {
     pub sandbox_image: String,
     /// Timeout for exploit execution in seconds
     pub timeout_secs: u64,
-    /// Maximum number of exploit attempts per finding
-    pub max_exploits_per_finding: usize,
 }
 
 impl Default for ExploitConfig {
@@ -155,7 +153,6 @@ impl Default for ExploitConfig {
             enabled: false,
             sandbox_image: "python:3.11-slim".to_string(),
             timeout_secs: 30,
-            max_exploits_per_finding: 1,
         }
     }
 }
@@ -179,12 +176,6 @@ pub struct VultriageConfig {
     /// Whether triple-path context augmentation is enabled
     #[serde(default)]
     pub enabled: bool,
-    /// Whether to include the control path (AST/CFG/DFG verbalisation)
-    #[serde(default = "crate::config::default_true")]
-    pub control_path: bool,
-    /// Whether to include the knowledge path (CWE pattern RAG)
-    #[serde(default = "crate::config::default_true")]
-    pub knowledge_path: bool,
     /// Whether to include the semantic path (function summary)
     #[serde(default = "crate::config::default_true")]
     pub semantic_path: bool,
@@ -356,32 +347,6 @@ impl Default for PacvdConfig {
     }
 }
 
-/// Configuration for AgentFlow multi-agent harness synthesis.
-/// Represents the harness as a typed graph DSL; search loop proposes,
-/// executes, observes, and diagnoses harness rewrites.
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
-pub struct AgentFlowConfig {
-    /// Whether AgentFlow is enabled
-    #[serde(default)]
-    pub enabled: bool,
-    /// Maximum search-loop iterations
-    #[serde(default = "crate::config::default_agent_flow_max_iterations")]
-    pub max_iterations: u8,
-    /// Whether the target must be built with coverage/sanitizer instrumentation
-    #[serde(default)]
-    pub requires_instrumented_target: bool,
-}
-
-impl Default for AgentFlowConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            max_iterations: crate::config::default_agent_flow_max_iterations(),
-            requires_instrumented_target: false,
-        }
-    }
-}
-
 pub const DEFAULT_POLICY_SAMPLES: u8 = 4;
 pub fn default_policy_samples() -> u8 {
     DEFAULT_POLICY_SAMPLES
@@ -397,8 +362,4 @@ pub fn default_agent_paths_per_target() -> u8 {
 pub const DEFAULT_PACVD_LEVEL: u8 = 2;
 pub fn default_pacvd_level() -> u8 {
     DEFAULT_PACVD_LEVEL
-}
-pub const DEFAULT_AGENT_FLOW_MAX_ITERATIONS: u8 = 10;
-pub fn default_agent_flow_max_iterations() -> u8 {
-    DEFAULT_AGENT_FLOW_MAX_ITERATIONS
 }

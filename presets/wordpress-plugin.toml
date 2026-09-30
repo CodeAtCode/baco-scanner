@@ -106,7 +106,6 @@ rules:
 ''']
 
 [scanner.performance]
-enable_incremental_scan = true
 enable_variant_search = true
 enable_cve_bootstrap = true
 
@@ -214,11 +213,5 @@ registrations = [
     '''(?si)add_action\s*\(\s*[\x27\x22](?P<hook>(?:wp_ajax|wp_ajax_nopriv|admin_post|admin_post_nopriv)[^\x27\x22]*)[\x27\x22]\s*,\s*''',
     '''(?si)register_rest_route\s*\([^;]*?[\x27\x22]callback[\x27\x22]\s*=>\s*''',
 ]
-
-[agent_flow]
-enabled = false
-requires_instrumented_target = false
-
 [agent]
 enabled = false
-trusted_paths = []

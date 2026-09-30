@@ -117,7 +117,6 @@ pub async fn run_llm_static_analysis(
         &config.project.languages,
         config.scanner.max_file_size_kb * 1024,
         &config.scanner.exclude_paths,
-        config.scanner.performance.enable_file_filtering,
     )
     .unwrap_or(crate::indexer::FileIndex {
         files: Vec::new(),
@@ -143,8 +142,6 @@ pub async fn run_llm_static_analysis(
     let mut new_analyzed_files: Vec<String> = analyzed_files.to_vec();
 
     if let Some(_api_key) = &phase_config.api_key {
-        let _discovery_timeout = phase_config.timeout_secs.unwrap_or(config.llm.timeout_secs);
-
         // Enable steady tick for progress bar timer
         pb.enable_steady_tick(std::time::Duration::from_millis(100));
 
@@ -180,17 +177,35 @@ pub async fn run_llm_static_analysis(
         // Get max_context_tokens for PacVD auto-level selection
         let max_context_tokens = config.llm.max_reasoning_tokens.unwrap_or(32768);
 
-        // Triage cascade (T17): filter files before deep analysis
+        // Triage cascade (T17): filter files before deep analysis.
+        // The triage pass gets its own client so `triage.model` selects the
+        // model that actually classifies the files. Reusing the phase client
+        // made the key a no-op: it was passed here and never read.
         let (files_to_analyze, skipped_files) = if config.triage.enabled {
-            run_triage_cascade(
-                &client,
-                &config.triage.model,
-                files,
-                analyzed_files,
-                config.triage.batch_size,
-                config.triage.suspicion_threshold,
-            )
-            .await
+            match llm::phase_llm_config(config, "static_analysis", Some(&config.triage.model)) {
+                Ok(cfg) => {
+                    let triage_client =
+                        crate::llm::LlmClient::with_metrics(cfg, Some(metrics_tracker.clone()));
+                    run_triage_cascade(
+                        &triage_client,
+                        files,
+                        analyzed_files,
+                        config.triage.batch_size,
+                        config.triage.suspicion_threshold,
+                    )
+                    .await
+                }
+                Err(e) => {
+                    // A triage model we cannot build is not a reason to scan less:
+                    // analyse every file rather than silently filtering on a
+                    // configuration that does not work.
+                    tracing::warn!(
+                        "Triage cascade skipped, its model is unusable: {}. Analysing all files instead.",
+                        e
+                    );
+                    (files.iter().collect(), Vec::new())
+                }
+            }
         } else {
             (files.iter().collect(), Vec::new())
         };
@@ -531,9 +546,30 @@ struct TriageResponse {
 }
 
 /// Run triage cascade to filter files before deep analysis (T17)
+/// Lines of a file handed to the triage model.
+///
+/// This is a budget, not a bug, but it is a real limit: an entry point below
+/// line 30 is invisible to triage. Kept as a named constant so the cost of
+/// raising it is visible wherever it is discussed.
+pub const TRIAGE_SNIPPET_LINES: usize = 30;
+
+/// First `max_lines` lines of a file, flattened, for the triage prompt.
+///
+/// A file we cannot read is an error, not an empty file. Returning `""` let
+/// triage score it near zero and drop it as uninteresting, so a permissions
+/// problem or a non-UTF-8 file came out indistinguishable from a file that
+/// genuinely holds nothing worth looking at.
+pub fn triage_snippet(path: &std::path::Path, max_lines: usize) -> std::io::Result<String> {
+    let content = std::fs::read_to_string(path)?;
+    Ok(content
+        .lines()
+        .take(max_lines)
+        .collect::<Vec<_>>()
+        .join(" "))
+}
+
 async fn run_triage_cascade<'a>(
     client: &crate::llm::LlmClient,
-    _triage_model: &str,
     files: &'a [crate::indexer::FileInfo],
     analyzed_files: &[String],
     batch_size: u8,
@@ -554,6 +590,7 @@ async fn run_triage_cascade<'a>(
 
     let mut files_to_analyze = Vec::new();
     let mut skipped_files = Vec::new();
+    let mut unreadable_files: Vec<String> = Vec::new();
 
     // Process files in batches
     let mut batch_start = 0;
@@ -561,19 +598,27 @@ async fn run_triage_cascade<'a>(
         let batch_end = std::cmp::min(batch_start + batch_size as usize, files.len());
         let batch = &files[batch_start..batch_end];
 
-        // Build batch request
-        let batch_files: Vec<TriageFile> = batch
-            .iter()
-            .filter(|f| !analyzed_files.contains(&f.path.to_string_lossy().to_string()))
-            .map(|f| {
-                let content = std::fs::read_to_string(&f.path).unwrap_or_default();
-                let snippet = content.lines().take(30).collect::<Vec<_>>().join(" ");
-                TriageFile {
-                    path: f.path.to_string_lossy().to_string(),
-                    content_snippet: snippet,
+        // A file we cannot read is not a clean file. Sending it with an empty
+        // snippet let triage score it near zero and drop it as uninteresting,
+        // so a permissions problem or a non-UTF-8 file was indistinguishable
+        // from a file that genuinely holds nothing of interest.
+        let mut batch_files: Vec<TriageFile> = Vec::new();
+        for f in batch {
+            if analyzed_files.contains(&f.path.to_string_lossy().to_string()) {
+                continue;
+            }
+            match triage_snippet(&f.path, TRIAGE_SNIPPET_LINES) {
+                Ok(snippet) => {
+                    batch_files.push(TriageFile {
+                        path: f.path.to_string_lossy().to_string(),
+                        content_snippet: snippet,
+                    });
                 }
-            })
-            .collect();
+                Err(e) => {
+                    unreadable_files.push(format!("{} ({e})", f.path.to_string_lossy()));
+                }
+            }
+        }
 
         if batch_files.is_empty() {
             batch_start = batch_end;
@@ -672,6 +717,17 @@ Files to analyze:
         }
 
         batch_start = batch_end;
+    }
+
+    if !unreadable_files.is_empty() {
+        // These were never scored and never analysed. Saying so is the whole
+        // point: they used to reach triage as empty snippets, get a suspicion
+        // near zero, and be reported as files that held nothing of interest.
+        tracing::warn!(
+            "[Triage] {} file(s) could not be read and were not analysed: {}",
+            unreadable_files.len(),
+            unreadable_files.join(", ")
+        );
     }
 
     (files_to_analyze, skipped_files)

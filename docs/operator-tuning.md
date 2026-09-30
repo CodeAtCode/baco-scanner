@@ -8,7 +8,6 @@ Performance tuning for the Baco SAST scanner. Adjust settings based on scan spee
 
 ```toml
 [scanner.performance]
-enable_incremental_scan = true
 max_parallel_tasks = 2
 enable_threat_modeling = false
 enable_confidence_refinement = false
@@ -28,7 +27,6 @@ exclude_paths = ["tests/", "docs/", "target/", "vendor/"]
 
 ```toml
 [scanner.performance]
-enable_incremental_scan = false
 max_parallel_tasks = 8
 enable_threat_modeling = true
 enable_root_cause_dedup = true
@@ -48,7 +46,6 @@ timeout_secs = 120
 
 ```toml
 [scanner.performance]
-enable_incremental_scan = true
 max_parallel_tasks = 2
 enable_confidence_refinement = false
 enable_variant_search = false
@@ -64,9 +61,7 @@ max_concurrent = 2
 
 | Flag | Type | Default | Effect |
 |------|------|---------|--------|
-| `enable_incremental_scan` | bool | false | Skips unchanged files via SHA256 hash comparison |
 | `max_parallel_tasks` | int | 4 | Max concurrent scan tasks |
-| `enable_file_filtering` | bool | true | Filters low-value files (minified, vendor) |
 | `enable_threat_modeling` | bool | false | STRIDE-based threat analysis |
 | `enable_root_cause_dedup` | bool | true | Collapses findings with same root cause |
 | `enable_auto_patching` | bool | false | Generates fix patches — opt-in |
@@ -120,13 +115,3 @@ early_termination_threshold = 500.0
 
 Scan stops after N medium+ findings. Useful for very large codebases. When triggered, an `early_termination` section is recorded in the JSON report.
 
-### Agent Flow Gate
-
-Multi-agent harness synthesis (opt-in, default OFF). Enable only after understanding the requirements:
-
-```toml
-[agent_flow]
-enabled = false
-max_iterations = 10
-requires_instrumented_target = false
-```

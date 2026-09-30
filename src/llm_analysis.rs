@@ -1353,12 +1353,6 @@ impl LlmAnalyzer {
                         _ => Severity::Medium,
                     };
 
-                    // Parse fix_code field (NEW - shows fixed code, not continuation)
-                    let _fix_code = item
-                        .get("fix_code")
-                        .and_then(|v| v.as_str())
-                        .map(|s| s.to_string());
-
                     // Parse code_snippet - now an object with before/code/after
                     let code_snippet_obj = item.get("code_snippet");
                     let code_snippet =

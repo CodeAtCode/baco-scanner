@@ -22,6 +22,10 @@ pub enum PhaseStatusKind {
     #[default]
     Run,
     Skipped,
+    /// The phase ran and failed. Distinct from Run so a dead phase cannot be
+    /// mistaken for a clean one, and distinct from Skipped so it is not
+    /// reported as a deliberate exclusion.
+    Failed,
 }
 
 /// LLM call outcome classification
@@ -126,6 +130,30 @@ impl ScanHealth {
             status: PhaseStatusKind::Skipped,
             reason: Some(reason.to_string()),
         });
+    }
+
+    /// Record a phase as failed with the reason it died.
+    ///
+    /// A phase that errors is neither a phase that ran nor one that was
+    /// deliberately excluded. Reporting it as either is what made a dead
+    /// Semgrep run indistinguishable from a clean target.
+    pub fn record_phase_failed(&mut self, phase: &ScanPhase, reason: &str) {
+        self.phase_status.push(PhaseStatus {
+            phase: phase_name(phase),
+            status: PhaseStatusKind::Failed,
+            reason: Some(reason.to_string()),
+        });
+    }
+
+    /// Flip an already-recorded phase to failed, keeping one entry per phase.
+    pub fn mark_phase_failed(&mut self, phase: &ScanPhase, reason: &str) {
+        let name = phase_name(phase);
+        if let Some(entry) = self.phase_status.iter_mut().find(|ps| ps.phase == name) {
+            entry.status = PhaseStatusKind::Failed;
+            entry.reason = Some(reason.to_string());
+        } else {
+            self.record_phase_failed(phase, reason);
+        }
     }
 
     /// Record an LLM outcome by class
@@ -339,9 +367,21 @@ impl ScanHealth {
             .iter()
             .filter(|ps| matches!(ps.status, PhaseStatusKind::Skipped))
             .count();
+        let failed_count = self
+            .phase_status
+            .iter()
+            .filter(|ps| matches!(ps.status, PhaseStatusKind::Failed))
+            .count();
 
         let mut parts = Vec::new();
-        parts.push(format!("phases: {} run, {} skipped", run_count, skip_count));
+        if failed_count > 0 {
+            parts.push(format!(
+                "phases: {} run, {} skipped, {} FAILED",
+                run_count, skip_count, failed_count
+            ));
+        } else {
+            parts.push(format!("phases: {} run, {} skipped", run_count, skip_count));
+        }
         parts.push(format!(
             "files: {} indexed, {} analyzed",
             self.files.indexed, self.files.analyzed

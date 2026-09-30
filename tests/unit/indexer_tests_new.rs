@@ -32,7 +32,6 @@ fn test_extension_map_includes_csharp_ruby_go_java() {
         ],
         1024 * 1024,
         &[],
-        false,
     )
     .unwrap();
 
@@ -59,7 +58,6 @@ fn test_case_insensitive_extension_matching() {
         ],
         1024 * 1024,
         &[],
-        false,
     )
     .unwrap();
 
@@ -87,7 +85,6 @@ fn test_size_boundary_exact_limit() {
         &["c".to_string()],
         1000, // Exact limit
         &[],
-        false,
     )
     .unwrap();
 
@@ -111,7 +108,6 @@ fn test_size_boundary_one_byte_over() {
         &["c".to_string()],
         1000, // Limit
         &[],
-        false,
     )
     .unwrap();
 
@@ -132,7 +128,6 @@ fn test_size_boundary_zero_limit() {
         &["c".to_string()],
         0, // Zero limit excludes any file with content
         &[],
-        false,
     )
     .unwrap();
 
@@ -158,7 +153,6 @@ fn test_glob_exclude_star_pattern() {
         &["c".to_string()],
         1024 * 1024,
         &["tests/*".to_string()],
-        false,
     )
     .unwrap();
 
@@ -180,7 +174,6 @@ fn test_glob_exclude_directory_trailing_slash() {
         &["c".to_string()],
         1024 * 1024,
         &["vendor/".to_string()],
-        false,
     )
     .unwrap();
 
@@ -200,7 +193,6 @@ fn test_glob_exclude_nested_directories() {
         &["c".to_string()],
         1024 * 1024,
         &["a/b/".to_string()],
-        false,
     )
     .unwrap();
 
@@ -221,13 +213,12 @@ fn test_incremental_select_unchanged_files() {
         .write_all(content)
         .unwrap();
 
-    // First index with hash store
+    // First index
     let index1 = FileIndex::index_project(
         temp_dir.path().to_str().unwrap(),
         &["c".to_string()],
         1024 * 1024,
         &[],
-        true, // Enable hash store
     )
     .unwrap();
 
@@ -240,7 +231,6 @@ fn test_incremental_select_unchanged_files() {
         1024 * 1024,
         &[],
         None,
-        true,
     )
     .unwrap();
 
@@ -262,7 +252,6 @@ fn test_incremental_select_changed_files() {
         &["c".to_string()],
         1024 * 1024,
         &[],
-        true,
     )
     .unwrap();
 
@@ -279,7 +268,6 @@ fn test_incremental_select_changed_files() {
         1024 * 1024,
         &[],
         None,
-        true,
     )
     .unwrap();
 
@@ -297,7 +285,6 @@ fn test_incremental_select_new_files() {
         &["c".to_string()],
         1024 * 1024,
         &[],
-        true,
     )
     .unwrap();
 
@@ -311,7 +298,6 @@ fn test_incremental_select_new_files() {
         1024 * 1024,
         &[],
         None,
-        true,
     )
     .unwrap();
 
@@ -330,7 +316,6 @@ fn test_incremental_select_removed_files() {
         &["c".to_string()],
         1024 * 1024,
         &[],
-        true,
     )
     .unwrap();
 
@@ -344,7 +329,6 @@ fn test_incremental_select_removed_files() {
         1024 * 1024,
         &[],
         None,
-        true,
     )
     .unwrap();
 
@@ -373,7 +357,6 @@ fn test_should_analyze_binary_file_excluded() {
         &["c".to_string()],
         1024 * 1024,
         &[],
-        false,
     )
     .unwrap();
 
@@ -398,7 +381,6 @@ fn test_should_analyze_symlink_skipped() {
         &["c".to_string()],
         1024 * 1024,
         &[],
-        false,
     )
     .unwrap();
 
@@ -418,7 +400,6 @@ fn test_should_analyze_hidden_files_excluded() {
         &["c".to_string()],
         1024 * 1024,
         &[],
-        false,
     )
     .unwrap();
 

@@ -203,9 +203,8 @@ pub async fn run_exploit_synth(
     }
 
     tracing::info!(
-        "Running exploit synthesis on {} findings (max {} exploit(s)/finding, sandbox={})",
+        "Running exploit synthesis on {} findings (sandbox={})",
         findings.len(),
-        config.exploit.max_exploits_per_finding,
         config.exploit.sandbox_image
     );
     let phase_num = crate::scanner::pipeline::orchestrator::phase_index(&ScanPhase::ExploitSynth);

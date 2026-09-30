@@ -176,28 +176,42 @@ fn test_validate_rule_reports_missing_semgrep_binary() {
 
 #[test]
 fn test_validate_rule_accepts_valid_rule() {
-    if which::which("semgrep").is_err() {
-        return;
-    }
     let rule = "rules:\n  - id: r\n    languages: [python]\n    message: m\n    severity: WARNING\n    patterns:\n      - pattern: printf($FMT)\n";
-    assert!(
-        validate_rule(rule).is_ok(),
-        "well-formed rule should validate"
-    );
+    match which::which("semgrep") {
+        Ok(_) => assert!(
+            validate_rule(rule).is_ok(),
+            "well-formed rule should validate"
+        ),
+        // Without the binary this must still assert something real: we have to
+        // notice it is missing and say so. Returning early made the test pass
+        // green on any machine without semgrep while checking nothing.
+        Err(_) => assert!(
+            matches!(validate_rule(rule), Err(RuleError::SemgrepNotFound)),
+            "without semgrep on PATH, validate_rule must report SemgrepNotFound"
+        ),
+    }
 }
 
 #[test]
 fn test_validate_rule_rejects_malformed_rule_with_message() {
-    if which::which("semgrep").is_err() {
-        return;
-    }
-    // Missing required keys: semgrep exits non-zero, and the error must carry its output.
-    let result = validate_rule("rules:\n  - id: broken\n");
-    match result {
-        Err(RuleError::SemgrepError(msg)) => {
-            assert!(!msg.is_empty(), "semgrep error should carry output")
+    match which::which("semgrep") {
+        Ok(_) => {
+            // Missing required keys: semgrep exits non-zero, and the error must carry its output.
+            let result = validate_rule("rules:\n  - id: broken\n");
+            match result {
+                Err(RuleError::SemgrepError(msg)) => {
+                    assert!(!msg.is_empty(), "semgrep error should carry output")
+                }
+                other => panic!("expected SemgrepError, got {other:?}"),
+            }
         }
-        other => panic!("expected SemgrepError, got {other:?}"),
+        Err(_) => assert!(
+            matches!(
+                validate_rule("rules:\n  - id: broken\n"),
+                Err(RuleError::SemgrepNotFound)
+            ),
+            "without semgrep on PATH, a malformed rule must still surface as SemgrepNotFound"
+        ),
     }
 }
 
@@ -213,8 +227,17 @@ fn test_validate_rule_handles_many_rules_without_hanging() {
         "  - id: r\n    languages: [python]\n    message: m\n    severity: WARNING\n    patterns:\n      - pattern: printf($FMT)\n"
             .repeat(200)
     );
-    assert!(
-        validate_rule(&many).is_ok(),
-        "a multi-rule document should validate"
-    );
+    if which::which("semgrep").is_ok() {
+        assert!(
+            validate_rule(&many).is_ok(),
+            "a multi-rule document should validate"
+        );
+    } else {
+        // Same contract as the sibling tests: with no binary, assert that we
+        // notice and report it rather than passing without a verdict.
+        assert!(
+            matches!(validate_rule(&many), Err(RuleError::SemgrepNotFound)),
+            "without semgrep on PATH, validate_rule must report SemgrepNotFound"
+        );
+    }
 }

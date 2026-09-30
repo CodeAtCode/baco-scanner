@@ -85,9 +85,7 @@ fn test_cwe_routing_disabled_pass_through() {
     // When router is disabled (config.router.enabled = false), findings pass through unchanged
     let config = RouterConfig {
         enabled: false,
-        default_prompt: "llm_static_analysis".to_string(),
         cwe_overrides: HashMap::new(),
-        language_overrides: HashMap::new(),
     };
 
     let router = CweRouter::from_config(&config);
@@ -119,16 +117,13 @@ fn test_cwe_routing_enabled_no_cwe_override() {
     cwe_overrides.insert(
         "CWE-79".to_string(),
         PromptSpec {
-            prompt_template: "xss_specialized".to_string(),
             model_override: Some("xss-model".to_string()),
         },
     );
 
     let config = RouterConfig {
         enabled: true,
-        default_prompt: "llm_static_analysis".to_string(),
         cwe_overrides,
-        language_overrides: HashMap::new(),
     };
 
     let router = CweRouter::from_config(&config);
@@ -160,16 +155,13 @@ fn test_cwe_routing_enabled_with_cwe_override() {
     cwe_overrides.insert(
         "CWE-89".to_string(),
         PromptSpec {
-            prompt_template: "sqli_specialized".to_string(),
             model_override: Some("sqli-model".to_string()),
         },
     );
 
     let config = RouterConfig {
         enabled: true,
-        default_prompt: "llm_static_analysis".to_string(),
         cwe_overrides,
-        language_overrides: HashMap::new(),
     };
 
     let router = CweRouter::from_config(&config);
@@ -197,23 +189,19 @@ fn test_cwe_routing_multiple_findings_different_cwes() {
     cwe_overrides.insert(
         "CWE-79".to_string(),
         PromptSpec {
-            prompt_template: "xss_specialized".to_string(),
             model_override: Some("xss-model".to_string()),
         },
     );
     cwe_overrides.insert(
         "CWE-89".to_string(),
         PromptSpec {
-            prompt_template: "sqli_specialized".to_string(),
             model_override: Some("sqli-model".to_string()),
         },
     );
 
     let config = RouterConfig {
         enabled: true,
-        default_prompt: "llm_static_analysis".to_string(),
         cwe_overrides,
-        language_overrides: HashMap::new(),
     };
 
     let router = CweRouter::from_config(&config);
@@ -267,16 +255,13 @@ fn test_cwe_routing_cwe_id_format_normalization() {
     cwe_overrides.insert(
         "CWE-79".to_string(),
         PromptSpec {
-            prompt_template: "xss_specialized".to_string(),
             model_override: Some("xss-model".to_string()),
         },
     );
 
     let config = RouterConfig {
         enabled: true,
-        default_prompt: "llm_static_analysis".to_string(),
         cwe_overrides,
-        language_overrides: HashMap::new(),
     };
 
     let router = CweRouter::from_config(&config);
@@ -338,16 +323,13 @@ fn test_router_registry_merge_default_with_config() {
     cwe_overrides.insert(
         "CWE-79".to_string(),
         PromptSpec {
-            prompt_template: "xss_custom".to_string(),
             model_override: Some("custom-xss-model".to_string()),
         },
     );
 
     let config = RouterConfig {
         enabled: true,
-        default_prompt: "llm_static_analysis".to_string(),
         cwe_overrides,
-        language_overrides: HashMap::new(),
     };
 
     let router = CweRouter::from_config(&config);
@@ -433,16 +415,13 @@ fn test_router_clone_preserves_config() {
     cwe_overrides.insert(
         "CWE-79".to_string(),
         PromptSpec {
-            prompt_template: "xss_specialized".to_string(),
             model_override: Some("xss-model".to_string()),
         },
     );
 
     let config = RouterConfig {
         enabled: true,
-        default_prompt: "custom_prompt".to_string(),
         cwe_overrides,
-        language_overrides: HashMap::new(),
     };
 
     let router1 = CweRouter::from_config(&config);
@@ -453,18 +432,4 @@ fn test_router_clone_preserves_config() {
 
     assert_eq!(route1.domain, route2.domain);
     assert_eq!(route1.model_override, route2.model_override);
-    assert_eq!(router1.default_prompt(), router2.default_prompt());
-}
-
-#[test]
-fn test_router_default_prompt_access() {
-    let config = RouterConfig {
-        enabled: true,
-        default_prompt: "my_custom_prompt".to_string(),
-        cwe_overrides: HashMap::new(),
-        language_overrides: HashMap::new(),
-    };
-
-    let router = CweRouter::from_config(&config);
-    assert_eq!(router.default_prompt(), "my_custom_prompt");
 }

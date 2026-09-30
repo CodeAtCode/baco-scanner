@@ -163,10 +163,19 @@ fn test_preset_agent_flow_staging_only() {
         let mut config = ScannerConfig::default();
         preset.merge_into(&mut config);
 
-        // Agent flow should be disabled for untrusted OSS targets
+        // Agent flow should be disabled for untrusted OSS targets. This must
+        // assert the gate the scanner actually reads, per phase -- the
+        // top-level [agent_flow] section it used to check was never read by
+        // anything, so a preset could have enabled the harness and this test
+        // would still have passed.
         assert!(
-            !config.agent_flow.enabled,
-            "Preset {} should have agent_flow disabled",
+            !config
+                .llm
+                .phases
+                .security_agent_verification
+                .agent_flow
+                .enabled,
+            "Preset {} should have agent_flow disabled for security_agent_verification",
             name
         );
     }
@@ -443,11 +452,11 @@ fn test_preset_performance_per_key_merge_preserves_user_settings() {
     use baco::preset::PresetOverlay;
 
     // Create a preset that sets only ONE performance key to a NON-DEFAULT value
-    // enable_incremental_scan defaults to false, so setting it to true is explicit
+    // early_termination_threshold defaults to 1000.0, so 500.0 is explicit
     let preset = PresetOverlay {
         scanner: Some(ScannerSettings {
             performance: baco::config::PerformanceSettings {
-                enable_incremental_scan: true, // Non-default value - explicitly set
+                early_termination_threshold: 500.0, // Non-default value - explicitly set
                 ..Default::default()
             },
             ..Default::default()
@@ -457,8 +466,6 @@ fn test_preset_performance_per_key_merge_preserves_user_settings() {
 
     // Create user config with OTHER performance keys set to non-default values
     let mut config = ScannerConfig::default();
-    // enable_file_filtering defaults to true, so setting to false is explicit
-    config.scanner.performance.enable_file_filtering = false;
     // max_parallel_tasks defaults to 4, so setting to 16 is explicit
     config.scanner.performance.max_parallel_tasks = 16;
     // enable_threat_modeling defaults to false, so setting to false is... the default
@@ -467,17 +474,13 @@ fn test_preset_performance_per_key_merge_preserves_user_settings() {
 
     preset.clone().merge_into(&mut config);
 
-    // Preset key should be applied (enable_incremental_scan defaults to false, preset sets true)
-    assert!(
-        config.scanner.performance.enable_incremental_scan,
-        "Preset enable_incremental_scan = true should be applied"
+    // Preset key should be applied (early_termination_threshold defaults to 1000.0, preset sets 500.0)
+    assert_eq!(
+        config.scanner.performance.early_termination_threshold, 500.0,
+        "Preset early_termination_threshold = 500.0 should be applied"
     );
 
     // User keys should be preserved (these are non-default values in user config)
-    assert!(
-        !config.scanner.performance.enable_file_filtering,
-        "User enable_file_filtering = false should be preserved"
-    );
     assert_eq!(
         config.scanner.performance.max_parallel_tasks, 16,
         "User max_parallel_tasks = 16 should be preserved"
@@ -704,20 +707,21 @@ fn test_preset_early_termination_threshold_zero_is_not_applied_limitation() {
 }
 
 #[test]
-fn test_preset_vuln_spec_merge_does_not_wipe_user_performance_fields() {
-    // Regression test for Defect 2: preset that sets one vuln_spec field
-    // should not wipe user's other performance fields.
+fn test_preset_merge_does_not_wipe_user_performance_fields() {
+    // Regression test for Defect 2: a preset that sets one performance field
+    // must not wipe the user's other performance fields.
     use baco::config::ScannerSettings;
     use baco::preset::PresetOverlay;
 
     let preset = PresetOverlay {
         scanner: Some(ScannerSettings {
             performance: baco::config::PerformanceSettings {
-                early_termination_threshold: 0.0, // serde default (field omitted in TOML)
-                vuln_spec: baco::vuln_spec::VulnSpecConfig {
-                    enabled: true, // explicitly set
-                    ..Default::default()
-                },
+                // enable_hunt_prompts defaults to false, so true is explicit.
+                enable_hunt_prompts: true,
+                // 0.0 is serde's default and stands for "omitted in the TOML".
+                // preset.rs skips the key on 0.0 for exactly that reason, which
+                // is what lets the user's 500.0 survive the merge.
+                early_termination_threshold: 0.0,
                 ..Default::default()
             },
             ..Default::default()
@@ -727,23 +731,18 @@ fn test_preset_vuln_spec_merge_does_not_wipe_user_performance_fields() {
 
     let mut config = ScannerConfig::default();
     // User has configured various performance fields
-    config.scanner.performance.enable_incremental_scan = true;
     config.scanner.performance.max_parallel_tasks = 16;
     config.scanner.performance.early_termination_threshold = 500.0;
 
     preset.clone().merge_into(&mut config);
 
-    // VulnSpec should be merged
+    // The preset's own key should be applied
     assert!(
-        config.scanner.performance.vuln_spec.enabled,
-        "Preset vuln_spec.enabled = true should be applied"
+        config.scanner.performance.enable_hunt_prompts,
+        "Preset enable_hunt_prompts = true should be applied"
     );
 
     // User performance fields should be preserved
-    assert!(
-        config.scanner.performance.enable_incremental_scan,
-        "User enable_incremental_scan = true should be preserved"
-    );
     assert_eq!(
         config.scanner.performance.max_parallel_tasks, 16,
         "User max_parallel_tasks = 16 should be preserved"

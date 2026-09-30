@@ -193,7 +193,6 @@ fn test_parse_full_config() {
         exclude_rules = ["rust-security.insecure-crypto"]
 
         [scanner.performance]
-        enable_incremental_scan = true
         early_termination_threshold = 500.0
         enable_threat_modeling = true
         enable_root_cause_dedup = true
@@ -239,7 +238,6 @@ fn test_parse_full_config() {
         enabled = true
         max_turns = 20
         tool_timeout_secs = 60
-        trusted_paths = ["/safe/path", "./trusted"]
     "#;
 
     let config: ScannerConfig = toml::from_str(toml_str).unwrap();
@@ -980,6 +978,44 @@ fn test_eval_floor_custom() {
 // ============================================================================
 
 #[test]
+fn test_prompt_overrides_reject_phases_that_never_read_them() {
+    use baco::config::{PromptOverrides, ScannerConfig};
+
+    // The one phase that consults overrides must keep working.
+    let live = PromptOverrides {
+        phase_overrides: std::collections::HashMap::from([(
+            "llm_static_analysis".to_string(),
+            "prompts/mine.md".to_string(),
+        )]),
+    };
+    assert!(
+        ScannerConfig::validate_prompt_overrides(&live).is_ok(),
+        "llm_static_analysis consults overrides and must stay accepted"
+    );
+
+    // Any other key parses into the map and is then never read. That has to
+    // fail at load time and say which key was ignored, otherwise the config
+    // looks applied and does nothing.
+    let dead = PromptOverrides {
+        phase_overrides: std::collections::HashMap::from([
+            ("discovery".to_string(), "prompts/a.md".to_string()),
+            ("verification".to_string(), "prompts/b.md".to_string()),
+        ]),
+    };
+    let err = ScannerConfig::validate_prompt_overrides(&dead)
+        .expect_err("overrides for phases that never read them must be rejected");
+    let rendered = format!("{err:?}");
+    assert!(
+        rendered.contains("discovery") && rendered.contains("verification"),
+        "the error must name every ignored key, got: {rendered}"
+    );
+    assert!(
+        rendered.contains("llm_static_analysis"),
+        "the error must say which phase does consult overrides, got: {rendered}"
+    );
+}
+
+#[test]
 fn test_validate_errors() {
     let cases = vec![
         (
@@ -1297,7 +1333,6 @@ fn test_from_file_invalid_toml() {
 fn test_performance_settings_defaults() {
     let settings = PerformanceSettings::default();
 
-    assert!(!settings.enable_incremental_scan);
     assert!(!settings.enable_threat_modeling);
     assert!(settings.enable_root_cause_dedup);
     assert!(!settings.enable_auto_patching);
@@ -1394,7 +1429,6 @@ fn test_agent_config_custom() {
         enabled = true
         max_turns = 50
         tool_timeout_secs = 120
-        trusted_paths = ["/safe", "./trusted"]
     "#;
 
     let config: ScannerConfig = toml::from_str(toml_str).unwrap();
@@ -1403,7 +1437,6 @@ fn test_agent_config_custom() {
     assert!(agent.enabled);
     assert_eq!(agent.max_turns, 50);
     assert_eq!(agent.tool_timeout_secs, 120);
-    assert_eq!(agent.trusted_paths.len(), 2);
 }
 
 // ============================================================================
@@ -1502,12 +1535,10 @@ fn test_ticket_system_config_parsing() {
         system_type = "github"
         url = "https://github.com/org/repo"
         api_key = "ghp-token"
-        project = "myproject"
 
         [[tickets.systems]]
         system_type = "jira"
         url = "https://company.atlassian.net"
-        project = "SEC"
     "#;
 
     let config: ScannerConfig = toml::from_str(toml_str).unwrap();
@@ -1517,13 +1548,11 @@ fn test_ticket_system_config_parsing() {
     assert_eq!(github.system_type, "github");
     assert_eq!(github.url, "https://github.com/org/repo");
     assert_eq!(github.api_key, Some("ghp-token".to_string()));
-    assert_eq!(github.project, Some("myproject".to_string()));
 
     let jira = &config.tickets.systems[1];
     assert_eq!(jira.system_type, "jira");
     assert_eq!(jira.url, "https://company.atlassian.net");
     assert!(jira.api_key.is_none());
-    assert_eq!(jira.project, Some("SEC".to_string()));
 }
 
 #[test]
@@ -1559,11 +1588,6 @@ fn test_example_toml_tickets_section() {
         github_system.system_type, "github",
         "system_type should be github"
     );
-    assert_eq!(
-        github_system.project,
-        Some("libxml2".to_string()),
-        "project should be libxml2"
-    );
     assert!(
         github_system.api_key.is_none(),
         "api_key should be None in example config"
@@ -1578,12 +1602,6 @@ fn test_config_defaults() {
     assert_eq!(scaffold_config.max_rounds, 5);
     assert_eq!(scaffold_config.paths_per_target, 3);
     assert!(!scaffold_config.enabled);
-
-    // AgentFlowConfig defaults
-    let agent_flow_config = baco::config::AgentFlowConfig::default();
-    assert_eq!(agent_flow_config.max_iterations, 10);
-    assert!(!agent_flow_config.requires_instrumented_target);
-    assert!(!agent_flow_config.enabled);
 
     // NormalizationConfig defaults
     let norm_config = baco::config::NormalizationConfig::default();

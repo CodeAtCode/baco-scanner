@@ -73,11 +73,6 @@ project = "test-repo"
 #level = 2
 #auto_level = false
 
-# P5: AgentFlow multi-agent harness synthesis — arXiv:2605.11835
-#[agent_flow]
-#enabled = false
-#max_iterations = 10
-#requires_instrumented_target = false
 
 # P2.1: Truncated generation (extends [llm]) — arXiv:2605.09461
 # In [llm] section above, add:

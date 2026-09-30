@@ -119,7 +119,6 @@ fn test_run_dry_run() {
     config.output.dir = output_dir.path().to_string_lossy().to_string();
     config.scanner.max_file_size_kb = 512;
     config.scanner.exclude_paths = vec![];
-    config.scanner.performance.enable_file_filtering = false;
 
     // Call run_dry_run with quiet=true
     let result = run_dry_run(&config, target_path, true);

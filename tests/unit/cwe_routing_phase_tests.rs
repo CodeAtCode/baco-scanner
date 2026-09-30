@@ -14,15 +14,12 @@ fn enabled_config_with_cwe_override(cwe_id: &str, model: &str) -> RouterConfig {
     cwe_overrides.insert(
         cwe_id.to_string(),
         PromptSpec {
-            prompt_template: "specialized_prompt".to_string(),
             model_override: Some(model.to_string()),
         },
     );
     RouterConfig {
         enabled: true,
-        default_prompt: "llm_static_analysis".to_string(),
         cwe_overrides,
-        language_overrides: HashMap::new(),
     }
 }
 
@@ -69,9 +66,7 @@ fn test_cwe_router_normalized_cwe_id() {
 fn test_cwe_router_no_match_falls_to_default() {
     let config = RouterConfig {
         enabled: true,
-        default_prompt: "my_default_prompt".to_string(),
         cwe_overrides: HashMap::new(),
-        language_overrides: HashMap::new(),
     };
     let router = CweRouter::from_config(&config);
 
@@ -127,13 +122,6 @@ fn test_cwe_routing_phase_enabled_applies_model_overrides() {
 
     // f3: no CWE → None
     assert!(findings[2].llm_model.is_none());
-}
-
-#[test]
-fn test_cwe_router_from_scanner_config() {
-    let config = RouterConfig::default();
-    let router = CweRouter::from_scanner_config(&config);
-    assert_eq!(router.default_prompt(), "llm_static_analysis");
 }
 
 #[test]

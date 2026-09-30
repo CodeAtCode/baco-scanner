@@ -10,15 +10,16 @@ use std::path::{Path, PathBuf};
 /// Known fields that appear unused due to dynamic/serde-only consumption.
 /// Add here with justification when a field is legitimately consumed in ways
 /// that static analysis cannot detect (e.g., serde deserialization only).
+///
+/// A field belongs here only if it genuinely reaches behaviour. Three entries
+/// used to sit here with justifications that did not hold: `control_path` and
+/// `knowledge_path` were listed as "consumed via destructuring in context
+/// modules", but every `control_path` reference in `src/` is a module path
+/// (`crate::context::control_path`), and `triple_path.rs` calls `extract()` and
+/// `retrieve()` unconditionally. `language_overrides` was listed as "consumed
+/// by to_registry", which iterates only `cwe_overrides`. They were phantoms
+/// wearing a justification, and the allowlist is what kept them invisible.
 const KNOWN_CONSUMED: &[(&str, &str)] = &[
-    (
-        "control_path",
-        "Consumed via destructuring in context modules (22 refs, no dot-access)",
-    ),
-    (
-        "knowledge_path",
-        "Consumed via destructuring in context modules (4 refs, no dot-access)",
-    ),
     (
         "normalization",
         "Consumed outside config via non-field-access pattern (root_cause_dedup)",
@@ -33,10 +34,6 @@ const KNOWN_CONSUMED: &[(&str, &str)] = &[
     ),
     (
         "cwe_overrides",
-        "Consumed by in-config to_registry conversion (scanner.rs) feeding the router",
-    ),
-    (
-        "language_overrides",
         "Consumed by in-config to_registry conversion (scanner.rs) feeding the router",
     ),
 ];
@@ -103,6 +100,20 @@ fn has_external_consumer(field_name: &str, defining_file: &str, src_dir: &PathBu
         // Skip the defining file
         if let Some(file_name) = path.file_name().map(|n| n.to_string_lossy().to_string()) {
             if file_name == defining_file {
+                continue;
+            }
+            // preset.rs copies an overlay onto the base config: that is plumbing,
+            // not consumption. Counting it let every phantom pass, because the
+            // overlay names almost every field it carries.
+            if file_name == "preset.rs" {
+                continue;
+            }
+            // Likewise for config-internal helpers that move a value between two
+            // config structs without letting it affect behaviour.
+            if path.components().any(|c| c.as_os_str() == "config")
+                && file_name.ends_with(".rs")
+                && !file_name.starts_with("env.rs")
+            {
                 continue;
             }
         }

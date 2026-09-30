@@ -124,7 +124,6 @@ fn test_symlink_containment_escape() {
         &["python".to_string()],
         1024 * 1024,
         &[],
-        false,
     )
     .unwrap();
 
@@ -176,7 +175,6 @@ fn test_symlink_containment_within_root() {
         &["python".to_string()],
         1024 * 1024,
         &[],
-        false,
     )
     .unwrap();
 

@@ -29,6 +29,59 @@ fn test_record_phase_run() {
 }
 
 #[test]
+fn test_failed_phase_is_not_reported_as_a_run_or_a_skip() {
+    let mut health = ScanHealth::new();
+    health.record_phase_run(&ScanPhase::Semgrep);
+    health.mark_phase_failed(&ScanPhase::Semgrep, "semgrep exited 127");
+
+    // mark_phase_failed keeps one entry per phase rather than appending.
+    assert_eq!(health.phase_status.len(), 1);
+    assert!(matches!(
+        health.phase_status[0].status,
+        PhaseStatusKind::Failed
+    ));
+    assert_eq!(
+        health.phase_status[0].reason.as_deref(),
+        Some("semgrep exited 127")
+    );
+
+    // A dead phase is neither "ran" nor "skipped": that is the whole point,
+    // since a phase that failed used to be indistinguishable from a clean one.
+    let summary = health.summary();
+    assert!(
+        summary.contains("1 FAILED"),
+        "a failed phase must be visible in the summary, got: {summary}"
+    );
+    assert!(
+        !summary.contains("1 run, 1 skipped"),
+        "the failed phase must not still be counted as a run, got: {summary}"
+    );
+}
+
+#[test]
+fn test_mark_phase_failed_records_a_phase_it_never_saw() {
+    let mut health = ScanHealth::new();
+    health.mark_phase_failed(&ScanPhase::Indexing, "walk failed: permission denied");
+    assert_eq!(health.phase_status.len(), 1);
+    assert!(matches!(
+        health.phase_status[0].status,
+        PhaseStatusKind::Failed
+    ));
+    assert!(health.summary().contains("1 FAILED"));
+}
+
+#[test]
+fn test_summary_omits_failed_when_nothing_failed() {
+    // Keeps the pre-existing summary format stable for healthy scans.
+    let mut health = ScanHealth::new();
+    health.record_phase_run(&ScanPhase::Indexing);
+    health.record_phase_skipped(&ScanPhase::CpgSlice, "profile=core");
+    let summary = health.summary();
+    assert!(summary.contains("phases: 1 run, 1 skipped"));
+    assert!(!summary.contains("FAILED"));
+}
+
+#[test]
 fn test_record_phase_skipped_with_reason() {
     let mut health = ScanHealth::new();
     health.record_phase_skipped(

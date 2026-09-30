@@ -39,8 +39,6 @@ pub struct PresetOverlay {
     #[serde(default)]
     pub budget: Option<crate::config::BudgetConfig>,
     #[serde(default)]
-    pub agent_flow: Option<crate::config::AgentFlowConfig>,
-    #[serde(default)]
     pub agent: Option<crate::config::AgentConfig>,
     #[serde(default)]
     pub knowledge: Option<crate::config::KnowledgeConfig>,
@@ -79,12 +77,6 @@ impl PresetOverlay {
             }
             // Performance settings - merge per-key to preserve user-configured values
             // Only apply non-default values from preset (to avoid overwriting user settings)
-            if scanner.performance.enable_incremental_scan
-                != crate::config::scanner::PerformanceSettings::default().enable_incremental_scan
-            {
-                base.scanner.performance.enable_incremental_scan =
-                    scanner.performance.enable_incremental_scan;
-            }
             // early_termination_threshold has #[serde(default)] on f32, so serde default is 0.0.
             // We cannot distinguish "omitted" (0.0) from "explicitly 0.0" without changing to Option<f32>.
             // Compare against serde default (0.0) to fix defect 1: omitted field preserves user value.
@@ -93,12 +85,6 @@ impl PresetOverlay {
             if scanner.performance.early_termination_threshold != 0.0 {
                 base.scanner.performance.early_termination_threshold =
                     scanner.performance.early_termination_threshold;
-            }
-            if scanner.performance.enable_file_filtering
-                != crate::config::scanner::PerformanceSettings::default().enable_file_filtering
-            {
-                base.scanner.performance.enable_file_filtering =
-                    scanner.performance.enable_file_filtering;
             }
             if scanner.performance.max_parallel_tasks
                 != crate::config::scanner::PerformanceSettings::default().max_parallel_tasks
@@ -171,30 +157,6 @@ impl PresetOverlay {
                 base.scanner.performance.variant_search_patterns =
                     scanner.performance.variant_search_patterns.clone();
             }
-            // VulnSpec config - merge if preset has non-default values
-            if scanner.performance.vuln_spec.enabled
-                != crate::config::scanner::PerformanceSettings::default()
-                    .vuln_spec
-                    .enabled
-            {
-                base.scanner.performance.vuln_spec.enabled = scanner.performance.vuln_spec.enabled;
-            }
-            if scanner.performance.vuln_spec.db_path
-                != crate::config::scanner::PerformanceSettings::default()
-                    .vuln_spec
-                    .db_path
-            {
-                base.scanner.performance.vuln_spec.db_path =
-                    scanner.performance.vuln_spec.db_path.clone();
-            }
-            if scanner.performance.vuln_spec.auto_extract_from_patches
-                != crate::config::scanner::PerformanceSettings::default()
-                    .vuln_spec
-                    .auto_extract_from_patches
-            {
-                base.scanner.performance.vuln_spec.auto_extract_from_patches =
-                    scanner.performance.vuln_spec.auto_extract_from_patches;
-            }
         }
 
         if let Some(ref llm) = self.llm {
@@ -259,19 +221,10 @@ impl PresetOverlay {
             }
         }
 
-        if let Some(ref agent_flow) = self.agent_flow {
-            base.agent_flow.enabled = agent_flow.enabled;
-            base.agent_flow.max_iterations = agent_flow.max_iterations;
-            base.agent_flow.requires_instrumented_target = agent_flow.requires_instrumented_target;
-        }
-
         if let Some(ref agent) = self.agent {
             base.agent.enabled = agent.enabled;
             base.agent.max_turns = agent.max_turns;
             base.agent.tool_timeout_secs = agent.tool_timeout_secs;
-            if !agent.trusted_paths.is_empty() {
-                base.agent.trusted_paths = agent.trusted_paths.clone();
-            }
         }
 
         if let Some(ref knowledge) = self.knowledge {

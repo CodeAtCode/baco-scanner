@@ -1,5 +1,4 @@
-use crate::config::{default_four, default_max_file_size_kb, default_true};
-use crate::vuln_spec::schema::VulnSpecConfig;
+use crate::config::{default_four, default_max_file_size_kb};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -70,16 +69,11 @@ pub struct SemgrepSettings {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PerformanceSettings {
-    #[serde(default)]
-    pub enable_incremental_scan: bool,
     /// Early termination threshold: scan stops when Medium-and-above finding count exceeds this value.
     /// Info findings are NOT counted toward the threshold (flood-resistant). Default: 1000.0.
     /// Set to 0.0 to disable early termination.
     #[serde(default)]
     pub early_termination_threshold: f32,
-    // Phantom config keys - implemented
-    #[serde(default = "default_true")]
-    pub enable_file_filtering: bool,
     #[serde(default = "default_four")]
     pub max_parallel_tasks: usize,
     // v3 feature flags
@@ -101,9 +95,6 @@ pub struct PerformanceSettings {
     /// from the target's languages during LLM discovery
     #[serde(default)]
     pub enable_hunt_prompts: bool,
-    /// VulInSpec configuration
-    #[serde(default)]
-    pub vuln_spec: VulnSpecConfig,
     /// Never-submit pattern filter - heavily penalizes findings matching known false-positive patterns
     #[serde(default = "crate::config::default_never_submit_enabled")]
     pub never_submit_enabled: bool,
@@ -128,9 +119,7 @@ pub fn default_never_submit_multiplier() -> f32 {
 impl Default for PerformanceSettings {
     fn default() -> Self {
         Self {
-            enable_incremental_scan: false,
             early_termination_threshold: 1000.0,
-            enable_file_filtering: default_true(),
             max_parallel_tasks: default_four(),
             enable_threat_modeling: crate::config::default_enable_threat_modeling(),
             enable_root_cause_dedup: crate::config::default_enable_root_cause_dedup(),
@@ -140,7 +129,6 @@ impl Default for PerformanceSettings {
             enable_cve_bootstrap: crate::config::default_enable_cve_bootstrap(),
             enable_variant_search: crate::config::default_enable_variant_search(),
             enable_hunt_prompts: false,
-            vuln_spec: VulnSpecConfig::default(),
             never_submit_enabled: crate::config::default_never_submit_enabled(),
             never_submit_multiplier: crate::config::default_never_submit_multiplier(),
             variant_search_patterns: Vec::new(),
@@ -149,50 +137,21 @@ impl Default for PerformanceSettings {
 }
 
 /// Router configuration for MoE per-CWE / per-language routing
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct RouterConfig {
     /// Whether the router is enabled
     #[serde(default)]
     pub enabled: bool,
-    /// Default prompt template name
-    #[serde(default = "crate::config::default_llm_static_analysis")]
-    pub default_prompt: String,
     /// CWE ID -> PromptSpec overrides
     #[serde(default)]
     pub cwe_overrides: HashMap<String, PromptSpec>,
-    /// Language -> PromptSpec overrides
-    #[serde(default)]
-    pub language_overrides: HashMap<String, PromptSpec>,
-}
-
-impl Default for RouterConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            default_prompt: crate::config::default_llm_static_analysis(),
-            cwe_overrides: HashMap::new(),
-            language_overrides: HashMap::new(),
-        }
-    }
 }
 
 /// Prompt specification for router overrides
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct PromptSpec {
-    /// The prompt template name to use
-    #[serde(default = "crate::config::default_llm_static_analysis")]
-    pub prompt_template: String,
     /// Optional model override for this prompt
     pub model_override: Option<String>,
-}
-
-impl Default for PromptSpec {
-    fn default() -> Self {
-        Self {
-            prompt_template: crate::config::default_llm_static_analysis(),
-            model_override: None,
-        }
-    }
 }
 
 impl RouterConfig {

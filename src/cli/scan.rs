@@ -381,7 +381,6 @@ pub fn run_dry_run(
         &config.project.languages,
         config.scanner.max_file_size_kb * 1024,
         &config.scanner.exclude_paths,
-        config.scanner.performance.enable_file_filtering,
     )
     .unwrap_or(FileIndex {
         files: Vec::new(),

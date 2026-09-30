@@ -313,23 +313,19 @@ fn test_cwe_routing_with_model_overrides() {
     cwe_overrides.insert(
         "CWE-79".to_string(),
         PromptSpec {
-            prompt_template: "xss_specialized".to_string(),
             model_override: Some("xss-model".to_string()),
         },
     );
     cwe_overrides.insert(
         "CWE-89".to_string(),
         PromptSpec {
-            prompt_template: "sqli_specialized".to_string(),
             model_override: Some("sqli-model".to_string()),
         },
     );
 
     let config = RouterConfig {
         enabled: true,
-        default_prompt: "llm_static_analysis".to_string(),
         cwe_overrides,
-        language_overrides: HashMap::new(),
     };
 
     let router = CweRouter::from_config(&config);

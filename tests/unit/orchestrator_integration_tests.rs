@@ -60,7 +60,6 @@ fn create_test_scanner_config() -> ScannerConfig {
         policy_sampling: Default::default(),
         agent_scaffold: Default::default(),
         pacvd: Default::default(),
-        agent_flow: Default::default(),
         vuln_spec: Default::default(),
         citation_verification: Default::default(),
         prior_runs: Default::default(),
@@ -508,10 +507,8 @@ fn test_scanner_config_defaults() {
 fn test_scanner_config_custom_performance_settings() {
     let mut config = create_test_scanner_config();
     config.scanner.performance.early_termination_threshold = 10.0;
-    config.scanner.performance.enable_incremental_scan = true;
 
     assert_eq!(config.scanner.performance.early_termination_threshold, 10.0);
-    assert!(config.scanner.performance.enable_incremental_scan);
 }
 // ============================================================================
 // Test: Early Exit When Scan Complete

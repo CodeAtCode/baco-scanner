@@ -34,7 +34,6 @@ fn test_route_by_cwe_unknown_has_no_domain() {
 fn test_router_config_default() {
     let config = RouterConfig::default();
     assert!(!config.enabled);
-    assert_eq!(config.default_prompt, "llm_static_analysis");
     assert!(config.cwe_overrides.is_empty());
 }
 
@@ -90,16 +89,13 @@ fn test_model_override_propagation() {
     cwe_overrides.insert(
         "CWE-89".to_string(),
         PromptSpec {
-            prompt_template: "llm_static_analysis".to_string(),
             model_override: Some("special-model".to_string()),
         },
     );
 
     let config = RouterConfig {
         enabled: true,
-        default_prompt: "llm_static_analysis".to_string(),
         cwe_overrides,
-        language_overrides: HashMap::new(),
     };
 
     let router = CweRouter::from_config(&config);
@@ -109,23 +105,13 @@ fn test_model_override_propagation() {
     assert_eq!(route.model_override.as_deref(), Some("special-model"));
 }
 
-/// Default prompt accessible from router
 #[test]
-fn test_cwe_router_default_prompt() {
-    let router = CweRouter::default();
-    assert_eq!(router.default_prompt(), "llm_static_analysis");
-}
-
-/// Custom default prompt from config
-#[test]
-fn test_cwe_router_custom_default_prompt() {
+fn test_cwe_router_from_config_accepts_empty_overrides() {
     let config = RouterConfig {
         enabled: true,
-        default_prompt: "my_custom_prompt".to_string(),
         cwe_overrides: HashMap::new(),
-        language_overrides: HashMap::new(),
     };
 
     let router = CweRouter::from_config(&config);
-    assert_eq!(router.default_prompt(), "my_custom_prompt");
+    assert_eq!(router.route_cwe("CWE-79").domain.as_deref(), Some("xss"));
 }

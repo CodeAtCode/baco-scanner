@@ -121,10 +121,16 @@ async fn test_semgrep_phase_error_handling() {
         project_stack: &project_stack,
     };
     let result = run_phase(&scanner, phase_config).await;
-    assert!(result.is_ok());
-    let (updated, _, _) = result.unwrap();
-    // Verify findings are preserved when semgrep path doesn't exist
-    assert_eq!(updated.len(), findings.len());
+
+    // A dead semgrep must report an error. Folding it into Ok is what made a
+    // failed scan indistinguishable from a clean one, and this test is the one
+    // that used to certify that.
+    let err = result.expect_err("a failing semgrep must not be reported as a success");
+    let message = err.to_string();
+    assert!(
+        message.contains("semgrep"),
+        "the error must name the phase that died, got: {message}"
+    );
 }
 
 // ============================================================================
@@ -933,8 +939,17 @@ async fn run_phase_list(
             config,
             project_stack,
         };
-        let result = run_phase(scanner, phase_config).await.unwrap();
-        current_findings = result.0;
+        // Mirror production: a phase that dies does not abort the chain and the
+        // findings gathered so far survive. The orchestrator records the failure
+        // in the health report; unwrapping here modelled a stricter contract
+        // than the scanner has, which is how the silent-failure path went
+        // unnoticed for so long.
+        match run_phase(scanner, phase_config).await {
+            Ok(result) => current_findings = result.0,
+            Err(e) => {
+                tracing::warn!("phase {phase:?} failed during chain: {e}");
+            }
+        }
     }
     current_findings
 }
@@ -991,9 +1006,15 @@ async fn test_semgrep_phase_with_nonexistent_path() {
         project_stack: &project_stack,
     };
 
-    let result = run_phase(&scanner, phase_config).await.unwrap();
-    // Should return findings unchanged when path doesn't exist
-    assert_eq!(result.0.len(), 1);
+    // Findings gathered by earlier phases are the orchestrator's job to keep;
+    // the phase only has to say it died, and say which phase.
+    let err = run_phase(&scanner, phase_config)
+        .await
+        .expect_err("semgrep against a missing path must fail loudly");
+    assert!(
+        err.to_string().contains("semgrep"),
+        "error must be attributable to the semgrep phase, got: {err}"
+    );
 }
 
 #[tokio::test]
@@ -1592,6 +1613,67 @@ async fn test_confidence_scoring_with_findings() {
     assert_eq!(updated.len(), findings.len());
 }
 
+// ConfidenceScoring must actually apply the [normalization] tier when it is on.
+#[tokio::test]
+async fn test_confidence_scoring_applies_the_configured_normalization_tier() {
+    use baco::config::NormalizationTier;
+
+    // Each run gets its own output dir so neither inherits a baseline written
+    // by the other; a missing baseline and one carrying a previous run's
+    // findings are not the same state.
+    async fn confidence_after(tier: NormalizationTier, enabled: bool) -> f32 {
+        let temp = TempDir::new().unwrap();
+        let scanner = create_test_scanner();
+        let mut config = create_test_config();
+        config.scanner.performance.enable_confidence_refinement = true;
+        config.output.dir = temp.path().to_string_lossy().to_string();
+        config.normalization.enabled = enabled;
+        config.normalization.normalization_tier = tier;
+
+        let pb = ProgressBar::hidden();
+        let metrics_tracker = LlmMetricsTracker::new();
+        let analyzed_files: Vec<String> = vec![];
+        let target_path = PathBuf::from(".");
+        let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
+        let findings = vec![create_test_finding("norm-1", Severity::High)];
+
+        let phase_config = PhaseConfig {
+            phase: &ScanPhase::ConfidenceScoring,
+            findings,
+            pb: &pb,
+            analyzed_files: &analyzed_files,
+            metrics_tracker: &metrics_tracker,
+            target_path: &target_path,
+            config: &config,
+            project_stack: &project_stack,
+        };
+
+        let result = run_phase(&scanner, phase_config)
+            .await
+            .expect("confidence scoring must succeed");
+        result.0[0].confidence_score
+    }
+
+    let off = confidence_after(NormalizationTier::None, false).await;
+
+    // Tier None means "no adjustment", so switching normalization on must not
+    // move the score. This is the arm that regresses if the call is dropped:
+    // the wiring would quietly stop happening.
+    let none_tier = confidence_after(NormalizationTier::None, true).await;
+    assert_eq!(
+        none_tier, off,
+        "tier None must leave the score untouched even with normalization enabled"
+    );
+
+    // ProjectRelative on an all-true-positive baseline gives fp_rate 0, which
+    // the tier scales up by 1.2, so a 0.9 score has to move.
+    let relative = confidence_after(NormalizationTier::ProjectRelative, true).await;
+    assert!(
+        relative > off,
+        "tier ProjectRelative must change the score (got {relative}, baseline {off})"
+    );
+}
+
 // RootCauseDedup with actual findings
 #[tokio::test]
 async fn test_root_cause_dedup_with_findings() {
@@ -1815,7 +1897,6 @@ async fn test_llm_static_analysis_phase_with_mockito() {
     config.triage.enabled = false;
     config.priority.enabled = false;
     config.vuln_spec.enabled = false;
-    config.scanner.performance.enable_file_filtering = false;
     config.output.dir = temp.path().to_string_lossy().to_string();
 
     let scanner = Scanner::new(config.clone(), temp.path().to_path_buf(), false);
@@ -1944,7 +2025,6 @@ async fn test_llm_static_analysis_triage_cascade_with_mockito() {
     config.triage.suspicion_threshold = 0.5;
     config.priority.enabled = false;
     config.vuln_spec.enabled = false;
-    config.scanner.performance.enable_file_filtering = false;
     config.output.dir = temp.path().to_string_lossy().to_string();
 
     let scanner = Scanner::new(config.clone(), temp.path().to_path_buf(), false);
@@ -1974,6 +2054,158 @@ async fn test_llm_static_analysis_triage_cascade_with_mockito() {
     assert!(
         updated.iter().all(|f| f.file_path.ends_with("vuln.rs")),
         "only vuln.rs should be analyzed (safe.rs below threshold)"
+    );
+}
+
+#[tokio::test]
+async fn test_triage_model_config_selects_the_model_that_classifies_files() {
+    let temp = TempDir::new().unwrap();
+    let vuln_path = temp.path().join("vuln.rs").to_string_lossy().to_string();
+    let safe_path = temp.path().join("safe.rs").to_string_lossy().to_string();
+    std::fs::write(
+        temp.path().join("vuln.rs"),
+        "fn vuln() {\n    let x = 1;\n}\n",
+    )
+    .unwrap();
+    std::fs::write(
+        temp.path().join("safe.rs"),
+        "fn safe() {\n    let y = 2;\n}\n",
+    )
+    .unwrap();
+
+    let mut server = mockito::Server::new_async().await;
+
+    let findings_inner = format!(
+        "{{\"findings\": [{{\"file\": \"{}\", \"summary_one_line\": \"vuln\", \"suspicion\": 0.8, \"reason\": \"test\"}}, {{\"file\": \"{}\", \"summary_one_line\": \"safe\", \"suspicion\": 0.1, \"reason\": \"test\"}}]}}",
+        vuln_path.replace('"', "\\\""),
+        safe_path.replace('"', "\\\"")
+    );
+    let triage_body = format!(
+        "{{\"choices\": [{{\"message\": {{\"content\": \"{}\"}}}}]}}",
+        findings_inner.replace('"', "\\\"")
+    );
+
+    // The triage request is only served when it carries the configured triage
+    // model. Drop `Some(&config.triage.model)` from the client construction and
+    // this mock stops matching, triage silently degrades to "analyse
+    // everything", and the assertion below about safe.rs being filtered out
+    // fails. That is the point: the test dies with the behaviour, not with the
+    // plumbing.
+    let _triage_mock = server
+        .mock("POST", "/v1/chat/completions")
+        .match_body(mockito::Matcher::AllOf(vec![
+            mockito::Matcher::Regex("security triage".to_string()),
+            mockito::Matcher::Regex("triage-canary-model".to_string()),
+        ]))
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(triage_body)
+        .create();
+
+    let _analysis_mock = server
+        .mock("POST", "/v1/chat/completions")
+        .match_body(mockito::Matcher::Regex("security expert".to_string()))
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(
+            r#"{"choices": [{"message": {"content": "[{\"severity\": \"high\", \"title\": \"Buffer Overflow\", \"description\": \"Potential buffer overflow\", \"line\": 2, \"cwe_id\": \"CWE-120\"}]"}}]}"#,
+        )
+        .create();
+
+    let mut config = create_test_config();
+    config.llm.phases.static_analysis.base_url = server.url();
+    config.llm.phases.static_analysis.api_key = Some("k".to_string());
+    config.llm.phases.static_analysis.models = vec!["analysis-phase-model".to_string()];
+    config.project.languages = vec!["rust".to_string()];
+    config.triage.enabled = true;
+    config.triage.model = "triage-canary-model".to_string();
+    config.triage.suspicion_threshold = 0.5;
+    config.priority.enabled = false;
+    config.vuln_spec.enabled = false;
+    config.output.dir = temp.path().to_string_lossy().to_string();
+
+    let scanner = Scanner::new(config.clone(), temp.path().to_path_buf(), false);
+    let pb = ProgressBar::hidden();
+    let metrics_tracker = LlmMetricsTracker::new();
+    let analyzed_files: Vec<String> = vec![];
+    let target_path = temp.path().to_path_buf();
+    let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
+    let phase = ScanPhase::LlmStaticAnalysis;
+    let phase_config = PhaseConfig {
+        phase: &phase,
+        findings: vec![],
+        pb: &pb,
+        analyzed_files: &analyzed_files,
+        metrics_tracker: &metrics_tracker,
+        target_path: &target_path,
+        config: &config,
+        project_stack: &project_stack,
+    };
+
+    let result = run_phase(&scanner, phase_config).await;
+    assert!(result.is_ok());
+    let (updated, _, _) = result.unwrap();
+    assert!(
+        updated.iter().all(|f| f.file_path.ends_with("vuln.rs")),
+        "triage must have run on the configured model and filtered safe.rs out; \
+         if it did not, the triage client is not honouring triage.model"
+    );
+}
+
+#[test]
+fn test_triage_snippet_reads_the_file_or_reports_why_it_cannot() {
+    use baco::scanner::phases::llm_phases::static_analysis::{
+        TRIAGE_SNIPPET_LINES, triage_snippet,
+    };
+
+    let temp = TempDir::new().unwrap();
+
+    // A readable file yields its first lines, flattened onto one line.
+    let readable = temp.path().join("readable.rs");
+    std::fs::write(&readable, "fn a() {}\nfn b() {}\n").unwrap();
+    let snippet = triage_snippet(&readable, TRIAGE_SNIPPET_LINES)
+        .expect("a readable file must yield a snippet");
+    assert_eq!(snippet, "fn a() {} fn b() {}");
+
+    // An unreadable file is an error, not an empty string. This is the
+    // assertion the fix rests on: `unwrap_or_default()` returned Ok(""), the
+    // file reached triage as an empty snippet, scored near zero, and came out
+    // of the scan indistinguishable from a file holding nothing of interest.
+    let binary = temp.path().join("binary.rs");
+    std::fs::write(&binary, [0xFFu8, 0xFE, 0x00, 0x01]).unwrap();
+    let err = triage_snippet(&binary, TRIAGE_SNIPPET_LINES)
+        .expect_err("a non-UTF-8 file must not become an empty snippet");
+    assert!(
+        err.to_string().contains("UTF-8"),
+        "the error must name the decode failure, got: {err}"
+    );
+
+    // A missing file is an error too, not an empty snippet.
+    assert!(
+        triage_snippet(&temp.path().join("nope.rs"), TRIAGE_SNIPPET_LINES).is_err(),
+        "a missing file must be an error, not an empty snippet"
+    );
+}
+
+#[test]
+fn test_triage_snippet_stops_at_the_line_budget() {
+    use baco::scanner::phases::llm_phases::static_analysis::triage_snippet;
+
+    let temp = TempDir::new().unwrap();
+    let path = temp.path().join("long.rs");
+    let body: String = (0..100).map(|i| format!("line{i}\n")).collect();
+    std::fs::write(&path, body).unwrap();
+
+    let snippet = triage_snippet(&path, 30).unwrap();
+    assert_eq!(snippet.split_whitespace().count(), 30);
+    assert!(
+        snippet.starts_with("line0 "),
+        "got: {}",
+        &snippet[..20.min(snippet.len())]
+    );
+    assert!(
+        !snippet.contains("line99"),
+        "content past the budget leaked through"
     );
 }
 

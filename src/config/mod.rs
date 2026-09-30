@@ -86,8 +86,6 @@ pub struct ScannerConfig {
     #[serde(default)]
     pub eval: EvalConfig,
     #[serde(default)]
-    pub agent_flow: AgentFlowConfig,
-    #[serde(default)]
     pub vuln_spec: VulnSpecConfig,
     #[serde(default)]
     pub citation_verification: CitationVerificationConfig,
@@ -307,6 +305,7 @@ impl ScannerConfig {
                 message: format!("Project path does not exist: {}", self.project.path),
             });
         }
+        Self::validate_prompt_overrides(&self.llm.phases.prompt_overrides)?;
         if which::which("semgrep").is_err() {
             return Err(ConfigError::MissingDependency {
                 tool: "Semgrep".to_string(),
@@ -317,6 +316,35 @@ impl ScannerConfig {
             });
         }
         Ok(())
+    }
+
+    /// Phases that actually consult `[llm.phases.prompt_overrides.phases]`.
+    ///
+    /// The map accepts any key, so an override for a phase that never reads it
+    /// parses cleanly and is then silently ignored -- a config that looks
+    /// applied and does nothing. Naming the dead key at load time is the only
+    /// way the user finds out.
+    const OVERRIDABLE_PROMPT_PHASES: &[&str] = &["llm_static_analysis"];
+
+    pub fn validate_prompt_overrides(overrides: &PromptOverrides) -> Result<(), ConfigError> {
+        let mut ignored: Vec<&str> = overrides
+            .phase_overrides
+            .keys()
+            .map(String::as_str)
+            .filter(|phase| !Self::OVERRIDABLE_PROMPT_PHASES.contains(phase))
+            .collect();
+        if ignored.is_empty() {
+            return Ok(());
+        }
+        ignored.sort_unstable();
+        Err(ConfigError::Validation {
+            field: "llm.phases.prompt_overrides.phases".to_string(),
+            message: format!(
+                "prompt override(s) for {} will never be read; only {} consult(s) overrides",
+                ignored.join(", "),
+                Self::OVERRIDABLE_PROMPT_PHASES.join(", ")
+            ),
+        })
     }
 }
 
@@ -387,10 +415,6 @@ pub fn default_max_turns() -> u32 {
 
 pub fn default_tool_timeout() -> u64 {
     30
-}
-
-pub fn default_trusted_paths() -> Vec<String> {
-    vec![".".to_string()]
 }
 
 pub fn default_true() -> bool {
