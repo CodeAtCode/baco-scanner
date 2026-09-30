@@ -239,6 +239,114 @@ fn test_path_traversal_rejection() {
 }
 
 #[test]
+fn test_absolute_path_inside_project_is_verified_not_rejected() {
+    // The indexer canonicalises, so every finding carries an absolute path. A
+    // check for a leading `/` marked all of them Failed and skipped the
+    // existence and line-range checks entirely -- the phase reported failure
+    // without having looked at anything.
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("test.rs");
+    let mut file = File::create(&file_path).unwrap();
+    writeln!(file, "line 1").unwrap();
+    writeln!(file, "line 2").unwrap();
+
+    let finding = make_finding(file_path.to_string_lossy().to_string(), Some(2));
+    let mut findings = vec![finding];
+    let report = verify_citations(&mut findings, temp_dir.path());
+
+    assert_eq!(
+        report.failed, 0,
+        "an absolute path inside the project is valid"
+    );
+    assert_eq!(report.passed, 1);
+    assert_eq!(findings[0].verification_status, None);
+}
+
+#[test]
+fn test_absolute_path_outside_project_is_rejected() {
+    // The containment check still has to reject a citation that leaves the
+    // tree, which is what the old shape check was reaching for.
+    let temp_dir = TempDir::new().unwrap();
+    let outside = std::env::temp_dir().join("citation-verification-outside-target.rs");
+    std::fs::write(&outside, "line 1\n").unwrap();
+
+    let finding = make_finding(outside.to_string_lossy().to_string(), Some(1));
+    let mut findings = vec![finding];
+    let report = verify_citations(&mut findings, temp_dir.path());
+
+    std::fs::remove_file(&outside).ok();
+
+    assert_eq!(
+        report.failed, 1,
+        "a path outside the project must be rejected"
+    );
+    assert_eq!(
+        findings[0].verification_status,
+        Some(baco::findings::VerificationStatus::Failed)
+    );
+    assert!(
+        findings[0]
+            .verification_notes
+            .as_deref()
+            .unwrap_or_default()
+            .contains("outside the scanned project"),
+        "the note must say why, got {:?}",
+        findings[0].verification_notes
+    );
+}
+
+#[test]
+fn test_absolute_path_beyond_eof_still_checks_the_line() {
+    // The regression that motivated the fix: with the shape check in place the
+    // line check never ran. It must run now, for an absolute path too.
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("short.rs");
+    std::fs::write(&file_path, "line 1\nline 2\n").unwrap();
+
+    let finding = make_finding(file_path.to_string_lossy().to_string(), Some(3894));
+    let mut findings = vec![finding];
+    let report = verify_citations(&mut findings, temp_dir.path());
+
+    assert_eq!(report.failed, 1);
+    assert_eq!(
+        findings[0].verification_status,
+        Some(baco::findings::VerificationStatus::Failed)
+    );
+    assert!(
+        findings[0]
+            .verification_notes
+            .as_deref()
+            .unwrap_or_default()
+            .contains("out of range"),
+        "the note must name the real reason, not path rejection, got {:?}",
+        findings[0].verification_notes
+    );
+}
+
+#[test]
+fn test_absolute_path_in_missing_file_inside_project_reports_missing() {
+    // A path that resolves inside the project but does not exist is not an
+    // escape: it must be reported as missing, so the note says what is wrong.
+    let temp_dir = TempDir::new().unwrap();
+    let missing = temp_dir.path().join("gone.rs");
+
+    let finding = make_finding(missing.to_string_lossy().to_string(), Some(1));
+    let mut findings = vec![finding];
+    let report = verify_citations(&mut findings, temp_dir.path());
+
+    assert_eq!(report.failed, 1);
+    assert!(
+        findings[0]
+            .verification_notes
+            .as_deref()
+            .unwrap_or_default()
+            .contains("not found or unreadable"),
+        "got {:?}",
+        findings[0].verification_notes
+    );
+}
+
+#[test]
 fn test_absolute_path_rejection() {
     let temp_dir = TempDir::new().unwrap();
     let file_path = temp_dir.path().join("test.rs");

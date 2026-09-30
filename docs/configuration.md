@@ -19,6 +19,23 @@ model = "mistral-small"
 max_parallel_tasks = 4
 ```
 
+## Unknown Keys Are Rejected
+
+A config key that no setting owns fails the load, with the key named and the
+keys that section does accept:
+
+```
+unknown field `enabled`, expected one of `rulesets`, `exclude_rules`, `custom_rules`
+```
+
+This applies to nested keys too. The alternative, which is what baco did before,
+is that an unknown key parses cleanly and is then dropped — leaving a config
+that looks applied and does nothing. That failure mode is silent and it hides
+settings that were renamed or removed, so the load fails instead.
+
+If a config you carried over is rejected, the message names the key that is no
+longer recognised.
+
 **Experimental sections** (disabled by default):
 - `[cpg]` — CPG-guided slicing (requires Joern binary)
 - `[validate]` — LLM-as-judge rationale validation
@@ -844,7 +861,6 @@ check against.
 | `triage`     | `enabled`, `model`, `batch_size`, `suspicion_threshold`                   |
 | `priority`   | `enabled`, `git_recent_boost`, `entry_point_boost`, `small_file_boost`    |
 | `budget`     | `enabled`, `max_llm_calls`, `reserve_percent_for_high_risk`               |
-| `agent_flow` | `enabled`, `max_iterations`                                                |
 | `agent`      | `enabled`, `max_turns`, `tool_timeout_secs`               |
 | `knowledge`  | `fp_patterns` (map of CWE → list of false-positive indicator strings), `required_security_primitives` (map of language → list of required primitives), `hook_registry` (map of language → HookRegistryLanguageConfig with `hook_label`, `registrations` regexes with optional `(?P<hook>)` capture, `handler_patterns` override) |
 

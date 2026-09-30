@@ -56,11 +56,17 @@ pub fn verify_citations(
 
         let file_path = project_path.join(&finding.file_path);
 
-        // Reject absolute paths and path traversal attempts
-        if finding.file_path.starts_with('/') || finding.file_path.contains("..") {
+        // Reject a citation that points outside the project.
+        //
+        // The test is containment, not shape. The scanner emits absolute paths
+        // (the indexer canonicalises), so a leading `/` says nothing about
+        // whether a citation is legitimate -- checking for one marked every
+        // finding Failed and skipped the existence and line-range checks that
+        // are the entire point of this phase.
+        if escapes_project(&finding.file_path, &file_path, project_path) {
             finding.verification_status = Some(crate::findings::VerificationStatus::Failed);
             let note = format!(
-                "citation verification failed: path traversal rejected: {}",
+                "citation verification failed: path outside the scanned project: {}",
                 finding.file_path
             );
             append_verification_note(&mut finding.verification_notes, &note);
@@ -123,6 +129,35 @@ pub fn verify_citations(
     );
 
     report
+}
+
+/// Whether a finding's citation points outside the scanned project.
+///
+/// Three cases, and the middle one is the reason this is not a `starts_with('/')`
+/// check:
+///
+/// - a `..` component: traversal by construction
+/// - an absolute path inside the project: legitimate, and what every finding
+///   from the scanner looks like
+/// - a resolved path under the project root: legitimate
+///
+/// A target that cannot be canonicalised because it does not exist is not an
+/// escape; the missing-file branch reports it with a more accurate reason. An
+/// unresolvable *root*, on the other hand, means containment cannot be checked
+/// at all, and that fails closed.
+fn escapes_project(finding_path: &str, resolved: &Path, project_root: &Path) -> bool {
+    if finding_path
+        .split(['/', '\\'])
+        .any(|segment| segment == "..")
+    {
+        return true;
+    }
+
+    match (project_root.canonicalize(), resolved.canonicalize()) {
+        (Ok(root), Ok(target)) => !target.starts_with(&root),
+        (Ok(_), Err(_)) => false,
+        (Err(_), _) => true,
+    }
 }
 
 /// Append a note to the verification_notes field, initializing it if needed.
