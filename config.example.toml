@@ -53,14 +53,8 @@ rulesets = [
 exclude_rules = ["html.security.plaintext-http-link", "html.security.plaintext-http-link.plaintext-http-link"]
 
 [scanner.performance]
-# Enable incremental scanning - skips unchanged files based on SHA256 hash comparison
-# When enabled, file hashes are persisted to output dir and compared on subsequent runs
-# Default: false (full rescan on every run)
-enable_incremental_scan = false
 # Maximum number of parallel tasks for scanning operations
 max_parallel_tasks = 4
-# Enable file filtering to reduce false positives
-enable_file_filtering = true
 
 # --- Phase enable flags ---
 # Each flag controls whether a specific analysis phase runs during the scan.
@@ -181,8 +175,6 @@ system_type = "github"
 url = "https://github.com/GNOME/libxml2"
 # Optional API key for authentication
 # api_key = "your-github-token"  # optional, or set env: TICKET_GITHUB_KEY
-# Optional project key/ID for filtering
-project = "libxml2"
 
 # Agent configuration (advanced: automatic remediation agent)
 # Uncomment and configure to enable the agent-based remediation system.
@@ -207,8 +199,6 @@ project = "libxml2"
 # sandbox_image = "python:3.11-slim"
 # Timeout for exploit execution in seconds
 # timeout_secs = 30
-# Maximum number of exploit attempts per finding
-# max_exploits_per_finding = 1
 
 # Soundness validation (CORRECT paper)
 [validate]
@@ -219,10 +209,13 @@ project = "libxml2"
 
 # Citation verification gate: deterministic checks that report citations
 # (file existence, line ranges) match the scanned tree before rendering.
-# Findings failing the check get demoted confidence and a note.
-# Default: false
+# Findings whose citation does not resolve get verification_status = failed
+# and a note. Their confidence is left alone: it is the model's own estimate,
+# and scaling it says nothing about how wrong the citation is. Whether failed
+# findings reach the report is the [output] evidence_gate setting.
+# Default: true
 [citation_verification]
-enabled = false
+enabled = true
 
 # Prior-runs store: cross-run findings history for skip directives and
 # coverage gap targeting on subsequent scans of the same output dir.
