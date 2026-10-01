@@ -2,7 +2,6 @@ use super::helpers::extract_function_name_from_finding;
 use crate::agent;
 use crate::checkpoint::ScanPhase;
 use crate::error::ScanResult;
-use crate::findings::VerificationStatus;
 use crate::findings::VulnerabilityFinding;
 use crate::indexer::ExcludeMatcher;
 use crate::scanner::phases::PhaseConfig;
@@ -168,12 +167,18 @@ pub fn apply_agent_result(
 }
 
 /// Record a failed agent verification on the finding.
+///
+/// This is called when the agent itself fails (timeout, tool failure, parse error, network).
+/// The finding's verification_status is NOT set to Failed, because the agent did not examine
+/// the finding. Instead, the error is recorded in verification_error and verification_notes.
 pub fn apply_agent_failure(
     finding: &mut VulnerabilityFinding,
     error: &str,
     scaffold_context: Option<String>,
 ) {
-    finding.verification_status = Some(VerificationStatus::Failed);
+    // Do NOT set verification_status to Failed - the agent did not examine the finding.
+    // The error category is recorded in verification_error and verification_notes.
+    finding.verification_error = Some(error.to_string());
     if scaffold_context.is_some() && finding.verification_notes.is_none() {
         finding.verification_notes = scaffold_context;
     } else {
@@ -182,7 +187,7 @@ pub fn apply_agent_failure(
     finding.add_evidence(
         crate::evidence::EvidenceSource::SecurityAgentVerification("agent_verification".into()),
         1.0,
-        format!("Agent verification result: Failed - {}", error),
+        format!("Agent verification error (not examined): {}", error),
     );
 }
 
@@ -556,18 +561,23 @@ pub async fn run_security_agent_verification(
     let base = pb.position();
 
     if !config.agent.enabled {
-        tracing::debug!("Agent mode disabled, skipping Security Agent verification");
+        tracing::warn!(
+            "Security Agent verification skipped: agent not enabled (set agent.enabled = true in config)"
+        );
         pb.set_message(format!(
             "Phase {}/{}: Agent mode disabled - skipping",
             phase_num, total
         ));
         pb.set_position(base + 100);
+        // The orchestrator already records this as Skipped via
+        // detect_llm_config_skips, which derives the reason from config.llm.phases.
+        // Returning an error here would mark the phase Failed and override it.
         return Ok((findings, analyzed_files.to_vec()));
     }
 
     let Some(_api_key) = &config.llm.phases.security_agent_verification.api_key else {
-        tracing::debug!(
-            "No API key for security_agent_verification, skipping Security Agent verification"
+        tracing::warn!(
+            "Security Agent verification skipped: no API key configured (set llm.phases.security_agent_verification.api_key in config)"
         );
         pb.set_message(format!(
             "Phase {}/{}: No API key - skipping",

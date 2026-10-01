@@ -99,17 +99,69 @@ fn is_function_like(kind: &str) -> bool {
     )
 }
 
+/// Whether a declared statement range can refer to this file.
+///
+/// The range arrives from the model as a pair of line numbers and nothing checked
+/// it against the file. A range past the end of the file, or one that runs
+/// backwards, reaches the reader as though it were located there. Absent is
+/// representable, so an impossible range is dropped rather than shown.
+fn statement_range_fits(finding: &VulnerabilityFinding, content: &str) -> bool {
+    let Some((start, end)) = finding.statement_range else {
+        return true;
+    };
+    if start == 0 || start > end {
+        return false;
+    }
+    let line_count = content.lines().count() as u32;
+    start <= line_count && end <= line_count
+}
+
 /// Check every finding's line against the function its title names.
 ///
 /// The reported line is the model's estimate; the function name in the title is
 /// something it read. Where they disagree and the name is in the file, the name
 /// wins -- and that holds for a chunked file too, because the ranges come from
 /// the whole file rather than the slice the model saw.
-fn anchor_against_ast(
+pub fn anchor_against_ast(
     findings: &mut [VulnerabilityFinding],
     content: &str,
     language: Option<&str>,
 ) {
+    // The snippet is replaced from the file first, and unconditionally: a
+    // finding with no line still has a file, and a hallucinated snippet shown
+    // to the verifier is worse than no snippet at all.
+    let mut restated = 0usize;
+    for finding in findings.iter_mut() {
+        if replace_snippet_from_source(finding, content) {
+            restated += 1;
+        }
+    }
+    if restated > 0 {
+        tracing::warn!(
+            "{} finding(s) had a code snippet that did not match the file; \
+             restated from the source",
+            restated
+        );
+    }
+
+    // Checked against the file before anything else, because unlike the line it
+    // needs no language and no function map: a range past the end of the file is
+    // impossible whatever language this is.
+    let mut dropped_range = 0usize;
+    for finding in findings.iter_mut() {
+        if !statement_range_fits(finding, content) {
+            finding.statement_range = None;
+            dropped_range += 1;
+        }
+    }
+    if dropped_range > 0 {
+        tracing::warn!(
+            "{} finding(s) declared a statement range the file does not contain; \
+             dropped it",
+            dropped_range
+        );
+    }
+
     let Some(language) = language else {
         return;
     };
@@ -141,6 +193,67 @@ fn anchor_against_ast(
             unknown
         );
     }
+}
+
+/// Replace a finding's code snippet with the real lines from the file.
+///
+/// The model reproduces the vulnerable lines from memory, and what it
+/// reproduces is what the verifier is shown as `>>> VULNERABLE CODE <<<` and
+/// what the patcher is asked to fix. When the text is not in the file it is
+/// being offered as evidence for a line, so it is dropped rather than kept as
+/// decoration.
+///
+/// Returns whether anything was changed.
+fn replace_snippet_from_source(finding: &mut VulnerabilityFinding, content: &str) -> bool {
+    let Some(snippet) = finding.code_snippet.as_deref().map(str::trim) else {
+        return false;
+    };
+    if snippet.is_empty() {
+        // An empty snippet is absence, not a mismatch, and the blind-verdict
+        // cap already treats it as no code shown.
+        finding.code_snippet = None;
+        return false;
+    }
+
+    let file_lines: Vec<&str> = content.lines().collect();
+    let substantive: Vec<&str> = snippet
+        .lines()
+        .map(str::trim)
+        .filter(|l| {
+            !l.is_empty() && !l.starts_with("--- Context") && *l != ">>> VULNERABLE CODE <<<"
+        })
+        .collect();
+    if substantive.is_empty() {
+        finding.code_snippet = None;
+        return false;
+    }
+
+    // Every non-trivial line the model claimed must appear in the file. One
+    // invented line means the whole snippet is suspect.
+    let present = substantive
+        .iter()
+        .all(|claimed| file_lines.iter().any(|actual| actual.trim() == *claimed));
+    if present {
+        return false;
+    }
+
+    let Some(line) = finding.line_number.map(|l| l as usize).filter(|l| *l > 0) else {
+        finding.code_snippet = None;
+        return true;
+    };
+    let start = line.saturating_sub(3);
+    let end = (line + 4).min(file_lines.len());
+    if start >= end {
+        finding.code_snippet = None;
+        return true;
+    }
+
+    let mut out = String::new();
+    for (i, text) in file_lines[start..end].iter().enumerate() {
+        out.push_str(&format!("{:5}: {}\n", start + i + 1, text));
+    }
+    finding.code_snippet = Some(out);
+    true
 }
 
 /// What happened to a finding's line when checked against the AST.
@@ -183,13 +296,21 @@ pub fn anchor_finding_line(
         Some(line) if (start..=end).contains(&(line as usize)) => LineAnchor::AlreadyInside,
         _ => {
             finding.line_number = Some(start as u32);
+            // code_location is a second copy of the same fact, and the CPG
+            // router reads it rather than line_number. Moving the line without
+            // moving this leaves the consumer reading the line we just
+            // corrected away from.
+            finding.code_location = Some(format!("{}:{}", finding.file_path, start));
             LineAnchor::MovedToDefinition
         }
     }
 }
 
 /// `name(` occurrences in a finding title, in order.
-fn function_names_in_title(title: &str) -> Vec<String> {
+///
+/// Public so the verifier can ask which function a finding is about without
+/// duplicating the rule.
+pub fn function_names_in_title(title: &str) -> Vec<String> {
     let bytes = title.as_bytes();
     let mut out = Vec::new();
     let mut i = 0;
@@ -533,6 +654,11 @@ fn line_end(content: &str, byte: usize) -> usize {
 /// - The prompt's JSON example (rendered at test time or prompt-build time)
 /// - The parser's field extraction logic
 ///
+/// A field listed here is one the parser reads. `exploit_scenario`,
+/// `attack_complexity` and `false_positive_probability` were listed and required
+/// while no code read them, so the model was paying for output that was
+/// discarded on arrival.
+///
 /// Format: (field_name, json_type, is_required)
 pub const STATIC_ANALYSIS_FIELDS: &[(&str, &str, bool)] = &[
     ("severity", "string", true),
@@ -541,13 +667,9 @@ pub const STATIC_ANALYSIS_FIELDS: &[(&str, &str, bool)] = &[
     ("line", "integer", true),
     ("cwe_id", "string", true),
     ("code_snippet", "object", true), // { before, code, after }
-    ("exploit_scenario", "string", true),
-    ("attack_complexity", "string", true),
-    ("impact", "string", true),
     ("fix_code", "string", true),
     ("diff_hunk", "string", true),
     ("recommendation", "string", true),
-    ("false_positive_probability", "string", true),
 ];
 
 /// Field specification for verification batch JSON output (prompt↔parser contract).
@@ -1584,31 +1706,16 @@ impl LlmAnalyzer {
                                 .to_string()
                         };
 
-                    // Extract diff_hunk from JSON if provided (unified diff format)
+                    // Only a real diff goes in a field named diff_hunk. It used
+                    // to fall back to fix_code, then to code_snippet.after --
+                    // so a suggested replacement was rendered under a "diff"
+                    // heading in the report, which reads as an applicable patch
+                    // and is not one. Absence is representable; use it.
                     let diff_hunk = item
                         .get("diff_hunk")
                         .and_then(|v| v.as_str())
                         .filter(|s| !s.is_empty())
-                        .map(|s| s.to_string())
-                        // Fallback to fix_code if diff_hunk not provided
-                        .or_else(|| {
-                            item.get("fix_code")
-                                .and_then(|v| v.as_str())
-                                .filter(|s| !s.is_empty())
-                                .map(|s| s.to_string())
-                        })
-                        // Fallback to after field if neither diff_hunk nor fix_code provided
-                        .or_else(|| {
-                            if let Some(obj) = item.get("code_snippet").and_then(|v| v.as_object())
-                            {
-                                obj.get("after")
-                                    .and_then(|v| v.as_str())
-                                    .filter(|s| !s.is_empty())
-                                    .map(|s| s.to_string())
-                            } else {
-                                None
-                            }
-                        });
+                        .map(|s| s.to_string());
 
                     // Parse statement_range from JSON: [start_line, end_line]
                     let statement_range = item

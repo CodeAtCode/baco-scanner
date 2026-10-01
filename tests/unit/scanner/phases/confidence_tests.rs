@@ -6,7 +6,7 @@ use crate::fixtures::create_minimal_finding;
 use baco::confidence_refinement::{
     ConfidenceFactor, ConfidenceRefinementPhase, HistoricalData, RefinedConfidence,
 };
-use baco::findings::{Severity, TriageVerdict, VerificationStatus};
+use baco::findings::VerificationStatus;
 
 // ============================================================================
 // HistoricalData Tests
@@ -357,21 +357,6 @@ fn test_confidence_never_submit_penalty() {
             .iter()
             .any(|f| matches!(f, ConfidenceFactor::NeverSubmitMatch { .. }))
     );
-}
-
-#[test]
-fn test_confidence_severity_downgrade() {
-    let phase = ConfidenceRefinementPhase::new();
-    let mut finding = create_minimal_finding();
-    finding.confidence_score = 0.7;
-    finding.triage_verdict = Some(TriageVerdict::Downgrade {
-        adjusted_severity: Severity::Medium,
-    });
-
-    let result = phase.refine_confidence(&finding, &Default::default(), true, 0.1);
-
-    // Should be reduced by 0.15
-    assert!((result.refined_score - 0.55).abs() < 1e-5);
 }
 
 // ============================================================================

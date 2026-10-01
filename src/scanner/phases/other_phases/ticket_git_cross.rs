@@ -52,6 +52,19 @@ pub async fn run_ticket_cross_ref(
     Ok((findings, analyzed_files.to_vec()))
 }
 
+/// Whether `path` sits inside a git repository.
+///
+/// Walks up from `path` looking for `.git`, which is how git itself decides
+/// whether it is in a work tree. Cheap, and it does not need git to work.
+///
+/// Public for tests: the warning it decides between is otherwise only reachable
+/// through an async phase that needs a whole scanner.
+pub fn looks_like_a_repository(path: &std::path::Path) -> bool {
+    path.ancestors()
+        .take(64)
+        .any(|dir| dir.join(".git").exists())
+}
+
 /// Run Git analysis phase (phase 12 of 23).
 pub async fn run_git_analysis(
     _scanner: &crate::scanner::Scanner,
@@ -111,7 +124,15 @@ pub async fn run_git_analysis(
             }
         }
         Err(git_err) => {
-            tracing::warn!("Git analysis failed: {} - skipping Git phase", git_err);
+            // Scanning an extracted archive is normal, and this fired on every
+            // such run. A channel that shouts every time is a channel nobody
+            // reads, which is how the triage fallback going silent went
+            // unnoticed twice. Only a real repository failing is a warning.
+            if looks_like_a_repository(target_path) {
+                tracing::warn!("Git analysis failed in a git repository: {git_err}");
+            } else {
+                tracing::debug!("No git repository at {}: {git_err}", target_path.display());
+            }
         }
     }
     pb.set_position(pb.position() + 100);

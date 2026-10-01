@@ -275,10 +275,7 @@ Analysis criteria:
 Return JSON with format:
 {
   "verification_status": "confirmed|false_positive|needs_review",
-  "verification_notes": "detailed reasoning",
-  "confidence": 0.0-1.0,
-  "mitigating_factors": ["optional mitigation 1", ...],
-  "related_patterns": ["optional pattern 1", ...]
+  "verification_notes": "detailed reasoning"
 }
 "#.to_string()
     }

@@ -890,6 +890,16 @@ pub(super) async fn run_scanner(
             "\u{1B}[33m[SCAN HEALTH] WARNING: zero LLM calls recorded — LLM phases were skipped or misconfigured (run `baco doctor`)\u{1B}[0m"
         );
     }
+    // The condition above is satisfied by a single triage call, so it stays
+    // silent through the failure it should catch: files the indexer found, and
+    // nothing analysed them. That reads as a clean scan of nothing.
+    if crate::scan_health::scan_analysed_nothing(health.files.indexed, health.files.analyzed) {
+        eprintln!(
+            "\u{1B}[33m[SCAN HEALTH] WARNING: {} file(s) indexed but 0 analysed — \
+             a phase silently dropped every file; the report below reflects nothing being scanned\u{1B}[0m",
+            health.files.indexed
+        );
+    }
     eprintln!("\n{}", health.summary());
 
     // Re-write the final report with the scan_health section, preserving early-termination info

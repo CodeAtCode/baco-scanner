@@ -452,13 +452,10 @@ fn test_parse_llm_response_with_fix_code() {
     assert_eq!(findings.len(), 1);
 
     let finding = &findings[0];
-    assert_eq!(
-        finding.diff_hunk,
-        Some(
-            "reader = xmlReaderForFile(filename, NULL, XML_PARSE_NOENT | XML_PARSE_NONET);"
-                .to_string()
-        )
-    );
+    // No diff_hunk key in the reply. It used to fall back to fix_code and
+    // then to code_snippet.after, so suggested replacement code was carried
+    // under a field named diff_hunk and rendered as though it applied.
+    assert_eq!(finding.diff_hunk, None);
 }
 
 #[test]
@@ -489,10 +486,10 @@ fn test_parse_llm_response_without_fix_code_uses_after() {
 
     let finding = &findings[0];
     assert_eq!(finding.cwe_id, Some("CWE-22".to_string()));
-    assert_eq!(
-        finding.diff_hunk,
-        Some("char *validated = validate_path(input); open(validated, O_RDONLY);".to_string())
-    );
+    // No diff_hunk key in the reply. It used to fall back to fix_code and
+    // then to code_snippet.after, so suggested replacement code was carried
+    // under a field named diff_hunk and rendered as though it applied.
+    assert_eq!(finding.diff_hunk, None);
 }
 
 #[test]
@@ -549,7 +546,10 @@ fn test_parse_llm_response_empty_code_snippet() {
     assert_eq!(findings.len(), 1);
 
     let finding = &findings[0];
-    assert_eq!(finding.diff_hunk, Some("Use env vars".to_string()));
+    // No diff_hunk key in the reply. It used to fall back to fix_code,
+    // so a suggested replacement was carried under a field named diff_hunk
+    // and rendered in the report as though it were an applicable patch.
+    assert_eq!(finding.diff_hunk, None);
 }
 
 #[test]
@@ -575,7 +575,10 @@ fn test_parse_llm_response_missing_code_snippet() {
     assert_eq!(findings.len(), 1);
 
     let finding = &findings[0];
-    assert_eq!(finding.diff_hunk, Some("Remove var".to_string()));
+    // No diff_hunk key in the reply. It used to fall back to fix_code,
+    // so a suggested replacement was carried under a field named diff_hunk
+    // and rendered in the report as though it were an applicable patch.
+    assert_eq!(finding.diff_hunk, None);
 }
 
 #[test]
@@ -945,7 +948,20 @@ fn test_parse_code_snippet_with_before_after() {
 
     let finding = &findings[0];
     assert_eq!(finding.cwe_id, Some("CWE-89".to_string()));
-    assert!(finding.diff_hunk.is_some());
+    // No diff_hunk key in the reply. It used to fall back to fix_code, so the
+    // suggested replacement was carried under a field named diff_hunk and
+    // rendered in the report as though it were an applicable patch. It is a
+    // suggestion, so absence is the honest value.
+    assert_eq!(finding.diff_hunk, None);
+    // fix_code is not dropped: it is what the recommendation is built from.
+    assert!(
+        finding
+            .recommendation
+            .as_deref()
+            .is_some_and(|r| r.contains("parameterized")),
+        "got {:?}",
+        finding.recommendation
+    );
 }
 
 #[test]
@@ -978,7 +994,10 @@ fn test_parse_code_snippet_empty_before_after() {
     assert_eq!(findings.len(), 1);
 
     let finding = &findings[0];
-    assert_eq!(finding.diff_hunk, Some("Use env vars".to_string()));
+    // No diff_hunk key in the reply. It used to fall back to fix_code,
+    // so a suggested replacement was carried under a field named diff_hunk
+    // and rendered in the report as though it were an applicable patch.
+    assert_eq!(finding.diff_hunk, None);
 }
 
 #[test]
@@ -1006,7 +1025,10 @@ fn test_parse_code_snippet_missing() {
     assert_eq!(findings.len(), 1);
 
     let finding = &findings[0];
-    assert_eq!(finding.diff_hunk, Some("Remove var".to_string()));
+    // No diff_hunk key in the reply. It used to fall back to fix_code,
+    // so a suggested replacement was carried under a field named diff_hunk
+    // and rendered in the report as though it were an applicable patch.
+    assert_eq!(finding.diff_hunk, None);
 }
 
 // ============================================================================

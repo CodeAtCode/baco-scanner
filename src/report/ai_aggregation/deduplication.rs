@@ -1,7 +1,7 @@
 //! Semantic deduplication logic for findings
 
 use super::enrichment::EnrichmentService;
-use crate::findings::{Severity, VulnerabilityFinding};
+use crate::findings::{Severity, VerificationStatus, VulnerabilityFinding};
 use crate::llm::ChatMessage;
 use std::collections::HashSet;
 
@@ -97,35 +97,8 @@ impl DeduplicationService {
                 candidates.push(findings[dup_idx].clone());
             }
 
-            let best = candidates.into_iter().max_by(|a, b| {
-                let severity_cmp = match (a.severity, b.severity) {
-                    (Severity::Critical, Severity::Critical) => std::cmp::Ordering::Equal,
-                    (Severity::Critical, _) => std::cmp::Ordering::Greater,
-                    (_, Severity::Critical) => std::cmp::Ordering::Less,
-                    (Severity::High, Severity::High) => std::cmp::Ordering::Equal,
-                    (Severity::High, Severity::Medium | Severity::Low | Severity::Info) => {
-                        std::cmp::Ordering::Greater
-                    }
-                    (Severity::Medium | Severity::Low | Severity::Info, Severity::High) => {
-                        std::cmp::Ordering::Less
-                    }
-                    (Severity::Medium, Severity::Medium) => std::cmp::Ordering::Equal,
-                    (Severity::Medium, Severity::Low | Severity::Info) => {
-                        std::cmp::Ordering::Greater
-                    }
-                    (Severity::Low | Severity::Info, Severity::Medium) => std::cmp::Ordering::Less,
-                    (Severity::Low, Severity::Low) => std::cmp::Ordering::Equal,
-                    (Severity::Low, Severity::Info) => std::cmp::Ordering::Greater,
-                    (Severity::Info, Severity::Low) => std::cmp::Ordering::Less,
-                    (Severity::Info, Severity::Info) => std::cmp::Ordering::Equal,
-                };
-
-                severity_cmp.then_with(|| {
-                    b.confidence_score
-                        .partial_cmp(&a.confidence_score)
-                        .unwrap_or(std::cmp::Ordering::Equal)
-                })
-            });
+            // Use the merge comparator to select the best candidate
+            let best = candidates.into_iter().max_by(dedup_merge_comparator);
 
             if let Some(best_finding) = best {
                 deduplicated.push(best_finding);
@@ -143,4 +116,62 @@ impl DeduplicationService {
         );
         deduplicated
     }
+}
+
+/// Merge comparator for selecting the best candidate when merging duplicate findings.
+///
+/// Priority order:
+/// 1. Verification status: Confirmed beats FalsePositive regardless of severity/confidence
+/// 2. Severity: Higher severity wins
+/// 3. Confidence: Higher confidence wins as tiebreaker
+pub fn dedup_merge_comparator(
+    a: &VulnerabilityFinding,
+    b: &VulnerabilityFinding,
+) -> std::cmp::Ordering {
+    // Verification status takes absolute priority: Confirmed beats FalsePositive
+    let status_a = a.verification_status;
+    let status_b = b.verification_status;
+
+    // If one is Confirmed and the other is FalsePositive, Confirmed wins
+    if status_a == Some(VerificationStatus::Confirmed)
+        && status_b == Some(VerificationStatus::FalsePositive)
+    {
+        return std::cmp::Ordering::Greater;
+    }
+    if status_b == Some(VerificationStatus::Confirmed)
+        && status_a == Some(VerificationStatus::FalsePositive)
+    {
+        return std::cmp::Ordering::Less;
+    }
+
+    // Otherwise, fall back to severity-then-confidence ordering
+    let severity_cmp = match (a.severity, b.severity) {
+        (Severity::Critical, Severity::Critical) => std::cmp::Ordering::Equal,
+        (Severity::Critical, _) => std::cmp::Ordering::Greater,
+        (_, Severity::Critical) => std::cmp::Ordering::Less,
+        (Severity::High, Severity::High) => std::cmp::Ordering::Equal,
+        (Severity::High, Severity::Medium | Severity::Low | Severity::Info) => {
+            std::cmp::Ordering::Greater
+        }
+        (Severity::Medium | Severity::Low | Severity::Info, Severity::High) => {
+            std::cmp::Ordering::Less
+        }
+        (Severity::Medium, Severity::Medium) => std::cmp::Ordering::Equal,
+        (Severity::Medium, Severity::Low | Severity::Info) => std::cmp::Ordering::Greater,
+        (Severity::Low | Severity::Info, Severity::Medium) => std::cmp::Ordering::Less,
+        (Severity::Low, Severity::Low) => std::cmp::Ordering::Equal,
+        (Severity::Low, Severity::Info) => std::cmp::Ordering::Greater,
+        (Severity::Info, Severity::Low) => std::cmp::Ordering::Less,
+        (Severity::Info, Severity::Info) => std::cmp::Ordering::Equal,
+    };
+
+    severity_cmp.then_with(|| {
+        // Higher confidence wins. This used to be b.partial_cmp(&a), which is
+        // reversed: under max_by a Greater result means "this element is the
+        // maximum", so the old form selected the LOWER confidence of two
+        // findings of equal severity.
+        a.confidence_score
+            .partial_cmp(&b.confidence_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    })
 }

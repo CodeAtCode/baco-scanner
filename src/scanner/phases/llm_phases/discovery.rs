@@ -296,6 +296,20 @@ pub async fn run_llm_discovery(
                         finding.cwe_id = converted.cwe_id.or(finding.cwe_id.clone());
                         finding.line_number = converted.line_number.or(finding.line_number);
                         finding.diff_hunk = converted.diff_hunk.or(finding.diff_hunk.clone());
+                        // The agent's line arrives from the same model that
+                        // estimated it before, so re-anchor it against the AST
+                        // rather than letting it replace a corrected one.
+                        if let Ok(source) = std::fs::read_to_string(&finding.file_path) {
+                            let language = std::path::Path::new(&finding.file_path)
+                                .extension()
+                                .and_then(|e| e.to_str())
+                                .and_then(crate::indexer::language_for_extension);
+                            crate::llm_analysis::anchor_against_ast(
+                                std::slice::from_mut(&mut finding),
+                                &source,
+                                language,
+                            );
+                        }
                         if finding.agent_evidence_path.is_none() {
                             finding.agent_evidence_path = converted.agent_evidence_path;
                         }

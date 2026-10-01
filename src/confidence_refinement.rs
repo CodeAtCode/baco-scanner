@@ -10,7 +10,7 @@
 
 use crate::analysis_context::AnalysisContext;
 use crate::config::{NormalizationConfig, NormalizationTier};
-use crate::findings::{Severity, TriageVerdict, VerificationStatus, VulnerabilityFinding};
+use crate::findings::{VerificationStatus, VulnerabilityFinding};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
@@ -63,11 +63,6 @@ pub enum ConfidenceFactor {
     RationaleValidated,
     /// Never-submit pattern matched - finding should not be reported
     NeverSubmitMatch { pattern: String },
-    /// Pre-severity downgrade gate - theoretical impact rather than demonstrated
-    SeverityDowngrade {
-        original_severity: Severity,
-        reason: String,
-    },
 }
 
 /// Historical data for confidence refinement.
@@ -102,11 +97,20 @@ fn matches_pattern_collection(
 ) -> bool {
     if let Some(patterns) = patterns.get(cwe_id) {
         for pattern in patterns {
-            if regex::Regex::new(pattern)
-                .map(|re| re.is_match(code))
-                .unwrap_or(false)
-            {
-                return true;
+            match regex::Regex::new(pattern) {
+                Ok(re) => {
+                    if re.is_match(code) {
+                        return true;
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "Pattern compilation failed for CWE='{}', pattern='{}': {}",
+                        cwe_id,
+                        pattern,
+                        e
+                    );
+                }
             }
         }
     }
@@ -173,7 +177,7 @@ impl HistoricalData {
         data.never_submit_patterns = vec![
             (
                 "CWE-693".to_string(),
-                r"missing.*header|content\.security\.policy|X-Frame-Options|HSTS".to_string(),
+                r"(?i)missing.*header|content\.security\.policy|x-frame-options|hsts".to_string(),
             ),
             ("CWE-601".to_string(), r"open.redirect".to_string()),
             (
@@ -226,9 +230,19 @@ impl HistoricalData {
         .to_lowercase();
 
         for (cwe_or_keyword, pattern) in &self.never_submit_patterns {
-            if let Ok(re) = regex::Regex::new(pattern) {
-                if re.is_match(&text) {
-                    return Some(format!("Never-submit pattern matched: {}", cwe_or_keyword));
+            match regex::Regex::new(pattern) {
+                Ok(re) => {
+                    if re.is_match(&text) {
+                        return Some(format!("Never-submit pattern matched: {}", cwe_or_keyword));
+                    }
+                }
+                Err(e) => {
+                    tracing::error!(
+                        "Never-submit pattern compilation failed for pattern='{}' (CWE/keyword='{}'): {}",
+                        pattern,
+                        cwe_or_keyword,
+                        e
+                    );
                 }
             }
         }
@@ -503,20 +517,6 @@ impl ConfidenceRefinementPhase {
                     match_desc,
                     finding.title
                 );
-            }
-        }
-
-        // Factor 12: Pre-severity downgrade gate
-        // Lower confidence when concrete impact proof is theoretical rather than demonstrated
-        if let Some(triage_verdict) = &finding.triage_verdict {
-            if matches!(triage_verdict, TriageVerdict::Downgrade { .. }) {
-                refined_score = (refined_score - 0.15).max(0.0);
-                factors.push(ConfidenceFactor::SeverityDowngrade {
-                    original_severity: finding.severity,
-                    reason: "Impact assessment is theoretical rather than demonstrated".to_string(),
-                });
-                explanations
-                    .push("Pre-severity downgrade gate applied - theoretical impact".to_string());
             }
         }
 

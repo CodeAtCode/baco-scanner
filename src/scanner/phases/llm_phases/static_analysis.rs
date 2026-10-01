@@ -622,8 +622,15 @@ pub fn triage_snippet(path: &std::path::Path, max_lines: usize) -> std::io::Resu
         .join(" "))
 }
 
-async fn run_triage_cascade<'a>(
-    client: &crate::llm::LlmClient,
+/// Triage files in batches, classifying each as interesting or not.
+///
+/// Takes the `LlmChatClient` trait rather than the concrete `LlmClient` so the
+/// classification can be tested against a scripted reply. The reply is the whole
+/// input here -- the function has no other judgement of its own -- and the bug
+/// this test exists for is entirely about what happens when the reply is a valid
+/// JSON that simply omits a file.
+pub async fn run_triage_cascade<'a>(
+    client: &impl crate::llm::LlmChatClient,
     files: &'a [crate::indexer::FileInfo],
     analyzed_files: &[String],
     batch_size: u8,
@@ -757,6 +764,32 @@ Files to analyze:
                             }
                         }
                     }
+                }
+
+                // The loop above walks the MODEL's findings, so a file that was
+                // submitted and not named in the reply lands in neither output
+                // vector: never analysed, never reported skipped, silently gone.
+                // A malformed reply is handled above; a well-formed one that
+                // simply omits a file is not a failure, and treating it as a
+                // verdict is what produced scans reporting zero findings.
+                let mut unnamed = 0usize;
+                for f in batch {
+                    let path = f.path.to_string_lossy().to_string();
+                    let classified = files_to_analyze
+                        .iter()
+                        .any(|x| x.path.to_string_lossy() == path)
+                        || skipped_files.contains(&path);
+                    if !classified && !analyzed_files.contains(&path) {
+                        files_to_analyze.push(f);
+                        unnamed += 1;
+                    }
+                }
+                if unnamed > 0 {
+                    tracing::warn!(
+                        "[Triage] {} submitted file(s) were not named in the triage reply \
+                         and were not classified; analysing them anyway",
+                        unnamed
+                    );
                 }
             }
             Err(e) => {

@@ -121,25 +121,28 @@ pub fn generate_html_report(
         r#"<div class="metadata-item"><div class="metadata-label">AI Models</div><div class="metadata-value">Not configured</div></div>"#.to_string()
     };
 
-    let stats = calculate_severity_stats(findings);
+    let stats = calculate_severity_stats(&filtered_findings);
     let filter_buttons_html = build_filter_buttons(&stats);
     let summary_cards_html = build_summary_cards(&stats);
 
-    let avg_confidence = if findings.is_empty() {
+    let avg_confidence = if filtered_findings.is_empty() {
         0.0
     } else {
-        findings
+        filtered_findings
             .iter()
             .map(|f| f.confidence_score as f64)
             .sum::<f64>()
-            / findings.len() as f64
+            / filtered_findings.len() as f64
     };
 
-    let verified = findings
+    let verified = filtered_findings
         .iter()
         .filter(|f| f.verification_status.is_some())
         .count();
-    let already_reported = findings.iter().filter(|f| f.already_reported).count();
+    let already_reported = filtered_findings
+        .iter()
+        .filter(|f| f.already_reported)
+        .count();
 
     let empty_state = if total_findings == 0 {
         build_empty_state_message()
@@ -164,7 +167,7 @@ pub fn generate_html_report(
 
         if !priority_findings.is_empty() {
             findings_html.push_str(r#"<div class="priority-section">"#);
-            findings_html.push_str(r#"<h2>🚨 Priority Findings (Critical & High)</h2>"#);
+            findings_html.push_str(r#"<h2>Priority Findings (Critical & High)</h2>"#);
 
             let mut sorted_priority = priority_findings;
             sorted_priority.sort_by_key(|a| std::cmp::Reverse(a.severity));

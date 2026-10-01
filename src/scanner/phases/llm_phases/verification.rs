@@ -99,6 +99,83 @@ pub fn judge_saw_no_code(finding: &VulnerabilityFinding) -> bool {
     no_snippet && finding.line_number.is_none()
 }
 
+/// Refute a confirmed finding by reading the code, not the model's opinion of it.
+///
+/// The seven gate questions are the model judging itself: it is shown ±5 lines
+/// around the anchored line and asked whether a guard is present. When the guard
+/// is there but outside that window, or the model simply misreads it, it answers
+/// "no" and the finding survives.
+///
+/// This asks the same question the detection phase asks, from the same code. If
+/// the function the title names contains a required security primitive, the
+/// finding is a false positive -- decided by reading the body, not by asking.
+/// No LLM call is involved, and the two phases can no longer disagree about
+/// what a primitive is.
+///
+/// Only ever downgrades. A finding that is not confirmed is left alone.
+pub fn refute_with_primitive_check(
+    finding: &VulnerabilityFinding,
+    status: VerificationStatus,
+    notes: &str,
+    primitives: &std::collections::HashMap<String, Vec<String>>,
+) -> (VerificationStatus, String) {
+    if status != VerificationStatus::Confirmed {
+        return (status, notes.to_string());
+    }
+    if let Some((_body, found)) = anchored_body_containing_primitive(finding, primitives) {
+        let reason = format!(
+            "not confirmed: {} found in the body of the function this finding names",
+            found
+        );
+        let merged = if notes.trim().is_empty() {
+            reason
+        } else {
+            format!("{notes} ({reason})")
+        };
+        return (VerificationStatus::FalsePositive, merged);
+    }
+    (status, notes.to_string())
+}
+
+/// The body of the function the title names, if it contains a primitive.
+///
+/// Returns the body and which primitive matched, so the reason names the
+/// evidence rather than asserting that a check happened.
+fn anchored_body_containing_primitive(
+    finding: &VulnerabilityFinding,
+    primitives: &std::collections::HashMap<String, Vec<String>>,
+) -> Option<(String, String)> {
+    let language = extract_language_from_path(&finding.file_path);
+    let for_language = primitives.get(&language)?;
+    if for_language.is_empty() {
+        return None;
+    }
+    let name = crate::llm_analysis::function_names_in_title(&finding.title)
+        .into_iter()
+        .next()?;
+    let content = std::fs::read_to_string(&finding.file_path).ok()?;
+    let ranges = crate::llm_analysis::function_line_ranges(&content, &language);
+    let (start, end) = *ranges.get(&name)?;
+
+    let body = body_of(&content, start, end)?;
+    let found = for_language
+        .iter()
+        .find(|p| !p.is_empty() && body.contains(p.as_str()))?
+        .clone();
+    Some((body, found))
+}
+
+/// The function body, by its 1-indexed line range.
+fn body_of(content: &str, start_line: usize, end_line: usize) -> Option<String> {
+    let lines: Vec<&str> = content.lines().collect();
+    let from = start_line.checked_sub(1)?;
+    let to = end_line.min(lines.len());
+    if from >= to {
+        return None;
+    }
+    Some(lines[from..to].join("\n"))
+}
+
 /// Cap a verdict on a finding the judge was shown nothing for.
 ///
 /// A real finding can reach here without a line: a chunked file whose reported
@@ -227,12 +304,8 @@ pub fn build_stable_verification_prefix(
              \"consequence\": \"specific security impact\",\n\
              \"is_theoretical\": true|false\n\
            },\n\
-           \"triage_verdict\": \"pass|kill|downgrade|needs_review\",\n\
            \"verification_status\": \"confirmed|false_positive|needs_review\",\n\
-           \"verification_notes\": \"detailed reasoning including gate answers\",\n\
-           \"confidence\": 0.0-1.0,\n\
-           \"mitigating_factors\": [\"optional mitigation 1\", ...],\n\
-           \"related_patterns\": [\"optional pattern 1\", ...]\n\
+           \"verification_notes\": \"detailed reasoning including gate answers and seven-question gate application\"\n\
          }\n\n\
          ## Skeptical gate — before you emit\n\n\
          ## Untrusted content\n\n\
@@ -696,6 +769,12 @@ pub async fn run_llm_verification(
                     if i < batch_results.len() {
                         let (status, notes) = &batch_results[i];
                         let (status, notes) = cap_blind_verdict(*status, finding, notes);
+                        let (status, notes) = refute_with_primitive_check(
+                            finding,
+                            status,
+                            &notes,
+                            &config.knowledge.required_security_primitives,
+                        );
                         finding.verification_status = Some(status);
                         finding.verification_notes = Some(notes.clone());
                         finding.add_evidence(
@@ -757,6 +836,12 @@ pub async fn run_llm_verification(
                         let (status, notes) =
                             parse_verification_verdict(&response_with_model.content);
                         let (status, notes) = cap_blind_verdict(status, finding, &notes);
+                        let (status, notes) = refute_with_primitive_check(
+                            finding,
+                            status,
+                            &notes,
+                            &config.knowledge.required_security_primitives,
+                        );
                         finding.verification_status = Some(status);
                         finding.verification_notes = Some(notes);
                         finding.add_evidence(

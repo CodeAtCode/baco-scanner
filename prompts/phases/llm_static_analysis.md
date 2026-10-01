@@ -165,13 +165,9 @@ Return valid JSON with ALL these fields (complete detail required):
     "line": <line number>,
     "cwe_id": "CWE-[NUMBER]",
     "code_snippet": {"before": "context lines before vulnerability", "code": "exact vulnerable lines", "after": "context lines after"} — include the exact vulnerable lines with a few lines of context before/after,
-    "exploit_scenario": "Complete attack walkthrough: 1) Attacker does X, 2) Sends payload Y, 3) Buffer overflow occurs at line Z, 4) Return address overwritten with shellcode, 5) RCE achieved. Include example payload.",
-    "attack_complexity": "low|medium|high",
-    "impact": "RCE|Data Exfiltration|DoS|Privilege Escalation",
     "fix_code": "Complete corrected code with the vulnerability fixed",
     "diff_hunk": "Git diff showing before/after",
     "recommendation": "Specific remediation steps",
-    "false_positive_probability": "low|medium|high"
   }
 ]
 ```
@@ -185,13 +181,9 @@ Return valid JSON with ALL these fields (complete detail required):
     "line": <exact line number where vulnerability occurs>,
     "cwe_id": "CWE-XXX (MUST be valid: CWE-79, CWE-89, CWE-119, CWE-120, CWE-416, CWE-22, CWE-78, CWE-502, etc.)",
     "code_snippet": {"before": "context lines before vulnerability", "code": "exact vulnerable lines", "after": "context lines after"} — include the exact vulnerable lines with a few lines of context before/after,
-    "exploit_scenario": "Concrete example: 'An attacker sends HTTP request with 512-byte header to /upload endpoint, causing buffer overflow at line 156 and overwriting return address to achieve RCE'",
-    "attack_complexity": "low|medium|high (based on prerequisites)",
-    "impact": "RCE|Data Theft|DoS|Privilege Escalation|Information Disclosure",
     "fix_code": "COMPLETE secure version of the code. Include:\n- Proper input validation\n- Error handling\n- Safe API usage\n- Comments explaining WHY this is secure",
     "diff_hunk": "Unified diff format showing EXACT changes needed:\n@@ -line,line +line,line @@\n context line\n-vulnerable code\n+secure code\n context line",
     "recommendation": "Specific remediation steps beyond just the code fix",
-    "false_positive_probability": "low|medium|high (if uncertain, explain why)"
   }
 ]
 ```

@@ -8,7 +8,7 @@ use baco::confidence_refinement::{
     normalize_confidence,
 };
 use baco::config::{NormalizationConfig, NormalizationTier};
-use baco::findings::{Severity, TriageVerdict, VerificationStatus, VulnerabilityFinding};
+use baco::findings::{Severity, VerificationStatus, VulnerabilityFinding};
 use tempfile::TempDir;
 
 use crate::fixtures::make_aggregation_finding;
@@ -661,25 +661,6 @@ fn test_refinement_with_rationale_validated() {
             .factors
             .contains(&ConfidenceFactor::RationaleValidated)
     );
-}
-
-#[test]
-fn test_refinement_with_downgrade_triage_verdict() {
-    let phase = ConfidenceRefinementPhase::new();
-    let context = AnalysisContext::default();
-
-    let mut finding = create_test_finding("f1", "Downgraded", "test.rs", 10, Severity::High, 0.7);
-    finding.triage_verdict = Some(TriageVerdict::Downgrade {
-        adjusted_severity: Severity::Medium,
-    });
-
-    let results = phase.run(vec![finding], &context, true, 0.1);
-    let refinement = results.get("f1").unwrap();
-
-    assert!(refinement.refined_score < refinement.original_score);
-    // Check that severity downgrade factor was applied
-    let has_downgrade = refinement.factors.iter().any(|f| matches!(f, ConfidenceFactor::SeverityDowngrade { original_severity, reason: _ } if *original_severity == Severity::High));
-    assert!(has_downgrade);
 }
 
 // ============================================================================

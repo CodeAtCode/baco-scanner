@@ -178,24 +178,46 @@ impl AgentSession {
                     // Parse final response for finding data
                     if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&response.content)
                     {
-                        let title = parsed
+                        // A response with no title is not a finding. Returning
+                        // one called "Agent finding" put a plausible row in the
+                        // report with nothing behind it, and nothing logged that
+                        // the model had said nothing useful.
+                        let Some(title) = parsed
                             .get("title")
                             .and_then(|v| v.as_str())
-                            .unwrap_or("Agent finding")
-                            .to_string();
+                            .map(str::trim)
+                            .filter(|t| !t.is_empty())
+                        else {
+                            return Err(format!(
+                                "agent produced no finding for {file_path}: response had no title"
+                            ));
+                        };
+                        let title = title.to_string();
                         let description = parsed
                             .get("description")
                             .and_then(|v| v.as_str())
-                            .unwrap_or("")
+                            .unwrap_or_default()
                             .to_string();
+                        // Defaulting to Medium invents a severity in whichever
+                        // direction the truth happens to lie. Info cannot
+                        // inflate a report, so that is the safe side to err on.
                         let severity_str = parsed
                             .get("severity")
                             .and_then(|v| v.as_str())
-                            .unwrap_or("Medium");
-                        let severity = match severity_str {
-                            "High" => Severity::High,
-                            "Low" => Severity::Low,
-                            _ => Severity::Medium,
+                            .map(str::trim)
+                            .filter(|s| !s.is_empty());
+                        if severity_str.is_none() {
+                            tracing::warn!(
+                                "agent finding {:?} for {} stated no severity; recorded as info",
+                                title,
+                                file_path
+                            );
+                        }
+                        let severity = match severity_str.map(str::to_ascii_lowercase).as_deref() {
+                            Some("high") | Some("critical") => Severity::High,
+                            Some("medium") => Severity::Medium,
+                            Some("low") => Severity::Low,
+                            _ => Severity::Info,
                         };
 
                         return Ok(AgentFinding {

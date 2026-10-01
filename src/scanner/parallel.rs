@@ -46,12 +46,26 @@ pub fn combine_parallel_results(
 ) -> (Vec<VulnerabilityFinding>, Vec<String>) {
     let mut analyzed_files = Vec::new();
 
-    if let Some(Ok((mut index_findings, _))) = indexing_result {
-        findings.append(&mut index_findings);
+    if let Some(results) = indexing_result {
+        match results {
+            Ok((mut index_findings, _)) => {
+                findings.append(&mut index_findings);
+            }
+            Err(e) => {
+                tracing::warn!("Indexing phase failed: {}, skipping results", e);
+            }
+        }
     }
 
-    if let Some(Ok((mut semgrep_findings, _))) = semgrep_result {
-        findings.append(&mut semgrep_findings);
+    if let Some(results) = semgrep_result {
+        match results {
+            Ok((mut semgrep_findings, _)) => {
+                findings.append(&mut semgrep_findings);
+            }
+            Err(e) => {
+                tracing::warn!("Semgrep phase failed: {}, skipping results", e);
+            }
+        }
     }
 
     log_and_aggregate_llm_results(&llm_static_result, &mut findings, &mut analyzed_files);

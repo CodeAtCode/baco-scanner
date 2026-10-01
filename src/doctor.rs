@@ -85,6 +85,7 @@ pub fn run_doctor_checks(config_path: Option<&Path>, output_dir: Option<&Path>) 
 
     // Check 1: Config file parsing
     results.add(check_config_parsing(config_path));
+    results.add(check_config_validation(config_path));
 
     // Check 2: Preset references resolve
     results.add(check_preset_references(config_path));
@@ -132,11 +133,11 @@ fn check_llm_reachability(config_path: Option<&Path>) -> CheckResult {
     };
     let config = match crate::config::ScannerConfig::from_file(path.to_str().unwrap_or("")) {
         Ok(c) => c,
-        Err(_) => {
+        Err(e) => {
             return CheckResult {
                 name: "llm_reachability".to_string(),
-                status: CheckStatus::Ok,
-                detail: "Config could not be parsed, skipping LLM reachability check".to_string(),
+                status: CheckStatus::Fail,
+                detail: format!("Config parse error (cannot check LLM reachability): {}", e),
             };
         }
     };
@@ -258,6 +259,10 @@ fn check_config_parsing(config_path: Option<&Path>) -> CheckResult {
         };
     }
 
+    // Parse only. Business rules are a separate check: folding them in here
+    // made a config that parses correctly but violates a rule report
+    // "config_parse: Fail", which is a lie about the parse and hides which of
+    // the two actually went wrong.
     match crate::config::ScannerConfig::from_file(path.to_str().unwrap_or("")) {
         Ok(_) => CheckResult {
             name: "config_parse".to_string(),
@@ -268,6 +273,44 @@ fn check_config_parsing(config_path: Option<&Path>) -> CheckResult {
             name: "config_parse".to_string(),
             status: CheckStatus::Fail,
             detail: format!("Config parse error: {}", e),
+        },
+    }
+}
+
+/// Check the config against the business rules the scan path enforces.
+///
+/// `scan` calls `validate()` after loading; `doctor` did not, so a config that
+/// parses but would be rejected at scan time reported green here.
+fn check_config_validation(config_path: Option<&Path>) -> CheckResult {
+    let Some(path) = config_path else {
+        return CheckResult {
+            name: "config_validation".to_string(),
+            status: CheckStatus::Warn,
+            detail: "No config file provided".to_string(),
+        };
+    };
+
+    let config = match crate::config::ScannerConfig::from_file(path.to_str().unwrap_or("")) {
+        Ok(c) => c,
+        Err(e) => {
+            return CheckResult {
+                name: "config_validation".to_string(),
+                status: CheckStatus::Warn,
+                detail: format!("Config does not parse; see config_parse: {}", e),
+            };
+        }
+    };
+
+    match config.validate() {
+        Ok(()) => CheckResult {
+            name: "config_validation".to_string(),
+            status: CheckStatus::Ok,
+            detail: "Config satisfies the rules the scan path enforces".to_string(),
+        },
+        Err(e) => CheckResult {
+            name: "config_validation".to_string(),
+            status: CheckStatus::Fail,
+            detail: format!("Config would be rejected by a scan: {}", e),
         },
     }
 }
@@ -391,11 +434,11 @@ fn check_llm_phases(config_path: Option<&Path>) -> CheckResult {
 
     let config = match crate::config::ScannerConfig::from_file(path.to_str().unwrap_or("")) {
         Ok(c) => c,
-        Err(_) => {
+        Err(e) => {
             return CheckResult {
                 name: "llm_phases".to_string(),
-                status: CheckStatus::Ok,
-                detail: "Config could not be parsed, skipping LLM phase check".to_string(),
+                status: CheckStatus::Fail,
+                detail: format!("Config parse error (cannot check LLM phases): {}", e),
             };
         }
     };
@@ -552,13 +595,19 @@ pub fn check_python3() -> CheckResult {
 /// Check if Joern is available (only if CPG is enabled in config)
 fn check_joern(config_path: Option<&Path>) -> CheckResult {
     // First check if CPG is enabled in config
-    let cpg_enabled = config_path
-        .and_then(|p| {
-            crate::config::ScannerConfig::from_file(p.to_str().unwrap_or(""))
-                .ok()
-                .map(|c| c.cpg.enabled)
-        })
-        .unwrap_or(false);
+    let cpg_enabled = match config_path {
+        Some(p) => match crate::config::ScannerConfig::from_file(p.to_str().unwrap_or("")) {
+            Ok(c) => c.cpg.enabled,
+            Err(e) => {
+                return CheckResult {
+                    name: "joern".to_string(),
+                    status: CheckStatus::Fail,
+                    detail: format!("Config parse error (cannot determine CPG status): {}", e),
+                };
+            }
+        },
+        None => false,
+    };
 
     if !cpg_enabled {
         return CheckResult {

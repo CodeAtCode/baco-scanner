@@ -108,6 +108,15 @@ pub struct ScanHealth {
     pub llm_failed: u64,
 }
 
+/// Whether the scan indexed files and then analysed none of them.
+///
+/// The zero-LLM-call warning does not cover this: a single triage call makes the
+/// call count non-zero, and the symptom it would need to report -- a clean
+/// report for a scan that looked at nothing -- goes unmentioned.
+pub fn scan_analysed_nothing(indexed: u64, analyzed: u64) -> bool {
+    indexed > 0 && analyzed == 0
+}
+
 impl ScanHealth {
     /// Create a new empty health report
     pub fn new() -> Self {

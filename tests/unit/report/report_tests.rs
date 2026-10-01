@@ -8,7 +8,7 @@
 //! - AI aggregation deduplication
 //! - AI aggregation enrichment
 
-use baco::findings::{Severity, VerificationStatus, VulnerabilityFinding};
+use baco::findings::{Severity, VulnerabilityFinding};
 use baco::llm::LlmConfig;
 use baco::report::ai_aggregation::conflict_resolver::ConflictResolver;
 use baco::report::ai_aggregation::deduplication::DeduplicationService;
@@ -255,32 +255,6 @@ fn test_resolve_cwe_conflict_without_cwe() {
         conflict.resolution_reason.contains("unknown")
             || conflict.resolution_reason.contains("Selected")
     );
-}
-
-#[test]
-fn test_resolve_verification_conflict_preferred_verified() {
-    let mut finding1 = make_finding("f1", Severity::High, "src/test.rs", Some(10));
-    finding1.verification_status = Some(VerificationStatus::Confirmed);
-
-    let mut finding2 = make_finding("f2", Severity::High, "src/test.rs", Some(10));
-    finding2.verification_status = Some(VerificationStatus::FalsePositive);
-
-    let findings = vec![&finding1, &finding2];
-    let conflict = ConflictResolver::resolve_verification_conflict("src/test.rs:10", &findings);
-
-    assert_eq!(conflict.conflict_type, ConflictType::VerificationConflict);
-    assert_eq!(conflict.resolution, ConflictResolution::PreferVerified);
-}
-
-#[test]
-fn test_resolve_verification_conflict_marked_fp() {
-    let finding1 = make_finding("f1", Severity::High, "src/test.rs", Some(10));
-    let finding2 = make_finding("f2", Severity::High, "src/test.rs", Some(10));
-
-    let findings = vec![&finding1, &finding2];
-    let conflict = ConflictResolver::resolve_verification_conflict("src/test.rs:10", &findings);
-
-    assert_eq!(conflict.resolution, ConflictResolution::MarkedFalsePositive);
 }
 
 #[test]

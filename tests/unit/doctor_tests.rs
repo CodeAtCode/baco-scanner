@@ -766,3 +766,152 @@ fn doctor_checks_missing_config_file_skip_ok() {
     assert!(names.contains(&"preset_resolve"));
     assert!(names.contains(&"llm_phases"));
 }
+
+// ============================================================================
+// Tests for Defect 1: check_config_parsing must call validate()
+// ============================================================================
+
+#[test]
+fn test_config_parsing_validates_business_rules() {
+    // Create a config that parses but fails business validation
+    // (e.g., has an invalid preset reference)
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join("baco.toml");
+
+    let config_content = r#"
+[scanner]
+profile = "core"
+preset = "nonexistent-preset-xyz-123"
+
+[llm]
+[llm.phases]
+[llm.phases.discovery]
+api_key = "test-key"
+base_url = "https://test.api/v1"
+model = "test-model"
+
+[llm.phases.verification]
+api_key = "test-key"
+base_url = "https://test.api/v1"
+model = "test-model"
+
+[llm.phases.aggregation]
+api_key = "test-key"
+base_url = "https://test.api/v1"
+model = "test-model"
+
+[llm.phases.static_analysis]
+api_key = "test-key"
+base_url = "https://test.api/v1"
+model = "test-model"
+
+[llm.phases.security_agent_verification]
+api_key = "test-key"
+base_url = "https://test.api/v1"
+model = "test-model"
+
+[llm.phases.threat_modeling]
+api_key = "test-key"
+base_url = "https://test.api/v1"
+model = "test-model"
+
+[cpg]
+enabled = false
+"#;
+
+    std::fs::write(&config_path, config_content).unwrap();
+
+    let results = baco::doctor::run_doctor_checks(Some(config_path.as_path()), None);
+
+    // Config parse should FAIL because business validation fails (invalid preset)
+    let config_check = results
+        .checks
+        .iter()
+        .find(|c| c.name == "config_parse")
+        .expect("config_parse check must run");
+
+    assert_eq!(config_check.status, CheckStatus::Fail);
+    assert!(config_check.detail.contains("validation") || config_check.detail.contains("preset"));
+}
+
+// ============================================================================
+// Tests for Defect 2: doctor checks must return Fail when config fails to parse
+// ============================================================================
+
+#[test]
+fn test_llm_reachability_fails_on_config_parse_error() {
+    // Create an invalid config file (malformed TOML)
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join("baco.toml");
+
+    let config_content = r#"
+[scanner
+profile = "core"  # Missing closing bracket - invalid TOML
+"#;
+
+    std::fs::write(&config_path, config_content).unwrap();
+
+    let results = baco::doctor::run_doctor_checks(Some(config_path.as_path()), None);
+
+    // LLM reachability should FAIL with config parse error
+    let llm_check = results
+        .checks
+        .iter()
+        .find(|c| c.name == "llm_reachability")
+        .expect("llm_reachability check must run");
+
+    assert_eq!(llm_check.status, CheckStatus::Fail);
+    assert!(llm_check.detail.contains("Config parse error"));
+}
+
+#[test]
+fn test_llm_phases_fails_on_config_parse_error() {
+    // Create an invalid config file (malformed TOML)
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join("baco.toml");
+
+    let config_content = r#"
+[scanner
+profile = "core"  # Missing closing bracket - invalid TOML
+"#;
+
+    std::fs::write(&config_path, config_content).unwrap();
+
+    let results = baco::doctor::run_doctor_checks(Some(config_path.as_path()), None);
+
+    // LLM phases should FAIL with config parse error
+    let llm_check = results
+        .checks
+        .iter()
+        .find(|c| c.name == "llm_phases")
+        .expect("llm_phases check must run");
+
+    assert_eq!(llm_check.status, CheckStatus::Fail);
+    assert!(llm_check.detail.contains("Config parse error"));
+}
+
+#[test]
+fn test_joern_fails_on_config_parse_error() {
+    // Create an invalid config file (malformed TOML)
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join("baco.toml");
+
+    let config_content = r#"
+[scanner
+profile = "core"  # Missing closing bracket - invalid TOML
+"#;
+
+    std::fs::write(&config_path, config_content).unwrap();
+
+    let results = baco::doctor::run_doctor_checks(Some(config_path.as_path()), None);
+
+    // Joern check should FAIL with config parse error
+    let joern_check = results
+        .checks
+        .iter()
+        .find(|c| c.name == "joern")
+        .expect("joern check must run");
+
+    assert_eq!(joern_check.status, CheckStatus::Fail);
+    assert!(joern_check.detail.contains("Config parse error"));
+}

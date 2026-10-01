@@ -1,6 +1,7 @@
 //! Unit tests for report
 
 mod ai_aggregation_enrichment_tests;
+mod ai_aggregation_silent_failure_tests;
 mod ai_aggregation_tests;
 // mod evidence_gate_tests;  // Disabled - pre-existing compilation errors
 mod finding_renderer_legacy_tests;

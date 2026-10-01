@@ -14,6 +14,7 @@ pub enum DependencyEcosystem {
     PyPi,
     Maven,
     GoModules,
+    Packagist,
 }
 
 /// Dependency information

@@ -358,7 +358,10 @@ async fn test_analyze_file_low_severity() {
 }
 
 #[tokio::test]
-async fn test_analyze_file_medium_severity_default() {
+async fn test_analyze_file_omitted_severity_records_as_info() {
+    // The response states no severity. Defaulting to Medium invented one, in
+    // whichever direction the truth happened to lie, and put a plausible row in
+    // the report. Info cannot inflate anything, so that is the side to err on.
     let responses = vec![MockLlmClient::mock_final_response(
         r#"{"title": "Missing Validation", "description": "Input not validated"}"#,
     )];
@@ -377,8 +380,36 @@ async fn test_analyze_file_medium_severity_default() {
 
     assert!(result.is_ok());
     let finding = result.unwrap();
-    // Default severity is Medium
-    assert_eq!(finding.finding.severity, Severity::Medium);
+    assert_eq!(finding.finding.severity, Severity::Info);
+}
+
+#[tokio::test]
+async fn test_analyze_file_without_a_title_is_an_error() {
+    // This used to return a finding called "Agent finding" with an empty
+    // description, which is a row in the report with nothing behind it. A
+    // response with no title is not a finding, and saying so is the only signal
+    // the caller gets.
+    let responses = vec![MockLlmClient::mock_final_response(
+        r#"{"description": "something is wrong somewhere"}"#,
+    )];
+
+    let mock_client = MockLlmClient::new(responses);
+    let config = create_test_config(10);
+    let temp_dir = create_temp_dir();
+    let progress_cb: ProgressCallback = Arc::new(|_| {});
+
+    let test_file = create_test_file(&temp_dir, "test.rs", "fn main() {}");
+    let session = AgentSession::new(mock_client, &config, temp_dir.path(), progress_cb);
+
+    let err = session
+        .analyze_file(test_file.to_string_lossy().as_ref())
+        .await
+        .expect_err("a response with no title must not become a finding");
+    let message = err.to_string();
+    assert!(
+        message.contains("no title"),
+        "the error must say what was missing, got: {message}"
+    );
 }
 
 // ============================================================================

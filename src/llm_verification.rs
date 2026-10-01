@@ -19,8 +19,6 @@ pub struct VerificationResult {
     pub status: VerificationStatus,
     pub confidence: f32,
     pub notes: String,
-    pub mitigating_factors: Vec<String>,
-    pub related_patterns: Vec<String>,
     pub false_positive_reason: Option<String>,
 }
 

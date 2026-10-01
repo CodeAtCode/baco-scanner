@@ -100,7 +100,7 @@ pub async fn run_poc_compiler(
         metrics_tracker: _,
         target_path: _,
         config,
-        project_stack: _,
+        project_stack,
     } = cfg;
 
     // Skip if disabled via config
@@ -114,9 +114,25 @@ pub async fn run_poc_compiler(
     let mut verified_findings = findings.clone();
     for finding in &mut verified_findings {
         if let Some(poc_code) = &finding.poc_code {
-            // Use language from poc_format or default to rust
-            let language = finding.poc_format.as_deref().unwrap_or("rust");
-            let result = crate::poc_compiler::PocCompiler::compile_check(poc_code, language);
+            // Defaulting to "rust" compiled every PoC with the Rust compiler
+            // whatever language it was written in, and the verdict of that
+            // check was then written onto the finding as Confirmed or Failed.
+            // A wrong compiler does not fail loudly -- it just answers about
+            // the wrong language. Fall back to the project's own language, and
+            // when even that is unknown, skip rather than guess.
+            let language = finding.poc_format.clone().or_else(|| {
+                project_stack
+                    .as_ref()
+                    .and_then(|s| s.languages.first().cloned())
+            });
+            let Some(language) = language else {
+                tracing::warn!(
+                    "skipping PoC compile check for {}: no poc_format and no detected project language",
+                    finding.file_path
+                );
+                continue;
+            };
+            let result = crate::poc_compiler::PocCompiler::compile_check(poc_code, &language);
 
             if result.compiles {
                 finding.verification_status = Some(crate::findings::VerificationStatus::Confirmed);

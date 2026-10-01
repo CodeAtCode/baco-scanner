@@ -328,7 +328,8 @@ pub fn print_scan_summary(
             }
         }
         ui.emit(format!(
-            "Evidence gate: {} verified, {} supported, {} unverified (excluded from reports)",
+            "Evidence gate: {} verified, {} supported, {} unverified (kept in findings.json \
+             and the HTML appendix; omitted from SARIF and Markdown)",
             tier_counts.0, tier_counts.1, tier_counts.2
         ));
     }

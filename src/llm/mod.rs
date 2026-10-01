@@ -269,16 +269,26 @@ pub async fn apply_retry_backoff(
 }
 
 /// Extract the assistant content from a chat-completions response value.
+///
+/// An empty answer is an error, not an empty string. Downstream, empty content
+/// parses as "no findings", so a provider that returned nothing looked exactly
+/// like a model that examined the file and found it clean. The tools path does
+/// not use this: a model acting through a tool legitimately answers with no prose,
+/// and `tools_response_is_malformed` is what decides that case.
 pub fn parse_chat_content(result: &serde_json::Value) -> Result<String, &'static str> {
-    result
+    let content = result
         .get("choices")
         .and_then(|c: &serde_json::Value| c.as_array())
         .and_then(|arr: &Vec<serde_json::Value>| arr.first())
         .and_then(|choice| choice.get("message"))
         .and_then(|msg: &serde_json::Value| msg.get("content"))
         .and_then(|c: &serde_json::Value| c.as_str())
-        .map(|s| s.to_string())
-        .ok_or("Invalid response format")
+        .ok_or("Invalid response format")?;
+
+    if content.trim().is_empty() {
+        return Err("Empty response: the model returned no content");
+    }
+    Ok(content.to_string())
 }
 
 /// Extract tool calls from a chat message value (empty vec when absent).
@@ -307,6 +317,18 @@ pub fn parse_tool_calls(message: &serde_json::Value) -> Vec<ToolCall> {
                 .collect()
         })
         .unwrap_or_default()
+}
+
+/// Whether a tools response carries nothing a caller could act on.
+///
+/// A provider that answers with neither prose nor tool calls has not answered.
+/// Reporting that as an empty string makes a broken call indistinguishable from a
+/// model that found nothing, which is the failure this guards.
+///
+/// A response with tool calls and no prose is legitimate: a model acting through a
+/// tool does not narrate.
+pub fn tools_response_is_malformed(content: &str, tool_call_count: usize) -> bool {
+    content.trim().is_empty() && tool_call_count == 0
 }
 
 impl LlmClient {
@@ -651,6 +673,7 @@ impl LlmClient {
                             .get("message")
                             .ok_or("Invalid response format: no message")?;
 
+                        // Parse content: may be None/empty if model is using tool_calls
                         let content = message
                             .get("content")
                             .and_then(|c: &serde_json::Value| c.as_str())
@@ -659,6 +682,17 @@ impl LlmClient {
 
                         // Parse tool_calls if present
                         let tool_calls = parse_tool_calls(message);
+
+                        // Error only when there is neither usable content nor tool calls.
+                        // A model may legitimately answer with tool calls and no
+                        // prose, so the presence of a tool call is a valid answer.
+                        if tools_response_is_malformed(&content, tool_calls.len()) {
+                            return Err(ScanError::Parse {
+                                message: "Malformed tools response: no content and no tool_calls"
+                                    .to_string(),
+                                source: None,
+                            });
+                        }
 
                         let raw = result.clone();
                         let latency_ms = start_time.elapsed().as_millis() as u64;

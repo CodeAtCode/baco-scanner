@@ -31,6 +31,40 @@ pub struct CveBootstrapper {
     cpe_hint: Option<String>,
 }
 
+/// How deep the language probe walks.
+///
+/// Shallow on purpose: this runs before indexing and only needs to answer
+/// "is there PHP here", not to inventory the tree. Indexing does the full job.
+const MAX_STACK_SCAN_DEPTH: usize = 3;
+
+fn has_source_file(root: &Path, extensions: &[&str], max_depth: usize) -> bool {
+    let mut dirs = vec![(root.to_path_buf(), 0usize)];
+    while let Some((dir, depth)) = dirs.pop() {
+        let Ok(entries) = fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let name = entry.file_name().to_string_lossy().to_lowercase();
+            if path.is_dir() {
+                // node_modules and vendor hold other languages' files and are
+                // frequently the bulk of the tree.
+                if depth < max_depth && !matches!(name.as_str(), "node_modules" | "vendor" | ".git")
+                {
+                    dirs.push((path, depth + 1));
+                }
+                continue;
+            }
+            if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                if extensions.contains(&ext.to_lowercase().as_str()) {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
 impl CveBootstrapper {
     pub fn new(project_root: String) -> Self {
         Self {
@@ -92,7 +126,77 @@ impl CveBootstrapper {
             }
         }
 
+        if root.join("composer.json").exists() {
+            if let Ok(composer) = self.parse_composer_json(root) {
+                if !stack.languages.contains(&"PHP".to_string()) {
+                    stack.languages.push("PHP".to_string());
+                }
+                stack.frameworks.extend(composer.0);
+                for dep in composer.1 {
+                    stack.dependencies.push(dep);
+                }
+            }
+        }
+
+        // A plugin usually has no composer.json -- WordPress core is not a
+        // dependency, it is the host -- so the language is detected from the
+        // source files themselves. Without this a PHP target got an empty
+        // stack, and because the result was Ok nothing downstream could tell
+        // "not PHP" from "found nothing".
+        if has_source_file(root, &["php", "phtml", "php5", "inc"], MAX_STACK_SCAN_DEPTH)
+            && !stack.languages.contains(&"PHP".to_string())
+        {
+            stack.languages.push("PHP".to_string());
+        }
+
+        // The directory shape is the reliable WordPress signal, and it is what
+        // tells the discovery prompt this is WordPress.
+        if (root.join("wp-includes").is_dir() || root.join("wp-content").is_dir())
+            && !stack.frameworks.iter().any(|f| f == "WordPress")
+        {
+            stack.frameworks.push("WordPress".to_string());
+        }
+
         Ok(stack)
+    }
+
+    /// Parse composer.json.
+    pub fn parse_composer_json(&self, root: &Path) -> Result<(Vec<String>, Vec<Dependency>)> {
+        let composer_path = root.join("composer.json");
+        if !composer_path.exists() {
+            return Ok((Vec::new(), Vec::new()));
+        }
+
+        let content = fs::read_to_string(&composer_path)?;
+        let parsed: serde_json::Value = serde_json::from_str(&content)
+            .map_err(|e| CveBootstrapError::DetectionError(e.to_string()))?;
+        let require = parsed.get("require").and_then(|r| r.as_object());
+
+        let mut deps = Vec::new();
+        let mut frameworks = Vec::new();
+        if let Some(require) = require {
+            for (name, constraint) in require {
+                // The PHP runtime itself is not a package with advisories.
+                if name.eq_ignore_ascii_case("php") {
+                    continue;
+                }
+                if let Some(version) = constraint.as_str() {
+                    if name.starts_with("laravel/") && !frameworks.iter().any(|f| f == "Laravel") {
+                        frameworks.push("Laravel".to_string());
+                    }
+                    if name.starts_with("symfony/") && !frameworks.iter().any(|f| f == "Symfony") {
+                        frameworks.push("Symfony".to_string());
+                    }
+                    deps.push(Dependency {
+                        name: name.clone(),
+                        version: version.to_string(),
+                        ecosystem: DependencyEcosystem::Packagist,
+                    });
+                }
+            }
+        }
+
+        Ok((frameworks, deps))
     }
 
     pub fn parse_cargo_toml(&self, root: &Path) -> Result<Vec<Dependency>> {

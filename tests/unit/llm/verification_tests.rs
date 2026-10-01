@@ -197,15 +197,12 @@ fn test_verification_result_creation() {
         status: VerificationStatus::Confirmed,
         confidence: 0.85,
         notes: "Verified via manual review".to_string(),
-        mitigating_factors: vec!["Input is sanitized".to_string()],
-        related_patterns: vec!["CWE-79".to_string()],
         false_positive_reason: None,
     };
 
     assert_eq!(result.finding_id, "test-123");
     assert_eq!(result.status, VerificationStatus::Confirmed);
     assert_eq!(result.confidence, 0.85);
-    assert_eq!(result.mitigating_factors.len(), 1);
 }
 
 #[test]
@@ -215,8 +212,6 @@ fn test_verification_result_false_positive() {
         status: VerificationStatus::FalsePositive,
         confidence: 0.95,
         notes: "Test code, not production".to_string(),
-        mitigating_factors: vec![],
-        related_patterns: vec![],
         false_positive_reason: Some("Code is in test directory".to_string()),
     };
 
@@ -324,8 +319,6 @@ fn test_verification_result_with_finding() {
         status: VerificationStatus::Confirmed,
         confidence: 0.85,
         notes: format!("Verified: {} is vulnerable", finding.title),
-        mitigating_factors: vec![],
-        related_patterns: finding.cwe_id.clone().into_iter().collect(),
         false_positive_reason: None,
     };
 
@@ -358,8 +351,6 @@ fn test_verification_report_summary() {
             status: VerificationStatus::Confirmed,
             confidence: 0.9,
             notes: String::new(),
-            mitigating_factors: vec![],
-            related_patterns: vec![],
             false_positive_reason: None,
         },
         VerificationResult {
@@ -367,8 +358,6 @@ fn test_verification_report_summary() {
             status: VerificationStatus::FalsePositive,
             confidence: 0.95,
             notes: String::new(),
-            mitigating_factors: vec![],
-            related_patterns: vec![],
             false_positive_reason: Some("Test code".to_string()),
         },
     ];

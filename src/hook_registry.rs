@@ -89,7 +89,12 @@ fn is_unauthenticated_hook(hook: &str) -> bool {
     hook.contains("wp_ajax_nopriv_") || hook.contains("admin_post_nopriv_")
 }
 
-fn body_has_primitive(body: &str, primitives: &[String]) -> bool {
+/// Whether the body contains any of the primitives.
+///
+/// Public because the verifier needs the same question answered the same way:
+/// a finding confirmed here must be refutable here, or the two phases disagree
+/// about what a primitive is.
+pub fn body_has_primitive(body: &str, primitives: &[String]) -> bool {
     primitives
         .iter()
         .any(|p| !p.is_empty() && body.contains(p.as_str()))

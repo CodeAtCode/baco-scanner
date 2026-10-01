@@ -114,12 +114,24 @@ pub async fn run_cpg_slice(
     let total = findings.len();
     let base = pb.position();
     for (i, finding) in findings.iter_mut().enumerate() {
-        let cwe_hint = finding.cwe_id.as_deref().unwrap_or("CWE-79");
-        let entry_point = finding
-            .code_location
-            .as_deref()
-            .and_then(|loc| loc.rsplit("::").next())
-            .unwrap_or("main");
+        // Without a CWE there is no query to run. Defaulting to CWE-79 made
+        // every uncategorised finding look like XSS, and get_query_for_cwe
+        // turned that guess into the query the CPG was sliced with -- evidence
+        // gathered for a vulnerability class the finding never claimed.
+        let Some(cwe_hint) = finding.cwe_id.as_deref() else {
+            pb.set_position(base + ((i as u64 + 1) * 100 / total.max(1) as u64));
+            continue;
+        };
+        // The CPG query is written against a function name. code_location holds
+        // "path:line", so splitting on a Rust path separator never yielded one
+        // and the fallback below was unreachable.
+        let Some(entry_point) = finding.title.split(['(', ' ']).find_map(|token| {
+            let name = token.trim();
+            (!name.is_empty() && name != "&").then_some(name)
+        }) else {
+            pb.set_position(base + ((i as u64 + 1) * 100 / total.max(1) as u64));
+            continue;
+        };
         if let Ok(slice) = slicer.slice(&cpg, cwe_hint, entry_point) {
             if !slice.is_empty() {
                 tracing::debug!(

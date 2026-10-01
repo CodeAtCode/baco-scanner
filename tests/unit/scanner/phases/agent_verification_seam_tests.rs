@@ -209,7 +209,7 @@ async fn test_run_agent_blocks_applies_verified_result_to_each_finding() {
 }
 
 #[tokio::test]
-async fn test_run_agent_blocks_marks_findings_failed_when_the_agent_errors() {
+async fn test_run_agent_blocks_records_the_error_without_claiming_a_verdict() {
     let dir = tempfile::tempdir().expect("temp dir");
     let config = base_config();
     let pb = ProgressBar::hidden();
@@ -221,7 +221,17 @@ async fn test_run_agent_blocks_marks_findings_failed_when_the_agent_errors() {
         .await
         .expect("agent blocks run");
 
-    assert_eq!(out[0].verification_status, Some(VerificationStatus::Failed));
+    // The agent never examined the finding, so no verdict is claimed for it.
+    assert_ne!(
+        out[0].verification_status,
+        Some(VerificationStatus::Failed),
+        "a sandbox failure must not read as an examined-and-rejected finding"
+    );
+    assert_eq!(
+        out[0].verification_error.as_deref(),
+        Some("sandbox refused the test"),
+        "the reason the agent could not run must reach the finding"
+    );
     assert_eq!(
         out[0].verification_notes.as_deref(),
         Some("Agent verification failed: sandbox refused the test"),
@@ -668,14 +678,23 @@ fn test_apply_agent_result_adds_evidence_entry() {
 // ============================================================================
 
 #[test]
-fn test_apply_agent_failure_sets_status_to_failed() {
+fn test_apply_agent_failure_does_not_claim_the_finding_was_examined() {
+    // An agent error is not a verdict. Timeout, tool failure and parse error all
+    // arrive here, and marking the finding `Failed` said "the agent looked and
+    // it failed" for a real vulnerability whose verification simply timed out.
     let mut finding = make_finding();
 
     apply_agent_failure(&mut finding, "connection timeout", None);
 
-    assert_eq!(
+    assert_ne!(
         finding.verification_status,
-        Some(VerificationStatus::Failed)
+        Some(VerificationStatus::Failed),
+        "an agent error must not be reported as an examined-and-rejected verdict"
+    );
+    assert_eq!(
+        finding.verification_error.as_deref(),
+        Some("connection timeout"),
+        "the reason the agent could not run must be recorded"
     );
 }
 

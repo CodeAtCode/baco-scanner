@@ -120,7 +120,7 @@ Enable with `[output] evidence_gate = true` in your config or `--evidence-gate` 
 | `report.html` | Main body shows verified + supported only; unverified findings listed in "Appendix: Unverified Findings" |
 | `report.sarif` | Only verified + supported findings emitted |
 | `report.md` (from `baco report`) | Only verified + supported findings |
-| CLI | Summary line: `Evidence gate: N verified, M supported, K unverified (excluded from reports)` |
+| CLI | Summary line: `Evidence gate: N verified, M supported, K unverified (kept in findings.json and the HTML appendix; omitted from SARIF and Markdown)` |
 
 With the gate off (default), all outputs contain all findings unchanged.
 

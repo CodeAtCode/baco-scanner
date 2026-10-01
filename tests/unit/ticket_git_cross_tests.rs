@@ -5,6 +5,7 @@
 use baco::config::ScannerConfig;
 use baco::findings::{Severity, VulnerabilityFinding};
 use baco::scanner::Scanner;
+use baco::scanner::phases::other_phases::looks_like_a_repository;
 use std::path::PathBuf;
 use tempfile::TempDir;
 
@@ -337,4 +338,78 @@ fn test_phase_with_special_filenames() {
     assert_eq!(findings.len(), 3);
 
     let _ = scanner;
+}
+
+// ============================================================================
+// looks_like_a_repository: "not a repository" vs "a repository where git broke"
+// ============================================================================
+//
+// The git phase warned on every scan of an extracted archive, because
+// extracted/ is not a repository. A warning channel that fires every time is
+// one nobody reads, which is how the triage fallback going silent went unnoticed
+// twice. So the warning is now conditional on the target really being inside a
+// git repository, and this predicate is what decides it.
+
+#[test]
+fn test_a_plain_directory_is_not_a_repository() {
+    let dir = tempfile::tempdir().expect("tmpdir");
+    std::fs::write(dir.path().join("main.rs"), "fn main() {}").expect("write");
+    assert!(
+        !looks_like_a_repository(dir.path()),
+        "a directory with no .git is not a repository"
+    );
+}
+
+#[test]
+fn test_a_directory_holding_dot_git_is_a_repository() {
+    let dir = tempfile::tempdir().expect("tmpdir");
+    std::fs::create_dir(dir.path().join(".git")).expect("mkdir");
+    assert!(looks_like_a_repository(dir.path()));
+}
+
+#[test]
+fn test_a_file_named_dot_git_counts() {
+    // Worktrees and submodules use a .git FILE, not a directory. The check uses
+    // exists(), so both are seen; a directory-only check would miss these.
+    let dir = tempfile::tempdir().expect("tmpdir");
+    std::fs::write(dir.path().join(".git"), "gitdir: ../elsewhere").expect("write");
+    assert!(looks_like_a_repository(dir.path()));
+}
+
+#[test]
+fn test_a_subdirectory_of_a_repository_is_inside_it() {
+    // The case that matters: the target is a plugin subdirectory and the
+    // repository is above it.
+    let dir = tempfile::tempdir().expect("tmpdir");
+    std::fs::create_dir(dir.path().join(".git")).expect("mkdir");
+    let nested = dir
+        .path()
+        .join("wp-content")
+        .join("plugins")
+        .join("captcha");
+    std::fs::create_dir_all(&nested).expect("mkdir -p");
+    assert!(looks_like_a_repository(&nested));
+}
+
+#[test]
+fn test_a_directory_named_git_is_not_dot_git() {
+    // "git" is not ".git". A loose check would fire on any vendored git dir.
+    let dir = tempfile::tempdir().expect("tmpdir");
+    std::fs::create_dir(dir.path().join("git")).expect("mkdir");
+    assert!(!looks_like_a_repository(dir.path()));
+}
+
+#[test]
+fn test_an_empty_directory_is_not_a_repository() {
+    let dir = tempfile::tempdir().expect("tmpdir");
+    assert!(!looks_like_a_repository(dir.path()));
+}
+
+#[test]
+fn test_the_project_under_test_is_inside_a_git_repository() {
+    // baco is a git repository, so scanning it must take the warning branch.
+    assert!(
+        looks_like_a_repository(std::path::Path::new(env!("CARGO_MANIFEST_DIR"))),
+        "baco's own source tree should be recognised as inside a repository"
+    );
 }

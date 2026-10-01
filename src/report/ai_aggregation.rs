@@ -223,20 +223,16 @@ impl AiAggregationPhase {
             }
 
             // Check for verification conflicts
-            let has_verified = findings
+            // NOTE: Verification conflicts are detected but not resolved here.
+            // The resolve_verification_conflict function was removed because it only
+            // computed metadata without actually modifying the findings list.
+            // Verification status priority is now handled in deduplication.rs merge comparator.
+            let _has_verified = findings
                 .iter()
                 .any(|f| f.verification_status == Some(VerificationStatus::Confirmed));
-            let has_fp = findings
+            let _has_fp = findings
                 .iter()
                 .any(|f| f.verification_status == Some(VerificationStatus::FalsePositive));
-
-            if has_verified && has_fp {
-                let conflict = conflict_resolver::ConflictResolver::resolve_verification_conflict(
-                    location, findings,
-                );
-                conflicts.push(conflict);
-                continue;
-            }
 
             // Check for confidence conflicts
             let confidences: Vec<f32> = findings.iter().map(|f| f.confidence_score).collect();

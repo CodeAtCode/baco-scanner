@@ -41,18 +41,16 @@ impl ConflictResolver {
             }
 
             // Check for verification conflicts
-            let has_verified = findings
+            // NOTE: Verification conflicts are detected but not resolved here.
+            // The resolve_verification_conflict function was removed because it only
+            // computed metadata without actually modifying the findings list.
+            // Verification status priority is now handled in deduplication.rs merge comparator.
+            let _has_verified = findings
                 .iter()
                 .any(|f| f.verification_status == Some(VerificationStatus::Confirmed));
-            let has_fp = findings
+            let _has_fp = findings
                 .iter()
                 .any(|f| f.verification_status == Some(VerificationStatus::FalsePositive));
-
-            if has_verified && has_fp {
-                let conflict = Self::resolve_verification_conflict(location, findings);
-                conflicts.push(conflict);
-                continue;
-            }
 
             // Check for confidence conflicts
             let confidences: Vec<f32> = findings.iter().map(|f| f.confidence_score).collect();
@@ -140,36 +138,6 @@ impl ConflictResolver {
                 most_specific.cwe_id.as_deref().unwrap_or("unknown"),
                 location
             ),
-        }
-    }
-
-    /// Resolve verification conflict by preferring verified findings
-    pub fn resolve_verification_conflict(
-        location: &str,
-        findings: &[&VulnerabilityFinding],
-    ) -> FindingConflict {
-        let confirmed = findings
-            .iter()
-            .find(|f| f.verification_status == Some(VerificationStatus::Confirmed));
-
-        let conflict_type = ConflictType::VerificationConflict;
-        let (resolution, reason) = if let Some(c) = confirmed {
-            (
-                ConflictResolution::PreferVerified,
-                format!("Kept verified finding '{}' over false positive", c.title),
-            )
-        } else {
-            (
-                ConflictResolution::MarkedFalsePositive,
-                format!("Marked as false positive due to conflict at {}", location),
-            )
-        };
-
-        FindingConflict {
-            findings: findings.iter().map(|f| (*f).clone()).collect(),
-            conflict_type,
-            resolution,
-            resolution_reason: reason,
         }
     }
 
