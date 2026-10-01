@@ -3,6 +3,7 @@
 
 mod analysis_extra_tests;
 mod analysis_helpers_tests;
+mod ast_line_anchor_tests;
 mod cache_tests;
 mod client_infra_tests;
 pub mod client_tests;
@@ -17,3 +18,4 @@ mod phase_gating_tests;
 mod request_count_tests;
 mod structured_output_tests;
 mod verification_tests;
+mod wp_anchor_coverage_tests;

@@ -25,6 +25,157 @@ struct BatchVerdictItem {
     #[serde(default)]
     verification_status: String,
     verification_notes: Option<String>,
+    /// The seven-question gate the prompt asks for. It was always requested and
+    /// never read, so the status was the model's unsupported word.
+    #[serde(default)]
+    seven_question_gate: Option<SevenQuestionGate>,
+    #[serde(default)]
+    concrete_impact_proof: Option<ImpactProof>,
+}
+
+#[derive(Deserialize, Debug, Default)]
+struct SevenQuestionGate {
+    #[serde(default)]
+    reachability: Option<String>,
+    #[serde(default)]
+    controllability: Option<String>,
+    #[serde(default)]
+    preconditions: Option<String>,
+    #[serde(default)]
+    impact: Option<String>,
+    #[serde(default)]
+    context: Option<String>,
+    #[serde(default)]
+    evidence: Option<String>,
+    #[serde(default)]
+    confidence: Option<String>,
+}
+
+#[derive(Deserialize, Debug, Default)]
+struct ImpactProof {
+    #[serde(default)]
+    attack_vector: Option<String>,
+    #[serde(default)]
+    is_theoretical: Option<bool>,
+}
+
+/// A gate answer as a decision: `Some(true)`/`Some(false)` for a stated yes or
+/// no, `None` for anything else.
+///
+/// "unknown" must land on `None`. Treating it as a no would let an unanswered
+/// question kill a finding, and treating it as a yes would let it through --
+/// either way the judge would decide the finding by what it failed to say.
+fn answered_yes(answer: &Option<String>) -> Option<bool> {
+    let answer = answer.as_deref()?.trim().to_ascii_lowercase();
+    match answer.as_str() {
+        "yes" | "true" | "confirmed" => Some(true),
+        "no" | "false" => Some(false),
+        _ => None,
+    }
+}
+
+/// Apply the gate the prompt already states, to a verdict the model returned.
+///
+/// The prompt defines it: a hard NO on reachability or controllability kills the
+/// finding, a YES on preconditions kills it, and passing the first three still
+/// needs all four remaining answers affirmative. Anything short of that is
+/// `needs_review`. Without this the seven questions were decoration -- the
+/// parser read `verification_status` and dropped them, so `confirmed` was the
+/// model's word with nothing behind it.
+///
+/// Returns a reason when the verdict was downgraded.
+/// Whether the judge was shown any of the finding's code.
+///
+/// The prompt asks the seven questions "against the CODE SHOWN", and
+/// `build_volatile_verification_tail` only emits code for a finding that has a
+/// line to read around or a snippet attached. A finding with neither is graded
+/// from its own description, so `confirmed` on one is a judgement about prose.
+pub fn judge_saw_no_code(finding: &VulnerabilityFinding) -> bool {
+    let no_snippet = finding
+        .code_snippet
+        .as_deref()
+        .map(str::trim)
+        .is_none_or(str::is_empty);
+    no_snippet && finding.line_number.is_none()
+}
+
+/// Cap a verdict on a finding the judge was shown nothing for.
+///
+/// A real finding can reach here without a line: a chunked file whose reported
+/// position did not map, or a hook whose handler name the AST could not
+/// resolve. Losing the line is the right outcome -- a wrong line is worse --
+/// but it must not also buy a confirmation nobody checked.
+pub fn cap_blind_verdict(
+    status: VerificationStatus,
+    finding: &VulnerabilityFinding,
+    notes: &str,
+) -> (VerificationStatus, String) {
+    if status != VerificationStatus::Confirmed || !judge_saw_no_code(finding) {
+        return (status, notes.to_string());
+    }
+    let reason = "not confirmed: no line and no snippet, so no code was shown to verify against";
+    let merged = if notes.trim().is_empty() {
+        reason.to_string()
+    } else {
+        format!("{notes} ({reason})")
+    };
+    (VerificationStatus::NeedsReview, merged)
+}
+
+fn apply_gate_parts(
+    status: &mut VerificationStatus,
+    gate: Option<&SevenQuestionGate>,
+    proof: Option<&ImpactProof>,
+) -> Option<String> {
+    if *status != VerificationStatus::Confirmed {
+        return None;
+    }
+    let gate = gate?;
+
+    if answered_yes(&gate.reachability) == Some(false) {
+        *status = VerificationStatus::FalsePositive;
+        return Some("gate: not reachable from user input".to_string());
+    }
+    if answered_yes(&gate.controllability) == Some(false) {
+        *status = VerificationStatus::FalsePositive;
+        return Some("gate: attacker does not control the input".to_string());
+    }
+    if answered_yes(&gate.preconditions) == Some(true) {
+        *status = VerificationStatus::FalsePositive;
+        return Some("gate: blocked by existing validation".to_string());
+    }
+    if answered_yes(&gate.context) == Some(false) {
+        *status = VerificationStatus::FalsePositive;
+        return Some("gate: test or example code, not a production path".to_string());
+    }
+    if answered_yes(&gate.impact) == Some(false) {
+        *status = VerificationStatus::FalsePositive;
+        return Some("gate: no concrete security impact".to_string());
+    }
+    if answered_yes(&gate.evidence) == Some(false) {
+        *status = VerificationStatus::NeedsReview;
+        return Some("gate: no code evidence for the claim".to_string());
+    }
+    if answered_yes(&gate.confidence) == Some(false) {
+        *status = VerificationStatus::NeedsReview;
+        return Some("gate: judge does not hold it a true positive".to_string());
+    }
+
+    // The prompt requires a concrete impact scenario, and downgrades a
+    // theoretical one. A confirmed finding with none is unbacked.
+    if let Some(proof) = proof {
+        let empty = proof
+            .attack_vector
+            .as_deref()
+            .map(str::trim)
+            .is_none_or(str::is_empty);
+        if empty || proof.is_theoretical == Some(true) {
+            *status = VerificationStatus::NeedsReview;
+            return Some("gate: impact is theoretical or unstated".to_string());
+        }
+    }
+
+    None
 }
 
 /// Build stable prefix for verification prompt (byte-stable across findings in same phase+domain)
@@ -268,16 +419,27 @@ pub fn parse_batch_verification_verdict(
                 };
 
                 if idx < expected_count {
-                    let status = match item.verification_status.as_str() {
+                    let mut status = match item.verification_status.as_str() {
                         "confirmed" => VerificationStatus::Confirmed,
                         "false_positive" => VerificationStatus::FalsePositive,
                         _ => VerificationStatus::NeedsReview,
                     };
-                    let notes = if item.verification_status.is_empty() {
+                    let mut notes = if item.verification_status.is_empty() {
                         "Batch parse missing verification_status for this item".to_string()
                     } else {
-                        item.verification_notes.unwrap_or_default()
+                        item.verification_notes.clone().unwrap_or_default()
                     };
+                    if let Some(reason) = apply_gate_parts(
+                        &mut status,
+                        item.seven_question_gate.as_ref(),
+                        item.concrete_impact_proof.as_ref(),
+                    ) {
+                        notes = if notes.is_empty() {
+                            reason
+                        } else {
+                            format!("{notes} ({reason})")
+                        };
+                    }
                     results[idx] = (status, notes);
                 }
             }
@@ -533,7 +695,8 @@ pub async fn run_llm_verification(
 
                     if i < batch_results.len() {
                         let (status, notes) = &batch_results[i];
-                        finding.verification_status = Some(*status);
+                        let (status, notes) = cap_blind_verdict(*status, finding, notes);
+                        finding.verification_status = Some(status);
                         finding.verification_notes = Some(notes.clone());
                         finding.add_evidence(
                             crate::evidence::EvidenceSource::LlmAnalysis("verification".into()),
@@ -593,6 +756,7 @@ pub async fn run_llm_verification(
                     if let Ok(response_with_model) = result {
                         let (status, notes) =
                             parse_verification_verdict(&response_with_model.content);
+                        let (status, notes) = cap_blind_verdict(status, finding, &notes);
                         finding.verification_status = Some(status);
                         finding.verification_notes = Some(notes);
                         finding.add_evidence(

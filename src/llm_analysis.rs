@@ -53,6 +53,167 @@ pub fn extract_sink_calls(code: &str) -> Vec<String> {
     sinks
 }
 
+/// Function and method name to its 1-indexed line range, from the AST.
+///
+/// The chunker already parses the file and throws the names away. This keeps
+/// them, so a line number can be checked against the function it claims to be
+/// in rather than trusted.
+pub fn function_line_ranges(content: &str, language: &str) -> HashMap<String, (usize, usize)> {
+    let mut out = HashMap::new();
+    let Some(lang) = tree_sitter_language(language) else {
+        return out;
+    };
+    let mut parser = tree_sitter::Parser::new();
+    if parser.set_language(&lang).is_err() {
+        return out;
+    }
+    let Some(tree) = parser.parse(content, None) else {
+        return out;
+    };
+
+    let mut pending = vec![tree.root_node()];
+    while let Some(node) = pending.pop() {
+        if is_function_like(node.kind()) {
+            if let Some(name_node) = node.child_by_field_name("name") {
+                let name = content[name_node.byte_range()].to_string();
+                // First definition wins: a later same-named node is an inner or
+                // conditional redefinition, and the outer one is the entry point.
+                out.entry(name)
+                    .or_insert((node.start_position().row + 1, node.end_position().row + 1));
+            }
+        }
+        let mut child_cursor = node.walk();
+        pending.extend(node.children(&mut child_cursor));
+    }
+    out
+}
+
+fn is_function_like(kind: &str) -> bool {
+    matches!(
+        kind,
+        "function_definition"
+            | "method_declaration"
+            | "method_definition"
+            | "function_declaration"
+            | "function_item"
+    )
+}
+
+/// Check every finding's line against the function its title names.
+///
+/// The reported line is the model's estimate; the function name in the title is
+/// something it read. Where they disagree and the name is in the file, the name
+/// wins -- and that holds for a chunked file too, because the ranges come from
+/// the whole file rather than the slice the model saw.
+fn anchor_against_ast(
+    findings: &mut [VulnerabilityFinding],
+    content: &str,
+    language: Option<&str>,
+) {
+    let Some(language) = language else {
+        return;
+    };
+    let ranges = function_line_ranges(content, language);
+    if ranges.is_empty() {
+        return;
+    }
+
+    let mut moved = 0usize;
+    let mut unknown = 0usize;
+    for finding in findings.iter_mut() {
+        match anchor_finding_line(finding, &ranges) {
+            LineAnchor::MovedToDefinition => moved += 1,
+            LineAnchor::NameNotInFile => unknown += 1,
+            _ => {}
+        }
+    }
+    if moved > 0 {
+        tracing::warn!(
+            "{} finding(s) cited a line outside the function their title names; \
+             moved to the function definition",
+            moved
+        );
+    }
+    if unknown > 0 {
+        tracing::warn!(
+            "{} finding(s) name a function that is not in the file; \
+             their line could not be checked",
+            unknown
+        );
+    }
+}
+
+/// What happened to a finding's line when checked against the AST.
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum LineAnchor {
+    /// The reported line already falls inside the named function.
+    AlreadyInside,
+    /// The reported line was outside it and was moved to its definition.
+    MovedToDefinition,
+    /// No function-shaped name in the title, so there was nothing to check.
+    NoNameGiven,
+    /// The title names something that is not in the file.
+    NameNotInFile,
+}
+
+/// Check a finding's line against the function its title names.
+///
+/// The title is trusted over the line because it is the part the model read off
+/// the code rather than estimated. Titles do not carry a separate `function`
+/// field: the model writes the name inline, so every `name(` in the title is a
+/// candidate and the first one that exists in the file is the anchor.
+pub fn anchor_finding_line(
+    finding: &mut VulnerabilityFinding,
+    ranges: &HashMap<String, (usize, usize)>,
+) -> LineAnchor {
+    if ranges.is_empty() {
+        return LineAnchor::NoNameGiven;
+    }
+
+    let candidates = function_names_in_title(&finding.title);
+    if candidates.is_empty() {
+        return LineAnchor::NoNameGiven;
+    }
+
+    let Some((start, end)) = candidates.iter().find_map(|name| ranges.get(name).copied()) else {
+        return LineAnchor::NameNotInFile;
+    };
+
+    match finding.line_number {
+        Some(line) if (start..=end).contains(&(line as usize)) => LineAnchor::AlreadyInside,
+        _ => {
+            finding.line_number = Some(start as u32);
+            LineAnchor::MovedToDefinition
+        }
+    }
+}
+
+/// `name(` occurrences in a finding title, in order.
+fn function_names_in_title(title: &str) -> Vec<String> {
+    let bytes = title.as_bytes();
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < bytes.len() {
+        if !(bytes[i].is_ascii_alphabetic() || bytes[i] == b'_') {
+            i += 1;
+            continue;
+        }
+        let start = i;
+        while i < bytes.len() && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_') {
+            i += 1;
+        }
+        // Skip whitespace between the name and the paren: `dismiss_pointers ()`.
+        let mut j = i;
+        while j < bytes.len() && bytes[j] == b' ' {
+            j += 1;
+        }
+        if j < bytes.len() && bytes[j] == b'(' {
+            out.push(title[start..i].to_string());
+        }
+    }
+    out
+}
+
 /// Extract import/requires from code (T22)
 pub fn extract_imports(code: &str) -> Vec<String> {
     let mut imports = Vec::new();
@@ -610,8 +771,7 @@ impl LlmAnalyzer {
 
         match response {
             Ok(response_with_model) => {
-                // If structured output was used, unwrap the findings array from the response
-                if self.enable_structured_output {
+                let mut parsed = if self.enable_structured_output {
                     self.parse_structured_llm_response(
                         &response_with_model.content,
                         &file_path,
@@ -623,7 +783,11 @@ impl LlmAnalyzer {
                         &file_path,
                         &response_with_model.model_used,
                     )
+                };
+                if let Ok(findings) = &mut parsed {
+                    anchor_against_ast(findings, content, Self::language_for_extension(extension));
                 }
+                parsed
             }
             Err(e) => {
                 tracing::error!(
@@ -806,6 +970,10 @@ impl LlmAnalyzer {
                                 map_chunk_line(i64::from(line), chunk.start_line, chunk.end_line);
                         }
                     }
+                    // Ranges come from the whole-file AST, so this also corrects
+                    // a chunked file: the model saw one slice, the map covers all
+                    // of it.
+                    anchor_against_ast(&mut placed, content, Some(language));
                     all_findings.extend(placed);
                 }
                 Err(e) => {
