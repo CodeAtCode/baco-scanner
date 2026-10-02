@@ -1,8 +1,8 @@
 use baco::llm::metrics::{LlmMetricsTracker, ModelMetrics, OperationMetrics, RecordRequestParams};
 use std::collections::HashMap;
 
-#[test]
-fn test_agent_message_with_tools_is_specific() {
+#[tokio::test]
+async fn test_agent_message_with_tools_is_specific() {
     let tools_used = ["file_read".to_string(), "pattern_search".to_string()];
     let turn_count = 3;
     let tools_list = tools_used.join(", ");
@@ -23,8 +23,8 @@ fn test_agent_message_with_tools_is_specific() {
     assert!(!message.contains("did not identify specific vulnerabilities"));
 }
 
-#[test]
-fn test_agent_message_without_tools_is_specific() {
+#[tokio::test]
+async fn test_agent_message_without_tools_is_specific() {
     let file_path = "src/vulnerable_module.py";
     let message = format!(
         "Static analysis of {} revealed no exploitable vulnerability patterns. Code review confirmed: input validation, proper error handling, and safe API usage throughout the analyzed section.",
@@ -42,6 +42,7 @@ fn test_agent_message_without_tools_is_specific() {
 
 #[tokio::test]
 async fn test_token_tracking_in_metrics() {
+    // Token tracking removed - this test now only verifies request counting
     let tracker = LlmMetricsTracker::new();
 
     tracker
@@ -49,8 +50,6 @@ async fn test_token_tracking_in_metrics() {
             model_name: "gpt-4".to_string(),
             operation: "discovery".to_string(),
             phase: "chat".to_string(),
-            prompt_tokens: 1000,
-            completion_tokens: 500,
             latency_ms: 1500,
             success: true,
         })
@@ -60,8 +59,6 @@ async fn test_token_tracking_in_metrics() {
             model_name: "gpt-4".to_string(),
             operation: "discovery".to_string(),
             phase: "chat".to_string(),
-            prompt_tokens: 800,
-            completion_tokens: 400,
             latency_ms: 1200,
             success: true,
         })
@@ -71,8 +68,6 @@ async fn test_token_tracking_in_metrics() {
             model_name: "gpt-3.5".to_string(),
             operation: "verification".to_string(),
             phase: "chat".to_string(),
-            prompt_tokens: 500,
-            completion_tokens: 200,
             latency_ms: 700,
             success: true,
         })
@@ -80,25 +75,16 @@ async fn test_token_tracking_in_metrics() {
 
     let metrics = tracker.finalize().await;
 
-    assert_eq!(metrics.total_tokens, 3400); // (1000+500) + (800+400) + (500+200)
-    assert_eq!(metrics.by_model.get("gpt-4").unwrap().total_tokens, 2700); // 1500 + 1200
-    assert_eq!(metrics.by_model.get("gpt-3.5").unwrap().total_tokens, 700);
-    assert_eq!(
-        metrics.by_operation.get("discovery:chat").unwrap().tokens,
-        2700
-    );
-    assert_eq!(
-        metrics
-            .by_operation
-            .get("verification:chat")
-            .unwrap()
-            .tokens,
-        700
-    );
+    // Only verify request counts - tokens removed
+    assert_eq!(metrics.total_requests, 3);
+    assert_eq!(metrics.total_success, 3);
+    assert_eq!(metrics.total_latency_ms, 3400);
+    assert_eq!(metrics.by_model.get("gpt-4").unwrap().total_requests, 2);
+    assert_eq!(metrics.by_model.get("gpt-3.5").unwrap().total_requests, 1);
 }
 
-#[test]
-fn test_html_report_includes_token_metrics() {
+#[tokio::test]
+async fn test_html_report_includes_token_metrics() {
     use baco::report::json::{LlmMetricsSummary, ModelMetricsSummary, OperationMetricsSummary};
 
     let mut by_model = HashMap::new();
@@ -110,7 +96,6 @@ fn test_html_report_includes_token_metrics() {
             successful_requests: 2,
             failed_requests: 0,
             cached_requests: 0,
-            total_tokens: 2700,
             total_latency_ms: 2700,
         },
     );
@@ -124,9 +109,6 @@ fn test_html_report_includes_token_metrics() {
             requests: 2,
             successful: 2,
             failed: 0,
-            tokens: 2700,
-            prompt_tokens: 2000,
-            completion_tokens: 700,
         },
     );
 
@@ -135,7 +117,6 @@ fn test_html_report_includes_token_metrics() {
         total_success: 2,
         total_failed: 0,
         total_cached: 0,
-        total_tokens: 2700,
         total_latency_ms: 2700,
         avg_latency_ms: 1350.0,
         by_model,
@@ -148,7 +129,6 @@ fn test_html_report_includes_token_metrics() {
         successful_requests: llm_metrics.total_success as usize,
         failed_requests: llm_metrics.total_failed as usize,
         cached_requests: llm_metrics.total_cached as usize,
-        total_tokens: llm_metrics.total_tokens as usize,
         avg_latency_ms: llm_metrics.avg_latency_ms,
         models: llm_metrics
             .by_model
@@ -159,7 +139,6 @@ fn test_html_report_includes_token_metrics() {
                 successful_requests: m.successful_requests as usize,
                 failed_requests: m.failed_requests as usize,
                 cached_requests: m.cached_requests as usize,
-                total_tokens: m.total_tokens as usize,
             })
             .collect(),
         operations: llm_metrics
@@ -173,17 +152,15 @@ fn test_html_report_includes_token_metrics() {
                 failed: m.failed as usize,
             })
             .collect(),
-        phase_spend: Default::default(),
     };
 
-    assert_eq!(summary.total_tokens, 2700);
+    assert_eq!(summary.total_requests, 2);
     assert_eq!(summary.models.len(), 1);
-    assert_eq!(summary.models[0].total_tokens, 2700);
     assert_eq!(summary.operations.len(), 1);
 }
 
-#[test]
-fn test_agent_prompt_includes_attack_vectors() {
+#[tokio::test]
+async fn test_agent_prompt_includes_attack_vectors() {
     let system_prompt = r#"You are an OFFENSIVE SECURITY RESEARCHER specializing in vulnerability discovery. Your mission is to find REAL security issues, not to be polite.
 
 **MINDSET**: Think like an attacker. Assume every input is malicious. Hunt for:

@@ -652,7 +652,7 @@ require github.com/gin-gonic/gin v1.9.0
 
     assert_eq!(deps.len(), 1);
     let dep = &deps[0];
-    assert_eq!(dep.name, "ithub.com/gin-gonic/gin");
+    assert_eq!(dep.name, "github.com/gin-gonic/gin");
     assert_eq!(dep.version, "v1.9.0");
 }
 

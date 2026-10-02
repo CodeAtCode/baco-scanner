@@ -11,5 +11,6 @@
 //! - Overlapping patterns
 
 mod inline_migrated_tests;
+mod mutation_verification_tests;
 mod pattern_edge_cases_tests;
 mod regex_defects_tests;

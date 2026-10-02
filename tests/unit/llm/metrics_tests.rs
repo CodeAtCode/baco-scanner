@@ -44,8 +44,6 @@ async fn test_record_request_success() {
         model_name: "gpt-4".to_string(),
         operation: "chat".to_string(),
         phase: "analysis".to_string(),
-        prompt_tokens: 100,
-        completion_tokens: 50,
         latency_ms: 500,
         success: true,
     };
@@ -56,7 +54,6 @@ async fn test_record_request_success() {
     assert_eq!(metrics.total_requests, 1);
     assert_eq!(metrics.total_success, 1);
     assert_eq!(metrics.total_failed, 0);
-    assert_eq!(metrics.total_tokens, 150);
     assert_eq!(metrics.total_latency_ms, 500);
 }
 
@@ -68,8 +65,6 @@ async fn test_record_request_failure() {
         model_name: "gpt-4".to_string(),
         operation: "chat".to_string(),
         phase: "analysis".to_string(),
-        prompt_tokens: 100,
-        completion_tokens: 50,
         latency_ms: 1000,
         success: false,
     };
@@ -91,7 +86,7 @@ async fn test_record_cached_request() {
     let tracker = LlmMetricsTracker::new();
 
     tracker
-        .record_cached_request("gpt-4", "chat", "analysis", 150)
+        .record_cached_request("gpt-4", "chat", "analysis")
         .await;
 
     let metrics = tracker.finalize().await;
@@ -99,7 +94,6 @@ async fn test_record_cached_request() {
     assert_eq!(metrics.total_requests, 1);
     assert_eq!(metrics.total_success, 1);
     assert_eq!(metrics.total_cached, 1);
-    assert_eq!(metrics.total_tokens, 150);
 }
 
 #[tokio::test]
@@ -107,7 +101,7 @@ async fn test_record_cached_request_updates_model_metrics() {
     let tracker = LlmMetricsTracker::new();
 
     tracker
-        .record_cached_request("claude-3", "chat_with_tools", "verification", 200)
+        .record_cached_request("claude-3", "chat_with_tools", "verification")
         .await;
 
     let metrics = tracker.finalize().await;
@@ -116,7 +110,6 @@ async fn test_record_cached_request_updates_model_metrics() {
     assert_eq!(model_metrics.model_name, "claude-3");
     assert_eq!(model_metrics.total_requests, 1);
     assert_eq!(model_metrics.cached_requests, 1);
-    assert_eq!(model_metrics.total_tokens, 200);
 }
 
 // ============================================================================
@@ -133,8 +126,6 @@ async fn test_multiple_models_aggregation() {
             model_name: "gpt-4".to_string(),
             operation: "chat".to_string(),
             phase: "analysis".to_string(),
-            prompt_tokens: 100,
-            completion_tokens: 50,
             latency_ms: 500,
             success: true,
         })
@@ -145,8 +136,6 @@ async fn test_multiple_models_aggregation() {
             model_name: "gpt-4".to_string(),
             operation: "chat".to_string(),
             phase: "analysis".to_string(),
-            prompt_tokens: 200,
-            completion_tokens: 100,
             latency_ms: 800,
             success: true,
         })
@@ -157,8 +146,6 @@ async fn test_multiple_models_aggregation() {
             model_name: "claude-3".to_string(),
             operation: "chat".to_string(),
             phase: "analysis".to_string(),
-            prompt_tokens: 150,
-            completion_tokens: 75,
             latency_ms: 600,
             success: true,
         })
@@ -170,12 +157,10 @@ async fn test_multiple_models_aggregation() {
 
     let gpt4_metrics = metrics.by_model.get("gpt-4").unwrap();
     assert_eq!(gpt4_metrics.total_requests, 2);
-    assert_eq!(gpt4_metrics.total_tokens, 450);
     assert_eq!(gpt4_metrics.total_latency_ms, 1300);
 
     let claude_metrics = metrics.by_model.get("claude-3").unwrap();
     assert_eq!(claude_metrics.total_requests, 1);
-    assert_eq!(claude_metrics.total_tokens, 225);
 }
 
 // ============================================================================
@@ -191,8 +176,6 @@ async fn test_operation_metrics_aggregation() {
             model_name: "gpt-4".to_string(),
             operation: "chat".to_string(),
             phase: "analysis".to_string(),
-            prompt_tokens: 100,
-            completion_tokens: 50,
             latency_ms: 500,
             success: true,
         })
@@ -203,8 +186,6 @@ async fn test_operation_metrics_aggregation() {
             model_name: "gpt-4".to_string(),
             operation: "chat".to_string(),
             phase: "verification".to_string(),
-            prompt_tokens: 200,
-            completion_tokens: 100,
             latency_ms: 700,
             success: true,
         })
@@ -219,12 +200,9 @@ async fn test_operation_metrics_aggregation() {
     assert_eq!(analysis_op.operation, "chat");
     assert_eq!(analysis_op.phase, "analysis");
     assert_eq!(analysis_op.requests, 1);
-    assert_eq!(analysis_op.prompt_tokens, 100);
-    assert_eq!(analysis_op.completion_tokens, 50);
 
     let verification_op = metrics.by_operation.get("chat:verification").unwrap();
     assert_eq!(verification_op.requests, 1);
-    assert_eq!(verification_op.prompt_tokens, 200);
 }
 
 // ============================================================================
@@ -240,8 +218,6 @@ async fn test_avg_latency_calculation() {
             model_name: "gpt-4".to_string(),
             operation: "chat".to_string(),
             phase: "analysis".to_string(),
-            prompt_tokens: 100,
-            completion_tokens: 50,
             latency_ms: 400,
             success: true,
         })
@@ -252,8 +228,6 @@ async fn test_avg_latency_calculation() {
             model_name: "gpt-4".to_string(),
             operation: "chat".to_string(),
             phase: "analysis".to_string(),
-            prompt_tokens: 100,
-            completion_tokens: 50,
             latency_ms: 600,
             success: true,
         })
@@ -304,8 +278,6 @@ async fn test_mixed_success_failure_tracking() {
                 model_name: "gpt-4".to_string(),
                 operation: "chat".to_string(),
                 phase: "analysis".to_string(),
-                prompt_tokens: 100,
-                completion_tokens: 50,
                 latency_ms: 500,
                 success: i < 3,
             })
@@ -331,7 +303,6 @@ fn test_model_metrics_default() {
     assert_eq!(metrics.total_requests, 0);
     assert_eq!(metrics.successful_requests, 0);
     assert_eq!(metrics.failed_requests, 0);
-    assert_eq!(metrics.total_tokens, 0);
 }
 
 #[test]
@@ -341,7 +312,7 @@ fn test_operation_metrics_default() {
     assert!(metrics.operation.is_empty());
     assert!(metrics.phase.is_empty());
     assert_eq!(metrics.requests, 0);
-    assert_eq!(metrics.tokens, 0);
+    assert_eq!(metrics.requests, 0);
 }
 
 // ============================================================================
@@ -356,7 +327,6 @@ fn test_llm_metrics_default() {
     assert_eq!(metrics.total_success, 0);
     assert_eq!(metrics.total_failed, 0);
     assert_eq!(metrics.total_cached, 0);
-    assert_eq!(metrics.total_tokens, 0);
     assert!(metrics.by_model.is_empty());
     assert!(metrics.by_operation.is_empty());
 }

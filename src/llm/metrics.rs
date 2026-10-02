@@ -15,7 +15,6 @@ pub struct ModelMetrics {
     pub successful_requests: u64,
     pub failed_requests: u64,
     pub cached_requests: u64,
-    pub total_tokens: u64,
     pub total_latency_ms: u64,
 }
 
@@ -27,13 +26,6 @@ pub struct OperationMetrics {
     pub requests: u64,
     pub successful: u64,
     pub failed: u64,
-    pub tokens: u64,
-    /// Prompt tokens per operation entry
-    #[serde(default)]
-    pub prompt_tokens: u64,
-    /// Completion tokens per operation entry
-    #[serde(default)]
-    pub completion_tokens: u64,
 }
 
 /// Aggregated LLM metrics for the entire scan
@@ -43,7 +35,6 @@ pub struct LlmMetrics {
     pub total_success: u64,
     pub total_failed: u64,
     pub total_cached: u64,
-    pub total_tokens: u64,
     pub total_latency_ms: u64,
     pub avg_latency_ms: f64,
     pub by_model: HashMap<String, ModelMetrics>,
@@ -71,7 +62,6 @@ impl LlmMetricsTracker {
         let mut metrics = self.inner.write().await;
 
         metrics.total_requests += 1;
-        metrics.total_tokens += params.prompt_tokens + params.completion_tokens;
         metrics.total_latency_ms += params.latency_ms;
 
         if params.success {
@@ -95,7 +85,6 @@ impl LlmMetricsTracker {
         } else {
             model_entry.failed_requests += 1;
         }
-        model_entry.total_tokens += params.prompt_tokens + params.completion_tokens;
         model_entry.total_latency_ms += params.latency_ms;
 
         // Update operation metrics
@@ -115,26 +104,15 @@ impl LlmMetricsTracker {
         } else {
             op_entry.failed += 1;
         }
-        op_entry.tokens += params.prompt_tokens + params.completion_tokens;
-        op_entry.prompt_tokens += params.prompt_tokens;
-        op_entry.completion_tokens += params.completion_tokens;
     }
 
     /// Record a cached request (from LLM cache)
-    pub async fn record_cached_request(
-        &self,
-        model_name: &str,
-        operation: &str,
-        phase: &str,
-        tokens: u64,
-    ) {
+    pub async fn record_cached_request(&self, model_name: &str, operation: &str, phase: &str) {
         let mut metrics = self.inner.write().await;
 
         metrics.total_requests += 1;
         metrics.total_success += 1;
         metrics.total_cached += 1;
-        metrics.total_tokens += tokens;
-
         let model_entry = metrics
             .by_model
             .entry(model_name.to_string())
@@ -146,8 +124,6 @@ impl LlmMetricsTracker {
         model_entry.total_requests += 1;
         model_entry.successful_requests += 1;
         model_entry.cached_requests += 1;
-        model_entry.total_tokens += tokens;
-
         let op_key = format!("{}:{}", operation, phase);
         let op_entry = metrics
             .by_operation
@@ -160,9 +136,6 @@ impl LlmMetricsTracker {
 
         op_entry.requests += 1;
         op_entry.successful += 1;
-        op_entry.tokens += tokens;
-        // Cached requests: tokens are counted as prompt tokens (no completion)
-        op_entry.prompt_tokens += tokens;
     }
 
     /// Record positional fallback usage in batch verification
@@ -191,8 +164,6 @@ pub struct RecordRequestParams {
     pub model_name: String,
     pub operation: String,
     pub phase: String,
-    pub prompt_tokens: u64,
-    pub completion_tokens: u64,
     pub latency_ms: u64,
     pub success: bool,
 }

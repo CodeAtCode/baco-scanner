@@ -272,64 +272,81 @@ fn test_static_analysis_example_json_deserializes() {
     }
 }
 
-/// Contract test: verify field types match expectations (string vs integer vs object).
+/// Contract test: every field the parser reads must appear in the prompt's JSON
+/// example, with the declared type.
+///
+/// This test previously verified nothing. It returned early when the prompt had
+/// no JSON example, wrapped the whole body in `if let` chains that silently did
+/// nothing when the block was not an array of objects, and merely logged a
+/// mismatch at debug level with the comment "we're lenient -- just log if types
+/// don't match". It was named a contract test and enforced no contract.
+///
+/// The contract is worth enforcing: the parser reads field names out of the
+/// model output, and the prompt is what tells the model to produce them. If a
+/// field is renamed in one place and not the other, the model returns objects the
+/// parser cannot read, and the finding arrives with the field silently missing.
 #[test]
 fn test_static_analysis_field_types_in_prompt() {
     let prompt_path = Path::new("prompts/phases/llm_static_analysis.md");
     let prompt_content = fs::read_to_string(prompt_path).expect("Should be able to read prompt");
 
-    // Extract first JSON example
     let json_blocks: Vec<&str> = prompt_content
         .split("```json")
         .skip(1)
         .map(|block| block.split("```").next().unwrap_or(""))
         .collect();
 
-    if json_blocks.is_empty() {
-        return; // No examples to check
-    }
+    assert!(
+        !json_blocks.is_empty(),
+        "the prompt must contain a ```json example; the model is told the schema by \
+         example, and without one there is nothing to check the parser against"
+    );
 
     let first_block = json_blocks[0].trim();
-    let parsed: Result<serde_json::Value, _> = serde_json::from_str(first_block);
+    let parsed: serde_json::Value = serde_json::from_str(first_block).unwrap_or_else(|e| {
+        panic!("the first ```json block in the prompt must be valid JSON: {e}\n---\n{first_block}")
+    });
 
-    if let Ok(value) = parsed {
-        if let Some(arr) = value.as_array() {
-            if let Some(first_obj) = arr.first().and_then(|v| v.as_object()) {
-                for (field_name, expected_type, _) in STATIC_ANALYSIS_FIELDS.iter() {
-                    if let Some(field_value) = first_obj.get(*field_name) {
-                        let actual_type = match field_value {
-                            serde_json::Value::String(_) => "string",
-                            serde_json::Value::Number(_) => "integer",
-                            serde_json::Value::Object(_) => "object",
-                            serde_json::Value::Array(_) => "array",
-                            serde_json::Value::Bool(_) => "boolean",
-                            serde_json::Value::Null => "null",
-                        };
+    let arr = parsed
+        .as_array()
+        .unwrap_or_else(|| panic!("the example must be an array of findings, got: {first_block}"));
+    let first_obj = arr
+        .first()
+        .and_then(|v| v.as_object())
+        .unwrap_or_else(|| panic!("the example array must contain an object, got: {first_block}"));
 
-                        // Note: we allow integer to be represented as number in JSON
-                        if *expected_type == "integer" && actual_type == "integer" {
-                            continue;
-                        }
-                        if *expected_type == "string" && actual_type == "string" {
-                            continue;
-                        }
-                        if *expected_type == "object" && actual_type == "object" {
-                            continue;
-                        }
+    for (field_name, expected_type, _) in STATIC_ANALYSIS_FIELDS.iter() {
+        let field_value = first_obj.get(*field_name).unwrap_or_else(|| {
+            panic!(
+                "field `{field_name}` is parsed by the code but does not appear in the \
+                 prompt's example, so the model will never emit it"
+            )
+        });
 
-                        // For this test, we're lenient - just log if types don't match
-                        // The important thing is the field exists
-                        if actual_type != *expected_type {
-                            tracing::debug!(
-                                "Field '{}' has type '{}' in example, expected '{}'",
-                                field_name,
-                                actual_type,
-                                expected_type
-                            );
-                        }
-                    }
-                }
-            }
-        }
+        let actual_type = match field_value {
+            serde_json::Value::String(_) => "string",
+            serde_json::Value::Number(_) => "number",
+            serde_json::Value::Object(_) => "object",
+            serde_json::Value::Array(_) => "array",
+            serde_json::Value::Bool(_) => "boolean",
+            serde_json::Value::Null => "null",
+        };
+
+        // JSON has a single numeric type, so an `integer` contract is satisfied by
+        // any number. Everything else is compared strictly.
+        let comparable = matches!(
+            (*expected_type, actual_type),
+            ("string", "string")
+                | ("object", "object")
+                | ("array", "array")
+                | ("integer", "number")
+                | ("number", "number")
+                | ("boolean", "boolean")
+        );
+        assert!(
+            comparable,
+            "field `{field_name}` is `{actual_type}` in the prompt's example but the \
+             parser expects `{expected_type}`"
+        );
     }
 }

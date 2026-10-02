@@ -77,6 +77,90 @@ fn write(dir: &std::path::Path, body: &str) {
     std::fs::write(dir.join("plugin.php"), body).expect("write fixture");
 }
 
+/// The second reported case: the guard is the very next line after the anchored
+/// one, which is the smallest possible offset and still outside nothing.
+const ADJACENT_GUARD: &str = r#"<?php
+function enable_access() {
+    check_admin_referer( 'enable', 'nonce' );
+    update_option( 'my_plugin_enabled', 1 );
+}
+
+function delete_everything() {
+    global $wpdb;
+    $wpdb->query( "DELETE FROM {$wpdb->prefix}orders" );
+}
+"#;
+
+#[test]
+fn test_a_guard_on_the_next_line_is_found_by_reading_the_function_body() {
+    let dir = tempfile::tempdir().expect("tmpdir");
+    write(dir.path(), ADJACENT_GUARD);
+    let mut f = finding(
+        dir.path(),
+        "CWE-862: Missing authorization check on enable_access()",
+        Some(2),
+    );
+    f.cwe_id = Some("CWE-862".to_string());
+
+    // The full primitive list as presets/wordpress-plugin.toml declares it, so a
+    // gap in the preset shows up here rather than only in a real scan.
+    let (status, notes) = refute_with_primitive_check(
+        &f,
+        VerificationStatus::Confirmed,
+        "the model saw no guard",
+        &primitives(&[
+            "wp_verify_nonce",
+            "check_admin_referer",
+            "check_ajax_referer",
+            "current_user_can",
+            "user_can",
+        ]),
+    );
+
+    assert_eq!(
+        status,
+        VerificationStatus::FalsePositive,
+        "the guard is inside the function the title names, so this is not a missing-auth finding"
+    );
+    assert!(
+        notes.contains("check_admin_referer"),
+        "the note must name the primitive that was found, got: {notes}"
+    );
+}
+
+#[test]
+fn test_a_genuinely_unprotected_function_stays_confirmed() {
+    // The other half: the refutation must not fire on a function that really has
+    // no guard, or it would be a blanket dismissal rather than a check.
+    let dir = tempfile::tempdir().expect("tmpdir");
+    write(dir.path(), ADJACENT_GUARD);
+    let mut f = finding(
+        dir.path(),
+        "CWE-862: Missing authorization check on delete_everything()",
+        Some(7),
+    );
+    f.cwe_id = Some("CWE-862".to_string());
+
+    let (status, notes) = refute_with_primitive_check(
+        &f,
+        VerificationStatus::Confirmed,
+        "no guard found",
+        &primitives(&[
+            "wp_verify_nonce",
+            "check_admin_referer",
+            "check_ajax_referer",
+            "current_user_can",
+            "user_can",
+        ]),
+    );
+
+    assert_eq!(
+        status,
+        VerificationStatus::Confirmed,
+        "there is no primitive in that function; it must survive, got notes: {notes}"
+    );
+}
+
 #[test]
 fn test_a_protected_handler_is_refuted_without_asking_the_model() {
     // The exact reported case. The model confirmed it; the code says otherwise.

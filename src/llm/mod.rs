@@ -417,7 +417,6 @@ impl LlmClient {
         &self,
         base_url: &str,
         payload: serde_json::Value,
-        messages_for_metrics: usize,
     ) -> Result<ChatResponseWithModel, ScanError> {
         let url = chat_endpoint(base_url);
         let mut models = self.get_all_models();
@@ -469,14 +468,10 @@ impl LlmClient {
                         let latency_ms = start_time.elapsed().as_millis() as u64;
 
                         // Record metrics
-                        let tokens_prompt: usize = messages_for_metrics;
-                        let tokens_completion: usize = content.len() / 4;
                         self.record_metrics(RecordMetricsParams {
                             model: model.clone(),
                             operation: "chat".to_string(),
                             phase: "unknown".to_string(),
-                            tokens_prompt,
-                            tokens_completion,
                             latency_ms,
                             success: true,
                         })
@@ -698,13 +693,10 @@ impl LlmClient {
                         let latency_ms = start_time.elapsed().as_millis() as u64;
 
                         // Record metrics
-                        let tokens_prompt: usize = 0;
                         self.record_metrics(RecordMetricsParams {
                             model: model.clone(),
                             operation: "chat_with_tools".to_string(),
                             phase: "unknown".to_string(),
-                            tokens_prompt,
-                            tokens_completion: 0,
                             latency_ms,
                             success: true,
                         })
@@ -860,8 +852,6 @@ impl LlmClient {
         let model = self.get_current_model();
         let payload = Self::build_chat_payload(self, &model, messages, None);
 
-        let tokens_prompt: usize = messages.iter().map(|m| m.content.len() / 4).sum();
-
         // Check cache if enabled
         if self.config.enable_llm_cache {
             let cache_dir =
@@ -882,12 +872,6 @@ impl LlmClient {
             match crate::llm::cache::read_cached_response(&cache_dir, &cache_key) {
                 Ok(Some(cached_content)) => {
                     tracing::info!("Cache hit for key {}", cache_key);
-                    // Record cached request metric
-                    if let Some(ref tracker) = self.metrics_tracker {
-                        tracker
-                            .record_cached_request(&model, "chat", "unknown", tokens_prompt as u64)
-                            .await;
-                    }
                     // Parse cached response
                     let cached_response: serde_json::Value = serde_json::from_str(&cached_content)
                         .map_err(|e| format!("Failed to parse cached response: {}", e))?;
@@ -910,10 +894,7 @@ impl LlmClient {
         let chat_url = chat_endpoint(&self.config.base_url);
         tracing::info!("Trying LLM API at: {}", chat_url);
 
-        match self
-            .try_chat_request(&self.config.base_url, payload, tokens_prompt)
-            .await
-        {
+        match self.try_chat_request(&self.config.base_url, payload).await {
             Ok(response) => {
                 // Best-effort write to cache if enabled
                 if self.config.enable_llm_cache {
@@ -976,15 +957,10 @@ impl LlmClient {
 
         let payload = Self::build_chat_payload(self, &model, messages, Some(&response_format));
 
-        let tokens_prompt: usize = messages.iter().map(|m| m.content.len() / 4).sum();
-
         let chat_url = chat_endpoint(&self.config.base_url);
         tracing::info!("Trying LLM API with JSON schema at: {}", chat_url);
 
-        match self
-            .try_chat_request(&self.config.base_url, payload, tokens_prompt)
-            .await
-        {
+        match self.try_chat_request(&self.config.base_url, payload).await {
             Ok(response) => Ok(response),
             Err(e) => {
                 tracing::warn!("LLM API with JSON schema {} failed: {}", chat_url, e);
@@ -1037,12 +1013,6 @@ impl LlmClient {
             match crate::llm::cache::read_cached_response(&cache_dir, &cache_key) {
                 Ok(Some(cached_content)) => {
                     tracing::info!("Cache hit for key {}", cache_key);
-                    // Record cached request metric
-                    if let Some(ref tracker) = self.metrics_tracker {
-                        tracker
-                            .record_cached_request(&model, "chat_with_tools", "unknown", 0)
-                            .await;
-                    }
                     // Parse cached response
                     let cached_response: serde_json::Value = serde_json::from_str(&cached_content)
                         .map_err(|e| format!("Failed to parse cached response: {}", e))?;
@@ -1169,8 +1139,6 @@ pub struct RecordMetricsParams {
     model: String,
     operation: String,
     phase: String,
-    tokens_prompt: usize,
-    tokens_completion: usize,
     latency_ms: u64,
     success: bool,
 }
@@ -1181,8 +1149,6 @@ impl From<RecordMetricsParams> for crate::llm::metrics::RecordRequestParams {
             model_name: p.model,
             operation: p.operation,
             phase: p.phase,
-            prompt_tokens: p.tokens_prompt as u64,
-            completion_tokens: p.tokens_completion as u64,
             latency_ms: p.latency_ms,
             success: p.success,
         }
@@ -1253,8 +1219,6 @@ async fn record_failure_metrics(client: &LlmClient, model: String, latency_ms: u
             model,
             operation: "chat".to_string(),
             phase: "unknown".to_string(),
-            tokens_prompt: 0,
-            tokens_completion: 0,
             latency_ms,
             success: false,
         })

@@ -1,9 +1,10 @@
-use std::path::PathBuf;
-use std::process::Command;
+use git2::{DiffFormat, DiffOptions, Repository};
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone)]
 pub struct DiffAnalysisInput {
     pub file_path: String,
+    pub repo_path: Option<String>,
     pub base_commit: Option<String>,
     pub head_commit: Option<String>,
 }
@@ -19,115 +20,217 @@ pub struct DiffAnalysisOutput {
 pub fn analyze_diff(
     input: DiffAnalysisInput,
 ) -> Result<DiffAnalysisOutput, Box<dyn std::error::Error>> {
-    let base_provided = input.base_commit.is_some();
-    let head_provided = input.head_commit.is_some();
-
-    if !base_provided && !head_provided {
-        return Err("Either base_commit or head_commit must be provided".into());
-    }
-
-    if base_provided && !head_provided {
-        let base = input.base_commit.unwrap();
-        let head = "HEAD".to_string();
-        return run_diff(&input.file_path, Some(&base), &head);
-    }
-
-    if !base_provided && head_provided {
-        let head = input.head_commit.unwrap();
-        let base = "HEAD~1".to_string();
-        return run_diff(&input.file_path, Some(&base), &head);
-    }
-
-    let base = input.base_commit.unwrap_or_else(|| "HEAD~1".to_string());
+    let base = match (&input.base_commit, &input.head_commit) {
+        (Some(b), None) => b.clone(),
+        (None, Some(h)) => {
+            return run_diff(
+                &input.file_path,
+                input.repo_path.as_deref(),
+                Some("HEAD~1"),
+                h,
+            );
+        }
+        (Some(b), Some(_h)) => b.clone(),
+        (None, None) => return Err("Either base_commit or head_commit must be provided".into()),
+    };
     let head = input.head_commit.unwrap_or_else(|| "HEAD".to_string());
-    run_diff(&input.file_path, Some(&base), &head)
+    run_diff(
+        &input.file_path,
+        input.repo_path.as_deref(),
+        Some(&base),
+        &head,
+    )
 }
 
 fn run_diff(
     file_path: &str,
+    repo_path: Option<&str>,
     base: Option<&str>,
     head: &str,
 ) -> Result<DiffAnalysisOutput, Box<dyn std::error::Error>> {
-    let base_str = base
-        .map(|s| format!("{}..{}", s, head))
+    let range = base
+        .map(|b| format!("{}..{}", b, head))
         .unwrap_or_else(|| head.to_string());
+    validate_revspec(&range)?;
 
-    validate_revspec(&base_str)?;
+    let repo = Repository::open(repo_path.unwrap_or("."))?;
 
-    let output = Command::new("git")
-        .args(["diff", &base_str, "--", file_path])
-        .current_dir(
-            PathBuf::from(file_path)
-                .parent()
-                .unwrap_or(&PathBuf::from(".")),
-        )
-        .output()
-        .map_err(|e| format!("Failed to execute git diff: {}", e))?;
+    let base_commit = if let Some(b) = base {
+        let obj = repo.revparse_single(b)?;
+        obj.peel_to_commit()?
+    } else {
+        repo.head()?.peel_to_commit()?
+    };
 
-    if !output.status.success() {
-        let exit_code = output.status.code().unwrap_or(-1);
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        return Err(format!("git diff failed (exit code {}): {}", exit_code, stderr).into());
+    // The head revspec must resolve even though the diff is taken against the
+    // working tree. Dropping this check made an unresolvable head succeed with an
+    // empty result, which is the failure mode this file is meant to avoid.
+    repo.revparse_single(head)?.peel_to_commit()?;
+
+    let base_tree = base_commit.tree()?;
+
+    let mut opts = DiffOptions::new();
+    // Against the WORKING TREE, not HEAD. `git diff <base>` means "what changed
+    // since base, including changes not yet committed" -- and an uncommitted fix
+    // is the normal case for analysing a change before committing it. Diffing
+    // base against HEAD's tree made every uncommitted change invisible and
+    // returned an empty result that read as "nothing to see here".
+    let diff = repo.diff_tree_to_workdir_with_index(Some(&base_tree), Some(&mut opts))?;
+
+    // Check if file exists in diff
+    let mut matched_path: Option<String> = None;
+    diff.foreach(
+        &mut |delta, _| {
+            if matched_path.is_none() {
+                if let Some(p) = delta.new_file().path() {
+                    let s = p.to_string_lossy();
+                    if s == file_path
+                        || s.ends_with(file_path)
+                        || Path::new(file_path)
+                            .file_name()
+                            .map(|n| s == n.to_string_lossy())
+                            .unwrap_or(false)
+                    {
+                        matched_path = Some(s.to_string());
+                    }
+                }
+            }
+            true
+        },
+        None,
+        None,
+        None,
+    )?;
+
+    if matched_path.is_none() {
+        return Ok(DiffAnalysisOutput {
+            diff_output: String::new(),
+            files_changed: 0,
+            insertions: 0,
+            deletions: 0,
+        });
     }
 
-    let diff_output = String::from_utf8_lossy(&output.stdout).to_string();
-    let (files_changed, insertions, deletions) = parse_diff(&diff_output);
+    // Single pass: collect diff output and count files
+    let mut output = String::new();
+    let mut files_changed = 0u32;
+    let file_path_clone = file_path.to_string();
+
+    diff.print(DiffFormat::Patch, |_delta, _hunk, line| {
+        let content = std::str::from_utf8(line.content()).unwrap_or("");
+        match line.origin() {
+            '@' => {
+                output.push_str(content);
+            }
+            ' ' | '+' | '-' => {
+                output.push(line.origin());
+                output.push_str(content);
+            }
+            _ => {
+                output.push_str(content);
+            }
+        }
+        true
+    })?;
+
+    diff.foreach(
+        &mut |delta, _| {
+            if let Some(p) = delta.new_file().path() {
+                let s = p.to_string_lossy();
+                if s == file_path_clone
+                    || s.ends_with(&file_path_clone)
+                    || Path::new(&file_path_clone)
+                        .file_name()
+                        .map(|n| s == n.to_string_lossy())
+                        .unwrap_or(false)
+                {
+                    files_changed += 1;
+                }
+            }
+            true
+        },
+        None,
+        None,
+        None,
+    )?;
+
+    let (mut insertions, mut deletions) = (0u32, 0u32);
+    for line in output.lines() {
+        if line.starts_with('+') && !line.starts_with("+++") {
+            insertions += 1;
+        } else if line.starts_with('-') && !line.starts_with("---") {
+            deletions += 1;
+        }
+    }
 
     Ok(DiffAnalysisOutput {
-        diff_output,
+        diff_output: output,
         files_changed,
         insertions,
         deletions,
     })
 }
 
-pub fn parse_diff(diff_output: &str) -> (u32, u32, u32) {
-    let lines: Vec<&str> = diff_output.lines().collect();
+pub fn changed_files(repo_path: &str, revspec: &str) -> Result<Vec<PathBuf>, String> {
+    let repo =
+        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+    validate_revspec(revspec)?;
 
-    let mut files_changed = 1u32;
-    let mut insertions = 0u32;
-    let mut deletions = 0u32;
+    let mut opts = DiffOptions::new();
+    opts.context_lines(0);
 
-    for line in &lines {
-        if line.starts_with("+++ ") && !line.starts_with("+++++") {
-            files_changed += 1;
-        } else if line.starts_with("+") && !line.starts_with("+++") {
-            insertions += 1;
-        } else if line.starts_with("-") && !line.starts_with("---") {
-            deletions += 1;
-        }
-    }
+    // A revspec names either one side (the other being the working tree) or both
+    // sides (a range). `HEAD~1...HEAD` is the form the CLI passes, and
+    // revparse_single cannot parse it at all; treating a range as a single rev
+    // made every ranged invocation fail to resolve.
+    let diff = if revspec.contains("..") {
+        let range = repo
+            .revparse(revspec)
+            .map_err(|e| format!("invalid revspec '{}': {}", revspec, e))?;
+        let from = range
+            .from()
+            .and_then(|o| o.peel_to_commit().ok())
+            .ok_or_else(|| format!("Could not resolve the left side of '{}'", revspec))?;
+        let to = range
+            .to()
+            .and_then(|o| o.peel_to_commit().ok())
+            .ok_or_else(|| format!("Could not resolve the right side of '{}'", revspec))?;
+        repo.diff_tree_to_tree(
+            Some(&from.tree().map_err(|e| e.to_string())?),
+            Some(&to.tree().map_err(|e| e.to_string())?),
+            Some(&mut opts),
+        )
+        .map_err(|e| format!("Failed to create diff: {}", e))?
+    } else {
+        let base_commit = repo
+            .revparse_single(revspec)
+            .map_err(|e| format!("invalid revspec '{}': {}", revspec, e))?
+            .peel_to_commit()
+            .map_err(|e| format!("Could not resolve '{}' in revspec: {}", revspec, e))?;
+        let base_tree = base_commit
+            .tree()
+            .map_err(|e| format!("Failed to get tree for '{}': {}", revspec, e))?;
+        repo.diff_tree_to_workdir_with_index(Some(&base_tree), Some(&mut opts))
+            .map_err(|e| format!("Failed to create diff: {}", e))?
+    };
 
-    if lines.is_empty() {
-        return (0, 0, 0);
-    }
-
-    (files_changed, insertions, deletions)
+    let mut files = Vec::new();
+    diff.foreach(
+        &mut |delta, _| {
+            if let Some(p) = delta.new_file().path() {
+                files.push(p.to_path_buf());
+            }
+            true
+        },
+        None,
+        None,
+        None,
+    )
+    .map_err(|e| format!("Failed to process diff: {}", e))?;
+    Ok(files)
 }
-/// List files changed in a git revspec (`git diff --name-only`), repo-relative.
-/// `repo_path` should be the repository root or a directory inside it.
-pub fn changed_files(repo_path: &str, revspec: &str) -> Result<Vec<std::path::PathBuf>, String> {
-    let output = std::process::Command::new("git")
-        .args(["-C", repo_path, "diff", "--name-only", revspec, "--"])
-        .output()
-        .map_err(|e| format!("Failed to run git diff: {e}"))?;
-    if !output.status.success() {
-        return Err(format!(
-            "git diff failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        ));
-    }
-    Ok(String::from_utf8_lossy(&output.stdout)
-        .lines()
-        .filter(|l| !l.trim().is_empty())
-        .map(std::path::PathBuf::from)
-        .collect())
-}
 
-/// Keep findings whose path matches the changed set. Compares exact paths
-/// plus suffix matches on normalized separators, covering absolute finding
-/// paths against repo-relative changed entries (and vice versa).
-pub fn matches_changed_set(file_path: &str, changed: &[std::path::PathBuf]) -> bool {
+pub fn matches_changed_set(file_path: &str, changed: &[PathBuf]) -> bool {
     let normalized = file_path.replace('\\', "/");
     changed.iter().any(|p| {
         let entry = p.to_string_lossy().replace('\\', "/");
@@ -137,7 +240,7 @@ pub fn matches_changed_set(file_path: &str, changed: &[std::path::PathBuf]) -> b
     })
 }
 
-fn validate_revspec(revspec: &str) -> Result<(), String> {
+pub fn validate_revspec(revspec: &str) -> Result<(), String> {
     if revspec.starts_with('-') {
         return Err(format!(
             "invalid revspec '{}': cannot start with '-' (would be interpreted as git option)",

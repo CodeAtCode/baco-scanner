@@ -20,12 +20,12 @@ First public release.
 - `baco doctor` pre-flight checks: config parse, per-phase LLM slot validation (warns on phases without `api_key` that will be skipped), semgrep/python3 presence, output dir writability, disk space
 - `baco eval` detection-regression suite: 10 labeled targets with ground-truth oracles, precision/recall/F1, CI gate on pass-rate (`BACO_EVAL_FLOOR`, default 0.70)
 - `baco init [PATH]` config scaffolding with language detection and preset suggestions
-- Scan-health report (console + JSON section): per-phase run/skipped-with-reason, file counters (indexed/analyzed/dropped/chunked), LLM call outcomes by error class, token and cost totals per phase, blind-scan warning when all LLM phases are skipped
+- Scan-health report (console + JSON section): per-phase run/skipped-with-reason, file counters (indexed/analyzed/dropped/chunked), LLM call outcomes by error class, blind-scan warning when all LLM phases are skipped
 - Pipeline profiles: `[scanner] profile = "core"` (default, 23 phases) or `"all"` (experimental phases included)
 - Presets: `django`, `laravel`, `cpp`; inline `custom_rules` Semgrep YAML in presets (self-contained detection packages)
 - Per-language default Semgrep rulesets derived from `project.languages`
 - Environment-variable bridges for all six LLM phase slots (`LLM_DISCOVERY_KEY`, `LLM_VERIFICATION_KEY`, `LLM_AGGREGATION_KEY`, `LLM_STATIC_ANALYSIS_KEY`, `LLM_SECURITY_AGENT_VERIFICATION_KEY`, `LLM_THREAT_MODELING_KEY`)
-- LLM cost transparency: optional `[llm.pricing]` table, token counts per phase and model surfaced in the health report
+
 - Configurable never-submit confidence filter (`never_submit_enabled`, `never_submit_multiplier`)
 - `max_reasoning_tokens` field for LLM config
 - Agent scaffold modules: `call_graph_paths`, `fn_lookup`

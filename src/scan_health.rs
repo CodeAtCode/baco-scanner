@@ -49,27 +49,6 @@ pub struct FileCounters {
     pub truncated: u64,
 }
 
-/// Token usage per phase
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct TokenUsage {
-    pub phase: String,
-    pub prompt_tokens: u64,
-    pub completion_tokens: u64,
-    pub total_tokens: u64,
-}
-
-/// Per-phase spend tracking (tokens + optional cost)
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct PhaseSpend {
-    pub phase: String,
-    pub prompt_tokens: u64,
-    pub completion_tokens: u64,
-    pub total_tokens: u64,
-    /// Cost in same currency as pricing config (empty if no pricing provided)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub cost: Option<f64>,
-}
-
 /// Budget tracking
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct BudgetStatus {
@@ -89,16 +68,6 @@ pub struct ScanHealth {
 
     /// File processing counters
     pub files: FileCounters,
-
-    /// Token usage per phase
-    pub tokens_by_phase: Vec<TokenUsage>,
-
-    /// Per-phase spend (tokens + optional cost)
-    #[serde(default)]
-    pub phase_spend: Vec<PhaseSpend>,
-
-    /// Total token usage
-    pub total_tokens: u64,
 
     /// Budget used vs cap if configured
     pub budget: BudgetStatus,
@@ -227,18 +196,6 @@ impl ScanHealth {
         self.files.truncated = count;
     }
 
-    /// Record token usage for a phase
-    pub fn record_tokens(&mut self, phase: &ScanPhase, prompt: u64, completion: u64) {
-        let total = prompt.saturating_add(completion);
-        self.tokens_by_phase.push(TokenUsage {
-            phase: phase_name(phase),
-            prompt_tokens: prompt,
-            completion_tokens: completion,
-            total_tokens: total,
-        });
-        self.total_tokens = self.total_tokens.saturating_add(total);
-    }
-
     /// Set budget cap and used amount
     pub fn set_budget(&mut self, cap: Option<u64>, used: u64) {
         self.budget = BudgetStatus {
@@ -323,47 +280,6 @@ impl ScanHealth {
         skips
     }
 
-    /// Compute per-phase spend from operation metrics and pricing table
-    /// Returns a vector of PhaseSpend entries, one per unique phase
-    pub fn compute_phase_spend(
-        operation_metrics: &HashMap<String, crate::llm::metrics::OperationMetrics>,
-        pricing: Option<&HashMap<String, crate::config::ModelPricing>>,
-    ) -> Vec<PhaseSpend> {
-        use std::collections::HashMap as StdHashMap;
-
-        // Aggregate tokens by phase
-        let mut phase_tokens: StdHashMap<String, (u64, u64)> = StdHashMap::new();
-        for op in operation_metrics.values() {
-            let entry = phase_tokens.entry(op.phase.clone()).or_insert((0, 0));
-            entry.0 += op.prompt_tokens;
-            entry.1 += op.completion_tokens;
-        }
-
-        // Build PhaseSpend entries
-        let mut spend = Vec::new();
-        for (phase, (prompt, completion)) in phase_tokens {
-            let total = prompt.saturating_add(completion);
-            let cost = pricing.and_then(|p| {
-                // Try to find pricing for any model - use first match
-                p.values()
-                    .next()
-                    .map(|model_pricing| model_pricing.cost(prompt, completion))
-            });
-
-            spend.push(PhaseSpend {
-                phase,
-                prompt_tokens: prompt,
-                completion_tokens: completion,
-                total_tokens: total,
-                cost,
-            });
-        }
-
-        // Sort by phase name for deterministic output
-        spend.sort_by(|a, b| a.phase.cmp(&b.phase));
-        spend
-    }
-
     /// Build a summary string for console output
     pub fn summary(&self) -> String {
         let run_count = self
@@ -426,9 +342,6 @@ impl ScanHealth {
                 skip_count,
                 skipped_list.join(", ")
             ));
-        }
-        if self.total_tokens > 0 {
-            parts.push(format!("tokens: {}", self.total_tokens));
         }
         if let Some(cap) = self.budget.cap_maybe {
             parts.push(format!(

@@ -763,32 +763,80 @@ fn test_graph_path_debug_display() {
 
 #[test]
 fn test_function_lookup_index_file_nonexistent() {
+    // Indexing a path that does not exist must add nothing and not panic. The
+    // test used to only make the call, so it passed whether the function indexed
+    // nothing, indexed a phantom, or threw and was never noticed.
     let dir = tempdir().expect("Failed to create temp dir");
     let file_path = dir.path().join("does_not_exist.rs");
 
     let mut lookup = FunctionLookup::new();
     lookup.index_file(&file_path, Language::Rust);
+
+    assert!(
+        !lookup.contains("does_not_exist"),
+        "a file that does not exist must not appear in the index"
+    );
+    assert!(lookup.lookup("does_not_exist").is_none());
+    assert!(lookup.lookup("anything").is_none());
 }
 
 #[test]
 fn test_function_lookup_index_directory_empty() {
+    // An empty directory is a legitimate input, and it must index to nothing.
     let dir = tempdir().expect("Failed to create temp dir");
 
     let mut lookup = FunctionLookup::new();
     lookup.index_directory(dir.path(), &[Language::Rust], 1024 * 1024, &[]);
+
+    assert!(
+        !lookup.contains(""),
+        "an empty directory must produce no entries"
+    );
+    assert!(lookup.lookup("main").is_none());
 }
 
 #[test]
 fn test_function_lookup_index_directory_nested() {
+    // The intent was to prove recursion into subdirectories. The test built the
+    // nested tree, wrote one file at the root, and never called index_directory,
+    // so recursion was never exercised at all.
     let dir = tempdir().expect("Failed to create temp dir");
     let subdir = dir.path().join("subdir");
     let nested_subdir = subdir.join("nested");
 
     fs::create_dir_all(&nested_subdir).expect("Failed to create dirs");
 
-    let file1 = dir.path().join("root.rs");
+    fs::write(
+        dir.path().join("root.rs"),
+        "fn root_func() { root_body(); }",
+    )
+    .expect("Failed to write root.rs");
+    fs::write(subdir.join("mid.rs"), "fn mid_func() { mid_body(); }")
+        .expect("Failed to write mid.rs");
+    fs::write(
+        nested_subdir.join("deep.rs"),
+        "fn deep_func() { deep_body(); }",
+    )
+    .expect("Failed to write deep.rs");
 
-    fs::write(&file1, "fn root_func() {}").expect("Failed to write file1");
+    let mut lookup = FunctionLookup::new();
+    lookup.index_directory(dir.path(), &[Language::Rust], 1024 * 1024, &[]);
+
+    for (name, body_marker) in [
+        ("root_func", "root_body"),
+        ("mid_func", "mid_body"),
+        ("deep_func", "deep_body"),
+    ] {
+        assert!(
+            lookup.contains(name),
+            "index_directory must recurse into subdirectories; {name} was not indexed"
+        );
+        assert_eq!(
+            lookup.lookup(name).map(|body| body.contains(body_marker)),
+            Some(true),
+            "the body of {name} must be recoverable from the index"
+        );
+    }
 }
 
 #[test]

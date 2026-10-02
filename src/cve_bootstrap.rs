@@ -25,6 +25,23 @@ pub enum CveBootstrapError {
 
 pub type Result<T> = std::result::Result<T, CveBootstrapError>;
 
+/// Read a manifest file, returning None if it doesn't exist.
+///
+/// Centralizes the pattern each manifest parser repeated:
+/// ```text
+/// let path = root.join(name);
+/// if !path.exists() { return Ok(None); }
+/// let content = fs::read_to_string(&path)?;
+/// ```
+fn read_manifest(root: &Path, name: &str) -> Result<Option<String>> {
+    let path = root.join(name);
+    if !path.exists() {
+        return Ok(None);
+    }
+    let content = fs::read_to_string(&path)?;
+    Ok(Some(content))
+}
+
 pub struct CveBootstrapper {
     project_root: String,
     client: CveClient,
@@ -162,12 +179,9 @@ impl CveBootstrapper {
 
     /// Parse composer.json.
     pub fn parse_composer_json(&self, root: &Path) -> Result<(Vec<String>, Vec<Dependency>)> {
-        let composer_path = root.join("composer.json");
-        if !composer_path.exists() {
+        let Some(content) = read_manifest(root, "composer.json")? else {
             return Ok((Vec::new(), Vec::new()));
-        }
-
-        let content = fs::read_to_string(&composer_path)?;
+        };
         let parsed: serde_json::Value = serde_json::from_str(&content)
             .map_err(|e| CveBootstrapError::DetectionError(e.to_string()))?;
         let require = parsed.get("require").and_then(|r| r.as_object());
@@ -200,12 +214,9 @@ impl CveBootstrapper {
     }
 
     pub fn parse_cargo_toml(&self, root: &Path) -> Result<Vec<Dependency>> {
-        let cargo_path = root.join("Cargo.toml");
-        if !cargo_path.exists() {
+        let Some(content) = read_manifest(root, "Cargo.toml")? else {
             return Ok(Vec::new());
-        }
-
-        let content = fs::read_to_string(&cargo_path)?;
+        };
         let mut deps = Vec::new();
 
         let mut in_dependencies = false;
@@ -246,12 +257,9 @@ impl CveBootstrapper {
     }
 
     pub fn parse_package_json(&self, root: &Path) -> Result<(Vec<String>, Vec<Dependency>)> {
-        let pkg_path = root.join("package.json");
-        if !pkg_path.exists() {
+        let Some(content) = read_manifest(root, "package.json")? else {
             return Ok((Vec::new(), Vec::new()));
-        }
-
-        let content = fs::read_to_string(&pkg_path)?;
+        };
         let mut frameworks = Vec::new();
         let mut deps = Vec::new();
 
@@ -287,12 +295,9 @@ impl CveBootstrapper {
     }
 
     pub fn parse_requirements_txt(&self, root: &Path) -> Result<Vec<Dependency>> {
-        let req_path = root.join("requirements.txt");
-        if !req_path.exists() {
+        let Some(content) = read_manifest(root, "requirements.txt")? else {
             return Ok(Vec::new());
-        }
-
-        let content = fs::read_to_string(&req_path)?;
+        };
         let mut deps = Vec::new();
 
         for line in content.lines() {
@@ -341,12 +346,9 @@ impl CveBootstrapper {
     }
 
     pub fn parse_go_mod(&self, root: &Path) -> Result<Vec<Dependency>> {
-        let go_path = root.join("go.mod");
-        if !go_path.exists() {
+        let Some(content) = read_manifest(root, "go.mod")? else {
             return Ok(Vec::new());
-        }
-
-        let content = fs::read_to_string(&go_path)?;
+        };
         let mut deps = Vec::new();
 
         let mut in_require = false;
@@ -363,12 +365,8 @@ impl CveBootstrapper {
                 continue;
             }
 
-            if trimmed.starts_with("require ") {
-                Self::parse_dependency_line(
-                    &trimmed[9..],
-                    &mut deps,
-                    DependencyEcosystem::GoModules,
-                );
+            if let Some(stripped) = trimmed.strip_prefix("require ") {
+                Self::parse_dependency_line(stripped, &mut deps, DependencyEcosystem::GoModules);
                 continue;
             }
 

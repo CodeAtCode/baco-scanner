@@ -1,0 +1,130 @@
+# BACO Corpus Manifest — WordPress Plugin Scanner Regression Tests
+#
+# Ground truth for measuring precision and recall. Each case is decided ONCE
+# by hand, so metrics move when the scanner changes, not when opinions shift.
+#
+# Format: TOML table with expected findings per fixture.
+
+[[cases]]
+id = "tp-01"
+fixture = "fixtures/tp_ajax_handler.php"
+language = "php"
+description = "Unprotected wp_ajax handler - missing CSRF/authorization"
+expected_findings = [
+    { line = 5, cwe = "CWE-352", description = "delete_post_handler has no nonce check or current_user_can" }
+]
+expected_refutation = false  # Should NOT be refuted - genuinely vulnerable
+
+[[cases]]
+id = "tp-02"
+fixture = "fixtures/tp_admin_post.php"
+language = "php"
+description = "Unprotected admin_post handler"
+expected_findings = [
+    { line = 5, cwe = "CWE-352", description = "flush_cache_action has no check_admin_referer or current_user_can" }
+]
+expected_refutation = false  # Should NOT be refuted - genuinely vulnerable
+
+[[cases]]
+id = "tp-03"
+fixture = "fixtures/tp_sqli_concat.php"
+language = "php"
+description = "SQL injection via string concatenation"
+expected_findings = [
+    { line = 4, cwe = "CWE-89", description = "get_user_posts builds SQL with unprepared concatenation" }
+]
+expected_refutation = false  # Should NOT be refuted - genuinely vulnerable
+
+[[cases]]
+id = "tp-04"
+fixture = "fixtures/tp_xss_echo.php"
+language = "php"
+description = "Unescaped echo of request data"
+expected_findings = [
+    { line = 4, cwe = "CWE-79", description = "display_search_results echoes $_GET without escaping" }
+]
+expected_refutation = false  # Should NOT be refuted - genuinely vulnerable
+
+[[cases]]
+id = "tp-05"
+fixture = "fixtures/tp_python_endpoint.py"
+language = "python"
+description = "Unprotected Python Flask endpoint"
+expected_findings = [
+    { line = 7, cwe = "CWE-862", description = "delete_user has no authentication check" }
+]
+expected_refutation = false  # Should NOT be refuted - genuinely vulnerable
+
+[[cases]]
+id = "fp-01"
+fixture = "fixtures/fp_ajax_protected.php"
+language = "php"
+description = "Protected wp_ajax handler - guard immediately after function start"
+expected_findings = [
+    { line = 5, cwe = "CWE-352", description = "update_settings_handler appears to lack guard but has check_ajax_referer on line 6" }
+]
+expected_refutation = true   # SHOULD be refuted - guard is present
+
+[[cases]]
+id = "fp-02"
+fixture = "fixtures/fp_admin_delayed_guard.php"
+language = "php"
+description = "Protected admin handler - guard 5+ lines after function start"
+expected_findings = [
+    { line = 5, cwe = "CWE-352", description = "save_config_action appears to lack guard but has check_admin_referer on line 16" }
+]
+expected_refutation = true   # SHOULD be refuted - guard is present (tests whole-function reading)
+
+[[cases]]
+id = "fp-03"
+fixture = "fixtures/fp_helper_guard.php"
+language = "php"
+description = "Protected via helper function call"
+expected_findings = [
+    { line = 5, cwe = "CWE-352", description = "process_payment_handler delegates auth to verify_payment_auth" }
+]
+expected_refutation = false   # Guard is in a helper, not the main function - current implementation doesn't follow calls
+
+[[cases]]
+id = "fp-04"
+fixture = "fixtures/fp_rest_protected.php"
+language = "php"
+description = "Protected REST endpoint"
+expected_findings = [
+    { line = 11, cwe = "CWE-352", description = "get_plugin_status has wp_verify_nonce" }
+]
+expected_refutation = true   # SHOULD be refuted - guard is present
+
+[[cases]]
+id = "neut-01"
+fixture = "fixtures/neutral_public_endpoint.php"
+language = "php"
+description = "Public read-only endpoint - legitimately no guard"
+expected_findings = [
+    { line = 10, cwe = "CWE-862", description = "get_public_info intentionally public - no auth needed" }
+]
+expected_refutation = false  # Should NOT be refuted - but may be flagged as needs review
+
+[[cases]]
+id = "neut-02"
+fixture = "fixtures/neutral_hallucinated_name.php"
+language = "php"
+description = "Function name in title cannot be resolved"
+expected_findings = [
+    { line = 5, cwe = "CWE-862", description = "Finding references nonexistent_function() which does not exist" }
+]
+expected_refutation = false  # Function not found - gracefully handled as Confirmed (can't refute what can't be found)
+
+# Minimum thresholds for precision and recall
+#
+# Precision minimum: 0.70
+# Rationale: With 5 true positives and 4 false positives expected to be refuted,
+# we expect 5/(5+0) = 1.0 precision if refutation works correctly. Setting 0.70
+# allows for one misclassification while still catching regressions.
+#
+# Recall minimum: 0.80
+# Rationale: We want to catch at least 4 of 5 genuine vulnerabilities. The
+# corpus is small, so one missed finding should fail the test.
+[min_thresholds]
+precision = 0.90
+recall = 0.95

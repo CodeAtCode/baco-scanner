@@ -161,16 +161,18 @@ Return valid JSON with ALL these fields (complete detail required):
   {
     "severity": "critical|high|medium|low",
     "title": "[CWE-ID] Specific vulnerability type in [function name] at line [N]",
-    "description": "DETAILED TECHNICAL ANALYSIS: Explain WHAT the vulnerability is (the specific flaw), WHERE it is located (exact file, function, line), WHY it exists (root cause - e.g., missing bounds check, unsafe function), HOW an attacker can exploit it (step-by-step attack scenario with конкретные values), and what the IMPACT is (RCE, data exfiltration, etc.). Include the vulnerable code snippet and explain WHY it's vulnerable.",
-    "line": <line number>,
+    "description": "DETAILED TECHNICAL ANALYSIS: Explain WHAT the vulnerability is (the specific flaw), WHERE it is located (exact file, function, line), WHY it exists (root cause - e.g., missing bounds check, unsafe function), HOW an attacker can exploit it (step-by-step attack scenario with concrete values), and what the IMPACT is (RCE, data exfiltration, etc.). Include the vulnerable code snippet and explain WHY it's vulnerable.",
+    "line": 0,
     "cwe_id": "CWE-[NUMBER]",
-    "code_snippet": {"before": "context lines before vulnerability", "code": "exact vulnerable lines", "after": "context lines after"} — include the exact vulnerable lines with a few lines of context before/after,
+    "code_snippet": {"before": "context lines before vulnerability", "code": "exact vulnerable lines", "after": "context lines after"},
     "fix_code": "Complete corrected code with the vulnerability fixed",
     "diff_hunk": "Git diff showing before/after",
-    "recommendation": "Specific remediation steps",
+    "recommendation": "Specific remediation steps"
   }
 ]
 ```
+
+`code_snippet` must include the exact vulnerable lines with a few lines of context before and after. `line` is the integer line number of the first vulnerable line.
 
 ```json
 [

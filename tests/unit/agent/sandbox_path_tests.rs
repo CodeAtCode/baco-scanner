@@ -272,25 +272,38 @@ fn test_path_traversal_dotdot_with_spaces() {
 }
 
 #[test]
-fn test_path_traversal_dotdot_in_filename() {
+fn test_path_traversal_dotdot_in_filename_is_blocked_even_though_legitimate() {
+    // A filename may legitimately contain dots -- `file..txt` is not traversal.
+    // The current implementation rejects any path containing the `..` substring,
+    // so this file is refused.
+    //
+    // This test used to assert nothing in either branch and carried a comment
+    // saying the behaviour was "allowed for now". It documented indecision rather
+    // than a contract. What it pins now is the real behaviour, plus the reason it
+    // is a known false positive: a substring check cannot tell `file..txt` from a
+    // traversal segment. Replacing that check with path-component logic is a
+    // separate change; this test is the tripwire for it.
     let (sandbox, temp_dir) = setup_sandbox();
 
-    // A legitimate file named with dots (not traversal)
     let test_file = temp_dir.path().join("file..txt");
     std::fs::write(&test_file, "content").expect("Failed to write");
 
     let result = sandbox.resolve_safe_path("file..txt");
-    // File with double dots in name should be allowed if it exists and is within sandbox
-    // This test may fail if the sandbox treats ".." as traversal even in filenames
-    // Mark as allowed for now - the real security check is for actual path traversal
-    if result.is_err() {
-        // If blocked, verify it's not a false positive for legitimate filenames
-        eprintln!("Path 'file..txt' was blocked - may need to adjust sandbox logic");
-    }
-    // File with ".." in name is ambiguous - current implementation blocks any ".."
-    // This is a false positive for legitimate filenames like "file..txt"
-    // The test documents the current behavior
-    let _ = result; // Just verify it doesn't panic
+
+    assert!(
+        result.is_err(),
+        "the current substring rule rejects any path containing '..', \
+         including this legitimate one; if this now passes, the rule was made \
+         component-aware and this test needs to say what it replaced"
+    );
+
+    // The file genuinely exists inside the sandbox, so the refusal is a false
+    // positive rather than a correct rejection.
+    assert!(
+        test_file.exists(),
+        "the fixture must be a real file inside the sandbox, otherwise this \
+         test would pass for the wrong reason"
+    );
 }
 
 // ============================================================================

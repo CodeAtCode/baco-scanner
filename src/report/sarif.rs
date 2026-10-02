@@ -155,6 +155,15 @@ pub fn generate_sarif_report(
                         })).collect::<Vec<_>>(),
                     }
                 },
+                // Every artifactLocation below sets "uriBaseId": "file://".
+                // SARIF 2.1.0 §3.4.4 requires that id to resolve against this map;
+                // an undeclared base id leaves the artifact uri unresolvable for a
+                // consumer, and this file is what GitHub Code Scanning ingests.
+                "originalUriBaseIds": {
+                    "file://": {
+                        "uri": "file:///"
+                    }
+                },
                 "results": results
             })
         ]
