@@ -398,9 +398,6 @@ pub fn phase_name(phase: &ScanPhase) -> String {
 
 /// Builder-style helper for constructing ScanHealth from LlmMetrics
 /// Returns (ok_calls, failed_calls)
-pub fn from_llm_metrics(
-    metrics: &LlmMetrics,
-    _pricing: Option<&HashMap<String, crate::config::ModelPricing>>,
-) -> (u64, u64) {
+pub fn from_llm_metrics(metrics: &LlmMetrics) -> (u64, u64) {
     (metrics.total_success, metrics.total_failed)
 }

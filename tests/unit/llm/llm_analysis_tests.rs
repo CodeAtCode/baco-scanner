@@ -234,7 +234,6 @@ mod parse_response_tests {
             enable_llm_cache: false,
             cache_dir: None,
             max_concurrent: 3,
-            pricing: Default::default(),
         };
         let client = LlmClient::new(config);
         LlmAnalyzer::new(client, vec!["rust".to_string()], 1024, &Default::default())
@@ -424,7 +423,6 @@ mod truncate_code_tests {
             enable_llm_cache: false,
             cache_dir: None,
             max_concurrent: 3,
-            pricing: Default::default(),
         };
         let client = LlmClient::new(config);
         LlmAnalyzer::new(client, vec!["rust".to_string()], 1024, &Default::default())
@@ -639,7 +637,6 @@ async fn analyze_file_chunked_path_with_mockito() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
-        pricing: Default::default(),
     };
     let client = baco::llm::LlmClient::new(llm_config);
     let scanner_config = baco::config::ScannerConfig::default();
@@ -681,7 +678,6 @@ async fn analyze_file_llm_error_yields_empty() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
-        pricing: Default::default(),
     };
     let client = baco::llm::LlmClient::new(llm_config);
     let scanner_config = baco::config::ScannerConfig::default();
@@ -723,7 +719,6 @@ async fn analyze_file_structured_output_path_with_mockito() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
-        pricing: Default::default(),
     };
     let client = baco::llm::LlmClient::new(llm_config);
     let scanner_config = baco::config::ScannerConfig::default();

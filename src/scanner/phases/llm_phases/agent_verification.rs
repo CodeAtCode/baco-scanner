@@ -5,6 +5,7 @@ use crate::error::ScanResult;
 use crate::findings::VulnerabilityFinding;
 use crate::indexer::ExcludeMatcher;
 use crate::scanner::phases::PhaseConfig;
+use crate::scanner::progress::progress_position;
 use std::sync::Arc;
 
 /// The three agent operations this phase performs, behind a seam.
@@ -331,12 +332,7 @@ pub async fn run_agent_blocks(
     let total_findings = findings.len();
 
     for (i, finding) in findings.iter_mut().enumerate() {
-        let progress_pct = if total_findings > 0 {
-            ((i as f64 / total_findings as f64) * 100.0) as u64
-        } else {
-            100
-        };
-        pb.set_position(base + progress_pct);
+        pb.set_position(progress_position(base, i, total_findings));
         pb.set_message(format!(
             "Phase {}/{}: Security Agent verifying [{}/{}] - {}",
             phase_num,

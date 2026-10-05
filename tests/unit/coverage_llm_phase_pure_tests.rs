@@ -279,7 +279,7 @@ fn test_build_volatile_verification_tail_with_surrounding_context() {
 #[test]
 fn test_parse_batch_verification_verdict_valid_json_array() {
     let json = r#"[
-        {"index": 0, "verification_status": "confirmed", "verification_notes": "Confirmed XSS"},
+        {"index": 0, "verification_status": "confirmed", "verification_notes": "Confirmed XSS", "seven_question_gate": {"reachability":"yes","controllability":"yes","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"}, "concrete_impact_proof": {"attack_vector":"test","consequence":"test","is_theoretical":false}},
         {"index": 1, "verification_status": "false_positive", "verification_notes": "Sanitized input"},
         {"index": 2, "verification_status": "needs_review", "verification_notes": "Unclear context"}
     ]"#;
@@ -307,7 +307,7 @@ fn test_parse_batch_verification_verdict_malformed_json() {
 #[test]
 fn test_parse_batch_verification_verdict_wrong_count() {
     let json = r#"[
-        {"index": 0, "verification_status": "confirmed", "verification_notes": "First"}
+        {"index": 0, "verification_status": "confirmed", "verification_notes": "First", "seven_question_gate": {"reachability":"yes","controllability":"yes","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"}, "concrete_impact_proof": {"attack_vector":"test","consequence":"test","is_theoretical":false}}
     ]"#;
 
     let results = parse_batch_verification_verdict(json, 3);
@@ -359,7 +359,7 @@ fn test_parse_batch_verification_verdict_with_extra_whitespace() {
 #[test]
 fn test_parse_batch_verification_verdict_positional_fallback() {
     let json = r#"[
-        {"verification_status": "confirmed", "verification_notes": "First"},
+        {"verification_status": "confirmed", "verification_notes": "First", "seven_question_gate": {"reachability":"yes","controllability":"yes","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"}, "concrete_impact_proof": {"attack_vector":"test","consequence":"test","is_theoretical":false}},
         {"verification_status": "false_positive", "verification_notes": "Second"}
     ]"#;
 
@@ -373,7 +373,7 @@ fn test_parse_batch_verification_verdict_positional_fallback() {
 #[test]
 fn test_parse_batch_verification_verdict_missing_index_fields() {
     let json = r#"[
-        {"verification_status": "confirmed", "verification_notes": "No index"}
+        {"verification_status": "confirmed", "verification_notes": "No index", "seven_question_gate": {"reachability":"yes","controllability":"yes","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"}, "concrete_impact_proof": {"attack_vector":"test","consequence":"test","is_theoretical":false}}
     ]"#;
 
     let results = parse_batch_verification_verdict(json, 1);

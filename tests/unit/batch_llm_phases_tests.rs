@@ -152,11 +152,11 @@ async fn test_verification_batch_single_bad_item() {
     let responses = vec![
         // One batch with one malformed item
         serde_json::to_string(&[
-            json!({"index": 0, "verification_status": "confirmed", "verification_notes": "Good"}),
-            json!({"index": 1, "verification_status": "confirmed", "verification_notes": "Good"}),
+            json!({"index": 0, "verification_status": "confirmed", "verification_notes": "Good", "seven_question_gate": {"reachability":"yes","controllability":"yes","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"}, "concrete_impact_proof": {"attack_vector":"test","consequence":"test","is_theoretical":false}}),
+            json!({"index": 1, "verification_status": "confirmed", "verification_notes": "Good", "seven_question_gate": {"reachability":"yes","controllability":"yes","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"}, "concrete_impact_proof": {"attack_vector":"test","consequence":"test","is_theoretical":false}}),
             // Malformed - missing required field
             json!({"index": 2, "verification_notes": "Missing status"}),
-            json!({"index": 3, "verification_status": "confirmed", "verification_notes": "Good"}),
+            json!({"index": 3, "verification_status": "confirmed", "verification_notes": "Good", "seven_question_gate": {"reachability":"yes","controllability":"yes","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"}, "concrete_impact_proof": {"attack_vector":"test","consequence":"test","is_theoretical":false}}),
             json!({"index": 4, "verification_status": "false_positive", "verification_notes": "Good"}),
         ]).unwrap(),
     ];

@@ -667,9 +667,7 @@ pub const STATIC_ANALYSIS_FIELDS: &[(&str, &str, bool)] = &[
     ("line", "integer", true),
     ("cwe_id", "string", true),
     ("code_snippet", "object", true), // { before, code, after }
-    ("fix_code", "string", true),
     ("diff_hunk", "string", true),
-    ("recommendation", "string", true),
 ];
 
 /// Field specification for verification batch JSON output (prompt↔parser contract).
@@ -680,6 +678,8 @@ pub const VERIFICATION_BATCH_FIELDS: &[(&str, &str, bool)] = &[
     ("index", "integer", false), // Optional - positional fallback
     ("verification_status", "string", true),
     ("verification_notes", "string", false), // Optional but expected
+    ("seven_question_gate", "object", false), // Optional - the 7-question gate
+    ("concrete_impact_proof", "object", false), // Optional - impact proof requirement
 ];
 
 /// Map a language name to its bundled tree-sitter parser, if any.

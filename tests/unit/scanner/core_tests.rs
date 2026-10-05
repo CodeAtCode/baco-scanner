@@ -1048,7 +1048,6 @@ fn create_test_config_core_migrated() -> ScannerConfig {
             max_retries: 3,
             retry_backoff_ms: 1000,
             max_concurrent: 3,
-            pricing: Default::default(),
             phases: LlmPhasesConfig::default(),
             temperature: 0.5,
             max_reasoning_tokens: None,

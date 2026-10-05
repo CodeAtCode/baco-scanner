@@ -49,7 +49,6 @@ fn test_llm_config_from_env() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
-        pricing: Default::default(),
     };
 
     assert_eq!(config.base_url, "https://api.custom.com/v1");
@@ -75,7 +74,6 @@ fn test_llm_config_invalid() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
-        pricing: Default::default(),
     };
 
     // Config allows invalid values - validation happens at runtime
@@ -99,7 +97,6 @@ fn test_llm_config_get_models_priority() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
-        pricing: Default::default(),
     };
 
     let models = config.get_models();
@@ -152,7 +149,6 @@ fn test_llm_client_creation() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
-        pricing: Default::default(),
     };
 
     let client = LlmClient::new(config);
@@ -174,7 +170,6 @@ fn test_llm_client_with_multiple_models() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
-        pricing: Default::default(),
     };
 
     let client = LlmClient::new(config);
@@ -528,123 +523,6 @@ fn test_llm_config_default_temperature() {
 }
 
 // ============================================================================
-// Pricing Configuration Tests
-// ============================================================================
-
-#[test]
-fn test_pricing_config_default_empty() {
-    // Pricing table defaults to empty HashMap
-    let config = LlmConfig::default();
-    assert!(config.pricing.is_empty());
-}
-
-#[test]
-fn test_pricing_config_with_models() {
-    use baco::config::ModelPricing;
-    use std::collections::HashMap;
-
-    let mut pricing: HashMap<String, ModelPricing> = HashMap::new();
-    pricing.insert(
-        "gpt-4".to_string(),
-        ModelPricing {
-            prompt_per_1k: 0.03,
-            completion_per_1k: 0.06,
-        },
-    );
-    pricing.insert(
-        "claude-3".to_string(),
-        ModelPricing {
-            prompt_per_1k: 0.015,
-            completion_per_1k: 0.075,
-        },
-    );
-
-    let config = LlmConfig {
-        base_url: "https://api.test.com/v1".to_string(),
-        api_key: "test-key".to_string(),
-        model: "test-model".to_string(),
-        models: vec![],
-        timeout: 30,
-        max_retries: 3,
-        retry_backoff_ms: 1000,
-        temperature: 0.5,
-        max_concurrent: 3,
-        max_reasoning_tokens: None,
-        enable_llm_cache: false,
-        cache_dir: None,
-        pricing: pricing.clone(),
-    };
-
-    assert_eq!(config.pricing.len(), 2);
-    assert_eq!(config.pricing.get("gpt-4").unwrap().prompt_per_1k, 0.03);
-    assert_eq!(
-        config.pricing.get("claude-3").unwrap().completion_per_1k,
-        0.075
-    );
-}
-
-#[test]
-fn test_model_pricing_cost_calculation() {
-    use baco::config::ModelPricing;
-
-    let pricing = ModelPricing {
-        prompt_per_1k: 0.03,
-        completion_per_1k: 0.06,
-    };
-
-    // Test cost calculation: (prompt/1000) * prompt_rate + (completion/1000) * completion_rate
-    let cost = pricing.cost(1000, 1000);
-    assert!((cost - 0.09).abs() < 0.001); // 0.03 + 0.06 = 0.09
-
-    let cost = pricing.cost(800, 200);
-    assert!((cost - 0.036).abs() < 0.001); // 0.024 + 0.012 = 0.036
-
-    let cost = pricing.cost(0, 0);
-    assert_eq!(cost, 0.0);
-
-    let cost = pricing.cost(5000, 2500);
-    assert!((cost - 0.3).abs() < 0.001); // 0.15 + 0.15 = 0.30
-}
-
-#[test]
-fn test_pricing_serialization() {
-    use baco::config::ModelPricing;
-    use std::collections::HashMap;
-
-    let mut pricing: HashMap<String, ModelPricing> = HashMap::new();
-    pricing.insert(
-        "test-model".to_string(),
-        ModelPricing {
-            prompt_per_1k: 0.025,
-            completion_per_1k: 0.05,
-        },
-    );
-
-    let config = LlmConfig {
-        base_url: "https://api.test.com/v1".to_string(),
-        api_key: "test-key".to_string(),
-        model: "test-model".to_string(),
-        models: vec![],
-        timeout: 30,
-        max_retries: 3,
-        retry_backoff_ms: 1000,
-        temperature: 0.5,
-        max_concurrent: 3,
-        max_reasoning_tokens: None,
-        enable_llm_cache: false,
-        cache_dir: None,
-        pricing: pricing.clone(),
-    };
-
-    let json = serde_json::to_string(&config).unwrap();
-    let parsed: LlmConfig = serde_json::from_str(&json).unwrap();
-
-    assert_eq!(parsed.pricing.len(), 1);
-    assert_eq!(
-        parsed.pricing.get("test-model").unwrap().prompt_per_1k,
-        0.025
-    );
-}
 
 // ============================================================================
 // Cache Module Tests
@@ -961,7 +839,6 @@ async fn test_chat_failover_to_next_model_on_retryable_error() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 4,
-        pricing: Default::default(),
     };
     let client = LlmClient::new(config);
     let messages = vec![ChatMessage::user("hi")];
@@ -1033,7 +910,6 @@ fn failover_test_config(base_url: String, models: Vec<String>) -> LlmConfig {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 4,
-        pricing: Default::default(),
     }
 }
 

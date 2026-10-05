@@ -228,7 +228,6 @@ pub fn create_test_config() -> ScannerConfig {
             max_retries: 0,
             retry_backoff_ms: 0,
             max_concurrent: 4,
-            pricing: Default::default(),
             phases: baco::config::LlmPhasesConfig {
                 discovery: LlmPhaseConfig {
                     base_url: "http://localhost:11434".to_string(),

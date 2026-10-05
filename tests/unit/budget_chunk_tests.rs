@@ -234,7 +234,6 @@ mod chunking_tests {
             enable_llm_cache: false,
             cache_dir: None,
             max_concurrent: 3,
-            pricing: Default::default(),
         });
         let analyzer = baco::llm_analysis::LlmAnalyzer::new(
             client,
@@ -276,7 +275,6 @@ fn function_two() {
             enable_llm_cache: false,
             cache_dir: None,
             max_concurrent: 3,
-            pricing: Default::default(),
         });
         let analyzer = baco::llm_analysis::LlmAnalyzer::new(
             client,
@@ -312,7 +310,6 @@ fn function_two() {
             enable_llm_cache: false,
             cache_dir: None,
             max_concurrent: 3,
-            pricing: Default::default(),
         });
         let analyzer = baco::llm_analysis::LlmAnalyzer::new(
             client,

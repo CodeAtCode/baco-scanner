@@ -66,7 +66,6 @@ fn create_valid_config() -> LlmConfig {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
-        pricing: Default::default(),
     }
 }
 
@@ -85,7 +84,6 @@ fn create_empty_config() -> LlmConfig {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
-        pricing: Default::default(),
     }
 }
 
@@ -129,7 +127,6 @@ fn test_enrichment_service_new_with_empty_api_key_no_client() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
-        pricing: Default::default(),
     };
     let service = EnrichmentService::new(&config);
 
@@ -158,7 +155,6 @@ fn test_enrichment_service_new_with_empty_base_url_no_client() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
-        pricing: Default::default(),
     };
     let service = EnrichmentService::new(&config);
 

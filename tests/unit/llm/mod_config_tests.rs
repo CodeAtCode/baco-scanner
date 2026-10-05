@@ -85,7 +85,6 @@ fn test_model_name_with_empty_model_and_single_model_in_vec() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 4,
-        pricing: Default::default(),
     };
     let client = LlmClient::new(config);
 
@@ -109,7 +108,6 @@ fn test_model_name_with_empty_model_and_empty_models_vec() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 4,
-        pricing: Default::default(),
     };
     let client = LlmClient::new(config);
 
@@ -132,7 +130,6 @@ fn test_model_name_with_nonempty_model_field() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 4,
-        pricing: Default::default(),
     };
     let client = LlmClient::new(config);
 

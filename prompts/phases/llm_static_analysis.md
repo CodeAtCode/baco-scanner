@@ -162,12 +162,10 @@ Return valid JSON with ALL these fields (complete detail required):
     "severity": "critical|high|medium|low",
     "title": "[CWE-ID] Specific vulnerability type in [function name] at line [N]",
     "description": "DETAILED TECHNICAL ANALYSIS: Explain WHAT the vulnerability is (the specific flaw), WHERE it is located (exact file, function, line), WHY it exists (root cause - e.g., missing bounds check, unsafe function), HOW an attacker can exploit it (step-by-step attack scenario with concrete values), and what the IMPACT is (RCE, data exfiltration, etc.). Include the vulnerable code snippet and explain WHY it's vulnerable.",
-    "line": 0,
+    "line": 42,
     "cwe_id": "CWE-[NUMBER]",
-    "code_snippet": {"before": "context lines before vulnerability", "code": "exact vulnerable lines", "after": "context lines after"},
-    "fix_code": "Complete corrected code with the vulnerability fixed",
-    "diff_hunk": "Git diff showing before/after",
-    "recommendation": "Specific remediation steps"
+     "code_snippet": {"before": "context lines before vulnerability", "code": "exact vulnerable lines", "after": "context lines after"},
+     "diff_hunk": "Git diff showing before/after"
   }
 ]
 ```
@@ -178,14 +176,12 @@ Return valid JSON with ALL these fields (complete detail required):
 [
   {
     "severity": "critical|high|medium|low",
-    "title": "Specific vulnerability name (e.g., 'Buffer overflow in parse_header()', NOT 'Memory issue')",
-    "description": "DETAILED technical explanation. Include:\n- EXACT location (function, line)\n- HOW the vulnerability works (step-by-step)\n- WHAT data flows where\n- WHY the current code is vulnerable\n- CWE category (e.g., CWE-119, CWE-79, CWE-89)",
-    "line": <exact line number where vulnerability occurs>,
-    "cwe_id": "CWE-XXX (MUST be valid: CWE-79, CWE-89, CWE-119, CWE-120, CWE-416, CWE-22, CWE-78, CWE-502, etc.)",
-    "code_snippet": {"before": "context lines before vulnerability", "code": "exact vulnerable lines", "after": "context lines after"} — include the exact vulnerable lines with a few lines of context before/after,
-    "fix_code": "COMPLETE secure version of the code. Include:\n- Proper input validation\n- Error handling\n- Safe API usage\n- Comments explaining WHY this is secure",
-    "diff_hunk": "Unified diff format showing EXACT changes needed:\n@@ -line,line +line,line @@\n context line\n-vulnerable code\n+secure code\n context line",
-    "recommendation": "Specific remediation steps beyond just the code fix",
+    "title": "[CWE-ID] Specific vulnerability type in [function name] at line [N]",
+    "description": "DETAILED TECHNICAL ANALYSIS: Explain WHAT the vulnerability is (the specific flaw), WHERE it is located (exact file, function, line), WHY it exists (root cause - e.g., missing bounds check, unsafe function), HOW an attacker can exploit it (step-by-step attack scenario with concrete values), and what the IMPACT is (RCE, data exfiltration, etc.). Include the vulnerable code snippet and explain WHY it's vulnerable.",
+    "line": 156,
+    "cwe_id": "CWE-[NUMBER]",
+     "code_snippet": {"before": "context lines before vulnerability", "code": "exact vulnerable lines", "after": "context lines after"},
+     "diff_hunk": "Unified diff format showing EXACT changes needed:\n@@ -line,line +line,line @@\n context line\n-vulnerable code\n+secure code\n context line"
   }
 ]
 ```
@@ -207,10 +203,20 @@ Return valid JSON with ALL these fields (complete detail required):
 - ❌ Use invalid CWE IDs or make them up
 - ❌ Include function signatures in diff that don't need changing
 - ❌ Generate false positives to "look thorough"
+- ❌ Add prose outside the JSON array — the parser expects JSON only
+
+## EXCLUSIONS — DO NOT REPORT
+
+Do NOT report the following as vulnerabilities:
+
+- **Missing hardening with no exploit path**: Controls that are absent but not required for security (e.g., missing input length check on already-whitelisted data).
+- **Unproven prerequisites**: Findings that depend on an attacker achieving something impossible or already prevented (e.g., "could be exploited if auth is bypassed" when auth is mandatory).
+- **Safe variants**: Correct usage of dangerous primitives (e.g., `strncpy` with proper bounds, parameterized SQL queries, escaped output).
+- **Unreachable code**: Code not reachable from any production entry point (internal test helpers, dead branches, `#if 0` blocks).
 
 ## IF NO VULNERABILITIES FOUND
 
-Return an empty array `[]` with this explanation in your reasoning:
+Return ONLY an empty JSON array with no additional text:
 
 ```json
 []

@@ -7,6 +7,7 @@ use crate::llm;
 use crate::org_context;
 use crate::prompt::engine::PromptEngine;
 use crate::scanner::phases::PhaseConfig;
+use crate::scanner::progress::progress_position;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -257,12 +258,7 @@ pub async fn run_llm_discovery(
 
         let mut enriched_findings = Vec::with_capacity(total_findings);
         for (i, mut finding) in needs_discovery.into_iter().enumerate() {
-            let progress_pct = if total_findings > 0 {
-                ((i as f64 / total_findings as f64) * 100.0) as u64
-            } else {
-                100
-            };
-            pb.set_position(base + progress_pct);
+            pb.set_position(progress_position(base, i, total_findings));
             pb.set_message(format!(
                 "Phase {}/{}: Enriching findings [{}/{}] - {}",
                 phase_num,

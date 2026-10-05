@@ -50,7 +50,6 @@ fn create_test_config_with_static_analysis() -> baco::config::ScannerConfig {
             max_retries: 3,
             retry_backoff_ms: 1000,
             max_concurrent: 3,
-            pricing: Default::default(),
             temperature: 0.5,
             phases: LlmPhasesConfig {
                 static_analysis: LlmPhaseConfig {
@@ -409,7 +408,9 @@ fn test_parse_batch_verification_valid_json_array() {
         {
             "index": 0,
             "verification_status": "confirmed",
-            "verification_notes": "True positive - SQL injection detected"
+            "verification_notes": "True positive - SQL injection detected",
+            "seven_question_gate": {"reachability":"yes","controllability":"yes","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"},
+            "concrete_impact_proof": {"attack_vector":"test","consequence":"test","is_theoretical":false}
         }
     ]"#;
 
@@ -482,7 +483,9 @@ fn test_parse_batch_verification_code_fence_stripping() {
     {
         "index": 0,
         "verification_status": "confirmed",
-        "verification_notes": "Verified"
+        "verification_notes": "Verified",
+        "seven_question_gate": {"reachability":"yes","controllability":"yes","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"},
+        "concrete_impact_proof": {"attack_vector":"test","consequence":"test","is_theoretical":false}
     }
 ]
 ```"#;
@@ -499,7 +502,7 @@ fn test_parse_batch_verification_code_fence_stripping() {
 #[test]
 fn test_parse_batch_verification_multiple_findings() {
     let json_response = r#"[
-        {"index": 0, "verification_status": "confirmed", "verification_notes": "OK"},
+        {"index": 0, "verification_status": "confirmed", "verification_notes": "OK", "seven_question_gate": {"reachability":"yes","controllability":"yes","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"}, "concrete_impact_proof": {"attack_vector":"test","consequence":"test","is_theoretical":false}},
         {"index": 1, "verification_status": "false_positive", "verification_notes": "Not exploitable"},
         {"index": 2, "verification_status": "needs_review", "verification_notes": "Unclear"}
     ]"#;

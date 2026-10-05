@@ -12,6 +12,7 @@ Documentation for baco — a 23-phase LLM-assisted code scanner.
 | [configuration.md](configuration.md) | All config options, LLM setup, phase flags |
 | [research-integration.md](research-integration.md) | Research-backed design and paper integrations |
 | [ci-integration.md](ci-integration.md) | CI/CD setup with SARIF output |
+| [mutation-testing.md](mutation-testing.md) | Nightly mutation testing: what it measures and how to read it |
 | [llm-vuln-detection-papers-survey.md](llm-vuln-detection-papers-survey.md) | Full survey of 36 papers |
 | [example-report-screenshot.png](example-report-screenshot.png) | Sample HTML report preview |
 

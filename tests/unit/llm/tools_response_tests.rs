@@ -99,7 +99,6 @@ fn config_for(url: String) -> LlmConfig {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 4,
-        pricing: Default::default(),
     }
 }
 

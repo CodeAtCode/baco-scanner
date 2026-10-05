@@ -3,6 +3,7 @@ use crate::cpg::CpgEngine as _;
 use crate::error::ScanResult;
 use crate::findings::VulnerabilityFinding;
 use crate::scanner::phases::PhaseConfig;
+use crate::scanner::progress::progress_position;
 
 /// Run CWE routing phase (phase 5 of 23).
 pub async fn run_cwe_routing(
@@ -119,7 +120,7 @@ pub async fn run_cpg_slice(
         // turned that guess into the query the CPG was sliced with -- evidence
         // gathered for a vulnerability class the finding never claimed.
         let Some(cwe_hint) = finding.cwe_id.as_deref() else {
-            pb.set_position(base + ((i as u64 + 1) * 100 / total.max(1) as u64));
+            pb.set_position(progress_position(base, i, total));
             continue;
         };
         // The CPG query is written against a function name. code_location holds
@@ -129,7 +130,7 @@ pub async fn run_cpg_slice(
             let name = token.trim();
             (!name.is_empty() && name != "&").then_some(name)
         }) else {
-            pb.set_position(base + ((i as u64 + 1) * 100 / total.max(1) as u64));
+            pb.set_position(progress_position(base, i, total));
             continue;
         };
         if let Ok(slice) = slicer.slice(&cpg, cwe_hint, entry_point) {
@@ -152,7 +153,7 @@ pub async fn run_cpg_slice(
                 );
             }
         }
-        pb.set_position(base + ((i as u64 + 1) * 100 / total.max(1) as u64));
+        pb.set_position(progress_position(base, i, total));
     }
 
     pb.set_position(base + 100);

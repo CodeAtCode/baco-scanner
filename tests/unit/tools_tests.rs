@@ -9,6 +9,7 @@ use baco::tools::diff_analysis::{
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
     use std::process::Command;
 
     // ============================================================================
@@ -86,9 +87,11 @@ mod tests {
     #[test]
     fn test_analyze_diff_nonexistent_file() {
         // A file that doesn't exist in the repo or has no changes
+        // Use CARGO_MANIFEST_DIR to ensure we're working from the package root
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let input = DiffAnalysisInput {
             file_path: "nonexistent_file_xyz123.txt".to_string(),
-            repo_path: None,
+            repo_path: Some(manifest_dir.to_str().unwrap().to_string()),
             base_commit: Some("HEAD~1".to_string()),
             head_commit: Some("HEAD".to_string()),
         };

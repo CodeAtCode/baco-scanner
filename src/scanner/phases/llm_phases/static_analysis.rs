@@ -6,6 +6,7 @@ use crate::context::semantic_path;
 use crate::context::triple_path::TriplePathContext;
 use crate::scanner::phases::PhaseConfig;
 use crate::scanner::phases::llm_phases::helpers::detect_language;
+use crate::scanner::progress::progress_position;
 
 use crate::error::ScanResult;
 use crate::findings::VulnerabilityFinding;
@@ -295,8 +296,7 @@ pub async fn run_llm_static_analysis(
         for (i, file_info) in prioritized_files.iter().enumerate() {
             let file_path_str = file_info.path.to_string_lossy().to_string();
             if analyzed_files.contains(&file_path_str) {
-                let progress_pct = ((i as f64 / file_count as f64) * 100.0) as u64;
-                pb.set_position(base + progress_pct);
+                pb.set_position(progress_position(base, i, file_count));
                 pb.set_message(format!(
                     "Phase {}/{}: Skipping already analyzed [{}]: {}",
                     phase_num,
@@ -306,18 +306,16 @@ pub async fn run_llm_static_analysis(
                 ));
                 continue;
             }
-            let progress_pct = ((i as f64 / file_count as f64) * 100.0) as u64;
-            let msg = format!(
+            pb.set_position(progress_position(base, i, file_count));
+            pb.set_message(format!(
                 "Phase {}/{}: LLM analyzing [{}/{}] ({:.0}%): {}",
                 phase_num,
                 total,
                 i + 1,
                 file_count,
-                progress_pct,
+                ((i as f64 / file_count as f64) * 100.0) as u64,
                 file_info.path.display()
-            );
-            pb.set_message(msg);
-            pb.set_position(base + progress_pct);
+            ));
 
             // Build context if enabled
             let context_prefix = if config.vultriage.enabled || config.pacvd.enabled {
@@ -501,7 +499,7 @@ pub async fn run_llm_static_analysis(
                         total,
                         i + 1,
                         file_count,
-                        progress_pct,
+                        ((i as f64 / file_count as f64) * 100.0) as u64,
                         file_info.path.display(),
                         llm_findings.len()
                     );

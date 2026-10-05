@@ -24,7 +24,6 @@ fn create_analyzer() -> LlmAnalyzer {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
-        pricing: Default::default(),
     };
 
     let client = LlmClient::new(llm_config);

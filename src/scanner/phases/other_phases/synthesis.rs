@@ -2,6 +2,7 @@ use crate::checkpoint::ScanPhase;
 use crate::error::ScanResult;
 use crate::findings::VulnerabilityFinding;
 use crate::scanner::phases::PhaseConfig;
+use crate::scanner::progress::progress_position;
 
 /// Run rule synthesis phase (phase 6 of 23).
 ///
@@ -104,7 +105,7 @@ pub async fn run_rule_synthesis(
                     tracing::warn!("MoCQ: no valid pattern produced for {}", cwe);
                 }
             }
-            pb.set_position(base + ((i as u64 + 1) * 100 / total.max(1) as u64));
+            pb.set_position(progress_position(base, i, total));
         }
     } else {
         // Original path: use old RuleSynthesizer
@@ -135,7 +136,7 @@ pub async fn run_rule_synthesis(
                     }
                 }
             }
-            pb.set_position(base + ((i as u64 + 1) * 100 / total.max(1) as u64));
+            pb.set_position(progress_position(base, i, total));
         }
 
         pb.set_position(base + 100);
@@ -189,7 +190,6 @@ pub async fn run_exploit_synth(
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
-        pricing: config.llm.pricing.clone(),
     };
     let client = crate::llm::LlmClient::with_metrics(llm_config, Some(metrics_tracker.clone()));
 
@@ -249,7 +249,7 @@ pub async fn run_exploit_synth(
                 tracing::warn!("Exploit synthesis failed for finding {}: {}", finding.id, e);
             }
         }
-        pb.set_position(base + ((i as u64 + 1) * 100 / total.max(1) as u64));
+        pb.set_position(progress_position(base, i, total));
     }
 
     pb.set_position(base + 100);
@@ -314,7 +314,6 @@ pub async fn run_validate(
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
-        pricing: config.llm.pricing.clone(),
     };
     let client = crate::llm::LlmClient::with_metrics(llm_config, Some(metrics_tracker.clone()));
 
@@ -363,7 +362,7 @@ pub async fn run_validate(
                 updated.push(finding);
             }
         }
-        pb.set_position(base + ((i as u64 + 1) * 100 / total.max(1) as u64));
+        pb.set_position(progress_position(base, i, total));
     }
 
     pb.set_position(base + 100);

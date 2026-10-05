@@ -126,7 +126,6 @@ pub fn create_test_config() -> ScannerConfig {
             max_reasoning_tokens: None,
             enable_llm_cache: false,
             cache_dir: None,
-            pricing: Default::default(),
         },
         agent: Default::default(),
         tickets: Default::default(),

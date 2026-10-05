@@ -675,12 +675,13 @@ async fn test_analyzed_files_preserved() {
 
 #[tokio::test]
 async fn test_all_phases_complete_without_error() {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let scanner = create_test_scanner();
     let config = create_test_config();
     let pb = ProgressBar::hidden();
     let metrics_tracker = LlmMetricsTracker::new();
     let analyzed_files: Vec<String> = vec![];
-    let target_path = PathBuf::from(".");
+    let target_path = manifest_dir;
     let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
     let findings = vec![create_test_finding("test-1", Severity::High)];
     let phases = vec![
@@ -1824,7 +1825,7 @@ async fn test_llm_verification_batch_path_with_mockito() {
         .with_status(200)
         .with_header("content-type", "application/json")
         .with_body(
-            r#"{"choices": [{"message": {"content": "[{\"index\": 0, \"verification_status\": \"confirmed\", \"verification_notes\": \"yes\"}, {\"index\": 1, \"verification_status\": \"false_positive\", \"verification_notes\": \"no\"}]"}}]}"#,
+            r#"{"choices": [{"message": {"content": "[{\"index\": 0, \"verification_status\": \"confirmed\", \"verification_notes\": \"yes\", \"seven_question_gate\": {\"reachability\":\"yes\",\"controllability\":\"yes\",\"preconditions\":\"no\",\"impact\":\"yes\",\"context\":\"yes\",\"evidence\":\"yes\",\"confidence\":\"yes\"}, \"concrete_impact_proof\": {\"attack_vector\":\"test\",\"consequence\":\"test\",\"is_theoretical\":false}}, {\"index\": 1, \"verification_status\": \"false_positive\", \"verification_notes\": \"no\"}]"}}]}"#,
         )
         .create();
 

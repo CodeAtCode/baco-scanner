@@ -91,9 +91,9 @@ fn create_test_finding(id: &str, line: u32) -> VulnerabilityFinding {
 
 #[test]
 fn test_batch_verdict_with_index_field() {
-    // Well-formed response WITH index field
+    // Well-formed response WITH index field - includes gate per updated prompt
     let json_response = r#"[
-        {"index": 0, "verification_status": "confirmed", "verification_notes": "Real vulnerability"},
+        {"index": 0, "verification_status": "confirmed", "verification_notes": "Real vulnerability", "seven_question_gate": {"reachability":"yes","controllability":"yes","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"}, "concrete_impact_proof": {"attack_vector":"test","consequence":"test","is_theoretical":false}},
         {"index": 1, "verification_status": "false_positive", "verification_notes": "Safe context"},
         {"index": 2, "verification_status": "needs_review", "verification_notes": "Unclear evidence"}
     ]"#;
@@ -112,10 +112,11 @@ fn test_batch_verdict_with_index_field() {
 #[test]
 fn test_batch_verdict_without_index_field_positional_fallback() {
     // Response WITHOUT index field - should use positional fallback
+    // Includes gate for confirmed items per updated prompt
     let json_response = r#"[
-        {"verification_status": "confirmed", "verification_notes": "First item"},
+        {"verification_status": "confirmed", "verification_notes": "First item", "seven_question_gate": {"reachability":"yes","controllability":"yes","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"}, "concrete_impact_proof": {"attack_vector":"test","consequence":"test","is_theoretical":false}},
         {"verification_status": "false_positive", "verification_notes": "Second item"},
-        {"verification_status": "confirmed", "verification_notes": "Third item"}
+        {"verification_status": "confirmed", "verification_notes": "Third item", "seven_question_gate": {"reachability":"yes","controllability":"yes","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"}, "concrete_impact_proof": {"attack_vector":"test","consequence":"test","is_theoretical":false}}
     ]"#;
 
     let results = parse_batch_verification_verdict(json_response, 3);
@@ -162,9 +163,9 @@ fn test_batch_verdict_invalid_status_defaults_to_needs_review() {
 
 #[test]
 fn test_batch_verdict_fewer_items_than_expected() {
-    // Response has fewer items than expected
+    // Response has fewer items than expected - includes gate for confirmed item
     let json_response = r#"[
-        {"index": 0, "verification_status": "confirmed", "verification_notes": "First"}
+        {"index": 0, "verification_status": "confirmed", "verification_notes": "First", "seven_question_gate": {"reachability":"yes","controllability":"yes","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"}, "concrete_impact_proof": {"attack_vector":"test","consequence":"test","is_theoretical":false}}
     ]"#;
 
     let results = parse_batch_verification_verdict(json_response, 3);
@@ -183,9 +184,9 @@ async fn test_verify_findings_batched_with_index() {
     // Test full batch verification flow with index field
     let responses = vec![
         r#"[
-            {"index": 0, "verification_status": "confirmed", "verification_notes": "Real vuln"},
+            {"index": 0, "verification_status": "confirmed", "verification_notes": "Real vuln", "seven_question_gate": {"reachability":"yes","controllability":"yes","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"}, "concrete_impact_proof": {"attack_vector":"test","consequence":"test","is_theoretical":false}},
             {"index": 1, "verification_status": "false_positive", "verification_notes": "Safe code"},
-            {"index": 2, "verification_status": "confirmed", "verification_notes": "Another vuln"},
+            {"index": 2, "verification_status": "confirmed", "verification_notes": "Another vuln", "seven_question_gate": {"reachability":"yes","controllability":"yes","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"}, "concrete_impact_proof": {"attack_vector":"test","consequence":"test","is_theoretical":false}},
             {"index": 3, "verification_status": "false_positive", "verification_notes": "Not a vuln"}
         ]"#.to_string(),
     ];
@@ -212,12 +213,13 @@ async fn test_verify_findings_batched_with_index() {
 #[tokio::test]
 async fn test_verify_findings_batched_without_index_fallback() {
     // Test full batch verification flow without index field
+    // Includes gate for confirmed items per updated prompt
     let responses = vec![
         r#"[
-            {"verification_status": "confirmed", "verification_notes": "First"},
+            {"verification_status": "confirmed", "verification_notes": "First", "seven_question_gate": {"reachability":"yes","controllability":"yes","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"}, "concrete_impact_proof": {"attack_vector":"test","consequence":"test","is_theoretical":false}},
             {"verification_status": "false_positive", "verification_notes": "Second"},
             {"verification_status": "needs_review", "verification_notes": "Third"},
-            {"verification_status": "confirmed", "verification_notes": "Fourth"}
+            {"verification_status": "confirmed", "verification_notes": "Fourth", "seven_question_gate": {"reachability":"yes","controllability":"yes","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"}, "concrete_impact_proof": {"attack_vector":"test","consequence":"test","is_theoretical":false}}
         ]"#
         .to_string(),
     ];
@@ -278,7 +280,12 @@ fn test_verification_batch_fields_spec_consistency() {
                 );
             }
             other => {
-                panic!("Unexpected field in VERIFICATION_BATCH_FIELDS: {}", other);
+                // Allow gate and proof fields
+                assert!(
+                    other == "seven_question_gate" || other == "concrete_impact_proof",
+                    "Unexpected field in VERIFICATION_BATCH_FIELDS: {}",
+                    other
+                );
             }
         }
     }
@@ -304,9 +311,11 @@ fn test_verification_prompt_includes_index_field_instruction() {
     // to include the index field in each verdict object.
 
     // Read the verification.rs source to check the instruction
-    let verification_path = Path::new("src/scanner/phases/llm_phases/verification.rs");
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+    let verification_path =
+        Path::new(manifest_dir).join("src/scanner/phases/llm_phases/verification.rs");
     let content =
-        fs::read_to_string(verification_path).expect("Should be able to read verification.rs");
+        fs::read_to_string(&verification_path).expect("Should be able to read verification.rs");
     // The prompt lives in Rust string literals, so quotes appear escaped in the source
     let unescaped = content.replace('\\', "");
 
@@ -326,9 +335,9 @@ fn test_verification_prompt_includes_index_field_instruction() {
 /// Contract test: parse example with and without index field both succeed.
 #[test]
 fn test_verification_batch_accepts_both_index_formats() {
-    // Example WITH index field
+    // Example WITH index field - includes gate per updated prompt
     let with_index = r#"[
-        {"index": 0, "verification_status": "confirmed", "verification_notes": "First"},
+        {"index": 0, "verification_status": "confirmed", "verification_notes": "First", "seven_question_gate": {"reachability":"yes","controllability":"yes","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"}, "concrete_impact_proof": {"attack_vector":"test","consequence":"test","is_theoretical":false}},
         {"index": 1, "verification_status": "false_positive", "verification_notes": "Second"}
     ]"#;
 
@@ -337,9 +346,9 @@ fn test_verification_batch_accepts_both_index_formats() {
     assert_eq!(results_with[0].0, VerificationStatus::Confirmed);
     assert_eq!(results_with[1].0, VerificationStatus::FalsePositive);
 
-    // Example WITHOUT index field (positional fallback)
+    // Example WITHOUT index field (positional fallback) - includes gate for confirmed
     let without_index = r#"[
-        {"verification_status": "confirmed", "verification_notes": "First"},
+        {"verification_status": "confirmed", "verification_notes": "First", "seven_question_gate": {"reachability":"yes","controllability":"yes","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"}, "concrete_impact_proof": {"attack_vector":"test","consequence":"test","is_theoretical":false}},
         {"verification_status": "false_positive", "verification_notes": "Second"}
     ]"#;
 
@@ -355,9 +364,9 @@ fn test_verification_batch_accepts_both_index_formats() {
 /// Contract test: verify field types in verification batch examples.
 #[test]
 fn test_verification_batch_field_types() {
-    // Test that index is parsed as integer (when present)
+    // Test that index is parsed as integer (when present) - includes gate
     let json_with_index = r#"[
-        {"index": 0, "verification_status": "confirmed", "verification_notes": "Test"}
+        {"index": 0, "verification_status": "confirmed", "verification_notes": "Test", "seven_question_gate": {"reachability":"yes","controllability":"yes","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"}, "concrete_impact_proof": {"attack_vector":"test","consequence":"test","is_theoretical":false}}
     ]"#;
 
     let results = parse_batch_verification_verdict(json_with_index, 1);

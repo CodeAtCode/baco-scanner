@@ -16,7 +16,8 @@ use std::path::Path;
 #[test]
 fn test_static_analysis_prompt_contains_code_snippet_object() {
     // Read the prompt file
-    let prompt_path = Path::new("prompts/phases/llm_static_analysis.md");
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+    let prompt_path = Path::new(manifest_dir).join("prompts/phases/llm_static_analysis.md");
     assert!(
         prompt_path.exists(),
         "Prompt file should exist at prompts/phases/llm_static_analysis.md"
@@ -58,7 +59,8 @@ fn test_static_analysis_prompt_contains_code_snippet_object() {
 #[test]
 fn test_static_analysis_prompt_fields_match_parser_requirements() {
     // Read the prompt file
-    let prompt_path = Path::new("prompts/phases/llm_static_analysis.md");
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+    let prompt_path = Path::new(manifest_dir).join("prompts/phases/llm_static_analysis.md");
     assert!(prompt_path.exists(), "Prompt file should exist");
 
     let prompt_content =
@@ -93,7 +95,8 @@ fn test_static_analysis_prompt_fields_match_parser_requirements() {
 #[test]
 fn test_static_analysis_prompt_has_instruction_for_code_snippet() {
     // Read the prompt file
-    let prompt_path = Path::new("prompts/phases/llm_static_analysis.md");
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+    let prompt_path = Path::new(manifest_dir).join("prompts/phases/llm_static_analysis.md");
     assert!(prompt_path.exists(), "Prompt file should exist");
 
     let prompt_content =
@@ -123,7 +126,8 @@ fn test_static_analysis_prompt_has_instruction_for_code_snippet() {
 #[test]
 fn test_static_analysis_prompt_json_examples_are_valid_structure() {
     // Read the prompt file
-    let prompt_path = Path::new("prompts/phases/llm_static_analysis.md");
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+    let prompt_path = Path::new(manifest_dir).join("prompts/phases/llm_static_analysis.md");
     assert!(prompt_path.exists(), "Prompt file should exist");
 
     let prompt_content =
@@ -228,47 +232,57 @@ fn test_static_analysis_fields_spec_matches_prompt_examples() {
     }
 }
 
-/// Contract test: parse an example JSON from the prompt and verify it deserializes.
+/// Contract test: ALL JSON example blocks in the prompt must be valid JSON.
+///
+/// This test extracts every ```json block and verifies each one parses.
+/// A broken exemplar misleads the model and produces unparseable output.
 #[test]
 fn test_static_analysis_example_json_deserializes() {
     let prompt_path = Path::new("prompts/phases/llm_static_analysis.md");
     let prompt_content = fs::read_to_string(prompt_path).expect("Should be able to read prompt");
 
-    // Extract first JSON example block
+    // Extract all JSON example blocks
     let json_blocks: Vec<&str> = prompt_content
         .split("```json")
         .skip(1)
-        .map(|block| block.split("```").next().unwrap_or(""))
+        .map(|block| block.split("```").next().unwrap_or("").trim())
         .collect();
 
-    assert!(!json_blocks.is_empty(), "No JSON examples found in prompt");
+    assert!(
+        !json_blocks.is_empty(),
+        "No JSON examples found in prompt - the model needs examples to follow"
+    );
 
-    // Try to parse the first example as a JSON array
-    let first_block = json_blocks[0].trim();
-    let parsed: Result<serde_json::Value, _> = serde_json::from_str(first_block);
+    // Every JSON block must parse - a broken exemplar is worse than none
+    for (i, block) in json_blocks.iter().enumerate() {
+        let parsed: Result<serde_json::Value, _> = serde_json::from_str(block);
 
-    if let Ok(value) = parsed {
-        // If it's an array, check the first element has required fields
-        if let Some(arr) = value.as_array() {
-            if !arr.is_empty() {
-                let first_obj = &arr[0];
-                for (field_name, _, is_required) in STATIC_ANALYSIS_FIELDS.iter() {
-                    if *is_required {
-                        assert!(
-                            first_obj.get(field_name).is_some(),
-                            "First JSON example object missing required field: {}",
-                            field_name
-                        );
+        assert!(
+            parsed.is_ok(),
+            "JSON example block {} is not valid JSON: {:?}\n---\n{}",
+            i + 1,
+            parsed.err(),
+            block
+        );
+
+        // For non-empty array blocks, verify required fields are present
+        if let Ok(value) = parsed {
+            if let Some(arr) = value.as_array() {
+                if !arr.is_empty() {
+                    let first_obj = &arr[0];
+                    for (field_name, _, is_required) in STATIC_ANALYSIS_FIELDS.iter() {
+                        if *is_required {
+                            assert!(
+                                first_obj.get(field_name).is_some(),
+                                "JSON example block {} object missing required field: {}",
+                                i + 1,
+                                field_name
+                            );
+                        }
                     }
                 }
             }
         }
-    } else {
-        // Not a valid JSON - that's okay, just note it
-        tracing::warn!(
-            "First JSON example in prompt is not valid JSON: {:?}",
-            parsed.err()
-        );
     }
 }
 

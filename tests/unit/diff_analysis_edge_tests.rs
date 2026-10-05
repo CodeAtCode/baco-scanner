@@ -3,6 +3,7 @@
 //! diffs, and error paths through the public API.
 
 use baco::tools::diff_analysis::{DiffAnalysisInput, DiffAnalysisOutput, analyze_diff};
+use std::path::PathBuf;
 use std::process::Command;
 
 #[test]
@@ -69,9 +70,11 @@ fn fn_analyze_diff_only_head_provided_does_not_return_validation_error() {
 
 #[test]
 fn fn_analyze_diff_both_commits_provided_runs_git() {
+    // Use CARGO_MANIFEST_DIR to ensure we're working from the package root
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let input = DiffAnalysisInput {
         file_path: "README.md".to_string(),
-        repo_path: None,
+        repo_path: Some(manifest_dir.to_str().unwrap().to_string()),
         base_commit: Some("HEAD~1".to_string()),
         head_commit: Some("HEAD".to_string()),
     };
@@ -213,9 +216,11 @@ fn test_git_diff_command_exists_inline_migrated() {
 
 #[test]
 fn test_nonexistent_ref_returns_error() {
+    // Use CARGO_MANIFEST_DIR to ensure we're working from the package root
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let input = DiffAnalysisInput {
         file_path: "README.md".to_string(),
-        repo_path: None,
+        repo_path: Some(manifest_dir.to_str().unwrap().to_string()),
         base_commit: Some("this-ref-does-not-exist-12345".to_string()),
         head_commit: Some("HEAD".to_string()),
     };

@@ -11,6 +11,7 @@ pub mod parallel;
 pub mod phase_spec;
 pub mod phases;
 mod pipeline;
+pub mod progress;
 pub mod sequential;
 
 // Re-export public API from core

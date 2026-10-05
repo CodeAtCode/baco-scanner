@@ -882,8 +882,7 @@ pub(super) async fn run_scanner(
 
     health.set_analyzed(analyzed_files.len() as u64);
     let llm_metrics = scanner.metrics_tracker.finalize().await;
-    let (ok_calls, failed_calls) =
-        crate::scan_health::from_llm_metrics(&llm_metrics, Some(&scanner.config.llm.pricing));
+    let (ok_calls, failed_calls) = crate::scan_health::from_llm_metrics(&llm_metrics);
     health.set_llm_counts(ok_calls, failed_calls);
     if ok_calls + failed_calls == 0 {
         eprintln!(

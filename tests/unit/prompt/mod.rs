@@ -1,6 +1,7 @@
 //! Unit tests for prompt
 
 mod core_tests;
+mod discovery_prompt_tests;
 mod engine_tests;
 mod golden_tests;
 mod hunt_tests;

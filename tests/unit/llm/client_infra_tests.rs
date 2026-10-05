@@ -26,7 +26,6 @@ async fn test_cache_hit_without_http() {
         enable_llm_cache: true,
         cache_dir: Some(cache_dir.to_string_lossy().to_string()),
         max_concurrent: 3,
-        pricing: Default::default(),
     };
 
     let client = LlmClient::with_metrics(config, Some(LlmMetricsTracker::new()));
@@ -129,7 +128,6 @@ fn test_llm_client_rate_limiter_config() {
         enable_llm_cache: false,
         cache_dir: None,
         max_concurrent: 3,
-        pricing: Default::default(),
     };
 
     let client = LlmClient::with_metrics(config, None);

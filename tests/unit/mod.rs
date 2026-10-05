@@ -169,6 +169,7 @@ mod poc_compiler_tests;
 mod poc_generation_tests;
 mod preset_from_config_tests;
 mod preset_tests;
+mod progress_bar_math_tests;
 mod project_type;
 mod prompt_test_fixtures;
 mod rate_limiter_tests;
