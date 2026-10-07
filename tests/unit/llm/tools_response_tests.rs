@@ -202,3 +202,60 @@ async fn test_chat_accepts_a_padded_but_real_answer() {
     assert_eq!(response.content.trim(), "[]");
     mock.assert_async().await;
 }
+
+#[tokio::test]
+async fn test_chat_with_tools_rejects_unreadable_tool_calls() {
+    // tool_calls is parsed with unwrap_or_default, so a payload the parser cannot
+    // read became an empty vec. The agent then behaves as though the model chose
+    // to answer in prose, when in fact it asked for a tool and the response was
+    // corrupt. Malformed is not the same as absent.
+    let mut server = mockito::Server::new_async().await;
+    let mock = server
+        .mock("POST", "/v1/chat/completions")
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(
+            r#"{"choices":[{"message":{"content":"I will read that file","tool_calls":"not-a-list"}}]}"#,
+        )
+        .create();
+
+    let client = LlmClient::new(config_for(server.url()));
+    let result = client
+        .chat_with_tools(&[ChatMessage::user("read p.rs")], &tool_schema())
+        .await;
+
+    let error = result
+        .expect_err("a corrupt tool_calls payload must not read as a model that called nothing");
+    let rendered = error.to_string();
+    assert!(
+        rendered.contains("tool_calls"),
+        "the error must name the unreadable field, got: {rendered}"
+    );
+    mock.assert_async().await;
+}
+
+#[tokio::test]
+async fn test_chat_with_tools_accepts_a_prose_answer_with_no_tool_calls_field() {
+    // Rejecting a malformed payload must not reject a model that legitimately
+    // answered in prose with no tool_calls key present.
+    let mut server = mockito::Server::new_async().await;
+    let mock = server
+        .mock("POST", "/v1/chat/completions")
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(r#"{"choices":[{"message":{"content":"I found nothing to read"}}]}"#)
+        .create();
+
+    let client = LlmClient::new(config_for(server.url()));
+    let response = client
+        .chat_with_tools(&[ChatMessage::user("read p.rs")], &tool_schema())
+        .await
+        .expect("a prose answer with no tool_calls key is not malformed");
+
+    assert_eq!(response.content, "I found nothing to read");
+    assert!(
+        response.tool_calls.is_empty(),
+        "no tool_calls key means the model called nothing"
+    );
+    mock.assert_async().await;
+}

@@ -1,5 +1,6 @@
 use crate::error::ScanResult;
 use crate::findings::VulnerabilityFinding;
+use crate::llm::phase_llm_config;
 use crate::scanner::phases::PhaseConfig;
 
 /// Run auto patching phase (phase 19 of 23).
@@ -12,7 +13,7 @@ pub async fn run_auto_patching(
         findings,
         pb: _,
         analyzed_files,
-        metrics_tracker: _,
+        metrics_tracker,
         target_path,
         config,
         project_stack: _,
@@ -26,10 +27,23 @@ pub async fn run_auto_patching(
 
     tracing::info!("Running auto patching phase");
 
-    let patcher = crate::staging::AutoPatcher::new(target_path.to_path_buf());
+    let llm_config = match phase_llm_config(config, "auto_patching", None) {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::warn!("Auto patching has no usable LLM config: {e}");
+            return Ok((findings, analyzed_files.to_vec()));
+        }
+    };
+    let client = std::sync::Arc::new(crate::llm::LlmClient::with_metrics(
+        llm_config,
+        Some(metrics_tracker.clone()),
+    ));
+    let patcher = crate::staging::AutoPatcher::with_llm(target_path.to_path_buf(), client);
     let patching_config = crate::staging::PatchingConfig::default();
 
-    match patcher.execute_batch_with_vuln_spec(&findings, &patching_config, Some(&config.vuln_spec))
+    match patcher
+        .execute_batch_with_vuln_spec(&findings, &patching_config, Some(&config.vuln_spec))
+        .await
     {
         Ok(patched_findings) => {
             tracing::info!(

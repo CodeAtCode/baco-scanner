@@ -213,3 +213,9 @@ mod verification_primitive_refutation_tests;
 mod verification_verdict_tests;
 mod vuln_spec_tests;
 mod wp_primitive_prompt_tests;
+
+mod prompt_absent_value_tests;
+
+mod severity_label_tests;
+
+mod path_match_tests;

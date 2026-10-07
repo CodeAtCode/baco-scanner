@@ -83,15 +83,8 @@ fn run_diff(
         &mut |delta, _| {
             if matched_path.is_none() {
                 if let Some(p) = delta.new_file().path() {
-                    let s = p.to_string_lossy();
-                    if s == file_path
-                        || s.ends_with(file_path)
-                        || Path::new(file_path)
-                            .file_name()
-                            .map(|n| s == n.to_string_lossy())
-                            .unwrap_or(false)
-                    {
-                        matched_path = Some(s.to_string());
+                    if path_matches(file_path, p) {
+                        matched_path = Some(p.to_string_lossy().to_string());
                     }
                 }
             }
@@ -127,6 +120,11 @@ fn run_diff(
                 output.push_str(content);
             }
             _ => {
+                // Same body as the '@' arm above. Git emits '@' for hunk headers,
+                // and this branch already handled them, so the explicit arm was
+                // redundant: a mutation run reported "delete match arm '@'" as a
+                // survivor, and it is not observable either way. Kept separate
+                // only to mark that this was checked rather than overlooked.
                 output.push_str(content);
             }
         }
@@ -136,14 +134,7 @@ fn run_diff(
     diff.foreach(
         &mut |delta, _| {
             if let Some(p) = delta.new_file().path() {
-                let s = p.to_string_lossy();
-                if s == file_path_clone
-                    || s.ends_with(&file_path_clone)
-                    || Path::new(&file_path_clone)
-                        .file_name()
-                        .map(|n| s == n.to_string_lossy())
-                        .unwrap_or(false)
-                {
+                if path_matches(&file_path_clone, p) {
                     files_changed += 1;
                 }
             }
@@ -230,14 +221,36 @@ pub fn changed_files(repo_path: &str, revspec: &str) -> Result<Vec<PathBuf>, Str
     Ok(files)
 }
 
-pub fn matches_changed_set(file_path: &str, changed: &[PathBuf]) -> bool {
+/// Whether a path reported by git refers to `file_path`.
+///
+/// This was written twice: once inline in `run_diff` and once here. Only this
+/// copy was reachable from a test, so a mutation run found `run_diff`'s copy
+/// alive — changing `||` to `&&` there left the suite green. The two copies had
+/// also drifted apart, so they are now one predicate.
+///
+/// The suffix rule anchors on `/`, which the inline copy did not: without the
+/// anchor, file_path "foo.rs" matched "myfoo.rs" and a finding was reported as
+/// touched by a commit that never touched it.
+pub fn path_matches(file_path: &str, candidate: &Path) -> bool {
     let normalized = file_path.replace('\\', "/");
-    changed.iter().any(|p| {
-        let entry = p.to_string_lossy().replace('\\', "/");
-        normalized == entry
-            || normalized.ends_with(format!("/{entry}").as_str())
-            || entry.ends_with(format!("/{normalized}").as_str())
-    })
+    let entry = candidate.to_string_lossy().replace('\\', "/");
+
+    if normalized == entry {
+        return true;
+    }
+    if entry.ends_with(&format!("/{normalized}")) {
+        return true;
+    }
+    // A bare filename has no directory to anchor on, so compare basenames. This
+    // is what the inline copy's third disjunct did.
+    match (Path::new(file_path).file_name(), candidate.file_name()) {
+        (Some(a), Some(b)) => a == b,
+        _ => false,
+    }
+}
+
+pub fn matches_changed_set(file_path: &str, changed: &[PathBuf]) -> bool {
+    changed.iter().any(|p| path_matches(file_path, p))
 }
 
 pub fn validate_revspec(revspec: &str) -> Result<(), String> {

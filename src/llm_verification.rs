@@ -136,14 +136,17 @@ where
     variables.insert("FILE_PATH".to_string(), finding.file_path.clone());
     variables.insert(
         "LINE_NUMBER".to_string(),
-        finding
-            .line_number
-            .map(|l| l.to_string())
-            .unwrap_or_default(),
+        match finding.line_number {
+            Some(l) => l.to_string(),
+            None => "not recorded".to_string(),
+        },
     );
     variables.insert(
         "CWE_ID".to_string(),
-        finding.cwe_id.clone().unwrap_or_default(),
+        match finding.cwe_id.as_deref() {
+            Some(c) if !c.is_empty() => c.to_string(),
+            _ => "not assigned".to_string(),
+        },
     );
     variables.insert(
         "VULNERABILITY_DESCRIPTION".to_string(),
@@ -151,7 +154,15 @@ where
     );
     variables.insert(
         "CODE_SNIPPET".to_string(),
-        finding.code_snippet.clone().unwrap_or_default(),
+        match finding.code_snippet.as_deref() {
+            Some(s) if !s.trim().is_empty() => s.to_string(),
+            // An empty slot here reads as "this code is empty", which is evidence
+            // of something. Say that no source was captured, so the judge weighs
+            // the reasoning instead of the absence of code.
+            _ => "(no source snippet was captured for this finding; \
+                  do not read the absence of code as evidence either way)"
+                .to_string(),
+        },
     );
 
     let prompt = render_template(RATIONALE_CHECK_PROMPT_TEMPLATE, &variables);

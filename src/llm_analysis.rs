@@ -1685,8 +1685,18 @@ impl LlmAnalyzer {
                                     snippet.push('\n');
                                 }
                             }
-                            snippet.push_str(">>> VULNERABLE CODE <<<\n");
-                            snippet.push_str(code);
+                            // before/after are already omitted when empty. The vulnerable body was not:
+                            // an absent snippet still produced a "VULNERABLE CODE" header
+                            // over nothing, which reads as source that was examined.
+                            if code.trim().is_empty() {
+                                snippet.push_str(
+                                    "(no source captured for this finding; the location was \
+                                     reported without its code)\n",
+                                );
+                            } else {
+                                snippet.push_str(">>> VULNERABLE CODE <<<\n");
+                                snippet.push_str(code);
+                            }
                             if !code.ends_with('\n') {
                                 snippet.push('\n');
                             }

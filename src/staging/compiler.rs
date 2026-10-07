@@ -1,42 +1,73 @@
 //! PoC compilation and auto-patching logic
 
+use crate::llm::{ChatMessage, LlmClient};
 use crate::scanner_types::patch::PatchCandidate;
 use crate::staging::PatchValidationResult;
 use crate::staging::core::StagingArea;
 use crate::staging::error::{AutoPatchError, AutoPatchResult};
 use std::path::PathBuf;
+use std::sync::Arc;
 
 /// Auto-Patcher for generating and validating patches
 pub struct AutoPatcher {
     /// Repository path for patch operations
     pub repo_path: PathBuf,
+    /// Model asked to produce the diff. Without one, generation cannot happen and
+    /// `generate_patch` reports that rather than inventing a patch.
+    llm_client: Option<Arc<LlmClient>>,
 }
 
 impl AutoPatcher {
+    /// A patcher with no model. `generate_patch` will report `NoLlmClient`.
     pub fn new(repo_path: PathBuf) -> Self {
-        Self { repo_path }
+        Self {
+            repo_path,
+            llm_client: None,
+        }
+    }
+
+    /// A patcher that asks `llm_client` to produce the diff.
+    pub fn with_llm(repo_path: PathBuf, llm_client: Arc<LlmClient>) -> Self {
+        Self {
+            repo_path,
+            llm_client: Some(llm_client),
+        }
     }
 
     /// Generate a patch for fixing a vulnerability
     ///
-    /// In production, this would call the LLM to generate the fix.
-    /// The prompt guides the LLM to produce a unified diff.
-    pub fn generate_patch(
+    /// Calls the model with a prompt that describes the vulnerability and asks for
+    /// a unified diff. The response must be a diff for `file_path`; anything else is
+    /// rejected rather than passed on to `validate_patch`.
+    pub async fn generate_patch(
         &self,
-        _vulnerability_description: &str,
-        _vulnerable_code: &str,
+        vulnerability_description: &str,
+        vulnerable_code: &str,
         file_path: &str,
     ) -> AutoPatchResult<PatchCandidate> {
-        // For now, generate a placeholder that indicates where the fix would go
-        // In production, this would be replaced by actual LLM-generated diff
-        let diff = format!(
-            "--- a/{}\n\
-             +++ b/{}\n\
-             @@ -1,10 +1,10 @@\n\
-             \n",
-            file_path, file_path
-        );
+        let Some(client) = self.llm_client.as_ref() else {
+            return Err(AutoPatchError::NoLlmClient);
+        };
 
+        let user = format!(
+            "Vulnerability:\n{vulnerability_description}\n\n\
+             Vulnerable code in {file_path}:\n```\n{vulnerable_code}\n```\n\n\
+             Reply with a unified diff against {file_path} that fixes it. \
+             The diff must begin with a line starting \"--- a/{file_path}\". \
+             Output only the diff."
+        );
+        let response = client
+            .chat(&[
+                ChatMessage::system(
+                    "You write minimal, correct unified diffs that fix a single \
+                     reported vulnerability. You output nothing but the diff.",
+                ),
+                ChatMessage::user(&user),
+            ])
+            .await
+            .map_err(|e| AutoPatchError::Generation(e.to_string()))?;
+
+        let diff = extract_unified_diff(&response.content, file_path)?;
         Ok(PatchCandidate::new(&diff, file_path))
     }
 
@@ -157,16 +188,17 @@ impl AutoPatcher {
     }
 
     /// Execute batch auto-patching on multiple findings
-    pub fn execute_batch(
+    pub async fn execute_batch(
         &self,
         findings: &[crate::findings::VulnerabilityFinding],
         config: &PatchingConfig,
     ) -> AutoPatchResult<Vec<crate::findings::VulnerabilityFinding>> {
         self.execute_batch_with_vuln_spec(findings, config, None)
+            .await
     }
 
     /// Execute batch auto-patching with optional vuln_spec config for auto-extraction
-    pub fn execute_batch_with_vuln_spec(
+    pub async fn execute_batch_with_vuln_spec(
         &self,
         findings: &[crate::findings::VulnerabilityFinding],
         config: &PatchingConfig,
@@ -190,7 +222,9 @@ impl AutoPatcher {
             };
 
             // Generate patch
-            let patch = self.generate_patch(&finding.title, code_snippet, &finding.file_path)?;
+            let patch = self
+                .generate_patch(&finding.title, code_snippet, &finding.file_path)
+                .await?;
 
             // Auto-extract specs from patch if enabled
             if let Some(vs_config) = vuln_spec_config {
@@ -255,6 +289,41 @@ impl AutoPatcher {
 
         Ok(patched_findings)
     }
+}
+
+/// Pull a unified diff for `file_path` out of a model response.
+///
+/// Models routinely wrap a diff in prose or a fenced block, so the diff is located
+/// rather than assumed to be the whole reply. A reply with no diff for this file is
+/// an error: `validate_patch` would otherwise be handed prose, and its failure would
+/// read as a patch that did not apply.
+fn extract_unified_diff(response: &str, file_path: &str) -> AutoPatchResult<String> {
+    let expected_header = format!("--- a/{file_path}");
+
+    let start = response
+        .lines()
+        .position(|l| l.trim_start().starts_with(&expected_header))
+        .ok_or_else(|| {
+            AutoPatchError::Generation(format!(
+                "model returned no unified diff for {file_path}; \
+                 expected a line starting '{expected_header}'"
+            ))
+        })?;
+
+    let diff: String = response
+        .lines()
+        .skip(start)
+        .take_while(|l| !l.starts_with("```"))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    if !diff.contains("@@") {
+        return Err(AutoPatchError::Generation(format!(
+            "model returned a diff for {file_path} with no hunk header"
+        )));
+    }
+
+    Ok(diff)
 }
 
 /// Configuration for auto-patching

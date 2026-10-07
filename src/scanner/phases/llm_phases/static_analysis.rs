@@ -627,6 +627,29 @@ pub fn triage_snippet(path: &std::path::Path, max_lines: usize) -> std::io::Resu
 /// input here -- the function has no other judgement of its own -- and the bug
 /// this test exists for is entirely about what happens when the reply is a valid
 /// JSON that simply omits a file.
+/// The next batch cursor, or `None` once every file has been sent.
+///
+/// Returning the cursor instead of only the end lets the caller assert that the
+/// sweep terminates for any batch size. `batch_end = batch_start + batch_size` with
+/// a batch size of zero pins the cursor, and the sweep then runs forever without
+/// ever yielding, which no timeout can interrupt.
+/// Where the next batch ends, or `None` once every file has been sent.
+///
+/// Returning the end rather than only asserting it inside the loop is what makes
+/// the sweep's termination checkable. `end = start + batch_size` with a batch size
+/// of zero leaves the cursor pinned and the loop runs forever without ever yielding,
+/// which no timeout can interrupt — a mutation run caught this as a 600s timeout on
+/// `default_triage_batch_size -> 0` rather than as a failing test.
+pub fn next_batch_end(total: usize, start: usize, batch_size: u8) -> Option<usize> {
+    if start >= total {
+        return None;
+    }
+    Some(std::cmp::min(
+        start + std::cmp::max(batch_size, 1) as usize,
+        total,
+    ))
+}
+
 pub async fn run_triage_cascade<'a>(
     client: &impl crate::llm::LlmChatClient,
     files: &'a [crate::indexer::FileInfo],
@@ -651,10 +674,12 @@ pub async fn run_triage_cascade<'a>(
     let mut skipped_files = Vec::new();
     let mut unreadable_files: Vec<String> = Vec::new();
 
-    // Process files in batches
+    // The cursor arithmetic is extracted so it can be asserted directly. Running
+    // the loop to observe a hang does not work: a `while` that never yields
+    // cannot be interrupted by tokio::time::timeout, so a regression takes the
+    // whole test binary down instead of failing one test.
     let mut batch_start = 0;
-    while batch_start < files.len() {
-        let batch_end = std::cmp::min(batch_start + batch_size as usize, files.len());
+    while let Some(batch_end) = next_batch_end(files.len(), batch_start, batch_size) {
         let batch = &files[batch_start..batch_end];
 
         // A file we cannot read is not a clean file. Sending it with an empty

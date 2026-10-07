@@ -26,30 +26,34 @@ fn test_auto_patcher_creation() {
     assert_eq!(patcher.repo_path, PathBuf::from("/tmp/test-repo"));
 }
 
-#[test]
-fn test_generate_patch_placeholder() {
+#[tokio::test]
+async fn test_generate_patch_returns_no_llm_client_error() {
     let patcher = AutoPatcher::new(PathBuf::from("/tmp/test-repo"));
 
-    let result = patcher.generate_patch("test vulnerability", "unsafe code here", "src/test.rs");
+    let result = patcher
+        .generate_patch("test vulnerability", "unsafe code here", "src/test.rs")
+        .await;
 
-    assert!(result.is_ok());
-    let patch = result.unwrap();
-
-    // Verify the patch contains expected unified diff format
-    assert!(patch.diff.contains("--- a/src/test.rs"));
-    assert!(patch.diff.contains("+++ b/src/test.rs"));
-    assert!(patch.diff.contains("@@ -1,10 +1,10 @@"));
+    // AutoPatcher::new creates a patcher without an LLM client, so generation
+    // must fail with NoLlmClient rather than returning a fabricated placeholder.
+    assert!(matches!(
+        result,
+        Err(baco::staging::AutoPatchError::NoLlmClient)
+    ));
 }
 
-#[test]
-fn test_generate_patch_file_path() {
+#[tokio::test]
+async fn test_generate_patch_file_path_in_error() {
     let patcher = AutoPatcher::new(PathBuf::from("/tmp/test-repo"));
 
-    let result = patcher.generate_patch("desc", "code", "lib/utils.rs");
-    assert!(result.is_ok());
-    let patch = result.unwrap();
+    let result = patcher.generate_patch("desc", "code", "lib/utils.rs").await;
 
-    assert_eq!(patch.file_path, "lib/utils.rs");
+    // The patcher has no LLM client, so generation fails with NoLlmClient.
+    // The file_path is not available in the error, but we verify the error type.
+    assert!(matches!(
+        result,
+        Err(baco::staging::AutoPatchError::NoLlmClient)
+    ));
 }
 
 #[test]
@@ -173,25 +177,26 @@ fn test_auto_patcher_new() {
     assert_eq!(patcher.repo_path, PathBuf::from("/custom/repo"));
 }
 
-#[test]
-fn test_generate_patch_with_different_file_paths() {
+#[tokio::test]
+async fn test_generate_patch_with_different_file_paths_returns_no_llm_client() {
     let patcher = AutoPatcher::new(PathBuf::from("/tmp/test-repo"));
 
-    let result = patcher.generate_patch("vuln", "code", "lib/main.rs");
-    assert!(result.is_ok());
-    let patch = result.unwrap();
-    assert!(patch.diff.contains("--- a/lib/main.rs"));
-    assert!(patch.diff.contains("+++ b/lib/main.rs"));
+    let result = patcher.generate_patch("vuln", "code", "lib/main.rs").await;
+    assert!(matches!(
+        result,
+        Err(baco::staging::AutoPatchError::NoLlmClient)
+    ));
 }
 
-#[test]
-fn test_generate_patch_with_empty_description() {
+#[tokio::test]
+async fn test_generate_patch_with_empty_description_returns_no_llm_client() {
     let patcher = AutoPatcher::new(PathBuf::from("/tmp/test-repo"));
 
-    let result = patcher.generate_patch("", "", "src/empty.rs");
-    assert!(result.is_ok());
-    let patch = result.unwrap();
-    assert!(patch.diff.contains("--- a/src/empty.rs"));
+    let result = patcher.generate_patch("", "", "src/empty.rs").await;
+    assert!(matches!(
+        result,
+        Err(baco::staging::AutoPatchError::NoLlmClient)
+    ));
 }
 
 #[test]
@@ -334,16 +339,15 @@ fn test_auto_patcher_repo_path_field() {
     assert_eq!(patcher.repo_path, PathBuf::from("/my/repo/path"));
 }
 
-#[test]
-fn test_generate_patch_diff_format() {
+#[tokio::test]
+async fn test_generate_patch_diff_format_returns_no_llm_client() {
     let patcher = AutoPatcher::new(PathBuf::from("/tmp/test-repo"));
 
-    let result = patcher.generate_patch("desc", "code", "file.txt");
-    let patch = result.unwrap();
-
-    // Verify unified diff structure
-    assert!(patch.diff.contains("@@ -1,10 +1,10 @@"));
-    assert!(patch.diff.ends_with("\n"));
+    let result = patcher.generate_patch("desc", "code", "file.txt").await;
+    assert!(matches!(
+        result,
+        Err(baco::staging::AutoPatchError::NoLlmClient)
+    ));
 }
 
 #[test]

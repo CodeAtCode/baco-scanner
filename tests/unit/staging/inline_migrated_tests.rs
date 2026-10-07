@@ -9,14 +9,25 @@ use std::process::Command;
 // ============================================================================
 
 /// Create a minimal temp directory with Rust project structure (no git)
+// Two threads can read the same clock tick, which handed two tests the same
+// directory: one rewrote the manifest and the other ran git init into a tree that
+// had been deleted underneath it. The clock was only ever a hint. One counter
+// covers all three helpers in this file, so uniqueness also holds between them.
+static TEMP_DIR_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+fn unique_temp_dir(prefix: &str) -> PathBuf {
+    let seq = TEMP_DIR_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    // The pid is load-bearing, not decoration. The counter above is per-process,
+    // so two concurrent `unit_tests` processes both start it at zero and both rely
+    // on the clock to separate them. Under load two processes do read the same
+    // tick, they build the same path, and the first one to finish deletes the
+    // directory out from under the second one's `git init`. src/staging/core.rs
+    // already does this for its worktrees.
+    std::env::temp_dir().join(format!("{prefix}-{}-{seq:x}", std::process::id()))
+}
+
 fn create_temp_rust_project() -> PathBuf {
-    let temp_dir = std::env::temp_dir().join(format!(
-        "baco-staging-test-{:x}",
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-    ));
+    let temp_dir = unique_temp_dir("baco-staging-test");
     fs::create_dir_all(&temp_dir).unwrap();
 
     // Create Cargo.toml
@@ -528,23 +539,23 @@ fn test_staging_path_contains_timestamp() {
 // AutoPatcher Tests
 // ============================================================================
 
-#[test]
-fn test_autopatcher_new() {
+#[tokio::test]
+async fn test_autopatcher_new() {
     let temp_dir = create_temp_rust_project();
     let autopatcher = AutoPatcher::new(temp_dir.clone());
 
     // Verify autopatcher was created by calling a public method
-    let patch = autopatcher
-        .generate_patch("test", "code", "test.rs")
-        .unwrap();
-    assert_eq!(patch.file_path, "test.rs");
-    assert!(!patch.diff.is_empty());
+    let result = autopatcher.generate_patch("test", "code", "test.rs").await;
+    assert!(matches!(
+        result,
+        Err(baco::staging::AutoPatchError::NoLlmClient)
+    ));
 
     cleanup_temp_dir(&temp_dir);
 }
 
-#[test]
-fn test_generate_placeholder_patch() {
+#[tokio::test]
+async fn test_generate_placeholder_patch_returns_no_llm_client() {
     let temp_dir = create_temp_rust_project();
     let autopatcher = AutoPatcher::new(temp_dir.clone());
 
@@ -552,39 +563,34 @@ fn test_generate_placeholder_patch() {
     let vulnerable_code = "let query = format!(\"SELECT * FROM users WHERE id = {}\", user_id);";
     let file_path = "src/db.rs";
 
-    let patch = autopatcher
+    let result = autopatcher
         .generate_patch(vulnerability_desc, vulnerable_code, file_path)
-        .unwrap();
+        .await;
 
-    assert_eq!(patch.file_path, file_path);
-    assert!(!patch.diff.is_empty());
-    assert!(patch.diff.contains("--- a/src/db.rs"));
-    assert!(patch.diff.contains("+++ b/src/db.rs"));
-    assert!(!patch.applied);
+    // AutoPatcher::new has no LLM client, so generation fails with NoLlmClient
+    assert!(matches!(
+        result,
+        Err(baco::staging::AutoPatchError::NoLlmClient)
+    ));
 
     cleanup_temp_dir(&temp_dir);
 }
 
-#[test]
-fn test_generate_patch_different_files() {
+#[tokio::test]
+async fn test_generate_patch_different_files_returns_no_llm_client() {
     let temp_dir = create_temp_rust_project();
     let autopatcher = AutoPatcher::new(temp_dir.clone());
 
-    let test_cases = vec![
-        ("main.rs", "main.rs"),
-        ("lib.rs", "lib.rs"),
-        ("utils/mod.rs", "utils/mod.rs"),
-        ("Cargo.toml", "Cargo.toml"),
-    ];
+    let test_cases = vec!["main.rs", "lib.rs", "utils/mod.rs", "Cargo.toml"];
 
-    for (short_path, full_path) in test_cases {
-        let patch = autopatcher
+    for short_path in test_cases {
+        let result = autopatcher
             .generate_patch("test vulnerability", "unsafe code", short_path)
-            .unwrap();
-
-        assert_eq!(patch.file_path, full_path);
-        assert!(patch.diff.contains(&format!("--- a/{}", full_path)));
-        assert!(patch.diff.contains(&format!("+++ b/{}", full_path)));
+            .await;
+        assert!(matches!(
+            result,
+            Err(baco::staging::AutoPatchError::NoLlmClient)
+        ));
     }
 
     cleanup_temp_dir(&temp_dir);
@@ -1056,14 +1062,14 @@ fn test_autopatcher_apply_and_validate_sets_validation_result() {
 // AutoPatcher execute_batch Tests
 // ============================================================================
 
-#[test]
-fn test_autopatcher_execute_batch_empty_findings() {
+#[tokio::test]
+async fn test_autopatcher_execute_batch_empty_findings() {
     let temp_dir = create_temp_rust_project();
     let autopatcher = AutoPatcher::new(temp_dir.clone());
     let config = PatchingConfig::default();
 
     let findings: Vec<baco::findings::VulnerabilityFinding> = vec![];
-    let result = autopatcher.execute_batch(&findings, &config);
+    let result = autopatcher.execute_batch(&findings, &config).await;
 
     assert!(result.is_ok());
     assert!(result.unwrap().is_empty());
@@ -1071,8 +1077,8 @@ fn test_autopatcher_execute_batch_empty_findings() {
     cleanup_temp_dir(&temp_dir);
 }
 
-#[test]
-fn test_autopatcher_execute_batch_respects_max_patches() {
+#[tokio::test]
+async fn test_autopatcher_execute_batch_respects_max_patches() {
     let temp_dir = create_temp_rust_project();
     let autopatcher = AutoPatcher::new(temp_dir.clone());
 
@@ -1153,18 +1159,19 @@ fn test_autopatcher_execute_batch_respects_max_patches() {
     };
 
     let findings = vec![finding1, finding2];
-    let result = autopatcher.execute_batch(&findings, &config);
+    let result = autopatcher.execute_batch(&findings, &config).await;
 
-    assert!(result.is_ok());
-    let patched = result.unwrap();
-    // Both findings should be returned (even if patch validation fails)
-    assert_eq!(patched.len(), 2);
+    // AutoPatcher::new has no LLM client, so execute_batch fails when trying to generate patches
+    assert!(matches!(
+        result,
+        Err(baco::staging::AutoPatchError::NoLlmClient)
+    ));
 
     cleanup_temp_dir(&temp_dir);
 }
 
-#[test]
-fn test_autopatcher_execute_batch_skips_missing_code_snippet() {
+#[tokio::test]
+async fn test_autopatcher_execute_batch_skips_missing_code_snippet() {
     let temp_dir = create_temp_rust_project();
     let autopatcher = AutoPatcher::new(temp_dir.clone());
     let config = PatchingConfig::default();
@@ -1206,7 +1213,7 @@ fn test_autopatcher_execute_batch_skips_missing_code_snippet() {
     };
 
     let findings = vec![finding];
-    let result = autopatcher.execute_batch(&findings, &config);
+    let result = autopatcher.execute_batch(&findings, &config).await;
 
     assert!(result.is_ok());
     // Finding without code snippet is skipped by autopatcher
@@ -1215,8 +1222,8 @@ fn test_autopatcher_execute_batch_skips_missing_code_snippet() {
     cleanup_temp_dir(&temp_dir);
 }
 
-#[test]
-fn test_autopatcher_execute_batch_with_multiple_findings() {
+#[tokio::test]
+async fn test_autopatcher_execute_batch_with_multiple_findings() {
     let temp_dir = create_temp_rust_project();
     let autopatcher = AutoPatcher::new(temp_dir.clone());
     let config = PatchingConfig::default();
@@ -1327,11 +1334,13 @@ fn test_autopatcher_execute_batch_with_multiple_findings() {
     };
 
     let findings = vec![finding1, finding2, finding3];
-    let result = autopatcher.execute_batch(&findings, &config);
+    let result = autopatcher.execute_batch(&findings, &config).await;
 
-    assert!(result.is_ok());
-    let patched = result.unwrap();
-    assert_eq!(patched.len(), 3);
+    // AutoPatcher::new has no LLM client, so execute_batch fails when trying to generate patches
+    assert!(matches!(
+        result,
+        Err(baco::staging::AutoPatchError::NoLlmClient)
+    ));
 
     cleanup_temp_dir(&temp_dir);
 }
@@ -1657,47 +1666,50 @@ fn test_patch_validation_result_all_fields() {
 // AutoPatcher configuration tests
 // ============================================================================
 
-#[test]
-fn test_auto_patcher_repo_path_storage() {
+#[tokio::test]
+async fn test_auto_patcher_repo_path_storage_returns_no_llm_client() {
     let temp_dir = create_temp_rust_project();
     let autopatcher = AutoPatcher::new(temp_dir.clone());
 
-    // Verify autopatcher stores the repo path by using it
-    let patch = autopatcher
+    // AutoPatcher::new has no LLM client, so generation fails with NoLlmClient
+    let result = autopatcher
         .generate_patch("test vuln", "unsafe code", "src/test.rs")
-        .unwrap();
-    assert!(patch.file_path.contains("test.rs"));
-    assert!(patch.diff.contains("--- a/src/test.rs"));
+        .await;
+    assert!(matches!(
+        result,
+        Err(baco::staging::AutoPatchError::NoLlmClient)
+    ));
 
     cleanup_temp_dir(&temp_dir);
 }
 
-#[test]
-fn test_autopatcher_generate_patch_empty_inputs() {
+#[tokio::test]
+async fn test_autopatcher_generate_patch_empty_inputs_returns_no_llm_client() {
     let temp_dir = create_temp_rust_project();
     let autopatcher = AutoPatcher::new(temp_dir.clone());
 
-    // Test with empty vulnerability description
-    let patch = autopatcher.generate_patch("", "", "empty.rs").unwrap();
-
-    assert_eq!(patch.file_path, "empty.rs");
-    assert!(!patch.diff.is_empty());
+    // Test with empty vulnerability description - without LLM, fails with NoLlmClient
+    let result = autopatcher.generate_patch("", "", "empty.rs").await;
+    assert!(matches!(
+        result,
+        Err(baco::staging::AutoPatchError::NoLlmClient)
+    ));
 
     cleanup_temp_dir(&temp_dir);
 }
 
-#[test]
-fn test_autopatcher_generate_patch_long_file_path() {
+#[tokio::test]
+async fn test_autopatcher_generate_patch_long_file_path_returns_no_llm_client() {
     let temp_dir = create_temp_rust_project();
     let autopatcher = AutoPatcher::new(temp_dir.clone());
 
     let long_path = "src/deep/nested/path/to/very/long/file/path.rs";
-    let patch = autopatcher
-        .generate_patch("vuln", "code", long_path)
-        .unwrap();
-
-    assert_eq!(patch.file_path, long_path);
-    assert!(patch.diff.contains(&format!("--- a/{}", long_path)));
+    // Without LLM client, generation fails with NoLlmClient
+    let result = autopatcher.generate_patch("vuln", "code", long_path).await;
+    assert!(matches!(
+        result,
+        Err(baco::staging::AutoPatchError::NoLlmClient)
+    ));
 
     cleanup_temp_dir(&temp_dir);
 }
@@ -1750,14 +1762,18 @@ fn test_multiple_staging_areas_independent() {
 // ============================================================================
 
 /// Create a temp git repo with at least one commit for worktree tests
+// Two threads can read the same clock tick, which gave two tests the same path:
+// one called cleanup_temp_dir and deleted the directory the other was using. The
+// clock was only ever a hint. The counter is what actually guarantees uniqueness
+// inside one test process.
+static TEMP_REPO_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 fn create_temp_git_repo() -> PathBuf {
-    let temp_dir = std::env::temp_dir().join(format!(
-        "baco-git-test-{:x}",
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-    ));
+    let seq = TEMP_REPO_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    // See unique_temp_dir: the pid is what separates two concurrent test
+    // processes. A per-process counter plus a shared clock is not a unique name.
+    let temp_dir =
+        std::env::temp_dir().join(format!("baco-git-test-{}-{seq:x}", std::process::id()));
     fs::create_dir_all(&temp_dir).unwrap();
 
     // Create Cargo.toml
@@ -2368,8 +2384,8 @@ fn test_auto_patch_error_display() {
     assert!(err.to_string().contains("No LLM client configured"));
 }
 
-#[test]
-fn test_auto_patcher_generate_patch() {
+#[tokio::test]
+async fn test_auto_patcher_generate_patch_returns_no_llm_client() {
     let temp_dir = create_temp_rust_project();
     fs::write(temp_dir.join("src/main.rs"), "fn main() {}").unwrap();
 
@@ -2403,11 +2419,15 @@ fn test_auto_patcher_generate_patch() {
     let _staging = StagingArea::create(&temp_dir).unwrap();
     let auto_patcher = AutoPatcher::new(temp_dir.clone());
 
-    let result =
-        auto_patcher.generate_patch("test vulnerability", "vulnerable code", "src/main.rs");
+    let result = auto_patcher
+        .generate_patch("test vulnerability", "vulnerable code", "src/main.rs")
+        .await;
 
-    // Should return a PatchCandidate (may be empty without LLM)
-    assert!(result.is_ok());
+    // AutoPatcher::new has no LLM client, so generation fails with NoLlmClient
+    assert!(matches!(
+        result,
+        Err(baco::staging::AutoPatchError::NoLlmClient)
+    ));
 
     cleanup_temp_dir(&temp_dir);
 }
@@ -2468,8 +2488,8 @@ mod tests {
     cleanup_temp_dir(&repo_path);
 }
 
-#[test]
-fn test_autopatcher_execute_batch_max_patches() {
+#[tokio::test]
+async fn test_autopatcher_execute_batch_max_patches() {
     let temp_dir = create_temp_rust_project();
     let autopatcher = AutoPatcher::new(temp_dir.clone());
     let config = PatchingConfig {
@@ -2546,9 +2566,14 @@ fn test_autopatcher_execute_batch_max_patches() {
         verification_tier: None,
     };
 
-    let result = autopatcher.execute_batch(&[finding1, finding2], &config);
-    assert!(result.is_ok());
-    assert_eq!(result.unwrap().len(), 2);
+    let result = autopatcher
+        .execute_batch(&[finding1, finding2], &config)
+        .await;
+    // AutoPatcher::new has no LLM client, so execute_batch fails when trying to generate patches
+    assert!(matches!(
+        result,
+        Err(baco::staging::AutoPatchError::NoLlmClient)
+    ));
     cleanup_temp_dir(&temp_dir);
 }
 

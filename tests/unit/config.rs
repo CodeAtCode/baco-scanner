@@ -10,11 +10,13 @@
 
 use baco::config::scanner::ScanPipelineProfile;
 use baco::config::{
-    AgentConfig, LlmPhaseConfig, PerformanceSettings, ScannerConfig, apply_env_overrides,
+    AgentConfig, ConfigError, LlmPhaseConfig, PerformanceSettings, ScannerConfig,
+    apply_env_overrides, default_llm_temperature, default_max_concurrent, default_prior_runs_max,
     expand_env_vars,
 };
 use serial_test::serial;
 use std::collections::HashMap;
+use std::error::Error;
 
 /// Test helper for environment variable management
 struct EnvVarGuard {
@@ -2318,4 +2320,248 @@ fn preset_deep_merge_user_wins_and_zero_applies() {
     );
     assert_eq!(config.llm.max_retries, 7);
     let _ = std::fs::remove_dir_all(&dir);
+}
+// ============================================================================
+// ConfigError Display and Error Behavior Tests
+// ============================================================================
+
+#[test]
+fn test_config_error_display_io_variant() {
+    use std::io;
+
+    let io_err = io::Error::new(io::ErrorKind::NotFound, "config file not found");
+    let err = ConfigError::Io(io_err);
+    let msg = format!("{}", err);
+
+    assert_eq!(msg, "IO error: config file not found");
+}
+
+#[test]
+fn test_config_error_display_parse_variant_with_location() {
+    let err = ConfigError::Parse {
+        message: "expected a table".to_string(),
+        line: Some(42),
+        column: Some(15),
+    };
+    let msg = format!("{}", err);
+
+    assert_eq!(
+        msg,
+        "TOML parse error at line 42, column 15: expected a table"
+    );
+}
+
+#[test]
+fn test_config_error_display_parse_variant_without_location() {
+    let err = ConfigError::Parse {
+        message: "invalid TOML syntax".to_string(),
+        line: None,
+        column: None,
+    };
+    let msg = format!("{}", err);
+
+    assert_eq!(msg, "TOML parse error: invalid TOML syntax");
+}
+
+#[test]
+fn test_config_error_display_validation_variant() {
+    let err = ConfigError::Validation {
+        field: "llm.phases.discovery.base_url".to_string(),
+        message: "base_url is required when API key is set".to_string(),
+    };
+    let msg = format!("{}", err);
+
+    assert_eq!(
+        msg,
+        "Validation error at llm.phases.discovery.base_url: base_url is required when API key is set"
+    );
+}
+
+#[test]
+fn test_config_error_display_missing_dependency_variant_with_hints() {
+    let err = ConfigError::MissingDependency {
+        tool: "Semgrep".to_string(),
+        install_hints: vec![
+            "brew install semgrep".to_string(),
+            "pip install semgrep".to_string(),
+        ],
+    };
+    let msg = format!("{}", err);
+
+    assert_eq!(
+        msg,
+        "Semgrep is not installed or not in PATH\nInstall with:\n  brew install semgrep\n  pip install semgrep"
+    );
+}
+
+#[test]
+fn test_config_error_display_missing_dependency_variant_without_hints() {
+    let err = ConfigError::MissingDependency {
+        tool: "Docker".to_string(),
+        install_hints: vec![],
+    };
+    let msg = format!("{}", err);
+
+    assert_eq!(msg, "Docker is not installed or not in PATH");
+}
+
+#[test]
+fn test_config_error_source_io_variant_returns_some() {
+    use std::io;
+
+    let io_err = io::Error::new(io::ErrorKind::NotFound, "config file not found");
+    let err = ConfigError::Io(io_err);
+
+    let source = err.source();
+    assert!(source.is_some(), "Io variant must return Some(source)");
+
+    // Verify the source is the underlying io::Error
+    let source_msg = source.unwrap().to_string();
+    assert_eq!(source_msg, "config file not found");
+}
+
+#[test]
+fn test_config_error_source_parse_variant_returns_none() {
+    let err = ConfigError::Parse {
+        message: "invalid TOML".to_string(),
+        line: Some(1),
+        column: Some(1),
+    };
+
+    assert!(
+        err.source().is_none(),
+        "Parse variant must return None for source()"
+    );
+}
+
+#[test]
+fn test_config_error_source_validation_variant_returns_none() {
+    let err = ConfigError::Validation {
+        field: "test.field".to_string(),
+        message: "validation failed".to_string(),
+    };
+
+    assert!(
+        err.source().is_none(),
+        "Validation variant must return None for source()"
+    );
+}
+
+#[test]
+fn test_config_error_source_missing_dependency_variant_returns_none() {
+    let err = ConfigError::MissingDependency {
+        tool: "Semgrep".to_string(),
+        install_hints: vec![],
+    };
+
+    assert!(
+        err.source().is_none(),
+        "MissingDependency variant must return None for source()"
+    );
+}
+
+// ============================================================================
+// Default Value Function Tests
+// ============================================================================
+
+#[test]
+fn test_default_prior_runs_max_returns_5() {
+    let result = default_prior_runs_max();
+    assert_eq!(
+        result, 5,
+        "default_prior_runs_max must return 5, got {}",
+        result
+    );
+}
+
+#[test]
+fn test_default_max_concurrent_returns_4() {
+    let result = default_max_concurrent();
+    assert_eq!(
+        result, 4,
+        "default_max_concurrent must return 4, got {}",
+        result
+    );
+}
+
+#[test]
+fn test_default_llm_temperature_returns_0_5() {
+    let result = default_llm_temperature();
+    const EPSILON: f32 = f32::EPSILON;
+    assert!(
+        (result - 0.5).abs() < EPSILON,
+        "default_llm_temperature must return 0.5, got {}",
+        result
+    );
+}
+
+#[test]
+fn test_default_max_turns_returns_10() {
+    let result = baco::config::default_max_turns();
+    assert_eq!(
+        result, 10,
+        "default_max_turns must return 10, got {}",
+        result
+    );
+}
+
+#[test]
+fn test_default_tool_timeout_returns_30() {
+    let result = baco::config::default_tool_timeout();
+    assert_eq!(
+        result, 30,
+        "default_tool_timeout must return 30, got {}",
+        result
+    );
+}
+
+#[test]
+fn test_default_true_returns_true() {
+    let result = baco::config::default_true();
+    assert!(result, "default_true must return true");
+}
+
+#[test]
+fn test_default_four_returns_4() {
+    let result = baco::config::default_four();
+    assert_eq!(result, 4, "default_four must return 4, got {}", result);
+}
+
+#[test]
+fn test_default_max_file_size_kb_returns_512() {
+    let result = baco::config::default_max_file_size_kb();
+    assert_eq!(
+        result, 512,
+        "default_max_file_size_kb must return 512, got {}",
+        result
+    );
+}
+/// Found by a mutation run over `src/config/mod.rs`: 59 mutants, 2 missed, both
+/// returning a different string from `default_llm_static_analysis`. Nothing
+/// asserted the value, so any model name at all passed.
+#[test]
+fn test_default_llm_static_analysis_names_the_phase() {
+    assert_eq!(
+        baco::config::default_llm_static_analysis(),
+        "llm_static_analysis",
+        "the default must name the phase it configures"
+    );
+}
+
+/// Same run, same omission in a sibling default: `default_triage_model` had no
+/// test at all. Triage runs on a cheap model, so changing this changes scan cost.
+#[test]
+fn test_default_triage_model_is_mistral_small() {
+    assert_eq!(baco::config::default_triage_model(), "mistral-small");
+}
+
+/// A batch size of zero makes the triage cursor stop advancing, which hangs the
+/// scan. The value is asserted so that cannot be reintroduced.
+#[test]
+fn test_default_triage_batch_size_is_eight() {
+    assert_eq!(
+        baco::config::default_triage_batch_size(),
+        8,
+        "zero would pin the triage cursor and never terminate"
+    );
 }

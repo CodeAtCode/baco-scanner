@@ -323,9 +323,9 @@ use baco::findings::Severity;
 use baco::findings::VulnerabilityFinding;
 use serial_test::serial;
 
-#[test]
+#[tokio::test]
 #[serial]
-fn test_execute_batch_with_vuln_spec_enabled_with_security_patch() {
+async fn test_execute_batch_with_vuln_spec_enabled_with_security_patch() {
     use baco::staging::compiler::AutoPatcher;
     use baco::staging::compiler::PatchingConfig;
     use std::path::PathBuf;
@@ -390,27 +390,23 @@ fn test_execute_batch_with_vuln_spec_enabled_with_security_patch() {
     };
 
     let patcher = AutoPatcher::new(PathBuf::from("/media/mte90/Doh-cker/projects/baco"));
-    let result =
-        patcher.execute_batch_with_vuln_spec(&findings, &patching_config, Some(&vuln_spec_config));
+    let result = patcher
+        .execute_batch_with_vuln_spec(&findings, &patching_config, Some(&vuln_spec_config))
+        .await;
 
+    // AutoPatcher::new has no LLM client, so execute_batch fails when it tries to generate patches
     assert!(
-        result.is_ok(),
-        "execute_batch_with_vuln_spec should succeed"
+        matches!(result, Err(baco::staging::AutoPatchError::NoLlmClient)),
+        "execute_batch_with_vuln_spec should fail with NoLlmClient"
     );
 
-    // Note: The AutoPatcher generates placeholder patches that don't contain
-    // actual security patterns, so no specs are extracted. This test verifies
-    // that the code path runs without error when vuln_spec is enabled.
-    // In production with real patches, specs would be extracted and index would increase.
     let final_count = baco::vuln_spec::get_index_stats().num_documents;
-    // The count may or may not increase depending on whether the placeholder patch
-    // matches any extraction patterns - we just verify no panic occurred
     assert!(final_count >= initial_count, "Index should not decrease");
 }
 
-#[test]
+#[tokio::test]
 #[serial]
-fn test_execute_batch_with_vuln_spec_disabled() {
+async fn test_execute_batch_with_vuln_spec_disabled() {
     use baco::staging::compiler::AutoPatcher;
     use baco::staging::compiler::PatchingConfig;
     use std::path::PathBuf;
@@ -489,12 +485,14 @@ fn test_execute_batch_with_vuln_spec_disabled() {
     };
 
     let patcher = AutoPatcher::new(PathBuf::from("/media/mte90/Doh-cker/projects/baco"));
-    let result =
-        patcher.execute_batch_with_vuln_spec(&findings, &patching_config, Some(&vuln_spec_config));
+    let result = patcher
+        .execute_batch_with_vuln_spec(&findings, &patching_config, Some(&vuln_spec_config))
+        .await;
 
+    // AutoPatcher::new has no LLM client, so it fails with NoLlmClient
     assert!(
-        result.is_ok(),
-        "Should succeed even when disabled: {:?}",
+        matches!(result, Err(baco::staging::AutoPatchError::NoLlmClient)),
+        "Should fail with NoLlmClient: {:?}",
         result.as_ref().err()
     );
 
@@ -506,9 +504,9 @@ fn test_execute_batch_with_vuln_spec_disabled() {
     );
 }
 
-#[test]
+#[tokio::test]
 #[serial]
-fn test_execute_batch_with_vuln_spec_empty_findings() {
+async fn test_execute_batch_with_vuln_spec_empty_findings() {
     use baco::staging::compiler::AutoPatcher;
     use baco::staging::compiler::PatchingConfig;
     use std::path::PathBuf;
@@ -534,8 +532,9 @@ fn test_execute_batch_with_vuln_spec_empty_findings() {
     };
 
     let patcher = AutoPatcher::new(PathBuf::from("/media/mte90/Doh-cker/projects/baco"));
-    let result =
-        patcher.execute_batch_with_vuln_spec(&findings, &patching_config, Some(&vuln_spec_config));
+    let result = patcher
+        .execute_batch_with_vuln_spec(&findings, &patching_config, Some(&vuln_spec_config))
+        .await;
 
     assert!(result.is_ok(), "Should succeed with empty findings");
 
@@ -547,9 +546,9 @@ fn test_execute_batch_with_vuln_spec_empty_findings() {
     );
 }
 
-#[test]
+#[tokio::test]
 #[serial]
-fn test_execute_batch_with_vuln_spec_non_security_patch() {
+async fn test_execute_batch_with_vuln_spec_non_security_patch() {
     use baco::staging::compiler::AutoPatcher;
     use baco::staging::compiler::PatchingConfig;
     use std::path::PathBuf;
@@ -631,10 +630,15 @@ fn test_execute_batch_with_vuln_spec_non_security_patch() {
     };
 
     let patcher = AutoPatcher::new(PathBuf::from("/media/mte90/Doh-cker/projects/baco"));
-    let result =
-        patcher.execute_batch_with_vuln_spec(&findings, &patching_config, Some(&vuln_spec_config));
+    let result = patcher
+        .execute_batch_with_vuln_spec(&findings, &patching_config, Some(&vuln_spec_config))
+        .await;
 
-    assert!(result.is_ok(), "Should succeed");
+    // AutoPatcher::new has no LLM client, so it fails with NoLlmClient
+    assert!(
+        matches!(result, Err(baco::staging::AutoPatchError::NoLlmClient)),
+        "Should fail with NoLlmClient"
+    );
 
     // Verify index count unchanged (extraction yields zero specs for non-security patch)
     let final_count = baco::vuln_spec::get_index_stats().num_documents;

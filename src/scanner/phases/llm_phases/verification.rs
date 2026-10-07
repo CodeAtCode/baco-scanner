@@ -123,29 +123,42 @@ pub fn refute_with_primitive_check(
     if status != VerificationStatus::Confirmed {
         return (status, notes.to_string());
     }
-    if let Some((_body, found)) = anchored_body_containing_primitive(finding, primitives) {
-        let reason = format!(
-            "not confirmed: {} found in the body of the function this finding names",
-            found
-        );
-        let merged = if notes.trim().is_empty() {
-            reason
-        } else {
-            format!("{notes} ({reason})")
-        };
-        return (VerificationStatus::FalsePositive, merged);
+    match anchored_body_containing_primitive(finding, primitives) {
+        Some(Ok((_body, found))) => {
+            let reason = format!(
+                "not confirmed: {} found in the body of the function this finding names",
+                found
+            );
+            let merged = if notes.trim().is_empty() {
+                reason
+            } else {
+                format!("{notes} ({reason})")
+            };
+            (VerificationStatus::FalsePositive, merged)
+        }
+        Some(Err(read_error)) => {
+            let reason = format!("{read_error}: {path}", path = finding.file_path);
+            let merged = if notes.trim().is_empty() {
+                reason
+            } else {
+                format!("{notes} ({reason})")
+            };
+            (VerificationStatus::NeedsReview, merged)
+        }
+        None => (status, notes.to_string()),
     }
-    (status, notes.to_string())
 }
 
 /// The body of the function the title names, if it contains a primitive.
 ///
-/// Returns the body and which primitive matched, so the reason names the
-/// evidence rather than asserting that a check happened.
+/// Returns:
+/// - `Some(Ok((body, primitive)))` if the file was read and a primitive was found
+/// - `Some(Err(String))` if the file could not be read (missing, permissions, etc.)
+/// - `None` if the file was read but no primitive was found, or if language/name could not be determined
 fn anchored_body_containing_primitive(
     finding: &VulnerabilityFinding,
     primitives: &std::collections::HashMap<String, Vec<String>>,
-) -> Option<(String, String)> {
+) -> Option<Result<(String, String), String>> {
     let language = extract_language_from_path(&finding.file_path);
     let for_language = primitives.get(&language)?;
     if for_language.is_empty() {
@@ -154,7 +167,10 @@ fn anchored_body_containing_primitive(
     let name = crate::llm_analysis::function_names_in_title(&finding.title)
         .into_iter()
         .next()?;
-    let content = std::fs::read_to_string(&finding.file_path).ok()?;
+    let content = match std::fs::read_to_string(&finding.file_path) {
+        Ok(c) => c,
+        Err(e) => return Some(Err(format!("cannot read file: {}", e))),
+    };
     let ranges = crate::llm_analysis::function_line_ranges(&content, &language);
     let (start, end) = *ranges.get(&name)?;
 
@@ -163,7 +179,7 @@ fn anchored_body_containing_primitive(
         .iter()
         .find(|p| !p.is_empty() && body.contains(p.as_str()))?
         .clone();
-    Some((body, found))
+    Some(Ok((body, found)))
 }
 
 /// The function body, by its 1-indexed line range.

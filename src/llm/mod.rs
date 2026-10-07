@@ -429,6 +429,23 @@ async fn execute_with_retry(
                                 .unwrap_or("")
                                 .to_string();
 
+                            // A model answering in prose may omit tool_calls entirely. A
+                            // tool_calls key that is present but not a list is a corrupt
+                            // payload, and parse_tool_calls would turn it into an empty vec,
+                            // leaving the agent as though the model chose not to act.
+                            match message.get("tool_calls") {
+                                None | Some(serde_json::Value::Null) => {}
+                                Some(tc) if tc.is_array() => {}
+                                Some(_) => {
+                                    return Err(ScanError::Parse {
+                                        message:
+                                            "Malformed tools response: tool_calls is not a list"
+                                                .to_string(),
+                                        source: None,
+                                    });
+                                }
+                            }
+
                             let tool_calls = parse_tool_calls(message);
 
                             if tools_response_is_malformed(&content, tool_calls.len()) {
@@ -951,11 +968,10 @@ impl LlmClient {
                 Ok(response)
             }
             Err(e) => {
-                tracing::warn!("LLM API (with tools) {} failed: {}", chat_url, e);
-                Err(ScanError::Network {
-                    message: "LLM API request failed".to_string(),
-                    source: None,
-                })
+                // A malformed response is not a network failure. Collapsing every
+                // error into Network made a corrupt payload indistinguishable from a
+                // connection problem, and dropped the detail that says which.
+                Err(e)
             }
         }
     }

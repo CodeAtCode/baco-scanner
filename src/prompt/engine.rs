@@ -280,7 +280,10 @@ impl PromptEngine {
         // Git analysis
         vars.insert("FINDING_TITLE".to_string(), "<finding_title>".to_string());
         vars.insert("FILE_PATH".to_string(), "<file_path>".to_string());
-        vars.insert("LINE_NUMBER".to_string(), "0".to_string());
+        // "0" was the odd one out here: every other entry is bracketed as a
+        // placeholder, and a bare 0 reads to anything consuming the registry as a
+        // real line number.
+        vars.insert("LINE_NUMBER".to_string(), "<line_number>".to_string());
         vars.insert(
             "VULNERABILITY_DESCRIPTION".to_string(),
             "<vulnerability_description>".to_string(),

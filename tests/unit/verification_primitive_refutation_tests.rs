@@ -322,22 +322,45 @@ fn test_a_function_name_absent_from_the_file_refutes_nothing() {
 }
 
 #[test]
-fn test_a_missing_file_refutes_nothing() {
+fn test_a_missing_file_downgrades_to_needs_review_with_reason() {
+    // An unreadable file is absence of evidence, not evidence of absence.
+    // The finding must not stay Confirmed when the check cannot run.
     let dir = tempfile::tempdir().expect("tmpdir");
-    // No file written.
-    let f = finding(
+    // No file written - path does not exist.
+    let mut f = finding(
         dir.path(),
         "CWE-352: Missing CSRF check on dismiss_pointers()",
         Some(2),
     );
+    // Use a path that definitely does not exist.
+    f.file_path = dir
+        .path()
+        .join("nonexistent.php")
+        .to_string_lossy()
+        .to_string();
 
-    let (status, _) = refute_with_primitive_check(
+    let (status, notes) = refute_with_primitive_check(
         &f,
         VerificationStatus::Confirmed,
         "",
         &primitives(&["check_ajax_referer"]),
     );
-    assert_eq!(status, VerificationStatus::Confirmed);
+
+    // Must not stay Confirmed - the check could not run.
+    assert_eq!(
+        status,
+        VerificationStatus::NeedsReview,
+        "unreadable file must not remain Confirmed, got: {status:?}"
+    );
+    // Reason must name the read failure and the path.
+    assert!(
+        notes.contains("cannot read"),
+        "notes must mention read failure, got: {notes}"
+    );
+    assert!(
+        notes.contains("nonexistent.php"),
+        "notes must name the file, got: {notes}"
+    );
 }
 
 #[test]

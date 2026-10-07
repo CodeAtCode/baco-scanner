@@ -11,6 +11,7 @@
 use baco::error::ScanError;
 use baco::indexer::FileInfo;
 use baco::llm::{ChatMessage, ChatResponseWithModel, LlmChatClient};
+use baco::scanner::phases::llm_phases::static_analysis::next_batch_end;
 use baco::scanner::phases::llm_phases::static_analysis::run_triage_cascade;
 use std::sync::{Arc, Mutex};
 
@@ -267,4 +268,63 @@ async fn test_a_malformed_reply_still_falls_back_to_everything() {
     let (to_analyze, _) = run_triage_cascade(&client, &files, &[], 10, 0.5).await;
 
     assert_eq!(to_analyze.len(), 2, "got {:?}", names_of(&to_analyze));
+}
+/// A batch size of zero must still advance the cursor.
+///
+/// `end = start + batch_size` with a batch size of zero leaves the cursor pinned,
+/// and the sweep then runs forever without ever yielding. `triage.batch_size` is
+/// user-configurable and nothing rejected zero.
+///
+/// This asserts the arithmetic rather than running the sweep. A `while` that never
+/// yields cannot be interrupted by `tokio::time::timeout`, so a test that ran the
+/// loop to observe the hang would take the whole binary down instead of failing —
+/// which is why a mutation run reported this as a 600s timeout rather than a caught
+/// mutant.
+#[test]
+fn a_zero_batch_size_still_advances_the_cursor() {
+    // The cursor must strictly increase or the loop never terminates.
+    assert_eq!(
+        next_batch_end(10, 0, 0),
+        Some(1),
+        "a batch size of zero must degrade to one file per request, not to no progress"
+    );
+    assert_eq!(
+        next_batch_end(10, 5, 0),
+        Some(6),
+        "a zero batch size must keep advancing from any cursor"
+    );
+
+    // Normal sizes still batch.
+    assert_eq!(next_batch_end(10, 0, 4), Some(4));
+    assert_eq!(
+        next_batch_end(10, 8, 4),
+        Some(10),
+        "the last batch is clipped"
+    );
+
+    // And a batch larger than the remainder does not overshoot.
+    assert_eq!(next_batch_end(3, 2, 8), Some(3));
+}
+
+/// Whatever the batch size, a sweep must reach the end and stop.
+#[test]
+fn a_sweep_reaches_the_end_for_every_batch_size() {
+    for batch_size in [0u8, 1, 3, 8, 200] {
+        let total = 17usize;
+        let mut cursor = 0usize;
+        let mut steps = 0usize;
+        while let Some(end) = next_batch_end(total, cursor, batch_size) {
+            assert!(
+                end > cursor,
+                "batch_size {batch_size} left the cursor at {cursor}, so the sweep never ends"
+            );
+            cursor = end;
+            steps += 1;
+            assert!(
+                steps <= total,
+                "batch_size {batch_size} made no progress per file"
+            );
+        }
+        assert_eq!(cursor, total, "batch_size {batch_size} stopped short");
+    }
 }
