@@ -12,6 +12,16 @@ use baco::config::RuleSynthConfig;
 use baco::rulesynth::{RuleError, SemgrepRule, extract_rule_id, parse_yaml_rules};
 use std::path::PathBuf;
 
+// ============================================================================
+// Helper for temp rulesynth paths
+// ============================================================================
+
+fn temp_rulesynth_path(prefix: &str) -> PathBuf {
+    static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    std::env::temp_dir().join(format!("{}-{}-{seq:x}", prefix, std::process::id()))
+}
+
 // Local copy of build_prompt for testing (mirrors src/rulesynth/prompt.rs)
 fn build_prompt(cwe: &str, language: &str, max_rules: usize) -> String {
     format!(
@@ -528,7 +538,7 @@ fn test_rulesynth_config_all_enabled_true() {
 fn test_rulesynth_config_zero_max_rules() {
     let config = RuleSynthConfig {
         enabled: true,
-        output_dir: PathBuf::from("/tmp"),
+        output_dir: temp_rulesynth_path("rules-deep-1"),
         max_rules_per_cwe: 0,
         mocq_mode: false,
         max_iterations: 5,
@@ -542,7 +552,7 @@ fn test_rulesynth_config_zero_max_rules() {
 fn test_rulesynth_config_very_large_max_rules() {
     let config = RuleSynthConfig {
         enabled: true,
-        output_dir: PathBuf::from("/tmp"),
+        output_dir: temp_rulesynth_path("rules-deep-1"),
         max_rules_per_cwe: 10000,
         mocq_mode: false,
         max_iterations: 5,
@@ -797,9 +807,10 @@ rules:
 #[test]
 fn test_config_persistence_simulation() {
     // Test that config can be serialized and used for path construction
+    let expected_output_dir = temp_rulesynth_path("test-rules");
     let config = RuleSynthConfig {
         enabled: true,
-        output_dir: PathBuf::from("/tmp/test_rules"),
+        output_dir: expected_output_dir.clone(),
         max_rules_per_cwe: 3,
         mocq_mode: false,
         max_iterations: 5,
@@ -815,7 +826,7 @@ fn test_config_persistence_simulation() {
 
     assert_eq!(
         filepath,
-        PathBuf::from("/tmp/test_rules/cwe-79-test_python_0.yml")
+        expected_output_dir.join("cwe-79-test_python_0.yml")
     );
 
     // Verify config fields are accessible
@@ -985,9 +996,10 @@ fn test_rulesynth_config_trait_implementations() {
 fn test_rulesynthesizer_new_with_custom_config() {
     // Test RuleSynthesizer construction with custom config
     // max_rules_per_cwe=0 and custom output_dir
+    let expected_output_dir = temp_rulesynth_path("custom-rules-output");
     let config = RuleSynthConfig {
         enabled: true,
-        output_dir: PathBuf::from("/tmp/custom_rules_output"),
+        output_dir: expected_output_dir.clone(),
         max_rules_per_cwe: 0,
         mocq_mode: false,
         max_iterations: 5,
@@ -995,7 +1007,7 @@ fn test_rulesynthesizer_new_with_custom_config() {
     };
 
     assert_eq!(config.max_rules_per_cwe, 0);
-    assert_eq!(config.output_dir, PathBuf::from("/tmp/custom_rules_output"));
+    assert_eq!(config.output_dir, expected_output_dir);
     assert!(config.enabled);
 }
 

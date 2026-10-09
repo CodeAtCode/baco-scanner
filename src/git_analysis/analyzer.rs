@@ -4,7 +4,10 @@ use git2::Repository;
 use std::path::Path;
 
 use crate::analysis_context::AnalysisContext;
-use crate::git_analysis::helpers::{calculate_overall_confidence, get_remote_url, update_context};
+use crate::git_analysis::helpers::{
+    calculate_cwe_refs_modifier, calculate_overall_confidence, calculate_security_commits_modifier,
+    get_remote_url, update_context,
+};
 use crate::git_analysis::models::{
     CommitReference, GitAnalysisResult, GitConfidenceModifier, RiskyCommitPattern,
     RiskyPatternType, VulnerabilityPattern, VulnerabilityPatternType,
@@ -297,7 +300,7 @@ impl GitHistoryAnalyzer {
         let security_commits: Vec<_> = commits.iter().filter(|c| c.is_security_fix).collect();
 
         if !security_commits.is_empty() {
-            let modifier = (security_commits.len() as f32 * 0.05).min(0.2);
+            let modifier = calculate_security_commits_modifier(&commits);
             modifiers.push(GitConfidenceModifier {
                 source: "security_commits".to_string(),
                 modifier,
@@ -329,9 +332,14 @@ impl GitHistoryAnalyzer {
             .collect();
 
         if !cwe_commits.is_empty() {
+            // Same convention as its siblings in helpers.rs: scale per CWE-referencing
+            // commit with a ceiling. This site gave a flat 0.15 for any count, which
+            // made one fix and ten indistinguishable. Unified on the codebase's own
+            // convention — calculate_security_commits_modifier scales the same way —
+            // rather than on preference.
             modifiers.push(GitConfidenceModifier {
                 source: "cwe_references".to_string(),
-                modifier: 0.15,
+                modifier: calculate_cwe_refs_modifier(&commits),
                 reason: "Commits reference CWE vulnerabilities".to_string(),
             });
         }

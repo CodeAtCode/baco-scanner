@@ -65,9 +65,26 @@ mod priority_scoring_tests {
         }
     }
 
+    /// The git_recent_boost applies only when the file's mtime is under seven days
+    /// old, so this needs a real file with a current mtime.
+    ///
+    /// It previously pointed at "src/main.rs" and relied on that repository file
+    /// happening to be recently modified. It passed while that file was fresh and
+    /// started failing eight days after it was last edited, and it would have
+    /// started passing again if the file were touched — the assertion was about the
+    /// checkout, not about the function.
     #[test]
     fn test_entry_point_boost() {
-        let file = make_file_info("src/main.rs", 5000);
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("main.rs");
+        std::fs::write(&path, "fn main() {}").expect("write");
+
+        let file = baco::indexer::FileInfo {
+            path: path.clone(),
+            language: "rust".to_string(),
+            size: 5000,
+            hash: None,
+        };
         let priority = baco::config::PriorityConfig {
             enabled: false,
             git_recent_boost: 2.0,
@@ -77,8 +94,74 @@ mod priority_scoring_tests {
             sink_patterns: vec![],
         };
         let score = compute_file_priority_score(&file, &priority, &HashMap::new());
-        // Multiplicative: 2.0 (git) * 1.5 (entry_point) * 1.2 (small_file) = 3.6
+        // Multiplicative: 2.0 (just written) * 1.5 (entry_point) * 1.2 (small_file)
         assert!((score - 3.6).abs() < 1e-6, "Expected ~3.6, got {}", score);
+    }
+
+    /// The boundary itself. A file older than seven days must not be boosted, and
+    /// this is the case that was broken: the old test only ever saw a file whose
+    /// mtime happened to be recent, so the seven-day threshold was never exercised.
+    /// Without this, widening the threshold to any value still above the file's age
+    /// leaves every other test green.
+    #[test]
+    fn test_a_file_older_than_seven_days_gets_no_git_boost() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("main.rs");
+        std::fs::write(&path, "fn main() {}").expect("write");
+
+        let ten_days = std::time::Duration::from_secs(10 * 24 * 60 * 60);
+        let old = std::time::SystemTime::now() - ten_days;
+        let file = std::fs::File::options()
+            .write(true)
+            .open(&path)
+            .expect("open");
+        file.set_times(std::fs::FileTimes::new().set_modified(old))
+            .expect("set mtime");
+
+        let info = baco::indexer::FileInfo {
+            path,
+            language: "rust".to_string(),
+            size: 5000,
+            hash: None,
+        };
+        let priority = baco::config::PriorityConfig {
+            enabled: false,
+            git_recent_boost: 2.0,
+            entry_point_boost: 1.5,
+            small_file_boost: 1.2,
+            entry_point_patterns: vec![],
+            sink_patterns: vec![],
+        };
+        let score = compute_file_priority_score(&info, &priority, &HashMap::new());
+        assert!(
+            (score - 1.8).abs() < 1e-6,
+            "a ten-day-old file is not a recent change, so it gets no git boost: got {score}"
+        );
+    }
+
+    /// The same file with no existence on disk gets no git boost. Without this the
+    /// first test's 2.0 factor would be indistinguishable from a constant.
+    #[test]
+    fn test_entry_point_boost_without_a_file_gets_no_git_boost() {
+        let file = baco::indexer::FileInfo {
+            path: PathBuf::from("/nonexistent/main.rs"),
+            language: "rust".to_string(),
+            size: 5000,
+            hash: None,
+        };
+        let priority = baco::config::PriorityConfig {
+            enabled: false,
+            git_recent_boost: 2.0,
+            entry_point_boost: 1.5,
+            small_file_boost: 1.2,
+            entry_point_patterns: vec![],
+            sink_patterns: vec![],
+        };
+        let score = compute_file_priority_score(&file, &priority, &HashMap::new());
+        assert!(
+            (score - 1.8).abs() < 1e-6,
+            "a file that is not on disk cannot be recently modified: got {score}"
+        );
     }
 
     #[test]

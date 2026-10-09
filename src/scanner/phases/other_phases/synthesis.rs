@@ -144,6 +144,21 @@ pub async fn run_rule_synthesis(
     Ok((findings, analyzed_files.to_vec()))
 }
 
+/// Record a verified exploit on the finding.
+///
+/// Extracted so it is testable at all: the confirmed branch of `run_exploit_synth`
+/// is unreachable without a sandbox, so a test calling the phase would never
+/// execute the line it is meant to cover.
+///
+/// An existing verdict is left alone rather than overwritten. `ChainRequired`
+/// carries `chain_partner_ids`, and clobbering it would discard the partner list
+/// that chain analysis built.
+pub fn record_confirmed_exploit(finding: &mut crate::findings::VulnerabilityFinding) {
+    if finding.triage_verdict.is_none() {
+        finding.triage_verdict = Some(crate::findings::TriageVerdict::Pass);
+    }
+}
+
 /// Run exploit synthesis phase (phase 22 of 23).
 ///
 /// Generates sandbox-verified exploits for confirmed findings (QRS paper).
@@ -232,9 +247,7 @@ pub async fn run_exploit_synth(
                         1.0,
                         "Exploit synthesized and verified against target".into(),
                     );
-                    if let Some(verdict) = &mut finding.triage_verdict {
-                        let _ = verdict;
-                    }
+                    record_confirmed_exploit(finding);
                 } else {
                     tracing::debug!(
                         "Exploit not confirmed for finding {} (exit_code={}, matched={})",

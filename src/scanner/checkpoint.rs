@@ -170,7 +170,6 @@ pub async fn save_checkpoint(
     findings: &[VulnerabilityFinding],
     analyzed_files: &[String],
     phase: &ScanPhase,
-    metrics_tracker: &crate::llm::metrics::LlmMetricsTracker,
     early_termination_info: Option<EarlyTerminationInfo>,
 ) -> Result<(), String> {
     let scan_id = format!("scan-{}", chrono::Utc::now().format("%Y%m%d-%H%M%S"));
@@ -196,8 +195,6 @@ pub async fn save_checkpoint(
             .unwrap_or_else(|| std::path::Path::new(""))
             .display()
     );
-    #[allow(clippy::needless_borrow)]
-    let _llm_metrics = metrics_tracker.finalize().await;
     #[allow(clippy::needless_borrow)]
     if let Err(e) = crate::report::json::write_findings_json(
         &findings,

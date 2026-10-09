@@ -118,3 +118,10 @@ lto = true
 codegen-units = 1
 strip = true
 panic = "abort"
+
+# Keeps filename and line in panic backtraces while dropping the bulk of the debug
+# info. The test binary was 242M with full debug info, which matters because a
+# mutation-testing run copies the target directory once per parallel job and this
+# repository's target is 9.7G against a 7.7G tmpfs /tmp.
+[profile.test]
+debug = "line-tables-only"

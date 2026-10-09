@@ -17,6 +17,16 @@ use std::path::PathBuf;
 use crate::fixtures::make_finding_report_agg;
 
 // ============================================================================
+// Helper for temp paths
+// ============================================================================
+
+fn temp_orchestrator_path(prefix: &str) -> PathBuf {
+    static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    std::env::temp_dir().join(format!("{}-{}-{seq:x}", prefix, std::process::id()))
+}
+
+// ============================================================================
 // Test Fixtures
 // ============================================================================
 
@@ -90,7 +100,7 @@ fn create_test_finding(title: &str, severity: Severity) -> VulnerabilityFinding 
 }
 
 fn get_temp_checkpoint_path(test_name: &str) -> PathBuf {
-    PathBuf::from(format!("/tmp/baco_orchestrator_test_{}.json", test_name))
+    temp_orchestrator_path(&format!("checkpoint_{}", test_name))
 }
 
 fn cleanup_checkpoint(test_name: &str) {
@@ -105,7 +115,7 @@ fn cleanup_checkpoint(test_name: &str) {
 #[test]
 fn test_scanner_construction_with_force_true() {
     let config = create_test_scanner_config();
-    let target_path = PathBuf::from("/tmp");
+    let target_path = temp_orchestrator_path("orch-test-force-true");
     let force = true;
 
     let scanner = Scanner::new(config, target_path, force);
@@ -118,7 +128,7 @@ fn test_scanner_construction_with_force_true() {
 #[test]
 fn test_scanner_construction_with_force_false() {
     let config = create_test_scanner_config();
-    let target_path = PathBuf::from("/tmp");
+    let target_path = temp_orchestrator_path("orch-test-force-false");
     let force = false;
 
     let scanner = Scanner::new(config, target_path, force);
@@ -134,18 +144,24 @@ fn test_scanner_construction_with_force_false() {
 
 #[test]
 fn test_force_flag_ignores_existing_checkpoint() {
-    let output_dir = PathBuf::from("/tmp/test_output_force_ignores");
+    let output_dir = temp_orchestrator_path("test_output_force_ignores");
     let _ = fs::remove_dir_all(&output_dir);
     fs::create_dir_all(&output_dir).unwrap();
     let checkpoint_path = output_dir.join("checkpoint.json");
 
-    let checkpoint = Checkpoint::new("test-force-scan", "/tmp/test-project", chrono::Utc::now());
+    let checkpoint = Checkpoint::new(
+        "test-force-scan",
+        temp_orchestrator_path("force-scan-project")
+            .to_str()
+            .unwrap(),
+        chrono::Utc::now(),
+    );
     checkpoint.save(checkpoint_path.to_str().unwrap()).unwrap();
     assert!(checkpoint_path.exists());
 
     let mut config = create_test_scanner_config();
     config.output.dir = output_dir.to_string_lossy().to_string();
-    let scanner = Scanner::new(config, PathBuf::from("/tmp"), true);
+    let scanner = Scanner::new(config, temp_orchestrator_path("force-ignores"), true);
 
     assert!(scanner.checkpoint_path.exists());
     assert_eq!(scanner.checkpoint_path, checkpoint_path);
@@ -155,13 +171,13 @@ fn test_force_flag_ignores_existing_checkpoint() {
 
 #[test]
 fn test_force_false_with_no_checkpoint_starts_fresh() {
-    let output_dir = PathBuf::from("/tmp/test_output_force_no_checkpoint");
+    let output_dir = temp_orchestrator_path("test_output_force_no_checkpoint");
     let _ = fs::remove_dir_all(&output_dir);
     fs::create_dir_all(&output_dir).unwrap();
 
     let mut config = create_test_scanner_config();
     config.output.dir = output_dir.to_string_lossy().to_string();
-    let scanner = Scanner::new(config, PathBuf::from("/tmp"), false);
+    let scanner = Scanner::new(config, temp_orchestrator_path("force-false"), false);
 
     assert!(!scanner.checkpoint_path.exists());
     assert!(scanner.checkpoint_path.parent().is_some());
@@ -178,8 +194,13 @@ fn test_checkpoint_resume_loads_completed_phases() {
     cleanup_checkpoint("resume_completed");
     let temp_path = get_temp_checkpoint_path("resume_completed");
 
-    let mut checkpoint =
-        Checkpoint::new("test-resume-scan", "/tmp/test-project", chrono::Utc::now());
+    let mut checkpoint = Checkpoint::new(
+        "test-resume-scan",
+        temp_orchestrator_path("resume-scan-project")
+            .to_str()
+            .unwrap(),
+        chrono::Utc::now(),
+    );
     checkpoint.current_phase = ScanPhase::LlmStaticAnalysis;
     checkpoint.completed_phases.push(ScanPhase::Indexing);
     checkpoint.completed_phases.push(ScanPhase::Semgrep);
@@ -215,7 +236,9 @@ fn test_checkpoint_resume_loads_analyzed_files() {
 
     let mut checkpoint = Checkpoint::new(
         "test-analyzed-scan",
-        "/tmp/test-project",
+        temp_orchestrator_path("analyzed-scan-project")
+            .to_str()
+            .unwrap(),
         chrono::Utc::now(),
     );
     checkpoint.analyzed_files.push("src/main.rs".to_string());
@@ -243,7 +266,9 @@ fn test_complete_phase_checkpoint_returns_findings_without_running() {
 
     let mut checkpoint = Checkpoint::new(
         "test-complete-scan",
-        "/tmp/test-project",
+        temp_orchestrator_path("complete-scan-project")
+            .to_str()
+            .unwrap(),
         chrono::Utc::now(),
     );
     checkpoint.current_phase = ScanPhase::Reporting;
@@ -282,7 +307,7 @@ fn test_complete_phase_checkpoint_returns_findings_without_running() {
 #[test]
 fn test_scanner_state_findings_updated_via_send_modify() {
     let config = create_test_scanner_config();
-    let scanner = Scanner::new(config, PathBuf::from("/tmp"), false);
+    let scanner = Scanner::new(config, temp_orchestrator_path("state-findings"), false);
 
     assert!(scanner.state.borrow().findings.is_empty());
 
@@ -305,7 +330,7 @@ fn test_scanner_state_findings_updated_via_send_modify() {
 #[test]
 fn test_scanner_state_phase_updates() {
     let config = create_test_scanner_config();
-    let scanner = Scanner::new(config, PathBuf::from("/tmp"), false);
+    let scanner = Scanner::new(config, temp_orchestrator_path("state-phase"), false);
 
     scanner.state.send_modify(|s| {
         s.current_phase = ScanPhase::LlmStaticAnalysis;
@@ -340,7 +365,7 @@ fn test_early_termination_threshold_config() {
 
     assert_eq!(config.scanner.performance.early_termination_threshold, 5.0);
 
-    let scanner = Scanner::new(config, PathBuf::from("/tmp"), false);
+    let scanner = Scanner::new(config, temp_orchestrator_path("threshold-config"), false);
 
     let threshold = scanner
         .config
@@ -355,7 +380,7 @@ fn test_early_termination_threshold_zero_disables() {
     let mut config = create_test_scanner_config();
     config.scanner.performance.early_termination_threshold = 0.0;
 
-    let scanner = Scanner::new(config, PathBuf::from("/tmp"), false);
+    let scanner = Scanner::new(config, temp_orchestrator_path("threshold-zero"), false);
 
     let threshold = scanner
         .config
@@ -370,7 +395,7 @@ fn test_early_termination_threshold_large_value() {
     let mut config = create_test_scanner_config();
     config.scanner.performance.early_termination_threshold = 10000.0;
 
-    let scanner = Scanner::new(config, PathBuf::from("/tmp"), false);
+    let scanner = Scanner::new(config, temp_orchestrator_path("threshold-large"), false);
 
     let threshold = scanner
         .config
@@ -388,10 +413,11 @@ fn test_early_termination_threshold_large_value() {
 fn test_checkpoint_save_and_load_roundtrip() {
     cleanup_checkpoint("roundtrip");
     let temp_path = get_temp_checkpoint_path("roundtrip");
+    let project_path = temp_orchestrator_path("roundtrip-project");
 
     let mut checkpoint = Checkpoint::new(
         "roundtrip-test",
-        "/tmp/roundtrip-project",
+        project_path.to_str().unwrap(),
         chrono::Utc::now(),
     );
     checkpoint.current_phase = ScanPhase::Semgrep;
@@ -409,7 +435,7 @@ fn test_checkpoint_save_and_load_roundtrip() {
     let loaded = Checkpoint::load(temp_path.to_str().unwrap()).unwrap();
 
     assert_eq!(loaded.scan_id, "roundtrip-test");
-    assert_eq!(loaded.project_path, "/tmp/roundtrip-project");
+    assert_eq!(loaded.project_path, project_path.to_str().unwrap());
     assert_eq!(loaded.current_phase, ScanPhase::Semgrep);
     assert_eq!(loaded.file_count, 150);
     assert_eq!(loaded.findings_so_far.len(), 1);
@@ -425,8 +451,11 @@ fn test_checkpoint_with_multiple_completed_phases() {
     cleanup_checkpoint("multi_phases");
     let temp_path = get_temp_checkpoint_path("multi_phases");
 
-    let mut checkpoint =
-        Checkpoint::new("multi-phase-test", "/tmp/multi-project", chrono::Utc::now());
+    let mut checkpoint = Checkpoint::new(
+        "multi-phase-test",
+        temp_orchestrator_path("multi-project").to_str().unwrap(),
+        chrono::Utc::now(),
+    );
     checkpoint.current_phase = ScanPhase::CrossFileAnalysis;
 
     checkpoint.completed_phases = vec![
@@ -456,7 +485,7 @@ fn test_checkpoint_with_multiple_completed_phases() {
 #[test]
 fn test_scanner_state_initial_values() {
     let config = create_test_scanner_config();
-    let scanner = Scanner::new(config, PathBuf::from("/tmp"), false);
+    let scanner = Scanner::new(config, temp_orchestrator_path("state-initial"), false);
 
     let state = scanner.state.borrow();
 
@@ -467,7 +496,7 @@ fn test_scanner_state_initial_values() {
 #[test]
 fn test_scanner_state_multiple_modifications() {
     let config = create_test_scanner_config();
-    let scanner = Scanner::new(config, PathBuf::from("/tmp"), false);
+    let scanner = Scanner::new(config, temp_orchestrator_path("state-multi"), false);
 
     scanner.state.send_modify(|s| {
         s.current_phase = ScanPhase::Indexing;
@@ -516,7 +545,7 @@ fn test_scanner_config_custom_performance_settings() {
 
 #[test]
 fn test_run_scanner_with_complete_checkpoint_exits_early() {
-    let output_dir = PathBuf::from("/tmp/test_output_complete_exit");
+    let output_dir = temp_orchestrator_path("test_output_complete_exit");
     let _ = fs::remove_dir_all(&output_dir);
     fs::create_dir_all(&output_dir).unwrap();
     let checkpoint_path = output_dir.join("checkpoint.json");
@@ -524,7 +553,9 @@ fn test_run_scanner_with_complete_checkpoint_exits_early() {
     // Create a checkpoint with Reporting phase completed
     let mut checkpoint = Checkpoint::new(
         "test-complete-exit",
-        "/tmp/test-project",
+        temp_orchestrator_path("complete-exit-project")
+            .to_str()
+            .unwrap(),
         chrono::Utc::now(),
     );
     checkpoint.current_phase = ScanPhase::Reporting;
@@ -540,7 +571,7 @@ fn test_run_scanner_with_complete_checkpoint_exits_early() {
     config.output.dir = output_dir.to_string_lossy().to_string();
 
     // Create scanner with force=false
-    let scanner = Scanner::new(config, PathBuf::from("/tmp"), false);
+    let scanner = Scanner::new(config, temp_orchestrator_path("complete-exit"), false);
 
     // Verify checkpoint path matches
     assert_eq!(scanner.checkpoint_path, checkpoint_path);
@@ -559,14 +590,19 @@ fn test_run_scanner_with_complete_checkpoint_exits_early() {
 
 #[test]
 fn test_run_scanner_force_ignores_checkpoint() {
-    let output_dir = PathBuf::from("/tmp/test_output_force_ignore");
+    let output_dir = temp_orchestrator_path("test_output_force_ignore");
     let _ = fs::remove_dir_all(&output_dir);
     fs::create_dir_all(&output_dir).unwrap();
     let checkpoint_path = output_dir.join("checkpoint.json");
 
     // Create a checkpoint with Reporting phase completed
-    let mut checkpoint =
-        Checkpoint::new("test-force-ignore", "/tmp/test-project", chrono::Utc::now());
+    let mut checkpoint = Checkpoint::new(
+        "test-force-ignore",
+        temp_orchestrator_path("force-ignore-project")
+            .to_str()
+            .unwrap(),
+        chrono::Utc::now(),
+    );
     checkpoint.current_phase = ScanPhase::Reporting;
     checkpoint.completed_phases.push(ScanPhase::Reporting);
 
@@ -577,7 +613,7 @@ fn test_run_scanner_force_ignores_checkpoint() {
     config.output.dir = output_dir.to_string_lossy().to_string();
 
     // Create scanner with force=true
-    let scanner = Scanner::new(config, PathBuf::from("/tmp"), true);
+    let scanner = Scanner::new(config, temp_orchestrator_path("force-ignore"), true);
 
     // With force=true, the scanner should still have the checkpoint path
     // but will ignore it during execution
@@ -592,14 +628,14 @@ fn test_run_scanner_force_ignores_checkpoint() {
 
 #[test]
 fn test_run_scanner_creates_checkpoint() {
-    let output_dir = PathBuf::from("/tmp/test_output_creates_checkpoint");
+    let output_dir = temp_orchestrator_path("test_output_creates_checkpoint");
     let _ = fs::remove_dir_all(&output_dir);
     fs::create_dir_all(&output_dir).unwrap();
 
     let mut config = create_test_scanner_config();
     config.output.dir = output_dir.to_string_lossy().to_string();
 
-    let scanner = Scanner::new(config, PathBuf::from("/tmp"), false);
+    let scanner = Scanner::new(config, temp_orchestrator_path("creates-checkpoint"), false);
 
     // Verify checkpoint path is set correctly
     assert!(scanner.checkpoint_path.parent().is_some());
@@ -623,7 +659,7 @@ fn test_run_scanner_creates_checkpoint() {
 #[test]
 fn test_run_scanner_propagates_findings() {
     let config = create_test_scanner_config();
-    let scanner = Scanner::new(config, PathBuf::from("/tmp"), false);
+    let scanner = Scanner::new(config, temp_orchestrator_path("propagate-findings"), false);
 
     // Verify initial state has no findings
     assert!(scanner.state.borrow().findings.is_empty());

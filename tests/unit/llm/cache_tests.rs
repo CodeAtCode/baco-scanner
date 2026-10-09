@@ -31,9 +31,12 @@ fn test_compute_cache_key_different_inputs() {
 
 #[test]
 fn test_cache_file_path() {
-    let dir = PathBuf::from("/tmp/cache");
+    let dir = TempDir::new()
+        .expect("Failed to create temp dir")
+        .path()
+        .to_path_buf();
     let path = cache_file_path(&dir, "abc123");
-    assert_eq!(path, PathBuf::from("/tmp/cache/abc123.json"));
+    assert_eq!(path, dir.join("abc123.json"));
 }
 
 // ============================================================================

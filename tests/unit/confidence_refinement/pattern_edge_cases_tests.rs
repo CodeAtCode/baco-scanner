@@ -11,8 +11,9 @@
 //! - Overlapping pattern matches
 
 use baco::analysis_context::AnalysisContext;
-use baco::confidence_refinement::{ConfidenceRefinementPhase, HistoricalData};
+use baco::confidence_refinement::ConfidenceRefinementPhase;
 use baco::findings::{Severity, VerificationStatus};
+use baco::historical_patterns::HistoricalData;
 use baco::phase::helpers::create_finding_with_params;
 
 /// Creates a finding with custom parameters for pattern tests

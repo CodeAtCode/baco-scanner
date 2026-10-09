@@ -9,7 +9,7 @@
 //! - Drop implementation (auto-cleanup)
 //! - Field accessors
 
-use baco::staging::core::StagingArea;
+use baco::staging::core::new_for_tests_with_created;
 use baco::staging::error::StagingError;
 use std::path::PathBuf;
 
@@ -34,27 +34,20 @@ fn create_temp_path(prefix: &str) -> PathBuf {
 
 #[test]
 fn test_staging_area_struct_fields() {
-    // Verify the struct has the expected fields
-    let temp_path = create_temp_path("test-repo");
-    let worktree_path = create_temp_path("staging-test");
-    let staging = StagingArea {
-        worktree_path: worktree_path.clone(),
-        original_repo_path: temp_path.clone(),
-        is_created: false,
-    };
+    // Verify the struct has the expected fields via accessors
+    let staging = new_for_tests_with_created(false);
 
-    assert_eq!(staging.worktree_path, worktree_path);
-    assert_eq!(staging.original_repo_path, temp_path);
-    assert!(!staging.is_created);
+    assert!(!staging.is_created());
+    // Worktree path is derived internally under temp_dir
+    assert!(staging.worktree_path().starts_with(std::env::temp_dir()));
+    // Verify the path contains the expected prefix
+    let path_str = staging.worktree_path().to_string_lossy();
+    assert!(path_str.contains("baco-staging-"));
 }
 
 #[test]
 fn test_staging_area_not_created_error() {
-    let mut staging = StagingArea {
-        worktree_path: create_temp_path("staging-test"),
-        original_repo_path: create_temp_path("test-repo"),
-        is_created: false,
-    };
+    let mut staging = new_for_tests_with_created(false);
 
     // Test apply_patch with is_created = false
     let result = staging.apply_patch("test diff");
@@ -87,50 +80,39 @@ fn test_staging_area_not_created_error() {
 
 #[test]
 fn test_staging_area_rollback_not_created() {
-    let mut staging = StagingArea {
-        worktree_path: create_temp_path("staging-test"),
-        original_repo_path: create_temp_path("test-repo"),
-        is_created: false,
-    };
+    let mut staging = new_for_tests_with_created(false);
 
     // Rollback when not created should succeed without doing anything
     let result = staging.rollback();
     assert!(result.is_ok());
-    assert!(!staging.is_created);
+    assert!(!staging.is_created());
 }
 
 #[test]
 fn test_patch_path_construction() {
-    let worktree_path = create_temp_path("staging-test");
-    let staging = StagingArea {
-        worktree_path: worktree_path.clone(),
-        original_repo_path: create_temp_path("test-repo"),
-        is_created: true,
-    };
+    let staging = new_for_tests_with_created(true);
 
     // Verify patch path would be constructed correctly
-    let expected_patch_path = staging.worktree_path.join("patch.diff");
-    assert_eq!(expected_patch_path, worktree_path.join("patch.diff"));
+    let expected_patch_path = staging.worktree_path().join("patch.diff");
+    // Assert exact parent directory matches worktree path
+    assert_eq!(expected_patch_path.parent(), Some(staging.worktree_path()));
+    // Assert exact file name
+    assert_eq!(expected_patch_path.file_name().unwrap(), "patch.diff");
 }
 
 #[test]
 fn test_staging_area_drop_cleanup() {
     // Create a staging area that will be dropped
     {
-        let mut staging = StagingArea {
-            worktree_path: create_temp_path("staging-drop-test"),
-            original_repo_path: create_temp_path("test-repo"),
-            is_created: true,
-        };
+        let mut staging = new_for_tests_with_created(true);
 
         // Verify it's created
-        assert!(staging.is_created);
+        assert!(staging.is_created());
 
         // Cleanup is called - the flag should be reset regardless of actual git operation result
-        // Capture the cleanup result but the key assertion is that is_created becomes false
         let _ = staging.cleanup();
         assert!(
-            !staging.is_created,
+            !staging.is_created(),
             "is_created should be false after cleanup"
         );
     }
@@ -152,92 +134,65 @@ fn test_staging_area_temp_dir_path() {
 
 #[test]
 fn test_cleanup_when_not_created_returns_ok() {
-    let mut staging = StagingArea {
-        worktree_path: create_temp_path("staging-test"),
-        original_repo_path: create_temp_path("test-repo"),
-        is_created: false,
-    };
+    let mut staging = new_for_tests_with_created(false);
 
     let result = staging.cleanup();
     assert!(result.is_ok());
-    assert!(!staging.is_created);
+    assert!(!staging.is_created());
 }
 
 #[test]
 fn test_rollback_when_created_calls_cleanup() {
-    let mut staging = StagingArea {
-        worktree_path: create_temp_path("staging-rollback-test"),
-        original_repo_path: create_temp_path("test-repo"),
-        is_created: true,
-    };
+    let mut staging = new_for_tests_with_created(true);
 
     // Rollback when created should attempt reset and cleanup
     let _result = staging.rollback();
-    assert!(!staging.is_created);
+    assert!(!staging.is_created());
 }
 
 #[test]
 fn test_staging_area_worktree_path_accessor() {
-    let staging = StagingArea {
-        worktree_path: PathBuf::from("/tmp/my-staging"),
-        original_repo_path: PathBuf::from("/tmp/repo"),
-        is_created: true,
-    };
-
-    assert_eq!(staging.worktree_path, PathBuf::from("/tmp/my-staging"));
+    // Verify worktree_path accessor returns a path under temp_dir
+    let staging = new_for_tests_with_created(true);
+    assert!(staging.worktree_path().starts_with(std::env::temp_dir()));
 }
 
 #[test]
 fn test_staging_area_original_repo_path_accessor() {
-    let staging = StagingArea {
-        worktree_path: PathBuf::from("/tmp/staging"),
-        original_repo_path: PathBuf::from("/tmp/original-repo"),
-        is_created: true,
-    };
+    let staging = new_for_tests_with_created(true);
 
-    assert_eq!(
-        staging.original_repo_path,
-        PathBuf::from("/tmp/original-repo")
-    );
+    // original_repo_path is a placeholder from new_for_tests_with_created()
+    // Verify it's under temp_dir and has the expected structure
+    let path = staging.original_repo_path();
+    assert!(path.starts_with(std::env::temp_dir()));
+    assert!(path.to_string_lossy().contains("test-repo-placeholder"));
 }
 
 #[test]
 fn test_apply_patch_writes_to_correct_path() {
-    let staging = StagingArea {
-        worktree_path: PathBuf::from("/tmp/patch-test"),
-        original_repo_path: PathBuf::from("/tmp/repo"),
-        is_created: true,
-    };
+    let staging = new_for_tests_with_created(true);
 
-    let expected_patch_path = staging.worktree_path.join("patch.diff");
-    assert_eq!(
-        expected_patch_path.to_str().unwrap(),
-        "/tmp/patch-test/patch.diff"
-    );
+    let expected_patch_path = staging.worktree_path().join("patch.diff");
+    // Assert exact parent directory matches worktree path
+    assert_eq!(expected_patch_path.parent(), Some(staging.worktree_path()));
+    // Assert exact file name
+    assert_eq!(expected_patch_path.file_name().unwrap(), "patch.diff");
 }
 
 #[test]
 fn test_cleanup_sets_is_created_to_false() {
-    let mut staging = StagingArea {
-        worktree_path: PathBuf::from("/tmp/cleanup-test"),
-        original_repo_path: PathBuf::from("/tmp/repo"),
-        is_created: true,
-    };
+    let mut staging = new_for_tests_with_created(true);
 
     let _ = staging.cleanup();
-    assert!(!staging.is_created);
+    assert!(!staging.is_created());
 }
 
 #[test]
 fn test_rollback_resets_is_created_flag() {
-    let mut staging = StagingArea {
-        worktree_path: PathBuf::from("/tmp/rollback-flag-test"),
-        original_repo_path: PathBuf::from("/tmp/repo"),
-        is_created: true,
-    };
+    let mut staging = new_for_tests_with_created(true);
 
     let _ = staging.rollback();
-    assert!(!staging.is_created);
+    assert!(!staging.is_created());
 }
 
 #[test]
@@ -245,30 +200,18 @@ fn test_drop_implements_auto_cleanup() {
     // Verify Drop trait is implemented by checking the impl exists
     // The actual cleanup behavior is tested via cleanup()
     // StagingArea implements Drop for auto-cleanup
-    let staging = StagingArea {
-        worktree_path: PathBuf::from("/tmp"),
-        original_repo_path: PathBuf::from("/tmp"),
-        is_created: false,
-    };
+    let staging = new_for_tests_with_created(false);
     // Verify staging area was created
-    assert!(!staging.is_created);
+    assert!(!staging.is_created());
 }
 
 #[test]
 fn test_staging_area_is_created_field_access() {
-    let staging_not_created = StagingArea {
-        worktree_path: PathBuf::from("/tmp"),
-        original_repo_path: PathBuf::from("/tmp"),
-        is_created: false,
-    };
-    assert!(!staging_not_created.is_created);
+    let staging_not_created = new_for_tests_with_created(false);
+    assert!(!staging_not_created.is_created());
 
-    let staging_created = StagingArea {
-        worktree_path: PathBuf::from("/tmp"),
-        original_repo_path: PathBuf::from("/tmp"),
-        is_created: true,
-    };
-    assert!(staging_created.is_created);
+    let staging_created = new_for_tests_with_created(true);
+    assert!(staging_created.is_created());
 }
 // ============================================================================
 // Additional Tests: Path Normalization, Patch Decision Logic
@@ -295,19 +238,15 @@ fn test_staging_area_path_contains_process_id() {
 
 #[test]
 fn test_apply_patch_to_worktree_path_construction() {
-    let worktree_path = PathBuf::from("/tmp/test-worktree");
+    let worktree_path = create_temp_path("test-worktree");
     let patch_path = worktree_path.join("patch.diff");
 
-    assert_eq!(patch_path, PathBuf::from("/tmp/test-worktree/patch.diff"));
+    assert_eq!(patch_path, worktree_path.join("patch.diff"));
 }
 
 #[test]
 fn test_staging_area_cleanup_idempotent() {
-    let mut staging = StagingArea {
-        worktree_path: PathBuf::from("/tmp/cleanup-idempotent"),
-        original_repo_path: PathBuf::from("/tmp/repo"),
-        is_created: false,
-    };
+    let mut staging = new_for_tests_with_created(false);
 
     // Cleanup when not created should succeed
     let result1 = staging.cleanup();
@@ -320,11 +259,7 @@ fn test_staging_area_cleanup_idempotent() {
 
 #[test]
 fn test_staging_area_rollback_idempotent() {
-    let mut staging = StagingArea {
-        worktree_path: PathBuf::from("/tmp/rollback-idempotent"),
-        original_repo_path: PathBuf::from("/tmp/repo"),
-        is_created: false,
-    };
+    let mut staging = new_for_tests_with_created(false);
 
     // Rollback when not created should succeed
     let result1 = staging.rollback();
@@ -345,12 +280,11 @@ fn test_staging_worktree_path_temp_directory() {
 
 #[test]
 fn test_staging_area_original_repo_preserved() {
-    let original_path = PathBuf::from("/original/repo/path");
-    let staging = StagingArea {
-        worktree_path: PathBuf::from("/tmp/worktree"),
-        original_repo_path: original_path.clone(),
-        is_created: true,
-    };
+    let staging = new_for_tests_with_created(true);
 
-    assert_eq!(staging.original_repo_path, original_path);
+    // original_repo_path is a placeholder from new_for_tests_with_created()
+    // Verify it's under temp_dir and has the expected structure
+    let path = staging.original_repo_path();
+    assert!(path.starts_with(std::env::temp_dir()));
+    assert!(path.to_string_lossy().contains("test-repo-placeholder"));
 }

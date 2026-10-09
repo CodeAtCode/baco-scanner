@@ -914,7 +914,11 @@ fn volatile_tail_early_line_reads_from_file_start() {
     let finding = make_finding("1", "Test", path.to_str().unwrap(), Some(3), Severity::Low);
     let tail = build_volatile_verification_tail(&[finding], &std::collections::HashMap::new());
     assert!(tail.contains("Code context"));
-    assert!(tail.contains("1:"));
+    // Helper format is "    N: content" or " >> N: content" with pipe separator
+    assert!(
+        tail.contains("1 |"),
+        "Should show line 1 with helper's pipe format"
+    );
 }
 
 #[test]

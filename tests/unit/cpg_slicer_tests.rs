@@ -5,6 +5,16 @@
 use baco::cpg::{CpgEngine, CpgError, CpgHandle, QueryResult};
 use std::path::{Path, PathBuf};
 
+// ============================================================================
+// Helper for temp CPG paths
+// ============================================================================
+
+fn temp_cpg_path(prefix: &str) -> PathBuf {
+    static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    std::env::temp_dir().join(format!("{}-{}-{seq:x}", prefix, std::process::id()))
+}
+
 /// Mock CPG engine for testing
 struct MockCpgEngine {
     available: bool,
@@ -147,7 +157,7 @@ fn test_extract_slice_from_result_with_filename() {
     let slicer = baco::cpg::CpgSlicer::new(&engine);
 
     let cpg = CpgHandle {
-        workspace: std::path::PathBuf::from("/tmp/workspace"),
+        workspace: temp_cpg_path("cpg-slicer-workspace"),
         cpg_path: std::path::PathBuf::new(),
     };
 
@@ -256,7 +266,7 @@ fn test_read_source_from_cpg_with_nonexistent_filename_returns_empty() {
     let slicer = baco::cpg::CpgSlicer::new(&engine);
 
     let cpg = CpgHandle {
-        workspace: std::path::PathBuf::from("/tmp/workspace"),
+        workspace: temp_cpg_path("cpg-slicer-workspace"),
         cpg_path: PathBuf::new(),
     };
 

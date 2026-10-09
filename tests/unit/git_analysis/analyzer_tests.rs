@@ -259,6 +259,121 @@ fn test_generate_confidence_scores_with_security_commits() {
 }
 
 #[test]
+fn test_generate_confidence_scores_security_commits_exact_value() {
+    // Test exact security commits contribution: 0.05 per commit, capped at 0.2
+    // After unification, this uses the same formula as helpers.rs
+
+    let tmp_dir = TempDir::new().expect("Failed to create temp dir");
+    let repo_path = tmp_dir.path();
+
+    // Initialize git repo
+    let repo = git2::Repository::init(repo_path).expect("Failed to init repo");
+
+    // Create a test file
+    let test_file = repo_path.join("test.txt");
+    fs::write(&test_file, "initial content\n").expect("Failed to write test file");
+
+    let signature =
+        git2::Signature::now("Test User", "test@example.com").expect("Failed to create signature");
+
+    // Create 1 security commit
+    let mut index = repo.index().expect("Failed to get index");
+    index
+        .add_path(Path::new("test.txt"))
+        .expect("Failed to add file");
+    index.write().expect("Failed to write index");
+    let tree_id = index.write_tree().expect("Failed to write tree");
+    let tree = repo.find_tree(tree_id).expect("Failed to find tree");
+    repo.commit(
+        Some("HEAD"),
+        &signature,
+        &signature,
+        "Fix security issue",
+        &tree,
+        &[],
+    )
+    .expect("Failed to create commit");
+
+    let analyzer = GitHistoryAnalyzer::new(repo_path.to_string_lossy().as_ref())
+        .expect("Failed to create analyzer");
+
+    let modifiers = analyzer
+        .generate_confidence_scores("test.txt")
+        .expect("Failed to generate confidence scores");
+
+    // Find security_commits modifier
+    let security_modifier = modifiers
+        .iter()
+        .find(|m| m.source == "security_commits")
+        .expect("Should have security_commits modifier");
+
+    // With 1 security commit: 0.05 * 1 = 0.05
+    assert!(
+        (security_modifier.modifier - 0.05).abs() < 0.001,
+        "1 security commit should give modifier 0.05, got {}",
+        security_modifier.modifier
+    );
+}
+
+#[test]
+fn test_generate_confidence_scores_cwe_refs_exact_value() {
+    // Test CWE refs contribution - flat bonus, deliberately divergent from helpers.rs
+
+    let tmp_dir = TempDir::new().expect("Failed to create temp dir");
+    let repo_path = tmp_dir.path();
+
+    // Initialize git repo
+    let repo = git2::Repository::init(repo_path).expect("Failed to init repo");
+
+    // Create a test file
+    let test_file = repo_path.join("test.txt");
+    fs::write(&test_file, "initial content\n").expect("Failed to write test file");
+
+    let signature =
+        git2::Signature::now("Test User", "test@example.com").expect("Failed to create signature");
+
+    // Create 1 commit with CWE reference
+    let mut index = repo.index().expect("Failed to get index");
+    index
+        .add_path(Path::new("test.txt"))
+        .expect("Failed to add file");
+    index.write().expect("Failed to write index");
+    let tree_id = index.write_tree().expect("Failed to write tree");
+    let tree = repo.find_tree(tree_id).expect("Failed to find tree");
+    repo.commit(
+        Some("HEAD"),
+        &signature,
+        &signature,
+        "Fix CWE-79 XSS",
+        &tree,
+        &[],
+    )
+    .expect("Failed to create commit");
+
+    let analyzer = GitHistoryAnalyzer::new(repo_path.to_string_lossy().as_ref())
+        .expect("Failed to create analyzer");
+
+    let modifiers = analyzer
+        .generate_confidence_scores("test.txt")
+        .expect("Failed to generate confidence scores");
+
+    // Find cwe_references modifier
+    let cwe_modifier = modifiers
+        .iter()
+        .find(|m| m.source == "cwe_references")
+        .expect("Should have cwe_references modifier");
+
+    // Both code paths now hold the same formula: scale 0.05 per CWE-referencing
+    // commit, capped at 0.15, matching calculate_security_commits_modifier. One
+    // commit gives 0.05.
+    assert!(
+        (cwe_modifier.modifier - 0.05).abs() < 0.001,
+        "1 CWE commit should give modifier 0.05, got {}",
+        cwe_modifier.modifier
+    );
+}
+
+#[test]
 fn test_analyze_full_result() {
     let tmp_dir = setup_test_repo();
     let repo_path = tmp_dir.path().to_string_lossy().to_string();

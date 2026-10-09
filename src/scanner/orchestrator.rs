@@ -400,7 +400,6 @@ async fn run_parallel_phases(
             &findings,
             &analyzed_files,
             &ScanPhase::LlmStaticAnalysis,
-            &scanner.metrics_tracker,
             Some(et_info),
         )
         .await
@@ -421,7 +420,6 @@ async fn run_parallel_phases(
         &findings,
         &analyzed_files,
         &ScanPhase::LlmStaticAnalysis,
-        &scanner.metrics_tracker,
         None,
     )
     .await
@@ -478,7 +476,6 @@ async fn run_sequential_phases(
                 &findings,
                 &analyzed_files,
                 phase,
-                &scanner.metrics_tracker,
                 None,
             )
             .await
@@ -666,7 +663,6 @@ async fn run_sequential_phases(
                 &findings,
                 &analyzed_files,
                 phase,
-                &scanner.metrics_tracker,
                 Some(et_info),
             )
             .await
@@ -687,7 +683,6 @@ async fn run_sequential_phases(
             &findings,
             &analyzed_files,
             phase,
-            &scanner.metrics_tracker,
             None,
         )
         .await

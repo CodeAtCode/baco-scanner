@@ -17,18 +17,29 @@ use baco::staging::error::PatchValidationResult;
 use std::path::PathBuf;
 
 // ============================================================================
+// Helper for temp repo path
+// ============================================================================
+
+fn temp_repo_path() -> PathBuf {
+    static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    std::env::temp_dir().join(format!("baco-compiler-test-{}-{seq:x}", std::process::id()))
+}
+
+// ============================================================================
 // AutoPatcher Tests
 // ============================================================================
 
 #[test]
 fn test_auto_patcher_creation() {
-    let patcher = AutoPatcher::new(PathBuf::from("/tmp/test-repo"));
-    assert_eq!(patcher.repo_path, PathBuf::from("/tmp/test-repo"));
+    let expected_path = temp_repo_path();
+    let patcher = AutoPatcher::new(expected_path.clone());
+    assert_eq!(patcher.repo_path, expected_path);
 }
 
 #[tokio::test]
 async fn test_generate_patch_returns_no_llm_client_error() {
-    let patcher = AutoPatcher::new(PathBuf::from("/tmp/test-repo"));
+    let patcher = AutoPatcher::new(temp_repo_path());
 
     let result = patcher
         .generate_patch("test vulnerability", "unsafe code here", "src/test.rs")
@@ -44,7 +55,7 @@ async fn test_generate_patch_returns_no_llm_client_error() {
 
 #[tokio::test]
 async fn test_generate_patch_file_path_in_error() {
-    let patcher = AutoPatcher::new(PathBuf::from("/tmp/test-repo"));
+    let patcher = AutoPatcher::new(temp_repo_path());
 
     let result = patcher.generate_patch("desc", "code", "lib/utils.rs").await;
 
@@ -58,7 +69,7 @@ async fn test_generate_patch_file_path_in_error() {
 
 #[test]
 fn test_format_patch_report_validated() {
-    let patcher = AutoPatcher::new(PathBuf::from("/tmp/test-repo"));
+    let patcher = AutoPatcher::new(temp_repo_path());
 
     let candidate = PatchCandidate::new("test diff", "src/test.rs");
     let validation = PatchValidationResult {
@@ -78,7 +89,7 @@ fn test_format_patch_report_validated() {
 
 #[test]
 fn test_format_patch_report_compiles_but_tests_failed() {
-    let patcher = AutoPatcher::new(PathBuf::from("/tmp/test-repo"));
+    let patcher = AutoPatcher::new(temp_repo_path());
 
     let candidate = PatchCandidate::new("test diff", "src/test.rs");
     let validation = PatchValidationResult {
@@ -95,7 +106,7 @@ fn test_format_patch_report_compiles_but_tests_failed() {
 
 #[test]
 fn test_format_patch_report_failed() {
-    let patcher = AutoPatcher::new(PathBuf::from("/tmp/test-repo"));
+    let patcher = AutoPatcher::new(temp_repo_path());
 
     let candidate = PatchCandidate::new("test diff", "src/test.rs");
     let validation = PatchValidationResult {
@@ -114,7 +125,7 @@ fn test_format_patch_report_failed() {
 
 #[test]
 fn test_format_patch_report_with_warnings() {
-    let patcher = AutoPatcher::new(PathBuf::from("/tmp/test-repo"));
+    let patcher = AutoPatcher::new(temp_repo_path());
 
     let candidate = PatchCandidate::new("test diff", "src/test.rs");
     let validation = PatchValidationResult {
@@ -179,7 +190,7 @@ fn test_auto_patcher_new() {
 
 #[tokio::test]
 async fn test_generate_patch_with_different_file_paths_returns_no_llm_client() {
-    let patcher = AutoPatcher::new(PathBuf::from("/tmp/test-repo"));
+    let patcher = AutoPatcher::new(temp_repo_path());
 
     let result = patcher.generate_patch("vuln", "code", "lib/main.rs").await;
     assert!(matches!(
@@ -190,7 +201,7 @@ async fn test_generate_patch_with_different_file_paths_returns_no_llm_client() {
 
 #[tokio::test]
 async fn test_generate_patch_with_empty_description_returns_no_llm_client() {
-    let patcher = AutoPatcher::new(PathBuf::from("/tmp/test-repo"));
+    let patcher = AutoPatcher::new(temp_repo_path());
 
     let result = patcher.generate_patch("", "", "src/empty.rs").await;
     assert!(matches!(
@@ -201,7 +212,7 @@ async fn test_generate_patch_with_empty_description_returns_no_llm_client() {
 
 #[test]
 fn test_format_patch_report_empty_error_message() {
-    let patcher = AutoPatcher::new(PathBuf::from("/tmp/test-repo"));
+    let patcher = AutoPatcher::new(temp_repo_path());
 
     let candidate = PatchCandidate::new("diff", "src/test.rs");
     let validation = PatchValidationResult {
@@ -218,7 +229,7 @@ fn test_format_patch_report_empty_error_message() {
 
 #[test]
 fn test_format_patch_report_zero_warnings() {
-    let patcher = AutoPatcher::new(PathBuf::from("/tmp/test-repo"));
+    let patcher = AutoPatcher::new(temp_repo_path());
 
     let candidate = PatchCandidate::new("diff", "src/test.rs");
     let validation = PatchValidationResult {
@@ -236,7 +247,7 @@ fn test_format_patch_report_zero_warnings() {
 
 #[test]
 fn test_format_patch_report_with_test_errors() {
-    let patcher = AutoPatcher::new(PathBuf::from("/tmp/test-repo"));
+    let patcher = AutoPatcher::new(temp_repo_path());
 
     let candidate = PatchCandidate::new("diff", "src/test.rs");
     let validation = PatchValidationResult {
@@ -254,7 +265,7 @@ fn test_format_patch_report_with_test_errors() {
 
 #[test]
 fn test_format_patch_report_with_test_errors_no_message() {
-    let patcher = AutoPatcher::new(PathBuf::from("/tmp/test-repo"));
+    let patcher = AutoPatcher::new(temp_repo_path());
 
     let candidate = PatchCandidate::new("diff", "src/test.rs");
     let validation = PatchValidationResult {
@@ -341,7 +352,7 @@ fn test_auto_patcher_repo_path_field() {
 
 #[tokio::test]
 async fn test_generate_patch_diff_format_returns_no_llm_client() {
-    let patcher = AutoPatcher::new(PathBuf::from("/tmp/test-repo"));
+    let patcher = AutoPatcher::new(temp_repo_path());
 
     let result = patcher.generate_patch("desc", "code", "file.txt").await;
     assert!(matches!(
@@ -352,7 +363,7 @@ async fn test_generate_patch_diff_format_returns_no_llm_client() {
 
 #[test]
 fn test_format_patch_report_status_variations() {
-    let patcher = AutoPatcher::new(PathBuf::from("/tmp/test-repo"));
+    let patcher = AutoPatcher::new(temp_repo_path());
     let candidate = PatchCandidate::new("diff", "src/test.rs");
 
     // Test VALIDATED status
@@ -388,7 +399,7 @@ fn test_format_patch_report_status_variations() {
 
 #[test]
 fn test_format_patch_report_build_errors_section() {
-    let patcher = AutoPatcher::new(PathBuf::from("/tmp/test-repo"));
+    let patcher = AutoPatcher::new(temp_repo_path());
     let candidate = PatchCandidate::new("diff", "src/test.rs");
 
     let failed = PatchValidationResult {
@@ -406,7 +417,7 @@ fn test_format_patch_report_build_errors_section() {
 
 #[test]
 fn test_format_patch_report_warnings_section() {
-    let patcher = AutoPatcher::new(PathBuf::from("/tmp/test-repo"));
+    let patcher = AutoPatcher::new(temp_repo_path());
     let candidate = PatchCandidate::new("diff", "src/test.rs");
 
     let with_warnings = PatchValidationResult {

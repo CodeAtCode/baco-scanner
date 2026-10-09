@@ -3,7 +3,7 @@ mod cwe_routing;
 pub mod indexing;
 mod patching;
 mod semgrep;
-mod synthesis;
+pub mod synthesis;
 mod threat_modeling;
 mod ticket_git_cross;
 

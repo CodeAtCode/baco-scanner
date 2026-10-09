@@ -4,7 +4,6 @@
 //! save_checkpoint/load_checkpoint_findings functions.
 
 use baco::findings::Severity;
-use baco::llm::metrics::LlmMetricsTracker;
 use baco::scanner::checkpoint::{Checkpoint, ScanLocation, ScanPhase, save_checkpoint};
 use std::fs;
 use std::path::Path;
@@ -31,7 +30,6 @@ async fn test_save_checkpoint_records_scan_target_and_config() {
         &[],
         &[],
         &ScanPhase::Semgrep,
-        &LlmMetricsTracker::new(),
         None,
     )
     .await

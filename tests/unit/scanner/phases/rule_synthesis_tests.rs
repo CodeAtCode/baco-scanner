@@ -7,6 +7,16 @@ use baco::rulesynth::{RuleError, parse_yaml_rules, validate_rule};
 use std::path::PathBuf;
 
 // ============================================================================
+// Helper for temp rulesynthesis paths
+// ============================================================================
+
+fn temp_rulesynth_path(prefix: &str) -> PathBuf {
+    static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    std::env::temp_dir().join(format!("{}-{}-{seq:x}", prefix, std::process::id()))
+}
+
+// ============================================================================
 // YAML Parsing Tests
 // ============================================================================
 
@@ -159,7 +169,7 @@ rules:
 fn test_synthesizer_new() {
     let config = RuleSynthConfig {
         enabled: true,
-        output_dir: PathBuf::from("/tmp/test-rules"),
+        output_dir: temp_rulesynth_path("test-rules-phase"),
         max_rules_per_cwe: 3,
         mocq_mode: false,
         max_iterations: 5,

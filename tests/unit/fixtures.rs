@@ -65,6 +65,16 @@ use std::path::PathBuf;
 use std::sync::LazyLock;
 use tempfile::TempDir;
 
+// ============================================================================
+// Helper for temp fixture paths
+// ============================================================================
+
+fn temp_fixture_path(prefix: &str) -> PathBuf {
+    static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    std::env::temp_dir().join(format!("{}-{}-{seq:x}", prefix, std::process::id()))
+}
+
 /// Create a minimal test finding with default values.
 ///
 /// This is a simpler version that works for tests that only need basic finding structure.
@@ -205,7 +215,9 @@ pub fn create_test_config() -> ScannerConfig {
             languages: vec!["rust".to_string()],
         },
         output: OutputConfig {
-            dir: "/tmp/baco-test-output".to_string(),
+            dir: temp_fixture_path("baco-test-output")
+                .to_string_lossy()
+                .to_string(),
             evidence_gate: false,
             include_rejected: false,
         },
@@ -329,7 +341,9 @@ pub fn create_minimal_config() -> ScannerConfig {
             languages: vec!["rust".to_string()],
         },
         output: OutputConfig {
-            dir: "/tmp/baco_test_output".to_string(),
+            dir: temp_fixture_path("baco_test_output")
+                .to_string_lossy()
+                .to_string(),
             evidence_gate: false,
             include_rejected: false,
         },
@@ -629,8 +643,7 @@ pub fn verify_severity_mapping_boundaries() {
 /// Ensure test output directory exists.
 pub fn ensure_test_output_dir() {
     use std::fs;
-    use std::path::PathBuf;
-    let output_dir = PathBuf::from("/tmp/baco-test-output");
+    let output_dir = temp_fixture_path("baco-test-output");
     let _ = fs::create_dir_all(&output_dir);
 }
 
@@ -722,7 +735,7 @@ pub fn make_threat_model_test_context() -> AnalysisContext {
 pub fn make_rulesynth_config() -> RuleSynthConfig {
     RuleSynthConfig {
         enabled: true,
-        output_dir: PathBuf::from("/tmp/rules"),
+        output_dir: temp_fixture_path("rules-fixtures"),
         max_rules_per_cwe: 3,
         mocq_mode: false,
         max_iterations: 5,

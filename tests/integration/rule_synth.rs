@@ -9,6 +9,16 @@ use baco::config::RuleSynthConfig;
 use std::env;
 use std::path::PathBuf;
 
+// ============================================================================
+// Helper for temp rule_synth integration paths
+// ============================================================================
+
+fn temp_rulesynth_path(prefix: &str) -> PathBuf {
+    static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    std::env::temp_dir().join(format!("{}-{}-{seq:x}", prefix, std::process::id()))
+}
+
 fn skip_if_no_llm_key() -> bool {
     // Check for any LLM API key
     let has_key = env::var("LLM_DISCOVERY_KEY")
@@ -67,9 +77,10 @@ fn test_rule_synthesis_config_defaults() {
 
 #[test]
 fn test_rule_synthesis_config_custom() {
+    let expected_output_dir = temp_rulesynth_path("custom-rules-integration");
     let config = RuleSynthConfig {
         enabled: true,
-        output_dir: PathBuf::from("/tmp/custom_rules"),
+        output_dir: expected_output_dir.clone(),
         max_rules_per_cwe: 10,
         mocq_mode: false,
         max_iterations: 5,
@@ -77,6 +88,6 @@ fn test_rule_synthesis_config_custom() {
     };
 
     assert!(config.enabled);
-    assert_eq!(config.output_dir, PathBuf::from("/tmp/custom_rules"));
+    assert_eq!(config.output_dir, expected_output_dir);
     assert_eq!(config.max_rules_per_cwe, 10);
 }

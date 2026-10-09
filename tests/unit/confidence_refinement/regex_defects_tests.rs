@@ -1,5 +1,5 @@
 /// Tests for Defects 2 & 3: regex compilation errors and case-insensitive patterns
-use baco::confidence_refinement::HistoricalData;
+use baco::historical_patterns::HistoricalData;
 
 #[test]
 fn test_never_submit_pattern_case_insensitive_xframe() {

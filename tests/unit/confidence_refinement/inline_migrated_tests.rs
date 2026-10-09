@@ -8,10 +8,9 @@
 #[cfg(test)]
 mod tests {
     use baco::analysis_context::AnalysisContext;
-    use baco::confidence_refinement::{
-        ConfidenceFactor, ConfidenceRefinementPhase, HistoricalData,
-    };
+    use baco::confidence_refinement::{ConfidenceFactor, ConfidenceRefinementPhase};
     use baco::findings::{Severity, VerificationStatus, VulnerabilityFinding};
+    use baco::historical_patterns::HistoricalData;
     use baco::phase::helpers::create_finding_with_params;
 
     #[test]

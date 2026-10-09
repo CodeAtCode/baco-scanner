@@ -9,7 +9,7 @@
 //! 3. Restore from backup
 //! 4. Write a test that kills the mutation
 
-use baco::confidence_refinement::{ProjectBaseline, normalize_confidence};
+use baco::confidence_normalization::{ProjectBaseline, normalize_confidence};
 use baco::config::{NormalizationConfig, NormalizationTier};
 
 // ============================================================================
@@ -312,7 +312,7 @@ fn test_isotonic_calibration_formula() {
 fn test_record_verification_increments_false_positives() {
     // This test verifies that record_verification with is_false_positive=true increments
     // If the mutation `+=` -> `-=` were applied, it would decrement instead
-    use baco::confidence_refinement::HistoricalData;
+    use baco::historical_patterns::HistoricalData;
 
     let mut data = HistoricalData::new();
 

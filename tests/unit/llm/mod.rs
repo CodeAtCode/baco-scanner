@@ -20,5 +20,6 @@ mod snippet_restatement_tests;
 mod statement_range_validation_tests;
 mod structured_output_tests;
 mod tools_response_tests;
+mod verification_code_context_tests;
 mod verification_tests;
 mod wp_anchor_coverage_tests;

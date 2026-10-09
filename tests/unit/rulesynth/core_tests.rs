@@ -18,6 +18,16 @@ use baco::rulesynth::{RuleError, SemgrepRule, validate_rule};
 use std::path::PathBuf;
 
 // ============================================================================
+// Helper for temp rulesynth paths
+// ============================================================================
+
+fn temp_rulesynth_path(prefix: &str) -> PathBuf {
+    static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    std::env::temp_dir().join(format!("{}-{}-{seq:x}", prefix, std::process::id()))
+}
+
+// ============================================================================
 // Test 1: SemgrepRule construction and field access
 // ============================================================================
 
@@ -111,9 +121,10 @@ fn test_rulesynth_config_default_values() {
 
 #[test]
 fn test_rulesynth_config_custom_construction() {
+    let expected_output_dir = temp_rulesynth_path("custom-rules");
     let config = RuleSynthConfig {
         enabled: true,
-        output_dir: PathBuf::from("/tmp/custom_rules"),
+        output_dir: expected_output_dir.clone(),
         max_rules_per_cwe: 10,
         mocq_mode: false,
         max_iterations: 5,
@@ -121,7 +132,7 @@ fn test_rulesynth_config_custom_construction() {
     };
 
     assert!(config.enabled);
-    assert_eq!(config.output_dir, PathBuf::from("/tmp/custom_rules"));
+    assert_eq!(config.output_dir, expected_output_dir);
     assert_eq!(config.max_rules_per_cwe, 10);
 }
 
@@ -590,7 +601,7 @@ fn test_rulesynth_config_all_field_variations() {
     let configs = vec![
         RuleSynthConfig {
             enabled: true,
-            output_dir: PathBuf::from("/tmp/a"),
+            output_dir: temp_rulesynth_path("rules-a"),
             max_rules_per_cwe: 1,
             mocq_mode: false,
             max_iterations: 5,
@@ -598,7 +609,7 @@ fn test_rulesynth_config_all_field_variations() {
         },
         RuleSynthConfig {
             enabled: false,
-            output_dir: PathBuf::from("/tmp/b"),
+            output_dir: temp_rulesynth_path("rules-b"),
             max_rules_per_cwe: 100,
             mocq_mode: false,
             max_iterations: 5,

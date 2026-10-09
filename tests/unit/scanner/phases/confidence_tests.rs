@@ -3,10 +3,9 @@
 //! Tests confidence score calculations, refinement factors, and HistoricalData.
 
 use crate::fixtures::create_minimal_finding;
-use baco::confidence_refinement::{
-    ConfidenceFactor, ConfidenceRefinementPhase, HistoricalData, RefinedConfidence,
-};
+use baco::confidence_refinement::{ConfidenceFactor, ConfidenceRefinementPhase, RefinedConfidence};
 use baco::findings::VerificationStatus;
+use baco::historical_patterns::HistoricalData;
 
 // ============================================================================
 // HistoricalData Tests

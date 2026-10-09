@@ -8,6 +8,16 @@ use baco::config::CpgConfig;
 use baco::findings::{Severity, VerificationStatus, VulnerabilityFinding};
 use std::path::PathBuf;
 
+// ============================================================================
+// Helper for temp CPG paths
+// ============================================================================
+
+fn temp_cpg_path(prefix: &str) -> PathBuf {
+    static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    std::env::temp_dir().join(format!("{}-{}-{seq:x}", prefix, std::process::id()))
+}
+
 /// Helper to create a minimal CPG config
 fn make_cpg_config(enabled: bool) -> CpgConfig {
     CpgConfig {
@@ -80,7 +90,7 @@ fn test_cpg_phase_unavailable_skips_with_debug_log_path() {
     if !engine.is_available() {
         // This is the "skip cheaply" path - no build() call, no phantom work
         // The phase returns early after checking is_available()
-        let result = engine.build_cpg(&PathBuf::from("/tmp/test"));
+        let result = engine.build_cpg(&temp_cpg_path("cpg-slice-test"));
         assert!(matches!(
             result,
             Err(baco::cpg::CpgError::JoernNotInstalled)

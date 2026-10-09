@@ -144,7 +144,6 @@ impl AgentSession {
                 .collect();
             match self.client.chat_with_tools(&messages, &schemas).await {
                 Ok(response) => {
-                    let _model_used = response.model_used.clone();
                     if !response.tool_calls.is_empty() {
                         let (new_tools_used, new_test_path, new_compile_path, new_messages) =
                             execute_tool_calls(
@@ -416,7 +415,6 @@ impl AgentSession {
 
             match self.client.chat_with_tools(&messages, &schemas).await {
                 Ok(response) => {
-                    let _model_used = response.model_used.clone();
                     if !response.tool_calls.is_empty() {
                         let (new_tools_used, new_test_path, new_compile_path, new_messages) =
                             execute_tool_calls(

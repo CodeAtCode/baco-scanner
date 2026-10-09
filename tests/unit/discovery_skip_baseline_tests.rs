@@ -142,7 +142,7 @@ mod discovery_skip_tests {
 
 #[cfg(test)]
 mod baseline_persistence_tests {
-    use baco::confidence_refinement::ProjectBaseline;
+    use baco::confidence_normalization::ProjectBaseline;
     use std::fs;
     use std::io::Write;
     use tempfile::TempDir;
@@ -229,7 +229,7 @@ mod baseline_persistence_tests {
 
 #[cfg(test)]
 mod confidence_scoring_baseline_integration_tests {
-    use baco::confidence_refinement::ProjectBaseline;
+    use baco::confidence_normalization::ProjectBaseline;
 
     #[test]
     fn test_baseline_update_logic() {

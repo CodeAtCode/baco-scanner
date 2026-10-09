@@ -3,12 +3,11 @@
 //! Tests cover confidence scoring phase functionality and confidence refinement.
 
 use baco::analysis_context::AnalysisContext;
-use baco::confidence_refinement::{
-    ConfidenceFactor, ConfidenceRefinementPhase, HistoricalData, ProjectBaseline,
-    normalize_confidence,
-};
+use baco::confidence_normalization::{ProjectBaseline, normalize_confidence};
+use baco::confidence_refinement::{ConfidenceFactor, ConfidenceRefinementPhase};
 use baco::config::{NormalizationConfig, NormalizationTier};
 use baco::findings::{Severity, VerificationStatus, VulnerabilityFinding};
+use baco::historical_patterns::HistoricalData;
 use tempfile::TempDir;
 
 use crate::fixtures::make_aggregation_finding;

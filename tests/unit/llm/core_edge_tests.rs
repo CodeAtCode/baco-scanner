@@ -7,6 +7,17 @@ use baco::llm::{
     AtomicModelSelector, ChatMessage, ChatResponseWithModel, LlmClient, LlmConfig,
     create_llm_client_with_metrics, phase_llm_config,
 };
+use std::path::PathBuf;
+
+// ============================================================================
+// Helper for temp scanner paths
+// ============================================================================
+
+fn temp_llm_path(prefix: &str) -> PathBuf {
+    static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    std::env::temp_dir().join(format!("{}-{}-{seq:x}", prefix, std::process::id()))
+}
 
 // ============================================================================
 // LlmConfig and phase_llm_config Tests
@@ -190,7 +201,7 @@ fn test_create_llm_client_with_metrics_none_on_missing_api_key() {
     use baco::scanner::core::Scanner;
 
     let metrics = LlmMetricsTracker::new();
-    let mut scanner = Scanner::new(config, std::path::PathBuf::from("/tmp"), false);
+    let mut scanner = Scanner::new(config, temp_llm_path("llm-client-metrics"), false);
     scanner.metrics_tracker = metrics;
 
     let client = create_llm_client_with_metrics(&scanner, "discovery");
@@ -228,7 +239,7 @@ fn test_create_llm_client_with_metrics_none_on_missing_base_url() {
     config.llm.phases.verification.model = "test-model".to_string();
 
     let metrics = LlmMetricsTracker::new();
-    let mut scanner = Scanner::new(config, std::path::PathBuf::from("/tmp"), false);
+    let mut scanner = Scanner::new(config, temp_llm_path("llm-client-metrics"), false);
     scanner.metrics_tracker = metrics;
 
     let client = create_llm_client_with_metrics(&scanner, "verification");
@@ -267,7 +278,7 @@ fn test_create_llm_client_with_metrics_none_on_empty_models() {
     config.llm.phases.aggregation.models = vec![];
 
     let metrics = LlmMetricsTracker::new();
-    let mut scanner = Scanner::new(config, std::path::PathBuf::from("/tmp"), false);
+    let mut scanner = Scanner::new(config, temp_llm_path("llm-client-metrics"), false);
     scanner.metrics_tracker = metrics;
 
     let client = create_llm_client_with_metrics(&scanner, "aggregation");
@@ -300,7 +311,7 @@ fn test_create_llm_client_with_metrics_some_on_valid_config() {
     use baco::scanner::core::Scanner;
 
     let metrics = LlmMetricsTracker::new();
-    let mut scanner = Scanner::new(config, std::path::PathBuf::from("/tmp"), false);
+    let mut scanner = Scanner::new(config, temp_llm_path("llm-client-metrics"), false);
     scanner.metrics_tracker = metrics;
 
     let client = create_llm_client_with_metrics(&scanner, "security_agent_verification");

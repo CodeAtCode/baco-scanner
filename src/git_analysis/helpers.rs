@@ -23,6 +23,23 @@ pub fn get_remote_url(repo: &Repository) -> Option<String> {
     })
 }
 
+/// Calculate security commits confidence modifier
+/// Returns 0.05 per security commit, capped at 0.2
+pub fn calculate_security_commits_modifier(commits: &[CommitReference]) -> f32 {
+    let security_commits = commits.iter().filter(|c| c.is_security_fix).count();
+    (security_commits as f32 * 0.05).min(0.2)
+}
+
+/// Calculate CWE references confidence modifier
+/// Returns 0.05 per commit with CWE references, capped at 0.15
+pub fn calculate_cwe_refs_modifier(commits: &[CommitReference]) -> f32 {
+    let cwe_refs = commits
+        .iter()
+        .filter(|c| !c.cwe_references.is_empty())
+        .count();
+    (cwe_refs as f32 * 0.05).min(0.15)
+}
+
 /// Calculate overall git-based confidence score
 pub fn calculate_overall_confidence(
     commits: &[CommitReference],

@@ -2,7 +2,8 @@
 
 use baco::analysis_context::AnalysisContext;
 use baco::git_analysis::helpers::{
-    calculate_overall_confidence, get_commit_stats, get_remote_url, update_context,
+    calculate_cwe_refs_modifier, calculate_overall_confidence, get_commit_stats, get_remote_url,
+    update_context,
 };
 use baco::git_analysis::models::{
     CommitReference, GitAnalysisResult, GitConfidenceModifier, RiskyCommitPattern,
@@ -130,6 +131,103 @@ fn test_calculate_overall_confidence_with_cwe_refs() {
 
     let score = calculate_overall_confidence(&commits, &patterns, &risky);
     assert!(score > 0.5); // Should be boosted by CWE reference
+}
+
+fn cwe_commit(hash: &str) -> CommitReference {
+    CommitReference {
+        commit_hash: hash.to_string(),
+        commit_message: "Fix CWE-79".to_string(),
+        author: "Test".to_string(),
+        author_email: "test@example.com".to_string(),
+        timestamp: 1234567890,
+        modified_files: vec!["test.txt".to_string()],
+        lines_added: 10,
+        lines_deleted: 5,
+        is_security_fix: false,
+        cwe_references: vec!["CWE-79".to_string()],
+    }
+}
+
+/// `helpers.rs` counts *commits that cite a CWE*, not references, and adds 0.05 each
+/// up to a ceiling of 0.15. Pinned at every point where the value moves, because the
+/// previous form of this test only asserted `score > 0.5`, which any boost satisfies.
+#[test]
+fn cwe_modifier_scales_per_commit_and_saturates() {
+    assert_eq!(
+        calculate_cwe_refs_modifier(&[]),
+        0.0,
+        "no CWE-referencing commit means no bonus"
+    );
+    assert_eq!(
+        calculate_cwe_refs_modifier(&[cwe_commit("a1")]),
+        0.05,
+        "one commit citing a CWE"
+    );
+    assert_eq!(
+        calculate_cwe_refs_modifier(&[cwe_commit("a1"), cwe_commit("a2")]),
+        0.10,
+        "two such commits accumulate"
+    );
+    assert_eq!(
+        calculate_cwe_refs_modifier(&[cwe_commit("a1"), cwe_commit("a2"), cwe_commit("a3")]),
+        0.15,
+        "the bonus saturates at the third commit"
+    );
+    assert_eq!(
+        calculate_cwe_refs_modifier(&[
+            cwe_commit("a1"),
+            cwe_commit("a2"),
+            cwe_commit("a3"),
+            cwe_commit("a4"),
+            cwe_commit("a5"),
+        ]),
+        0.15,
+        "further commits cannot push it past the ceiling"
+    );
+}
+
+/// A commit citing *several* CWEs counts once here, because the filter is on non-empty
+/// `cwe_references` and not on its length. This is the behaviour as built, pinned so
+/// that changing it is a visible decision rather than a silent edit.
+#[test]
+fn a_commit_citing_several_cwes_counts_once() {
+    let mut commit = cwe_commit("a1");
+    commit.cwe_references = vec![
+        "CWE-79".to_string(),
+        "CWE-89".to_string(),
+        "CWE-352".to_string(),
+    ];
+    assert_eq!(
+        calculate_cwe_refs_modifier(&[commit]),
+        0.05,
+        "one commit contributes once however many CWEs it cites"
+    );
+}
+
+/// The second site used to compute the same quantity differently, and the difference
+/// was recorded rather than accidental: `analyzer.rs` returned a flat 0.15 for any
+/// number of CWE-referencing commits, while this function scaled. They agreed from
+/// three commits upward and diverged at one and two.
+///
+/// The divergence is closed. Both sites now use this function, because the sibling
+/// modifier in the same file — `calculate_security_commits_modifier` — already scaled
+/// per commit with a ceiling, and the flat form made a project with one security fix
+/// indistinguishable from one with ten.
+///
+/// This test pins the unified behaviour, so if either site drifts from it the suite
+/// fails.
+#[test]
+fn both_sites_now_scale_per_cwe_referencing_commit() {
+    let per_commit = [(0usize, 0.0f32), (1, 0.05), (2, 0.10), (3, 0.15)];
+    for (count, expected) in per_commit {
+        let commits: Vec<CommitReference> =
+            (1..=count).map(|i| cwe_commit(&format!("a{i}"))).collect();
+        assert_eq!(
+            calculate_cwe_refs_modifier(&commits),
+            expected,
+            "{count} CWE-referencing commits"
+        );
+    }
 }
 
 #[test]

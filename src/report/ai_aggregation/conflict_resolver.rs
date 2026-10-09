@@ -1,74 +1,12 @@
 //! Conflict resolution logic for AI aggregation
 
 use super::models::*;
-use crate::findings::{Severity, VerificationStatus, VulnerabilityFinding};
-use std::collections::HashMap;
+use crate::findings::{Severity, VulnerabilityFinding};
 
 /// Resolves conflicts between findings
 pub struct ConflictResolver;
 
 impl ConflictResolver {
-    /// Detect conflicts between findings grouped by location
-    pub fn detect_conflicts(
-        grouped: &HashMap<String, Vec<&VulnerabilityFinding>>,
-    ) -> Vec<FindingConflict> {
-        let mut conflicts = Vec::new();
-
-        for (location, findings) in grouped {
-            if findings.len() < 2 {
-                continue;
-            }
-
-            // Check for severity mismatches
-            let severities: Vec<_> = findings.iter().map(|f| f.severity).collect();
-            if severities
-                .iter()
-                .collect::<std::collections::HashSet<_>>()
-                .len()
-                > 1
-            {
-                let conflict = Self::resolve_severity_conflict(location, findings);
-                conflicts.push(conflict);
-                continue;
-            }
-
-            // Check for CWE mismatches
-            let cwes: Vec<_> = findings.iter().filter_map(|f| f.cwe_id.as_ref()).collect();
-            if cwes.iter().collect::<std::collections::HashSet<_>>().len() > 1 {
-                let conflict = Self::resolve_cwe_conflict(location, findings);
-                conflicts.push(conflict);
-                continue;
-            }
-
-            // Check for verification conflicts
-            // NOTE: Verification conflicts are detected but not resolved here.
-            // The resolve_verification_conflict function was removed because it only
-            // computed metadata without actually modifying the findings list.
-            // Verification status priority is now handled in deduplication.rs merge comparator.
-            let _has_verified = findings
-                .iter()
-                .any(|f| f.verification_status == Some(VerificationStatus::Confirmed));
-            let _has_fp = findings
-                .iter()
-                .any(|f| f.verification_status == Some(VerificationStatus::FalsePositive));
-
-            // Check for confidence conflicts
-            let confidences: Vec<f32> = findings.iter().map(|f| f.confidence_score).collect();
-            let min_conf = confidences.iter().cloned().fold(f32::INFINITY, f32::min);
-            let max_conf = confidences
-                .iter()
-                .cloned()
-                .fold(f32::NEG_INFINITY, f32::max);
-
-            if max_conf - min_conf > 0.3 {
-                let conflict = Self::resolve_confidence_conflict(location, findings);
-                conflicts.push(conflict);
-            }
-        }
-
-        conflicts
-    }
-
     /// Resolve severity conflict by keeping highest severity
     pub fn resolve_severity_conflict(
         location: &str,

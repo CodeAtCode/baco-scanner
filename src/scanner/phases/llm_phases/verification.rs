@@ -10,9 +10,10 @@ use crate::prompt::loader::{load_hunt_prompts, load_phase_prompts};
 use crate::prompt::templates::cwe_to_hunt_domain;
 use crate::scanner::phases::PhaseConfig;
 use crate::scanner::progress::progress_position;
+use crate::scanner_types::project::ProjectStack;
+use crate::semgrep::parser::extract_code_snippet;
 use serde::Deserialize;
 use std::collections::HashMap;
-use std::fs;
 use std::sync::Arc;
 
 /// Rejected finding with its rejection reason.
@@ -285,8 +286,16 @@ fn apply_gate_parts(
 /// This is the single source of truth for the LLM Verification phase prompt.
 pub fn load_verification_prompt() -> String {
     let loaded = load_phase_prompts(None);
-    let prompt = loaded.get("llm_verification").map(String::as_str);
-    match prompt {
+    require_verification_prompt(loaded.get("llm_verification").map(String::as_str))
+}
+
+/// The guard on the verification prompt, separated from loading it.
+///
+/// `load_phase_prompts(None)` resolves the packaged directory, so the panic branch is
+/// unreachable from a test that calls `load_verification_prompt`. Extracted so both
+/// ways of failing — absent, and present but empty — can be exercised directly.
+pub fn require_verification_prompt(text: Option<&str>) -> String {
+    match text {
         Some(text) if !text.trim().is_empty() => text.to_string(),
         other => panic!(
             "prompts/phases/llm_verification.md is missing or empty (loaded value: {:?}). \
@@ -403,26 +412,13 @@ pub fn build_volatile_verification_tail(
             tail.push_str(&format!("Vulnerable code:\n```\n{}\n```\n", snippet));
         }
 
-        // Add surrounding code context from disk (±5 lines)
+        // Add surrounding code context from disk (±5 lines) using the shared helper
         if let Some(line_num) = finding.line_number {
-            if let Ok(content) = fs::read_to_string(&finding.file_path) {
-                let lines: Vec<&str> = content.lines().collect();
-                let start = if line_num >= 6 {
-                    (line_num - 6) as usize
-                } else {
-                    0
-                };
-                let end = std::cmp::min(line_num as usize + 5, lines.len());
-                let context_lines: Vec<String> = (start..end)
-                    .map(|i| format!("{:5}: {}", i + 1, lines[i]))
-                    .collect();
-                tail.push_str(&format!(
-                    "Code context ({}:{}):\n{}\n",
-                    finding.file_path,
-                    line_num,
-                    context_lines.join("\n")
-                ));
-            }
+            let context = extract_code_snippet(&finding.file_path, line_num, 5);
+            tail.push_str(&format!(
+                "Code context ({}:{}):\n{}\n",
+                finding.file_path, line_num, context
+            ));
         }
 
         tail.push_str("\n---\n\n");
@@ -718,116 +714,66 @@ pub async fn run_llm_verification(
             // Load hunt prompts once for all findings
             let hunt_prompts = load_hunt_prompts(None);
 
-            // Use batched verification (batch_size=8 by default)
-            // Note: config-overridable if a natural knob exists; currently hardcoded per T14 spec
-            let batch_size = 8;
+            // Batched verification path: always taken since batch_size=8.
+            //
+            // A per-finding fallback branch was removed here. It held a different
+            // prompt (strict-JSON single object vs batched array), different parsing
+            // (parse_verification_verdict vs parse_batch_verification_verdict), and
+            // critically, it did NOT apply the seven-question verification gate.
+            // The batched path applies the gate via apply_gate_parts(), which enforces
+            // the seven-question gate that decides reachability, controllability,
+            // preconditions, context, impact, evidence, and confidence. Without this
+            // gate, a Confirmed verdict would be the model's unsupported word.
+            // This path was unreachable because batch_size is hardcoded to 8 and
+            // the condition batch_size > 1 is always true.
+            let batch_results = verify_findings_batched(
+                &client,
+                &findings,
+                8,
+                &hunt_prompts,
+                &config.knowledge.required_security_primitives,
+            )
+            .await;
 
-            if batch_size > 1 {
-                // Batched path
-                let batch_results = verify_findings_batched(
-                    &client,
-                    &findings,
-                    batch_size,
-                    &hunt_prompts,
-                    &config.knowledge.required_security_primitives,
-                )
-                .await;
+            // Apply batch results to findings
+            let batch_results = batch_results.0;
+            for (i, finding) in findings.iter_mut().enumerate() {
+                pb.set_position(progress_position(base, i, total_findings));
+                pb.set_message(format!(
+                    "Phase {}/{}: Verifying [{}/{}] - {} (batched)",
+                    phase_num,
+                    total,
+                    i + 1,
+                    total_findings,
+                    finding.title
+                ));
 
-                // Apply batch results to findings
-                let (batch_results, _fallback_count) = batch_results;
-                for (i, finding) in findings.iter_mut().enumerate() {
-                    pb.set_position(progress_position(base, i, total_findings));
-                    pb.set_message(format!(
-                        "Phase {}/{}: Verifying [{}/{}] - {} (batched)",
-                        phase_num,
-                        total,
-                        i + 1,
-                        total_findings,
-                        finding.title
-                    ));
-
-                    if i < batch_results.len() {
-                        let (status, notes) = &batch_results[i];
-                        let (status, notes) = cap_blind_verdict(*status, finding, notes);
-                        let (status, notes) = refute_with_primitive_check(
-                            finding,
-                            status,
-                            &notes,
-                            &config.knowledge.required_security_primitives,
-                        );
-                        finding.verification_status = Some(status);
-                        finding.verification_notes = Some(notes.clone());
-                        finding.add_evidence(
-                            crate::evidence::EvidenceSource::LlmAnalysis("verification".into()),
-                            0.8,
-                            format!(
-                                "LLM verification verdict: {:?}",
-                                finding.verification_status
-                            ),
-                        );
-                        tracing::info!(
-                            "Verification verdict [batched]: {:?} — {} ({}:{:?})",
-                            status,
-                            finding.title,
-                            finding.file_path,
-                            finding.line_number
-                        );
-                    }
-                }
-            } else {
-                // Per-finding fallback (original path)
-                for (i, finding) in findings.iter_mut().enumerate() {
-                    pb.set_position(progress_position(base, i, total_findings));
-                    pb.set_message(format!(
-                        "Phase {}/{}: Verifying findings [{}/{}] - {}",
-                        phase_num,
-                        total,
-                        i + 1,
-                        total_findings,
-                        finding.title
-                    ));
-
-                    // Build stable prefix + volatile tail for prompt caching
-                    let stable_prefix = build_stable_verification_prefix(
-                        std::slice::from_ref(finding),
-                        &hunt_prompts,
+                if i < batch_results.len() {
+                    let (status, notes) = &batch_results[i];
+                    let (status, notes) = cap_blind_verdict(*status, finding, notes);
+                    let (status, notes) = refute_with_primitive_check(
+                        finding,
+                        status,
+                        &notes,
                         &config.knowledge.required_security_primitives,
                     );
-                    let volatile_tail = build_volatile_verification_tail(
-                        std::slice::from_ref(finding),
-                        &hunt_prompts,
-                    );
-                    let prompt_text = format!("{}{}", stable_prefix, volatile_tail);
-
-                    let messages = vec![
-                        ChatMessage::system(
-                            "You are a security vulnerability verifier. Analyze the finding and determine if it's a true positive, false positive, or needs review.\n\nSTRICT OUTPUT FORMAT: Return ONLY valid JSON with no prose outside the JSON object.\n\nJSON schema:\n{\n  \"verification_status\": \"confirmed|false_positive|needs_review\",\n  \"verification_notes\": \"detailed reasoning for the verdict\"\n}\n\nDo NOT include any text before or after the JSON.",
+                    finding.verification_status = Some(status);
+                    finding.verification_notes = Some(notes.clone());
+                    finding.add_evidence(
+                        crate::evidence::EvidenceSource::LlmAnalysis("verification".into()),
+                        0.8,
+                        format!(
+                            "LLM verification verdict: {:?}",
+                            finding.verification_status
                         ),
-                        ChatMessage::user(&prompt_text),
-                    ];
-                    let result = client.chat(&messages).await;
-
-                    if let Ok(response_with_model) = result {
-                        let (status, notes) =
-                            parse_verification_verdict(&response_with_model.content);
-                        let (status, notes) = cap_blind_verdict(status, finding, &notes);
-                        let (status, notes) = refute_with_primitive_check(
-                            finding,
-                            status,
-                            &notes,
-                            &config.knowledge.required_security_primitives,
-                        );
-                        finding.verification_status = Some(status);
-                        finding.verification_notes = Some(notes);
-                        finding.add_evidence(
-                            crate::evidence::EvidenceSource::LlmAnalysis("verification".into()),
-                            0.8,
-                            format!(
-                                "LLM verification verdict: {:?}",
-                                finding.verification_status
-                            ),
-                        );
-                    }
+                    );
+                    tracing::info!(
+                        "Verification verdict [batched]: {:?} — {} ({}:{:?})",
+                        status,
+                        finding.title,
+                        finding.file_path,
+                        finding.line_number
+                    );
                 }
             }
         }
@@ -854,43 +800,21 @@ pub async fn run_llm_verification(
     let poc_engine = PoCGenerationEngine::new();
 
     // Determine target languages for PoC based on project stack
-    let poc_formats = if let Some(stack) = project_stack {
-        let mut formats = Vec::new();
-        for lang in &stack.languages {
-            match lang.to_lowercase().as_str() {
-                "rust" => formats.push(PoCFormat::Rust),
-                "python" => formats.push(PoCFormat::Python),
-                "javascript" | "typescript" => formats.push(PoCFormat::Python), // Default to Python for JS
-                "go" => formats.push(PoCFormat::Go),
-                _ => formats.push(PoCFormat::Python),
-            }
-        }
-        if formats.is_empty() {
-            formats.push(PoCFormat::Python)
-        }
-        formats
-    } else {
-        vec![PoCFormat::Python]
-    };
+    let poc_formats = poc_formats_for_stack(project_stack.as_ref());
 
     // Generate PoCs for findings that are confirmed or have high severity
     let high_severity_findings: Vec<_> = findings
         .iter()
-        .filter(|f| {
-            matches!(
-                f.verification_status,
-                Some(VerificationStatus::Confirmed) | None
-            ) && f.severity.is_high_or_critical()
-        })
+        .filter(|f| poc_generation_predicate(f))
         .cloned()
         .collect();
 
-    if !high_severity_findings.is_empty() {
+    if poc_generation_gate(&high_severity_findings) {
         let poc_result = poc_engine.generate(&high_severity_findings, &context, &poc_formats);
         let poc_count = poc_result.proofs.len();
 
         for poc in &poc_result.proofs {
-            if let Some(finding) = findings.iter_mut().find(|f| f.id == poc.finding_id) {
+            if let Some(finding) = find_finding_by_id(&mut findings, &poc.finding_id) {
                 finding.poc_code = Some(poc.code.clone());
                 finding.poc_format = Some(match poc.format {
                     PoCFormat::Rust => "rust".to_string(),
@@ -922,12 +846,7 @@ pub async fn run_llm_verification(
         }
 
         // Also generate mitigation code
-        for finding in &mut findings.iter_mut().filter(|f| {
-            matches!(
-                f.verification_status,
-                Some(VerificationStatus::Confirmed) | None
-            ) && f.severity.is_high_or_critical()
-        }) {
+        for finding in &mut findings.iter_mut().filter(|f| poc_generation_predicate(f)) {
             if let Some(mitigation) = poc_engine.generate_mitigation(finding) {
                 finding.mitigation_code = Some(mitigation.code);
             }
@@ -1048,4 +967,70 @@ pub fn parse_verification_verdict(content: &str) -> (VerificationStatus, String)
             }
         }
     }
+}
+/// Determine PoC formats from a project stack.
+///
+/// Extracted from `run_llm_verification` to make the format selection logic
+/// testable without constructing a full `Scanner` and LLM client.
+///
+/// - A Rust language yields `PoCFormat::Rust`
+/// - A Python language yields `PoCFormat::Python`
+/// - A Go language yields `PoCFormat::Go`
+/// - JavaScript/TypeScript default to `PoCFormat::Python`
+/// - Unknown languages default to `PoCFormat::Python`
+/// - Empty stack or no stack yields `vec![PoCFormat::Python]`
+pub fn poc_formats_for_stack(stack: Option<&ProjectStack>) -> Vec<PoCFormat> {
+    let Some(stack) = stack else {
+        return vec![PoCFormat::Python];
+    };
+
+    let mut formats = Vec::new();
+    for lang in &stack.languages {
+        match lang.to_lowercase().as_str() {
+            "rust" => formats.push(PoCFormat::Rust),
+            "python" => formats.push(PoCFormat::Python),
+            "go" => formats.push(PoCFormat::Go),
+            _ => formats.push(PoCFormat::Python),
+        }
+    }
+
+    if formats.is_empty() {
+        vec![PoCFormat::Python]
+    } else {
+        formats
+    }
+}
+
+/// Predicate for findings eligible for PoC generation.
+///
+/// Extracted from `run_llm_verification` to make the filter logic testable.
+///
+/// A finding qualifies if:
+/// - Its verification status is `Confirmed` or `None` (unverified)
+/// - Its severity is high or critical
+pub fn poc_generation_predicate(finding: &VulnerabilityFinding) -> bool {
+    matches!(
+        finding.verification_status,
+        Some(VerificationStatus::Confirmed) | None
+    ) && finding.severity.is_high_or_critical()
+}
+
+/// Gate for PoC generation: true when there are high-severity findings.
+///
+/// Extracted from `run_llm_verification` to make the generation gate testable.
+pub fn poc_generation_gate(findings: &[VulnerabilityFinding]) -> bool {
+    !findings.is_empty()
+}
+
+/// Find the finding matching a PoC by ID.
+///
+/// Extracted from `run_llm_verification` to make the assignment logic testable.
+///
+/// Returns a mutable reference to the finding whose `id` equals `poc_finding_id`,
+/// or `None` if no match exists.
+pub fn find_finding_by_id<'a>(
+    findings: &'a mut [VulnerabilityFinding],
+    poc_finding_id: &str,
+) -> Option<&'a mut VulnerabilityFinding> {
+    findings.iter_mut().find(|f| f.id == poc_finding_id)
 }

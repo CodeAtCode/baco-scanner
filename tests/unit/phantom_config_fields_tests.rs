@@ -7,6 +7,16 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+// ============================================================================
+// Helper for temp phantom test paths
+// ============================================================================
+
+fn temp_phantom_path(prefix: &str) -> PathBuf {
+    static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    std::env::temp_dir().join(format!("{}-{}-{seq:x}", prefix, std::process::id()))
+}
+
 /// Known fields that appear unused due to dynamic/serde-only consumption.
 /// Add here with justification when a field is legitimately consumed in ways
 /// that static analysis cannot detect (e.g., serde deserialization only).
@@ -35,6 +45,10 @@ const KNOWN_CONSUMED: &[(&str, &str)] = &[
     (
         "cwe_overrides",
         "Consumed by in-config to_registry conversion (scanner.rs) feeding the router",
+    ),
+    (
+        "project_baseline_path",
+        "Legacy field: file read was a no-op (always returned original baseline unchanged)",
     ),
 ];
 
@@ -151,7 +165,7 @@ fn test_phantom_detection_logic_with_synthetic_fixture() {
     let temp_dir = std::env::var("CARGO_MANIFEST_DIR")
         .map(PathBuf::from)
         .map(|p| p.join("target/test_fixture_phantom"))
-        .unwrap_or_else(|_| PathBuf::from("/tmp/phantom_test"));
+        .unwrap_or_else(|_| temp_phantom_path("phantom-test"));
 
     let src_dir = temp_dir.join("src");
     let config_dir = src_dir.join("config");

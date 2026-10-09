@@ -10,10 +10,10 @@
 
 use baco::findings::{Severity, VulnerabilityFinding};
 use baco::llm::LlmConfig;
-use baco::report::ai_aggregation::conflict_resolver::ConflictResolver;
 use baco::report::ai_aggregation::deduplication::DeduplicationService;
 use baco::report::ai_aggregation::enrichment::EnrichmentService;
 use baco::report::ai_aggregation::models::*;
+use baco::report::ai_aggregation::{AiAggregationPhase, conflict_resolver::ConflictResolver};
 use baco::report::html::{render_finding, utilities};
 use baco::report::json::write_findings_json;
 use baco::report::presenter;
@@ -282,7 +282,9 @@ fn test_detect_conflicts_severity_mismatch() {
 
     grouped.insert("src/test.rs:10".to_string(), vec![&finding1, &finding2]);
 
-    let conflicts = ConflictResolver::detect_conflicts(&grouped);
+    let config = make_llm_config(vec!["test-model"]);
+    let phase = AiAggregationPhase::new(config);
+    let conflicts = phase.detect_conflicts(&grouped);
 
     assert_eq!(conflicts.len(), 1);
     assert_eq!(conflicts[0].conflict_type, ConflictType::SeverityMismatch);
@@ -297,7 +299,9 @@ fn test_detect_conflicts_no_conflict() {
 
     grouped.insert("src/test.rs:10".to_string(), vec![&finding1, &finding2]);
 
-    let conflicts = ConflictResolver::detect_conflicts(&grouped);
+    let config = make_llm_config(vec!["test-model"]);
+    let phase = AiAggregationPhase::new(config);
+    let conflicts = phase.detect_conflicts(&grouped);
 
     assert!(conflicts.is_empty());
 }
@@ -309,7 +313,9 @@ fn test_detect_conflicts_single_finding() {
     let finding1 = make_finding("f1", Severity::High, "src/test.rs", Some(10));
     grouped.insert("src/test.rs:10".to_string(), vec![&finding1]);
 
-    let conflicts = ConflictResolver::detect_conflicts(&grouped);
+    let config = make_llm_config(vec!["test-model"]);
+    let phase = AiAggregationPhase::new(config);
+    let conflicts = phase.detect_conflicts(&grouped);
 
     assert!(conflicts.is_empty());
 }
@@ -317,7 +323,9 @@ fn test_detect_conflicts_single_finding() {
 #[test]
 fn test_detect_conflicts_empty_grouped() {
     let grouped: HashMap<String, Vec<&VulnerabilityFinding>> = HashMap::new();
-    let conflicts = ConflictResolver::detect_conflicts(&grouped);
+    let config = make_llm_config(vec!["test-model"]);
+    let phase = AiAggregationPhase::new(config);
+    let conflicts = phase.detect_conflicts(&grouped);
 
     assert!(conflicts.is_empty());
 }

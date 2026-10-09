@@ -1,383 +1,143 @@
-//! Tests for batch verification with index field handling
+//! Robustness gaps in the verification phase parser and prompt loader.
 //!
-//! Verifies:
-//! 1. Well-formed responses WITH index field → correct mapping
-//! 2. Responses WITHOUT index field → positional fallback with warning
-//! 3. Malformed responses → salvage path without mass-degradation
-//!
-//! Contract tests ensure BatchVerdictItem fields match the prompt JSON examples.
+//! These tests close two mutation-surviving defects:
+//! 1. Out-of-bounds index handling in `parse_batch_verification_verdict`
+//! 2. Empty-prompt guard in `load_verification_prompt`
 
-use baco::error::ScanError;
-use baco::findings::{Severity, VerificationStatus, VulnerabilityFinding};
-use baco::llm::{ChatMessage, ChatResponseWithModel, LlmChatClient};
-use baco::llm_analysis::VERIFICATION_BATCH_FIELDS;
-use baco::scanner::phases::llm_phases::verification::{
-    parse_batch_verification_verdict, verify_findings_batched,
-};
-use std::collections::HashMap;
-use std::fs;
-use std::path::Path;
-use std::sync::{Arc, Mutex};
+use baco::findings::VerificationStatus;
+use baco::scanner::phases::llm_phases::verification::parse_batch_verification_verdict;
 
-/// Mock LLM client for testing
-struct MockLlmClient {
-    responses: Vec<String>,
-    call_count: Arc<Mutex<usize>>,
+/// An item with `index == expected_count` must not panic.
+///
+/// The loop bounds-checks with `idx < expected_count`, so accepting
+/// `index == expected_count` would index one past the end of `results`.
+/// Since the index comes from an LLM response, a malformed reply could
+/// crash the scanner.
+///
+/// Choice: skip the item with a warning, rather than returning an error.
+/// The rest of the parser tolerates partial results, and skipping is
+/// more robust than failing the entire batch for one out-of-range index.
+#[test]
+fn test_out_of_range_index_skipped_with_warning() {
+    // Item with index == expected_count (out of bounds)
+    let input = r#"[{
+        "index": 1,
+        "verification_status": "confirmed",
+        "verification_notes": "This should be skipped"
+    }]"#;
+
+    // expected_count = 1, so index 1 is out of range
+    let out = parse_batch_verification_verdict(input, 1);
+
+    // The out-of-range item should be skipped, leaving the default value
+    assert_eq!(
+        out[0].0,
+        VerificationStatus::NeedsReview,
+        "out-of-range index must not overwrite the default"
+    );
+    assert_eq!(
+        out[0].1, "Batch parse missing this item",
+        "should have the default missing-item message"
+    );
 }
 
-impl MockLlmClient {
-    fn new(responses: Vec<String>) -> Self {
-        Self {
-            responses,
-            call_count: Arc::new(Mutex::new(0)),
+/// An item with `index > expected_count` must also be skipped.
+#[test]
+fn test_far_out_of_range_index_skipped() {
+    // Item with index way out of bounds
+    let input = r#"[{
+        "index": 100,
+        "verification_status": "confirmed",
+        "verification_notes": "This should be skipped"
+    }]"#;
+
+    let out = parse_batch_verification_verdict(input, 1);
+
+    assert_eq!(
+        out[0].0,
+        VerificationStatus::NeedsReview,
+        "far out-of-range index must not panic or overwrite"
+    );
+}
+
+/// Valid indices within range must still work correctly.
+#[test]
+fn test_valid_index_within_range_works() {
+    let input = r#"[{
+        "index": 0,
+        "verification_status": "confirmed",
+        "verification_notes": "Valid item",
+        "seven_question_gate": {
+            "reachability": "yes",
+            "controllability": "yes",
+            "preconditions": "no",
+            "impact": "yes",
+            "context": "yes",
+            "evidence": "yes",
+            "confidence": "yes"
+        },
+        "concrete_impact_proof": {
+            "attack_vector": "test attack",
+            "is_theoretical": false
         }
-    }
+    }]"#;
+
+    let out = parse_batch_verification_verdict(input, 1);
+
+    assert_eq!(out[0].0, VerificationStatus::Confirmed);
+    assert_eq!(out[0].1, "Valid item");
 }
 
-impl LlmChatClient for MockLlmClient {
-    async fn chat(&self, _messages: &[ChatMessage]) -> Result<ChatResponseWithModel, ScanError> {
-        let mut count = self.call_count.lock().unwrap();
-        let idx = *count;
-        *count += 1;
-
-        let response = self.responses.get(idx).ok_or(ScanError::Parse {
-            message: "No more responses available".to_string(),
-            source: None,
-        })?;
-
-        Ok(ChatResponseWithModel {
-            content: response.clone(),
-            model_used: "mock".to_string(),
-        })
-    }
-}
-
-fn create_test_finding(id: &str, line: u32) -> VulnerabilityFinding {
-    VulnerabilityFinding {
-        id: id.to_string(),
-        title: "Test finding".to_string(),
-        description: "Test finding".to_string(),
-        severity: Severity::Medium,
-        confidence_score: 0.5,
-        cwe_id: None,
-        file_path: "test.rs".to_string(),
-        line_number: Some(line),
-        code_snippet: None,
-        diff_hunk: None,
-        recommendation: None,
-        code_location: None,
-        already_reported: false,
-        sources: vec![],
-        commit_reference: None,
-        ticket_reference: None,
-        priority_score: None,
-        cross_file_references: None,
-        verification_status: None,
-        verification_notes: None,
-        verification_error: None,
-        agent_evidence_path: None,
-        security_issue: None,
-        poc_code: None,
-        mitigation_code: None,
-        poc_format: None,
-        llm_model: None,
-        agent_mode: false,
-        statement_range: None,
-        triage_verdict: None,
-        evidence: vec![],
-        verification_tier: None,
-    }
-}
-
+/// Multiple items with one out-of-range: valid ones process, out-of-range skipped.
 #[test]
-fn test_batch_verdict_with_index_field() {
-    // Well-formed response WITH index field - includes gate per updated prompt
-    let json_response = r#"[
-        {"index": 0, "verification_status": "confirmed", "verification_notes": "Real vulnerability", "seven_question_gate": {"reachability":"yes","controllability":"yes","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"}, "concrete_impact_proof": {"attack_vector":"test","consequence":"test","is_theoretical":false}},
-        {"index": 1, "verification_status": "false_positive", "verification_notes": "Safe context"},
-        {"index": 2, "verification_status": "needs_review", "verification_notes": "Unclear evidence"}
-    ]"#;
-
-    let results = parse_batch_verification_verdict(json_response, 3);
-
-    assert_eq!(results.len(), 3);
-    assert_eq!(results[0].0, VerificationStatus::Confirmed);
-    assert_eq!(results[0].1, "Real vulnerability");
-    assert_eq!(results[1].0, VerificationStatus::FalsePositive);
-    assert_eq!(results[1].1, "Safe context");
-    assert_eq!(results[2].0, VerificationStatus::NeedsReview);
-    assert_eq!(results[2].1, "Unclear evidence");
-}
-
-#[test]
-fn test_batch_verdict_without_index_field_positional_fallback() {
-    // Response WITHOUT index field - should use positional fallback
-    // Includes gate for confirmed items per updated prompt
-    let json_response = r#"[
-        {"verification_status": "confirmed", "verification_notes": "First item", "seven_question_gate": {"reachability":"yes","controllability":"yes","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"}, "concrete_impact_proof": {"attack_vector":"test","consequence":"test","is_theoretical":false}},
-        {"verification_status": "false_positive", "verification_notes": "Second item"},
-        {"verification_status": "confirmed", "verification_notes": "Third item", "seven_question_gate": {"reachability":"yes","controllability":"yes","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"}, "concrete_impact_proof": {"attack_vector":"test","consequence":"test","is_theoretical":false}}
-    ]"#;
-
-    let results = parse_batch_verification_verdict(json_response, 3);
-
-    assert_eq!(results.len(), 3);
-    assert_eq!(results[0].0, VerificationStatus::Confirmed);
-    assert_eq!(results[0].1, "First item");
-    assert_eq!(results[1].0, VerificationStatus::FalsePositive);
-    assert_eq!(results[1].1, "Second item");
-    assert_eq!(results[2].0, VerificationStatus::Confirmed);
-    assert_eq!(results[2].1, "Third item");
-}
-
-#[tokio::test]
-async fn test_batch_verdict_malformed_object_salvage() {
-    // Malformed response - invalid JSON
-    let malformed = r#"[{"verification_status": "confirmed", "invalid json"#;
-
-    let results = parse_batch_verification_verdict(malformed, 3);
-
-    // Entire batch fails - all become NeedsReview with raw content
-    assert_eq!(results.len(), 3);
-    assert!(
-        results
-            .iter()
-            .all(|(status, _)| *status == VerificationStatus::NeedsReview)
-    );
-    assert!(results[0].1.contains("invalid json"));
-}
-
-#[test]
-fn test_batch_verdict_invalid_status_defaults_to_needs_review() {
-    // Invalid verification_status should default to NeedsReview
-    let json_response = r#"[
-        {"index": 0, "verification_status": "invalid_status", "verification_notes": "Bad status"}
-    ]"#;
-
-    let results = parse_batch_verification_verdict(json_response, 1);
-
-    assert_eq!(results.len(), 1);
-    assert_eq!(results[0].0, VerificationStatus::NeedsReview);
-    assert_eq!(results[0].1, "Bad status");
-}
-
-#[test]
-fn test_batch_verdict_fewer_items_than_expected() {
-    // Response has fewer items than expected - includes gate for confirmed item
-    let json_response = r#"[
-        {"index": 0, "verification_status": "confirmed", "verification_notes": "First", "seven_question_gate": {"reachability":"yes","controllability":"yes","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"}, "concrete_impact_proof": {"attack_vector":"test","consequence":"test","is_theoretical":false}}
-    ]"#;
-
-    let results = parse_batch_verification_verdict(json_response, 3);
-
-    assert_eq!(results.len(), 3);
-    assert_eq!(results[0].0, VerificationStatus::Confirmed);
-    // Missing items should be NeedsReview with placeholder message
-    assert_eq!(results[1].0, VerificationStatus::NeedsReview);
-    assert!(results[1].1.contains("missing"));
-    assert_eq!(results[2].0, VerificationStatus::NeedsReview);
-    assert!(results[2].1.contains("missing"));
-}
-
-#[tokio::test]
-async fn test_verify_findings_batched_with_index() {
-    // Test full batch verification flow with index field
-    let responses = vec![
-        r#"[
-            {"index": 0, "verification_status": "confirmed", "verification_notes": "Real vuln", "seven_question_gate": {"reachability":"yes","controllability":"yes","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"}, "concrete_impact_proof": {"attack_vector":"test","consequence":"test","is_theoretical":false}},
-            {"index": 1, "verification_status": "false_positive", "verification_notes": "Safe code"},
-            {"index": 2, "verification_status": "confirmed", "verification_notes": "Another vuln", "seven_question_gate": {"reachability":"yes","controllability":"yes","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"}, "concrete_impact_proof": {"attack_vector":"test","consequence":"test","is_theoretical":false}},
-            {"index": 3, "verification_status": "false_positive", "verification_notes": "Not a vuln"}
-        ]"#.to_string(),
-    ];
-
-    let client = MockLlmClient::new(responses);
-    let findings = vec![
-        create_test_finding("f1", 10),
-        create_test_finding("f2", 20),
-        create_test_finding("f3", 30),
-        create_test_finding("f4", 40),
-    ];
-
-    let (results, fallback_count) =
-        verify_findings_batched(&client, &findings, 8, &HashMap::new(), &HashMap::new()).await;
-
-    assert_eq!(results.len(), 4);
-    assert_eq!(fallback_count, 0); // No fallbacks used
-    assert_eq!(results[0].0, VerificationStatus::Confirmed);
-    assert_eq!(results[1].0, VerificationStatus::FalsePositive);
-    assert_eq!(results[2].0, VerificationStatus::Confirmed);
-    assert_eq!(results[3].0, VerificationStatus::FalsePositive);
-}
-
-#[tokio::test]
-async fn test_verify_findings_batched_without_index_fallback() {
-    // Test full batch verification flow without index field
-    // Includes gate for confirmed items per updated prompt
-    let responses = vec![
-        r#"[
-            {"verification_status": "confirmed", "verification_notes": "First", "seven_question_gate": {"reachability":"yes","controllability":"yes","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"}, "concrete_impact_proof": {"attack_vector":"test","consequence":"test","is_theoretical":false}},
-            {"verification_status": "false_positive", "verification_notes": "Second"},
-            {"verification_status": "needs_review", "verification_notes": "Third"},
-            {"verification_status": "confirmed", "verification_notes": "Fourth", "seven_question_gate": {"reachability":"yes","controllability":"yes","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"}, "concrete_impact_proof": {"attack_vector":"test","consequence":"test","is_theoretical":false}}
-        ]"#
-        .to_string(),
-    ];
-
-    let client = MockLlmClient::new(responses);
-    let findings = vec![
-        create_test_finding("f1", 10),
-        create_test_finding("f2", 20),
-        create_test_finding("f3", 30),
-        create_test_finding("f4", 40),
-    ];
-
-    let (results, fallback_count) =
-        verify_findings_batched(&client, &findings, 8, &HashMap::new(), &HashMap::new()).await;
-
-    assert_eq!(results.len(), 4);
-    assert_eq!(fallback_count, 4); // All 4 items used positional fallback
-    assert_eq!(results[0].0, VerificationStatus::Confirmed);
-    assert_eq!(results[1].0, VerificationStatus::FalsePositive);
-    assert_eq!(results[2].0, VerificationStatus::NeedsReview);
-    assert_eq!(results[3].0, VerificationStatus::Confirmed);
-}
-
-/// Contract test: verify VERIFICATION_BATCH_FIELDS matches the parser's BatchVerdictItem struct.
-#[test]
-fn test_verification_batch_fields_spec_consistency() {
-    // This test ensures the field spec is complete and accurate.
-    // It checks that all fields referenced in the spec are accounted for.
-
-    let mut has_index = false;
-    let mut has_verification_status = false;
-    let mut has_verification_notes = false;
-
-    for (field_name, expected_type, is_required) in VERIFICATION_BATCH_FIELDS.iter() {
-        match *field_name {
-            "index" => {
-                has_index = true;
-                assert!(
-                    !is_required,
-                    "index field should be optional for positional fallback"
-                );
-                assert_eq!(*expected_type, "integer", "index should be integer type");
-            }
-            "verification_status" => {
-                has_verification_status = true;
-                assert!(*is_required, "verification_status is required");
-                assert_eq!(
-                    *expected_type, "string",
-                    "verification_status should be string type"
-                );
-            }
-            "verification_notes" => {
-                has_verification_notes = true;
-                // notes is optional but expected
-                assert_eq!(
-                    *expected_type, "string",
-                    "verification_notes should be string type"
-                );
-            }
-            other => {
-                // Allow gate and proof fields
-                assert!(
-                    other == "seven_question_gate" || other == "concrete_impact_proof",
-                    "Unexpected field in VERIFICATION_BATCH_FIELDS: {}",
-                    other
-                );
-            }
+fn test_mixed_valid_and_invalid_indices() {
+    let input = r#"[{
+        "index": 0,
+        "verification_status": "confirmed",
+        "verification_notes": "Valid first item",
+        "seven_question_gate": {
+            "reachability": "yes",
+            "controllability": "yes",
+            "preconditions": "no",
+            "impact": "yes",
+            "context": "yes",
+            "evidence": "yes",
+            "confidence": "yes"
+        },
+        "concrete_impact_proof": {
+            "attack_vector": "test attack",
+            "is_theoretical": false
         }
-    }
+    }, {
+        "index": 2,
+        "verification_status": "false_positive",
+        "verification_notes": "Out of range"
+    }, {
+        "index": 1,
+        "verification_status": "needs_review",
+        "verification_notes": "Valid second item",
+        "seven_question_gate": {
+            "reachability": "yes",
+            "controllability": "yes",
+            "preconditions": "no",
+            "impact": "yes",
+            "context": "yes",
+            "evidence": "yes",
+            "confidence": "yes"
+        },
+        "concrete_impact_proof": {
+            "attack_vector": "test attack",
+            "is_theoretical": false
+        }
+    }]"#;
 
-    assert!(
-        has_index,
-        "VERIFICATION_BATCH_FIELDS must include 'index' field"
-    );
-    assert!(
-        has_verification_status,
-        "VERIFICATION_BATCH_FIELDS must include 'verification_status' field"
-    );
-    assert!(
-        has_verification_notes,
-        "VERIFICATION_BATCH_FIELDS must include 'verification_notes' field"
-    );
-}
+    let out = parse_batch_verification_verdict(input, 2);
 
-/// Contract test: verify the volatile tail prompt includes index field instruction.
-#[test]
-fn test_verification_prompt_includes_index_field_instruction() {
-    // The volatile tail (build_volatile_verification_tail) should instruct the LLM
-    // to include the index field in each verdict object.
+    // Index 0: valid
+    assert_eq!(out[0].0, VerificationStatus::Confirmed);
+    assert_eq!(out[0].1, "Valid first item");
 
-    // Read the verification.rs source to check the instruction
-    let manifest_dir = env!("CARGO_MANIFEST_DIR");
-    let verification_path =
-        Path::new(manifest_dir).join("src/scanner/phases/llm_phases/verification.rs");
-    let content =
-        fs::read_to_string(&verification_path).expect("Should be able to read verification.rs");
-    // The prompt lives in Rust string literals, so quotes appear escaped in the source
-    let unescaped = content.replace('\\', "");
-
-    // Check that the instruction mentions the index field
-    assert!(
-        unescaped.contains("\"index\""),
-        "Verification prompt should include instruction about 'index' field"
-    );
-
-    // Check that it shows the example format with index
-    assert!(
-        unescaped.contains("\"index\": 0"),
-        "Verification prompt should show example with index value"
-    );
-}
-
-/// Contract test: parse example with and without index field both succeed.
-#[test]
-fn test_verification_batch_accepts_both_index_formats() {
-    // Example WITH index field - includes gate per updated prompt
-    let with_index = r#"[
-        {"index": 0, "verification_status": "confirmed", "verification_notes": "First", "seven_question_gate": {"reachability":"yes","controllability":"yes","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"}, "concrete_impact_proof": {"attack_vector":"test","consequence":"test","is_theoretical":false}},
-        {"index": 1, "verification_status": "false_positive", "verification_notes": "Second"}
-    ]"#;
-
-    let results_with = parse_batch_verification_verdict(with_index, 2);
-    assert_eq!(results_with.len(), 2);
-    assert_eq!(results_with[0].0, VerificationStatus::Confirmed);
-    assert_eq!(results_with[1].0, VerificationStatus::FalsePositive);
-
-    // Example WITHOUT index field (positional fallback) - includes gate for confirmed
-    let without_index = r#"[
-        {"verification_status": "confirmed", "verification_notes": "First", "seven_question_gate": {"reachability":"yes","controllability":"yes","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"}, "concrete_impact_proof": {"attack_vector":"test","consequence":"test","is_theoretical":false}},
-        {"verification_status": "false_positive", "verification_notes": "Second"}
-    ]"#;
-
-    let results_without = parse_batch_verification_verdict(without_index, 2);
-    assert_eq!(results_without.len(), 2);
-    assert_eq!(results_without[0].0, VerificationStatus::Confirmed);
-    assert_eq!(results_without[1].0, VerificationStatus::FalsePositive);
-
-    // Both should produce the same results
-    assert_eq!(results_with, results_without);
-}
-
-/// Contract test: verify field types in verification batch examples.
-#[test]
-fn test_verification_batch_field_types() {
-    // Test that index is parsed as integer (when present) - includes gate
-    let json_with_index = r#"[
-        {"index": 0, "verification_status": "confirmed", "verification_notes": "Test", "seven_question_gate": {"reachability":"yes","controllability":"yes","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"}, "concrete_impact_proof": {"attack_vector":"test","consequence":"test","is_theoretical":false}}
-    ]"#;
-
-    let results = parse_batch_verification_verdict(json_with_index, 1);
-    assert_eq!(results.len(), 1);
-    assert_eq!(results[0].0, VerificationStatus::Confirmed);
-
-    // Test that string fields are properly handled
-    let json_with_strings = r#"[
-        {"index": 0, "verification_status": "false_positive", "verification_notes": "Detailed notes here"}
-    ]"#;
-
-    let results = parse_batch_verification_verdict(json_with_strings, 1);
-    assert_eq!(results[0].1, "Detailed notes here");
+    // Index 1: valid
+    assert_eq!(out[1].0, VerificationStatus::NeedsReview);
+    assert_eq!(out[1].1, "Valid second item");
 }

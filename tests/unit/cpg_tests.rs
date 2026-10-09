@@ -9,6 +9,16 @@ use baco::cpg::{CodeSlice, CpgConfig, CpgError, DataFlowNode, QueryResult};
 use std::path::PathBuf;
 
 // ============================================================================
+// Helper for temp CPG paths
+// ============================================================================
+
+fn temp_cpg_path(prefix: &str) -> PathBuf {
+    static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    std::env::temp_dir().join(format!("{}-{}-{seq:x}", prefix, std::process::id()))
+}
+
+// ============================================================================
 // get_query_for_cwe tests - comprehensive CWE coverage
 // ============================================================================
 
@@ -388,13 +398,14 @@ fn test_data_flow_nodes_preserve_order() {
 
 #[test]
 fn test_cpg_handle_joern_struct_construction() {
+    let workspace = temp_cpg_path("cpg-workspace");
     let handle = baco::cpg::CpgHandleJoern {
-        workspace: PathBuf::from("/tmp/workspace"),
-        cpg_path: PathBuf::from("/tmp/workspace/project.cpg"),
+        workspace: workspace.clone(),
+        cpg_path: workspace.join("project.cpg"),
     };
 
-    assert_eq!(handle.workspace, PathBuf::from("/tmp/workspace"));
-    assert_eq!(handle.cpg_path, PathBuf::from("/tmp/workspace/project.cpg"));
+    assert_eq!(handle.workspace, workspace);
+    assert_eq!(handle.cpg_path, workspace.join("project.cpg"));
 }
 
 #[test]

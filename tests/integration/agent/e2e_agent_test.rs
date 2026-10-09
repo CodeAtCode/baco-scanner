@@ -2,6 +2,16 @@ use crate::common::fixtures::mock_llm::MockLlmClient;
 use baco::config::{AgentConfig, ScannerConfig};
 use std::path::PathBuf;
 
+// ============================================================================
+// Helper for temp e2e agent paths
+// ============================================================================
+
+fn temp_e2e_path(prefix: &str) -> PathBuf {
+    static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    std::env::temp_dir().join(format!("{}-{}-{seq:x}", prefix, std::process::id()))
+}
+
 fn compute_hash(path: &PathBuf) -> String {
     use std::fs::File;
     use std::io::Read;
@@ -35,7 +45,7 @@ fn test_agent_enabled_with_mock() {
         MockLlmClient::mock_final_response("[]"),
     ];
     let _mock_client = MockLlmClient::new(responses);
-    let project_root = PathBuf::from("/tmp");
+    let project_root = temp_e2e_path("e2e-agent-test");
     let config = AgentConfig::default();
     let sandbox =
         baco::agent::sandbox::ToolSandbox::new(project_root.clone(), config.tool_timeout_secs);

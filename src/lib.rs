@@ -6,6 +6,7 @@ pub mod chain_analysis;
 pub mod checkpoint;
 pub mod citation_verification;
 pub mod cli;
+pub mod confidence_normalization;
 pub mod confidence_refinement;
 pub mod config;
 pub mod context; // Context extraction module
@@ -23,6 +24,7 @@ pub mod exploit;
 pub mod file_hash;
 pub mod findings;
 pub mod git_analysis;
+pub mod historical_patterns;
 pub mod hook_registry;
 pub mod incremental_scan;
 pub mod indexer;

@@ -110,7 +110,6 @@ impl Bm25Index {
 
     pub fn index(&mut self, doc_id: usize, text: &str) {
         let terms = self.tokenize(text);
-        let _term_count = terms.len() as f64;
 
         // Update document lengths
         self.doc_lengths.insert(doc_id, terms.len());

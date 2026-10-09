@@ -10,10 +10,20 @@
 //! - ProjectBaseline save/load roundtrip
 //! - Empty baseline handling
 
-use baco::confidence_refinement::{ProjectBaseline, normalize_confidence};
+use baco::confidence_normalization::{ProjectBaseline, normalize_confidence};
 use baco::config::{NormalizationConfig, NormalizationTier};
 use std::path::PathBuf;
 use tempfile::NamedTempFile;
+
+// ============================================================================
+// Helper for temp normalization paths
+// ============================================================================
+
+fn temp_norm_path(prefix: &str) -> PathBuf {
+    static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    std::env::temp_dir().join(format!("{}-{}-{seq:x}", prefix, std::process::id()))
+}
 
 // ============================================================================
 // Normalization Tier Tests
@@ -259,7 +269,7 @@ fn test_baseline_save_load_various_cases() {
                 assert!((loaded.sum_sq_dev - baseline.sum_sq_dev).abs() < 0.001);
             }
             "nonexistent_file" => {
-                let path = PathBuf::from("/tmp/nonexistent_baseline_12345.json");
+                let path = temp_norm_path("nonexistent-baseline");
                 let baseline = ProjectBaseline::load(&path);
                 assert_eq!(baseline, ProjectBaseline::empty());
             }

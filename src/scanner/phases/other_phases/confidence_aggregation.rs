@@ -35,7 +35,7 @@ pub async fn run_confidence_scoring(
     // Load project baseline if present
     let output_path = PathBuf::from(&config.output.dir);
     let baseline_path = output_path.join(PROJECT_BASELINE_FILE);
-    let mut baseline = crate::confidence_refinement::ProjectBaseline::load(&baseline_path);
+    let mut baseline = crate::confidence_normalization::ProjectBaseline::load(&baseline_path);
     tracing::info!(
         "Loaded project baseline: {} findings, {:.1}% FP rate",
         baseline.total_findings,
@@ -113,7 +113,7 @@ pub async fn run_confidence_scoring(
     if config.normalization.enabled {
         let norm_config = &config.normalization;
         for finding in &mut updated_findings {
-            let calibrated = crate::confidence_refinement::normalize_confidence(
+            let calibrated = crate::confidence_normalization::normalize_confidence(
                 finding.confidence_score,
                 norm_config,
                 &baseline,

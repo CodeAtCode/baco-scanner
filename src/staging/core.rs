@@ -46,19 +46,46 @@ static WORKTREE_SEQ: AtomicU64 = AtomicU64::new(0);
 static REPO_GIT_LOCK: Mutex<()> = Mutex::new(());
 
 /// Manages a temporary git worktree for safe patch validation
+///
+/// Fields are private to prevent constructing a StagingArea that could
+/// delete a foreign directory on Drop. Tests use `new_for_tests()` which
+/// always derives the worktree path from the system temp directory.
+///
+/// # Compile-fail test
+///
+/// The following code should NOT compile (uncomment to verify):
+/// ```compile_fail
+/// use baco::staging::core::StagingArea;
+/// let staging = StagingArea {
+///     worktree_path: std::path::PathBuf::from("/tmp"),
+///     original_repo_path: std::path::PathBuf::from("/tmp"),
+///     is_created: true,
+/// };
+/// ```
 pub struct StagingArea {
-    pub worktree_path: PathBuf,
-    pub original_repo_path: PathBuf,
-    pub is_created: bool,
+    worktree_path: PathBuf,
+    original_repo_path: PathBuf,
+    is_created: bool,
 }
 
 impl StagingArea {
     /// Creates a new staging area by cloning the repo into a temp worktree
+    /// The worktree path is derived from the system temp directory.
     pub fn create(repo_path: &Path) -> StagingResult<Self> {
-        let original_repo_path = repo_path.to_path_buf();
+        let worktree_path = Self::derive_worktree_path();
+        Self::create_with_worktree(repo_path, worktree_path)
+    }
+
+    /// Derives a unique worktree path under the system temp directory
+    fn derive_worktree_path() -> PathBuf {
         let seq = WORKTREE_SEQ.fetch_add(1, Ordering::Relaxed);
-        let worktree_path =
-            std::env::temp_dir().join(format!("baco-staging-{}-{}", std::process::id(), seq));
+        std::env::temp_dir().join(format!("baco-staging-{}-{}", std::process::id(), seq))
+    }
+
+    /// Internal constructor that creates a worktree at the given path
+    /// The path is used as-is; no derivation happens here.
+    fn create_with_worktree(repo_path: &Path, worktree_path: PathBuf) -> StagingResult<Self> {
+        let original_repo_path = repo_path.to_path_buf();
 
         tracing::info!("Creating staging worktree at: {:?}", worktree_path);
 
@@ -81,11 +108,32 @@ impl StagingArea {
 
         Ok(Self {
             worktree_path,
-            original_repo_path: original_repo_path.to_path_buf(),
+            original_repo_path,
             is_created: true,
         })
     }
+}
 
+/// Test-only constructor. Always derives the worktree path from temp_dir
+/// to make it structurally impossible to point cleanup at a foreign directory.
+pub fn new_for_tests() -> StagingArea {
+    StagingArea {
+        worktree_path: StagingArea::derive_worktree_path(),
+        original_repo_path: std::env::temp_dir().join("test-repo-placeholder"),
+        is_created: false,
+    }
+}
+
+/// Test-only constructor with explicit is_created flag
+pub fn new_for_tests_with_created(is_created: bool) -> StagingArea {
+    StagingArea {
+        worktree_path: StagingArea::derive_worktree_path(),
+        original_repo_path: std::env::temp_dir().join("test-repo-placeholder"),
+        is_created,
+    }
+}
+
+impl StagingArea {
     /// Applies a unified diff patch to the staging worktree
     pub fn apply_patch(&self, diff: &str) -> StagingResult<()> {
         if !self.is_created {
@@ -94,9 +142,24 @@ impl StagingArea {
             ));
         }
 
-        tracing::info!("Applying patch to {:?}", self.worktree_path);
+        tracing::info!("Applying patch to {:?}", self.worktree_path());
 
         apply_patch_to_worktree(&self.worktree_path, diff).map_err(StagingError::PatchApply)
+    }
+
+    /// Returns the worktree path (read-only)
+    pub fn worktree_path(&self) -> &Path {
+        &self.worktree_path
+    }
+
+    /// Returns the original repo path (read-only)
+    pub fn original_repo_path(&self) -> &Path {
+        &self.original_repo_path
+    }
+
+    /// Returns whether the staging area was created
+    pub fn is_created(&self) -> bool {
+        self.is_created
     }
 
     /// Validates the patch by running cargo check and cargo test
@@ -107,7 +170,7 @@ impl StagingArea {
             ));
         }
 
-        tracing::info!("Validating patch in {:?}", self.worktree_path);
+        tracing::info!("Validating patch in {:?}", self.worktree_path());
 
         let mut result = crate::staging::error::PatchValidationResult::default();
 
@@ -154,7 +217,7 @@ impl StagingArea {
             return Ok(());
         }
 
-        tracing::info!("Cleaning up staging worktree at {:?}", self.worktree_path);
+        tracing::info!("Cleaning up staging worktree at {:?}", self.worktree_path());
 
         let _guard = REPO_GIT_LOCK
             .lock()
@@ -188,7 +251,7 @@ impl StagingArea {
         }
 
         // Try force removal
-        let _ = std::fs::remove_dir_all(&self.worktree_path);
+        let _ = std::fs::remove_dir_all(self.worktree_path());
 
         self.is_created = false;
         Ok(())
@@ -199,7 +262,7 @@ impl StagingArea {
         if self.is_created {
             // Reset worktree to HEAD
             let _ = Command::new("git")
-                .current_dir(&self.worktree_path)
+                .current_dir(self.worktree_path())
                 .args(["reset", "--hard", "HEAD"])
                 .output();
 

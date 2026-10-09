@@ -1,4 +1,5 @@
 use baco::scanner_types::patch::PatchCandidate;
+use baco::staging::core::new_for_tests_with_created;
 use baco::staging::*;
 use std::fs;
 use std::path::PathBuf;
@@ -370,12 +371,7 @@ fn test_autopatch_error_debug_trait() {
 
 #[test]
 fn test_staging_area_not_created_apply_patch() {
-    let temp_dir = create_temp_rust_project();
-    let staging = StagingArea {
-        worktree_path: temp_dir.clone(),
-        original_repo_path: temp_dir.clone(),
-        is_created: false,
-    };
+    let staging = new_for_tests_with_created(false);
 
     let result = staging.apply_patch("some diff");
 
@@ -386,18 +382,11 @@ fn test_staging_area_not_created_apply_patch() {
         }
         _ => panic!("Expected PatchApply error"),
     }
-
-    cleanup_temp_dir(&temp_dir);
 }
 
 #[test]
 fn test_staging_area_not_created_validate() {
-    let temp_dir = create_temp_rust_project();
-    let staging = StagingArea {
-        worktree_path: temp_dir.clone(),
-        original_repo_path: temp_dir.clone(),
-        is_created: false,
-    };
+    let staging = new_for_tests_with_created(false);
 
     let result = staging.validate();
 
@@ -408,85 +397,48 @@ fn test_staging_area_not_created_validate() {
         }
         _ => panic!("Expected Validation error"),
     }
-
-    cleanup_temp_dir(&temp_dir);
 }
 
 #[test]
 fn test_staging_area_cleanup_not_created() {
-    let temp_dir = create_temp_rust_project();
-    let mut staging = StagingArea {
-        worktree_path: temp_dir.clone(),
-        original_repo_path: temp_dir.clone(),
-        is_created: false,
-    };
+    let mut staging = new_for_tests_with_created(false);
 
     let result = staging.cleanup();
 
     // Should succeed without doing anything
     assert!(result.is_ok());
-
-    cleanup_temp_dir(&temp_dir);
 }
 
 #[test]
 fn test_staging_area_rollback_not_created() {
-    let temp_dir = create_temp_rust_project();
-    let mut staging = StagingArea {
-        worktree_path: temp_dir.clone(),
-        original_repo_path: temp_dir.clone(),
-        is_created: false,
-    };
+    let mut staging = new_for_tests_with_created(false);
 
     let result = staging.rollback();
 
     // Should succeed without doing anything
     assert!(result.is_ok());
-
-    cleanup_temp_dir(&temp_dir);
 }
 
 #[test]
 fn test_staging_area_is_created_flag() {
-    let temp_dir = create_temp_rust_project();
-
     // Just verify we can create StagingArea with different is_created values
-    let _staging_created = StagingArea {
-        worktree_path: temp_dir.clone(),
-        original_repo_path: temp_dir.clone(),
-        is_created: true,
-    };
+    let _staging_created = new_for_tests_with_created(true);
 
-    let staging_not_created = StagingArea {
-        worktree_path: temp_dir.clone(),
-        original_repo_path: temp_dir.clone(),
-        is_created: false,
-    };
+    let staging_not_created = new_for_tests_with_created(false);
 
     // Verify is_created field is set correctly
-    assert!(!staging_not_created.is_created);
-
-    cleanup_temp_dir(&temp_dir);
+    assert!(!staging_not_created.is_created());
 }
 
 #[test]
 fn test_staging_area_drop_auto_cleanup() {
-    let temp_dir = create_temp_rust_project();
-
     // Create a staging area that will be dropped
     {
-        let staging = StagingArea {
-            worktree_path: temp_dir.clone(),
-            original_repo_path: temp_dir.clone(),
-            is_created: false, // Set to false to avoid actual git operations
-        };
+        let staging = new_for_tests_with_created(false);
         // Verify is_created before drop
-        assert!(!staging.is_created);
+        assert!(!staging.is_created());
         // Drop happens here
     }
-
-    // Temp dir cleanup
-    cleanup_temp_dir(&temp_dir);
 }
 
 #[test]
@@ -1351,41 +1303,26 @@ async fn test_autopatcher_execute_batch_with_multiple_findings() {
 
 #[test]
 fn test_staging_area_worktree_path_type() {
-    let temp_dir = create_temp_rust_project();
-    let staging = StagingArea {
-        worktree_path: temp_dir.clone(),
-        original_repo_path: temp_dir.clone(),
-        is_created: false,
-    };
+    let staging = new_for_tests_with_created(false);
 
-    // Verify worktree_path is a PathBuf
-    assert!(staging.worktree_path.is_absolute() || staging.worktree_path.starts_with("/tmp"));
-
-    cleanup_temp_dir(&temp_dir);
+    // Verify worktree_path is under temp_dir
+    assert!(staging.worktree_path().starts_with(std::env::temp_dir()));
 }
 
 #[test]
 fn test_staging_area_original_repo_path() {
-    let temp_dir = create_temp_rust_project();
-    let staging = StagingArea {
-        worktree_path: temp_dir.join("worktree"),
-        original_repo_path: temp_dir.clone(),
-        is_created: false,
-    };
+    let staging = new_for_tests_with_created(false);
 
-    assert_eq!(staging.original_repo_path, temp_dir.as_path());
-
-    cleanup_temp_dir(&temp_dir);
+    // original_repo_path is a placeholder from new_for_tests_with_created()
+    // Verify it's under temp_dir and has the expected structure
+    let path = staging.original_repo_path();
+    assert!(path.starts_with(std::env::temp_dir()));
+    assert!(path.to_string_lossy().contains("test-repo-placeholder"));
 }
 
 #[test]
 fn test_apply_patch_with_empty_diff() {
-    let temp_dir = create_temp_rust_project();
-    let staging = StagingArea {
-        worktree_path: temp_dir.clone(),
-        original_repo_path: temp_dir.clone(),
-        is_created: true, // Simulate created state
-    };
+    let staging = new_for_tests_with_created(true);
 
     // Empty patch - function should handle gracefully
     // Without actual git worktree, this will fail but not panic
@@ -1393,58 +1330,35 @@ fn test_apply_patch_with_empty_diff() {
     // Verify it returns a result - the key is that it doesn't panic
     // and returns a proper error when worktree is not created
     assert!(result.is_err()); // Should fail because is_created=true but no real worktree
-
-    cleanup_temp_dir(&temp_dir);
 }
 
 #[test]
 fn test_validate_with_empty_staging() {
-    let temp_dir = create_temp_rust_project();
-    let staging = StagingArea {
-        worktree_path: temp_dir.clone(),
-        original_repo_path: temp_dir.clone(),
-        is_created: false,
-    };
+    let staging = new_for_tests_with_created(false);
 
     let result = staging.validate();
     assert!(result.is_err());
     assert!(matches!(result, Err(StagingError::Validation(_))));
-
-    cleanup_temp_dir(&temp_dir);
 }
 
 #[test]
 fn test_cleanup_sets_is_created_false() {
-    let temp_dir = create_temp_rust_project();
-    let mut staging = StagingArea {
-        worktree_path: temp_dir.clone(),
-        original_repo_path: temp_dir.clone(),
-        is_created: true,
-    };
+    let mut staging = new_for_tests_with_created(true);
 
-    // Manually simulate cleanup by setting is_created to false
-    staging.is_created = false;
+    // Call cleanup which sets is_created to false
+    let _ = staging.cleanup();
 
-    assert!(!staging.is_created);
-
-    cleanup_temp_dir(&temp_dir);
+    assert!(!staging.is_created());
 }
 
 #[test]
 fn test_rollback_with_created_staging() {
-    let temp_dir = create_temp_rust_project();
-    let mut staging = StagingArea {
-        worktree_path: temp_dir.clone(),
-        original_repo_path: temp_dir.clone(),
-        is_created: true, // Simulate created state
-    };
+    let mut staging = new_for_tests_with_created(true);
 
     // Rollback should execute without panic
     let result = staging.rollback();
     // Rollback executes without error even without real worktree
     assert!(result.is_ok());
-
-    cleanup_temp_dir(&temp_dir);
 }
 
 // ============================================================================
@@ -1624,8 +1538,8 @@ fn test_staging_area_create_with_valid_git_repo() {
 
     // Now test StagingArea::create with valid git repo
     let mut staging = StagingArea::create(&repo_path).unwrap();
-    assert!(staging.is_created);
-    assert!(staging.worktree_path.exists());
+    assert!(staging.is_created());
+    assert!(staging.worktree_path().exists());
 
     // Cleanup the worktree
     staging.cleanup().unwrap();
@@ -1720,41 +1634,31 @@ async fn test_autopatcher_generate_patch_long_file_path_returns_no_llm_client() 
 
 #[test]
 fn test_staging_area_paths_after_creation() {
-    let temp_dir = create_temp_rust_project();
-    let staging = StagingArea {
-        worktree_path: temp_dir.join("staging-worktree"),
-        original_repo_path: temp_dir.clone(),
-        is_created: true,
-    };
+    // Use the accessor-based construction
+    let staging = new_for_tests_with_created(true);
 
-    assert!(staging.worktree_path.ends_with("staging-worktree"));
-    assert_eq!(staging.original_repo_path, temp_dir);
-
-    cleanup_temp_dir(&temp_dir);
+    // original_repo_path is a placeholder from new_for_tests_with_created()
+    // Verify it's under temp_dir and has the expected structure
+    let path = staging.original_repo_path();
+    assert!(path.starts_with(std::env::temp_dir()));
+    assert!(path.to_string_lossy().contains("test-repo-placeholder"));
 }
 
 #[test]
 fn test_multiple_staging_areas_independent() {
-    let temp_dir1 = create_temp_rust_project();
-    let temp_dir2 = create_temp_rust_project();
+    // Both staging areas use auto-generated paths from temp_dir
+    // They will have the same original_repo_path but different worktree paths
+    let staging1 = new_for_tests_with_created(true);
+    let staging2 = new_for_tests_with_created(true);
 
-    let staging1 = StagingArea {
-        worktree_path: temp_dir1.join("worktree1"),
-        original_repo_path: temp_dir1.clone(),
-        is_created: true,
-    };
-
-    let staging2 = StagingArea {
-        worktree_path: temp_dir2.join("worktree2"),
-        original_repo_path: temp_dir2.clone(),
-        is_created: true,
-    };
-
-    assert_ne!(staging1.worktree_path, staging2.worktree_path);
-    assert_ne!(staging1.original_repo_path, staging2.original_repo_path);
-
-    cleanup_temp_dir(&temp_dir1);
-    cleanup_temp_dir(&temp_dir2);
+    // The worktree paths should be unique (derived with timestamp + counter)
+    // The original_repo_path is a placeholder, so they will be the same
+    // This test verifies we can create multiple staging areas without conflict
+    assert_ne!(
+        staging1.worktree_path(),
+        staging2.worktree_path(),
+        "Worktree paths should be unique"
+    );
 }
 
 // ============================================================================
@@ -1862,12 +1766,15 @@ fn test_staging_area_create_worktree() {
     let staging = staging.unwrap();
 
     // Verify worktree was created
-    assert!(staging.worktree_path.exists(), "Worktree path should exist");
-    assert!(staging.is_created, "is_created should be true");
-    assert_eq!(staging.original_repo_path, repo_path);
+    assert!(
+        staging.worktree_path().exists(),
+        "Worktree path should exist"
+    );
+    assert!(staging.is_created(), "is_created should be true");
+    assert_eq!(staging.original_repo_path(), repo_path);
 
     // Verify it's a valid git worktree by checking for .git file
-    let git_file = staging.worktree_path.join(".git");
+    let git_file = staging.worktree_path().join(".git");
     assert!(git_file.exists(), "Worktree should have .git file");
 
     // Cleanup
@@ -1877,7 +1784,7 @@ fn test_staging_area_create_worktree() {
 
     // Verify worktree is gone
     assert!(
-        !staging.worktree_path.exists(),
+        !staging.worktree_path().exists(),
         "Worktree should be removed after cleanup"
     );
 
@@ -1894,7 +1801,7 @@ fn test_staging_area_apply_patch_success() {
 
     // Instead of crafting a patch string, directly modify the worktree
     // This tests the staging infrastructure without patch format issues
-    let lib_rs = staging.worktree_path.join("src/lib.rs");
+    let lib_rs = staging.worktree_path().join("src/lib.rs");
     let original_content = fs::read_to_string(&lib_rs).unwrap();
 
     // Add a new function
@@ -1926,7 +1833,7 @@ fn test_staging_area_validate_success() {
 
     // Instead of trying to craft a perfect patch string,
     // directly modify the worktree file and test validation
-    let lib_rs = staging.worktree_path.join("src/lib.rs");
+    let lib_rs = staging.worktree_path().join("src/lib.rs");
     let original_content = fs::read_to_string(&lib_rs).unwrap();
 
     // Add a new function to the lib.rs
@@ -1962,7 +1869,7 @@ fn test_staging_area_validate_invalid_patch() {
     let staging = StagingArea::create(&repo_path).unwrap();
 
     // Directly modify the worktree file with invalid Rust syntax
-    let lib_rs = staging.worktree_path.join("src/lib.rs");
+    let lib_rs = staging.worktree_path().join("src/lib.rs");
     let invalid_content = r#"pub fn add(a: i32, b: i32) -> i32 {
     a + b
 }
@@ -2121,11 +2028,7 @@ fn test_apply_and_validate_invalid_syntax() {
 #[test]
 fn test_staging_validate_not_created() {
     // Test validate on non-created staging area
-    let temp_dir = create_temp_lib_project();
-    let staging = StagingArea::create(&temp_dir).unwrap();
-    // Manually set is_created to false to test error path
-    let mut staging = staging;
-    staging.is_created = false;
+    let staging = new_for_tests_with_created(false);
 
     let result = staging.validate();
 
@@ -2137,10 +2040,7 @@ fn test_staging_validate_not_created() {
 #[test]
 fn test_staging_cleanup_not_created() {
     // Test cleanup on non-created staging area should be Ok
-    let temp_dir = create_temp_lib_project();
-    let staging = StagingArea::create(&temp_dir).unwrap();
-    let mut staging = staging;
-    staging.is_created = false;
+    let mut staging = new_for_tests_with_created(false);
 
     let result = staging.cleanup();
 
@@ -2150,10 +2050,7 @@ fn test_staging_cleanup_not_created() {
 #[test]
 fn test_staging_rollback_not_created() {
     // Test rollback on non-created staging area should be Ok
-    let temp_dir = create_temp_lib_project();
-    let staging = StagingArea::create(&temp_dir).unwrap();
-    let mut staging = staging;
-    staging.is_created = false;
+    let mut staging = new_for_tests_with_created(false);
 
     let result = staging.rollback();
 
@@ -2172,7 +2069,7 @@ fn test_staging_rollback_with_created_staging() {
     let result = staging.rollback();
 
     assert!(result.is_ok());
-    assert!(!staging.is_created);
+    assert!(!staging.is_created());
 }
 
 #[test]
@@ -2294,7 +2191,7 @@ fn test_staging_rollback_sets_flag() {
 
     let _ = staging.rollback();
 
-    assert!(!staging.is_created);
+    assert!(!staging.is_created());
 }
 #[allow(clippy::field_reassign_with_default)]
 #[test]
@@ -2322,10 +2219,13 @@ fn test_patch_validation_all_combinations() {
 
 #[test]
 fn test_staging_area_path_preservation() {
-    let temp_dir = create_temp_lib_project();
-    let staging = StagingArea::create(&temp_dir).unwrap();
+    let staging = new_for_tests_with_created(true);
 
-    assert_eq!(staging.original_repo_path, temp_dir);
+    assert!(
+        staging
+            .original_repo_path()
+            .starts_with(std::env::temp_dir())
+    );
 }
 
 #[test]
@@ -2437,7 +2337,7 @@ fn test_staging_validate_with_warnings() {
     let repo_path = create_temp_git_repo();
     let staging = StagingArea::create(&repo_path).unwrap();
 
-    let lib_rs = staging.worktree_path.join("src/lib.rs");
+    let lib_rs = staging.worktree_path().join("src/lib.rs");
     // Test the warning counting code path - use dead_code to potentially generate warning
     let content_with_warning = r#"pub fn add(a: i32, b: i32) -> i32 {
     a + b
@@ -2467,7 +2367,7 @@ fn test_staging_validate_compiles_but_tests_fail() {
     let repo_path = create_temp_git_repo();
     let staging = StagingArea::create(&repo_path).unwrap();
 
-    let lib_rs = staging.worktree_path.join("src/lib.rs");
+    let lib_rs = staging.worktree_path().join("src/lib.rs");
     let content = r#"pub fn add(a: i32, b: i32) -> i32 { a + b }
 
 #[cfg(test)]

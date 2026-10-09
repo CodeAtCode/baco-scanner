@@ -79,7 +79,6 @@ impl Scanner {
             findings,
             analyzed_files,
             phase,
-            &self.metrics_tracker,
             None,
         )
         .await

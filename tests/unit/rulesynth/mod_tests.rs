@@ -15,6 +15,16 @@ use baco::rulesynth::{SemgrepRule, extract_rule_id, prompt};
 use std::path::PathBuf;
 
 // ============================================================================
+// Helper for temp rulesynth paths
+// ============================================================================
+
+fn temp_rulesynth_path(prefix: &str) -> PathBuf {
+    static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    std::env::temp_dir().join(format!("{}-{}-{seq:x}", prefix, std::process::id()))
+}
+
+// ============================================================================
 // extract_rule_id tests
 // ============================================================================
 
@@ -72,7 +82,7 @@ fn test_rulesynth_config_default() {
 fn test_rulesynth_config_serialization() {
     let config = RuleSynthConfig {
         enabled: true,
-        output_dir: PathBuf::from("/tmp/rules"),
+        output_dir: temp_rulesynth_path("rules-mod"),
         max_rules_per_cwe: 3,
         mocq_mode: false,
         max_iterations: 5,
@@ -176,7 +186,7 @@ fn test_parse_yaml_rules_special_characters() {
 fn test_error_disabled_config() {
     let config = RuleSynthConfig {
         enabled: false,
-        output_dir: PathBuf::from("/tmp/test"),
+        output_dir: temp_rulesynth_path("test-rules-mod"),
         max_rules_per_cwe: 5,
         mocq_mode: false,
         max_iterations: 5,

@@ -18,13 +18,23 @@ use tempfile::TempDir;
 use crate::fixtures::{create_test_config, make_finding_report_agg};
 
 // ============================================================================
+// Helper for temp scanner paths
+// ============================================================================
+
+fn temp_scanner_path(prefix: &str) -> PathBuf {
+    static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    std::env::temp_dir().join(format!("{}-{}-{seq:x}", prefix, std::process::id()))
+}
+
+// ============================================================================
 // Scanner::new() Tests
 // ============================================================================
 
 #[test]
 fn test_scanner_new_creates_valid_instance() {
     let config = create_test_config();
-    let target_path = PathBuf::from("/tmp/test-project");
+    let target_path = temp_scanner_path("scanner-valid-instance");
     let scanner = Scanner::new(config.clone(), target_path.clone(), false);
 
     assert_eq!(scanner.config.output.dir, config.output.dir);
@@ -35,7 +45,7 @@ fn test_scanner_new_creates_valid_instance() {
 #[test]
 fn test_scanner_new_with_force_flag() {
     let config = create_test_config();
-    let target_path = PathBuf::from("/tmp/test-project");
+    let target_path = temp_scanner_path("scanner-force-flag");
     let scanner = Scanner::new(config, target_path, true);
 
     // Force flag is internal state, verify it is set
@@ -45,7 +55,7 @@ fn test_scanner_new_with_force_flag() {
 #[test]
 fn test_scanner_new_sets_checkpoint_path() {
     let config = create_test_config();
-    let target_path = PathBuf::from("/tmp/test-project");
+    let target_path = temp_scanner_path("scanner-checkpoint");
     let scanner = Scanner::new(config, target_path, false);
 
     assert!(scanner.checkpoint_path.ends_with("checkpoint.json"));
@@ -58,7 +68,7 @@ fn test_scanner_new_sets_checkpoint_path() {
 #[test]
 fn test_scanner_with_initial_findings() {
     let config = create_test_config();
-    let target_path = PathBuf::from("/tmp/test-project");
+    let target_path = temp_scanner_path("scanner-initial-findings");
     let initial_findings = vec![
         make_finding_report_agg(
             "test-finding-001",
@@ -89,7 +99,7 @@ fn test_scanner_with_initial_findings() {
 #[test]
 fn test_scanner_with_initial_findings_empty() {
     let config = create_test_config();
-    let target_path = PathBuf::from("/tmp/test-project");
+    let target_path = temp_scanner_path("scanner-initial-empty");
 
     let scanner = Scanner::with_initial_findings(config, target_path, Vec::new(), false);
 
@@ -103,7 +113,7 @@ fn test_scanner_with_initial_findings_empty() {
 #[test]
 fn test_scanner_findings_returns_clone() {
     let config = create_test_config();
-    let target_path = PathBuf::from("/tmp/test-project");
+    let target_path = temp_scanner_path("scanner-findings-clone");
     let scanner = Scanner::new(config, target_path, false);
 
     let findings1 = scanner.findings();
@@ -120,7 +130,7 @@ fn test_scanner_findings_returns_clone() {
 #[test]
 fn test_scanner_update_findings() {
     let config = create_test_config();
-    let target_path = PathBuf::from("/tmp/test-project");
+    let target_path = temp_scanner_path("scanner-update");
     let scanner = Scanner::new(config, target_path, false);
 
     let new_findings = vec![make_finding_report_agg(
@@ -141,7 +151,7 @@ fn test_scanner_update_findings() {
 #[test]
 fn test_scanner_update_findings_replaces_all() {
     let config = create_test_config();
-    let target_path = PathBuf::from("/tmp/test-project");
+    let target_path = temp_scanner_path("scanner-update-replace");
     let scanner = Scanner::new(config, target_path, false);
 
     // Add initial findings
@@ -189,7 +199,7 @@ fn test_scanner_update_findings_replaces_all() {
 #[test]
 fn test_scanner_add_finding() {
     let config = create_test_config();
-    let target_path = PathBuf::from("/tmp/test-project");
+    let target_path = temp_scanner_path("scanner-add");
     let scanner = Scanner::new(config, target_path, false);
 
     let finding = make_finding_report_agg(
@@ -210,7 +220,7 @@ fn test_scanner_add_finding() {
 #[test]
 fn test_scanner_add_finding_multiple() {
     let config = create_test_config();
-    let target_path = PathBuf::from("/tmp/test-project");
+    let target_path = temp_scanner_path("scanner-add-multi");
     let scanner = Scanner::new(config, target_path, false);
 
     scanner.add_finding(make_finding_report_agg(
@@ -249,7 +259,7 @@ fn test_scanner_add_finding_multiple() {
 #[test]
 fn test_scanner_target_path() {
     let config = create_test_config();
-    let target_path = PathBuf::from("/tmp/test-project");
+    let target_path = temp_scanner_path("scanner-target");
     let scanner = Scanner::new(config, target_path.clone(), false);
 
     assert_eq!(scanner.target_path(), target_path.as_path());
@@ -280,7 +290,7 @@ fn test_scanner_target_path_various_paths() {
 #[test]
 fn test_scanner_state_initial_values() {
     let config = create_test_config();
-    let target_path = PathBuf::from("/tmp/test-project");
+    let target_path = temp_scanner_path("scanner-state-initial");
     let scanner = Scanner::new(config, target_path, false);
 
     let state = scanner.state.borrow();
@@ -295,7 +305,7 @@ fn test_scanner_state_initial_values() {
 #[test]
 fn test_scanner_state_updates_with_findings() {
     let config = create_test_config();
-    let target_path = PathBuf::from("/tmp/test-project");
+    let target_path = temp_scanner_path("scanner-state-initial");
     let scanner = Scanner::new(config, target_path, false);
 
     scanner.add_finding(make_finding_report_agg(
@@ -318,7 +328,7 @@ fn test_scanner_state_updates_with_findings() {
 #[test]
 fn test_scanner_config_accessible() {
     let config = create_test_config();
-    let target_path = PathBuf::from("/tmp/test-project");
+    let target_path = temp_scanner_path("scanner-state-initial");
     let scanner = Scanner::new(config.clone(), target_path, false);
 
     assert_eq!(scanner.config.output.dir, config.output.dir);
@@ -339,7 +349,7 @@ fn test_scanner_config_accessible() {
 #[test]
 fn test_scanner_has_metrics_tracker() {
     let config = create_test_config();
-    let target_path = PathBuf::from("/tmp/test-project");
+    let target_path = temp_scanner_path("scanner-state-initial");
     let scanner = Scanner::new(config, target_path, false);
 
     assert_eq!(
@@ -474,7 +484,7 @@ fn test_scanner_early_termination_config() {
     let mut config = create_test_config();
     config.scanner.performance.early_termination_threshold = 1000.0;
 
-    let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), false);
+    let scanner = Scanner::new(config, temp_scanner_path("checkpoint-test"), false);
     assert_eq!(
         scanner
             .config
@@ -491,7 +501,7 @@ fn test_scanner_early_termination_disabled() {
     let mut config = create_test_config();
     config.scanner.performance.early_termination_threshold = 0.0;
 
-    let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), false);
+    let scanner = Scanner::new(config, temp_scanner_path("checkpoint-test"), false);
     assert_eq!(
         scanner
             .config
@@ -509,7 +519,7 @@ fn test_scanner_early_termination_disabled() {
 #[test]
 fn test_scanner_state_phase_update() {
     let config = create_test_config();
-    let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), false);
+    let scanner = Scanner::new(config, temp_scanner_path("checkpoint-test"), false);
 
     // Initial phase should be Indexing
     {
@@ -531,7 +541,7 @@ fn test_scanner_state_phase_update() {
 #[test]
 fn test_scanner_state_files_scanned_update() {
     let config = create_test_config();
-    let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), false);
+    let scanner = Scanner::new(config, temp_scanner_path("checkpoint-test"), false);
 
     // Update files_scanned
     scanner.state.send_modify(|s| {
@@ -545,7 +555,7 @@ fn test_scanner_state_files_scanned_update() {
 #[test]
 fn test_scanner_state_errors_update() {
     let config = create_test_config();
-    let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), false);
+    let scanner = Scanner::new(config, temp_scanner_path("checkpoint-test"), false);
 
     // Add errors
     scanner.state.send_modify(|s| {
@@ -567,8 +577,8 @@ fn test_multiple_scanner_instances_independent() {
     let config1 = create_test_config();
     let config2 = create_test_config();
 
-    let scanner1 = Scanner::new(config1, PathBuf::from("/tmp/project1"), false);
-    let scanner2 = Scanner::new(config2, PathBuf::from("/tmp/project2"), false);
+    let scanner1 = Scanner::new(config1, temp_scanner_path("concurrent-scanner-1"), false);
+    let scanner2 = Scanner::new(config2, temp_scanner_path("concurrent-scanner-2"), false);
 
     scanner1.add_finding(make_finding_report_agg(
         "test-finding-001",
@@ -591,7 +601,7 @@ fn test_multiple_scanner_instances_independent() {
 #[test]
 fn test_scanner_state_arc_clone() {
     let config = create_test_config();
-    let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), false);
+    let scanner = Scanner::new(config, temp_scanner_path("checkpoint-test"), false);
 
     // Clone the Arc
     let state_clone = scanner.state.clone();
@@ -609,7 +619,7 @@ fn test_scanner_state_arc_clone() {
 #[test]
 fn test_scanner_state_watch_channel() {
     let config = create_test_config();
-    let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), false);
+    let scanner = Scanner::new(config, temp_scanner_path("checkpoint-test"), false);
 
     // Get initial phase
     let initial_phase = scanner.state.borrow().current_phase.clone();
@@ -648,7 +658,7 @@ fn test_scanner_with_current_dir() {
 #[test]
 fn test_scanner_findings_empty_vector() {
     let config = create_test_config();
-    let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), false);
+    let scanner = Scanner::new(config, temp_scanner_path("checkpoint-test"), false);
 
     let findings = scanner.findings();
     assert!(findings.is_empty());
@@ -658,7 +668,7 @@ fn test_scanner_findings_empty_vector() {
 #[test]
 fn test_scanner_update_findings_empty_vector() {
     let config = create_test_config();
-    let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), false);
+    let scanner = Scanner::new(config, temp_scanner_path("checkpoint-test"), false);
 
     // Add some findings first
     scanner.add_finding(make_finding_report_agg(
@@ -683,7 +693,7 @@ fn test_scanner_update_findings_empty_vector() {
 #[test]
 fn test_scanner_full_workflow_simulation() {
     let config = create_test_config();
-    let scanner = Scanner::new(config, PathBuf::from("/tmp/test-project"), false);
+    let scanner = Scanner::new(config, temp_scanner_path("scanner-state-concurrent"), false);
 
     // Simulate finding discovery
     scanner.add_finding(make_finding_report_agg(
@@ -714,7 +724,7 @@ fn test_scanner_with_custom_config_values() {
     config.output.dir = "/custom/output/dir".to_string();
     config.scanner.performance.early_termination_threshold = 50.0;
 
-    let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), false);
+    let scanner = Scanner::new(config, temp_scanner_path("checkpoint-test"), false);
 
     assert_eq!(scanner.config.output.dir, "/custom/output/dir");
     assert_eq!(
@@ -1118,7 +1128,7 @@ fn create_test_finding_core_migrated(id: &str) -> VulnerabilityFinding {
 #[test]
 fn test_scanner_new_creates_initial_state_inline_migrated() {
     let config = create_test_config_core_migrated();
-    let target_path = PathBuf::from("/tmp/test-target");
+    let target_path = temp_scanner_path("checkpoint-path-test");
     let scanner = baco::scanner::Scanner::new(config.clone(), target_path.clone(), false);
 
     assert_eq!(scanner.config.project.name, "test-project");
@@ -1132,7 +1142,7 @@ fn test_scanner_new_creates_initial_state_inline_migrated() {
 #[test]
 fn test_scanner_with_initial_findings_inline_migrated() {
     let config = create_test_config_core_migrated();
-    let target_path = PathBuf::from("/tmp/test-target");
+    let target_path = temp_scanner_path("checkpoint-path-test");
     let initial_findings = vec![VulnerabilityFinding {
         id: "test-1".to_string(),
         title: "Test Finding".to_string(),
@@ -1182,7 +1192,7 @@ fn test_scanner_with_initial_findings_inline_migrated() {
 #[test]
 fn test_scanner_force_flag_inline_migrated() {
     let config = create_test_config_core_migrated();
-    let target_path = PathBuf::from("/tmp/test-target");
+    let target_path = temp_scanner_path("checkpoint-path-test");
     let scanner = baco::scanner::Scanner::new(config, target_path, true);
 
     assert!(scanner.force);
@@ -1191,7 +1201,7 @@ fn test_scanner_force_flag_inline_migrated() {
 #[test]
 fn test_scanner_findings_method_inline_migrated() {
     let config = create_test_config_core_migrated();
-    let target_path = PathBuf::from("/tmp/test-target");
+    let target_path = temp_scanner_path("checkpoint-path-test");
     let scanner = baco::scanner::Scanner::new(config, target_path, false);
 
     assert!(scanner.findings().is_empty());
@@ -1204,7 +1214,7 @@ fn test_scanner_findings_method_inline_migrated() {
 #[test]
 fn test_scanner_findings_mut_method_inline_migrated() {
     let config = create_test_config_core_migrated();
-    let target_path = PathBuf::from("/tmp/test-target");
+    let target_path = temp_scanner_path("checkpoint-path-test");
     let scanner = baco::scanner::Scanner::new(config, target_path, false);
 
     scanner.add_finding(create_test_finding_core_migrated("test-1"));
@@ -1228,20 +1238,18 @@ fn test_scanner_target_path_inline_migrated() {
 #[test]
 fn test_scanner_checkpoint_path_computed_from_config_inline_migrated() {
     let mut config = create_test_config_core_migrated();
-    config.output.dir = "/tmp/custom-output".to_string();
-    let target_path = PathBuf::from("/tmp/target");
+    let output_dir = temp_scanner_path("custom-output");
+    config.output.dir = output_dir.to_string_lossy().to_string();
+    let target_path = temp_scanner_path("checkpoint-custom");
     let scanner = baco::scanner::Scanner::new(config, target_path, false);
 
-    assert_eq!(
-        scanner.checkpoint_path,
-        PathBuf::from("/tmp/custom-output/checkpoint.json")
-    );
+    assert_eq!(scanner.checkpoint_path, output_dir.join("checkpoint.json"));
 }
 
 #[test]
 fn test_scanner_state_initial_values_inline_migrated() {
     let config = create_test_config_core_migrated();
-    let target_path = PathBuf::from("/tmp/test-target");
+    let target_path = temp_scanner_path("checkpoint-path-test");
     let scanner = baco::scanner::Scanner::new(config, target_path, false);
 
     let state = scanner.state.borrow();
@@ -1256,13 +1264,13 @@ fn test_scanner_state_initial_values_inline_migrated() {
 #[test]
 fn test_scanner_metrics_tracker_initialization_inline_migrated() {
     let config = create_test_config_core_migrated();
-    let target_path = PathBuf::from("/tmp/test-target");
+    let target_path = temp_scanner_path("checkpoint-path-test");
     let scanner = baco::scanner::Scanner::new(config, target_path, false);
 
     // Two scanners must not share tracker state.
     let other = baco::scanner::Scanner::new(
         create_test_config_core_migrated(),
-        PathBuf::from("/tmp/test-target-2"),
+        temp_scanner_path("scanner-merge-findings-2"),
         false,
     );
     assert_eq!(
@@ -1275,7 +1283,7 @@ fn test_scanner_metrics_tracker_initialization_inline_migrated() {
 #[test]
 fn test_scanner_with_different_force_values_inline_migrated() {
     let config = create_test_config_core_migrated();
-    let target_path = PathBuf::from("/tmp/test-target");
+    let target_path = temp_scanner_path("checkpoint-path-test");
 
     let scanner_force = baco::scanner::Scanner::new(config.clone(), target_path.clone(), true);
     let scanner_no_force = baco::scanner::Scanner::new(config, target_path, false);
@@ -1287,20 +1295,18 @@ fn test_scanner_with_different_force_values_inline_migrated() {
 #[test]
 fn test_scanner_checkpoint_path_with_nested_output_dir_inline_migrated() {
     let mut config = create_test_config_core_migrated();
-    config.output.dir = "/tmp/output/nested/path".to_string();
-    let target_path = PathBuf::from("/tmp/target");
+    let output_dir = temp_scanner_path("nested-output");
+    config.output.dir = output_dir.to_string_lossy().to_string();
+    let target_path = temp_scanner_path("checkpoint-custom");
     let scanner = baco::scanner::Scanner::new(config, target_path, false);
 
-    assert_eq!(
-        scanner.checkpoint_path,
-        PathBuf::from("/tmp/output/nested/path/checkpoint.json")
-    );
+    assert_eq!(scanner.checkpoint_path, output_dir.join("checkpoint.json"));
 }
 
 #[tokio::test]
 async fn test_check_early_termination_below_threshold_inline_migrated() {
     let config = create_test_config_core_migrated();
-    let target_path = PathBuf::from("/tmp/test-target");
+    let target_path = temp_scanner_path("checkpoint-path-test");
     let scanner = baco::scanner::Scanner::new(config, target_path, false);
 
     let findings = vec![create_test_finding_core_migrated("test-1")];
@@ -1320,7 +1326,7 @@ async fn test_check_early_termination_below_threshold_inline_migrated() {
 async fn test_check_early_termination_above_threshold_inline_migrated() {
     let mut config = create_test_config_core_migrated();
     config.scanner.performance.early_termination_threshold = 2.0;
-    let target_path = PathBuf::from("/tmp/test-target");
+    let target_path = temp_scanner_path("checkpoint-path-test");
     let scanner = baco::scanner::Scanner::new(config, target_path, false);
 
     let findings: Vec<VulnerabilityFinding> = (0..5)
@@ -1342,7 +1348,7 @@ async fn test_check_early_termination_above_threshold_inline_migrated() {
 async fn test_check_early_termination_disabled_inline_migrated() {
     let mut config = create_test_config_core_migrated();
     config.scanner.performance.early_termination_threshold = 0.0;
-    let target_path = PathBuf::from("/tmp/test-target");
+    let target_path = temp_scanner_path("checkpoint-path-test");
     let scanner = baco::scanner::Scanner::new(config, target_path, false);
 
     let findings: Vec<VulnerabilityFinding> = (0..10000)
@@ -1460,7 +1466,7 @@ fn test_extract_owner_repo_from_url_with_underscore() {
 #[test]
 fn test_scanner_state_borrow_mut() {
     let config = create_test_config();
-    let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), false);
+    let scanner = Scanner::new(config, temp_scanner_path("checkpoint-test"), false);
 
     // Test mutable borrow - use send_modify instead
     scanner.state.send_modify(|s| {
@@ -1476,7 +1482,7 @@ fn test_scanner_state_borrow_mut() {
 #[test]
 fn test_scanner_add_multiple_findings_same_id() {
     let config = create_test_config();
-    let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), false);
+    let scanner = Scanner::new(config, temp_scanner_path("checkpoint-test"), false);
 
     let finding = make_finding_report_agg(
         "test-finding-001",
@@ -1498,7 +1504,7 @@ fn test_scanner_add_multiple_findings_same_id() {
 #[test]
 fn test_scanner_update_findings_with_duplicates() {
     let config = create_test_config();
-    let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), false);
+    let scanner = Scanner::new(config, temp_scanner_path("checkpoint-test"), false);
 
     let findings = vec![
         make_finding_report_agg(
@@ -1539,7 +1545,7 @@ fn test_scanner_checkpoint_path_various_output_dirs() {
         let mut config = create_test_config();
         config.output.dir = output_dir.to_string();
 
-        let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), false);
+        let scanner = Scanner::new(config, temp_scanner_path("checkpoint-test"), false);
         assert_eq!(
             scanner.checkpoint_path.to_string_lossy(),
             expected_checkpoint
@@ -1550,7 +1556,7 @@ fn test_scanner_checkpoint_path_various_output_dirs() {
 #[test]
 fn test_scanner_with_force_flag_true() {
     let config = create_test_config();
-    let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), true);
+    let scanner = Scanner::new(config, temp_scanner_path("force-flag-true"), true);
 
     assert!(scanner.force);
 }
@@ -1558,7 +1564,7 @@ fn test_scanner_with_force_flag_true() {
 #[test]
 fn test_scanner_with_force_flag_false() {
     let config = create_test_config();
-    let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), false);
+    let scanner = Scanner::new(config, temp_scanner_path("checkpoint-test"), false);
 
     assert!(!scanner.force);
 }
@@ -1566,7 +1572,7 @@ fn test_scanner_with_force_flag_false() {
 #[test]
 fn test_scanner_state_error_accumulation() {
     let config = create_test_config();
-    let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), false);
+    let scanner = Scanner::new(config, temp_scanner_path("checkpoint-test"), false);
 
     scanner.state.send_modify(|s| {
         s.errors.push("error 1".to_string());
@@ -1583,7 +1589,7 @@ fn test_scanner_state_error_accumulation() {
 #[test]
 fn test_scanner_state_phase_transition() {
     let config = create_test_config();
-    let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), false);
+    let scanner = Scanner::new(config, temp_scanner_path("checkpoint-test"), false);
 
     let phases = vec![
         ScanPhase::Indexing,
@@ -1606,7 +1612,7 @@ fn test_scanner_state_phase_transition() {
 #[test]
 fn test_scanner_findings_empty_after_update() {
     let config = create_test_config();
-    let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), false);
+    let scanner = Scanner::new(config, temp_scanner_path("checkpoint-test"), false);
 
     scanner.add_finding(make_finding_report_agg(
         "test-finding-001",
@@ -1636,7 +1642,7 @@ fn test_scanner_target_path_absolute_vs_relative() {
 #[test]
 fn test_scanner_multiple_state_modifications() {
     let config = create_test_config();
-    let scanner = Scanner::new(config, PathBuf::from("/tmp/test"), false);
+    let scanner = Scanner::new(config, temp_scanner_path("checkpoint-test"), false);
 
     // Multiple state modifications
     scanner.state.send_modify(|s| {

@@ -106,6 +106,7 @@ mod chunked_analysis_tests;
 mod citation_verification_tests;
 mod confidence_aggregation_tests;
 mod confidence_normalization;
+mod confidence_normalization_update_tests;
 mod confidence_refinement;
 mod config;
 mod cost_estimate_tests;
@@ -150,6 +151,7 @@ mod fixtures;
 mod git_analysis;
 mod glob_exclude_tests;
 mod global_fp;
+mod historical_patterns_tests;
 mod html_finding_renderer_tests;
 mod incremental_scan_tests;
 mod indexer_tests;
@@ -206,11 +208,13 @@ mod validation_success_path_tests;
 mod validation_tests;
 mod variant_search_edge_tests;
 mod variant_search_tests;
+mod verification;
 mod verification_batch_index_tests;
 mod verification_blind_cap_tests;
 mod verification_gate_tests;
 mod verification_primitive_refutation_tests;
 mod verification_verdict_tests;
+
 mod vuln_spec_tests;
 mod wp_primitive_prompt_tests;
 
@@ -219,3 +223,7 @@ mod prompt_absent_value_tests;
 mod severity_label_tests;
 
 mod path_match_tests;
+
+mod task1_noop_read_test;
+mod verification_batch_guard_tests;
+mod verification_prompt_guard_tests;
