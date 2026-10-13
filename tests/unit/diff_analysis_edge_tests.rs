@@ -264,6 +264,60 @@ fn test_revspec_starting_with_dash_rejected() {
 }
 
 #[test]
+fn test_head_tilde_1_on_single_commit_repo_wraps_error() {
+    // Reproduces the CI failure: a shallow checkout has no parent for HEAD,
+    // so revparse_single("HEAD~1") returns a libgit2 error whose raw message
+    // ("parent 0 does not exist") contains neither "revspec" nor "not found".
+    // The production wrapper must add that context so callers get a meaningful
+    // error.
+    let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
+    let repo_path = temp_dir.path();
+
+    Command::new("git")
+        .args(["init", "-q"])
+        .current_dir(repo_path)
+        .output()
+        .expect("failed to init git repo");
+    Command::new("git")
+        .args(["config", "user.email", "test@test.com"])
+        .current_dir(repo_path)
+        .output()
+        .expect("failed to set email");
+    Command::new("git")
+        .args(["config", "user.name", "Test"])
+        .current_dir(repo_path)
+        .output()
+        .expect("failed to set name");
+
+    std::fs::write(repo_path.join("file.txt"), "content\n").expect("write");
+    Command::new("git")
+        .args(["add", "."])
+        .current_dir(repo_path)
+        .output()
+        .expect("failed to add");
+    Command::new("git")
+        .args(["commit", "-q", "-m", "only commit"])
+        .current_dir(repo_path)
+        .output()
+        .expect("failed to commit");
+
+    let input = DiffAnalysisInput {
+        file_path: "file.txt".to_string(),
+        repo_path: Some(repo_path.to_str().unwrap().to_string()),
+        base_commit: Some("HEAD~1".to_string()),
+        head_commit: Some("HEAD".to_string()),
+    };
+
+    let result = analyze_diff(input);
+    assert!(result.is_err(), "HEAD~1 on a single-commit repo must error");
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.contains("revspec") || err.contains("not found"),
+        "error should be meaningful, got: {err}"
+    );
+}
+
+#[test]
 fn test_valid_range_returns_files() {
     let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
     let repo_path = temp_dir.path();

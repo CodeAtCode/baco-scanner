@@ -56,8 +56,11 @@ fn run_diff(
     let repo = Repository::open(repo_path.unwrap_or("."))?;
 
     let base_commit = if let Some(b) = base {
-        let obj = repo.revparse_single(b)?;
-        obj.peel_to_commit()?
+        let obj = repo
+            .revparse_single(b)
+            .map_err(|e| format!("revspec '{b}' not found: {e}"))?;
+        obj.peel_to_commit()
+            .map_err(|e| format!("revspec '{b}' not found: {e}"))?
     } else {
         repo.head()?.peel_to_commit()?
     };
@@ -65,7 +68,10 @@ fn run_diff(
     // The head revspec must resolve even though the diff is taken against the
     // working tree. Dropping this check made an unresolvable head succeed with an
     // empty result, which is the failure mode this file is meant to avoid.
-    repo.revparse_single(head)?.peel_to_commit()?;
+    repo.revparse_single(head)
+        .map_err(|e| format!("revspec '{head}' not found: {e}"))?
+        .peel_to_commit()
+        .map_err(|e| format!("revspec '{head}' not found: {e}"))?;
 
     let base_tree = base_commit.tree()?;
 
