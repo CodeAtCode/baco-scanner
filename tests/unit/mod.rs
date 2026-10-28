@@ -227,3 +227,6 @@ mod path_match_tests;
 mod task1_noop_read_test;
 mod verification_batch_guard_tests;
 mod verification_prompt_guard_tests;
+
+mod strip_between_markers_tests;
+mod upgrade_absence_read_error_tests;

@@ -182,19 +182,20 @@ pub async fn run_llm_static_analysis(
         // The triage pass gets its own client so `triage.model` selects the
         // model that actually classifies the files. Reusing the phase client
         // made the key a no-op: it was passed here and never read.
-        let (mut files_to_analyze, mut skipped_files) = if config.triage.enabled {
+        let (files_to_analyze, skipped_files, submitted, classified) = if config.triage.enabled {
             match llm::phase_llm_config(config, "static_analysis", Some(&config.triage.model)) {
                 Ok(cfg) => {
                     let triage_client =
                         crate::llm::LlmClient::with_metrics(cfg, Some(metrics_tracker.clone()));
-                    run_triage_cascade(
+                    let result = run_triage_cascade(
                         &triage_client,
                         files,
                         analyzed_files,
                         config.triage.batch_size,
                         config.triage.suspicion_threshold,
                     )
-                    .await
+                    .await;
+                    (result.0, result.1, result.2, result.3)
                 }
                 Err(e) => {
                     // A triage model we cannot build is not a reason to scan less:
@@ -204,11 +205,11 @@ pub async fn run_llm_static_analysis(
                         "Triage cascade skipped, its model is unusable: {}. Analysing all files instead.",
                         e
                     );
-                    (files.iter().collect(), Vec::new())
+                    (files.iter().collect(), Vec::new(), files.len(), files.len())
                 }
             }
         } else {
-            (files.iter().collect(), Vec::new())
+            (files.iter().collect(), Vec::new(), files.len(), files.len())
         };
 
         // Triage is a cost filter, so it is allowed to drop files. It is not
@@ -219,35 +220,28 @@ pub async fn run_llm_static_analysis(
         // threshold the triage result is treated as untrustworthy and the
         // batch is analysed anyway, with a warning, because a false negative
         // here costs a whole file of coverage and a warning costs nothing.
-        if !skipped_files.is_empty() {
-            let total = files_to_analyze.len() + skipped_files.len();
+        //
+        // The distrust check runs whenever files were submitted, not only when
+        // skipped_files is non-empty: an empty LLM response is still a response
+        // that must be validated.
+        if submitted > 0 {
+            let unclassified = submitted - classified;
             tracing::info!(
-                "[Triage] Skipped {} of {} files (suspicion < {} threshold)",
-                skipped_files.len(),
-                total,
-                config.triage.suspicion_threshold
+                "[Triage] Submitted {} files, classified {} ({} unclassified)",
+                submitted,
+                classified,
+                unclassified
             );
-            if should_distrust_triage(files_to_analyze.len(), skipped_files.len()) {
+            if should_distrust_triage(classified, submitted) {
                 tracing::warn!(
-                    "[Triage] Discarded {}/{} files, above the {:.0}% limit; \
-                     analysing them anyway rather than reporting an empty scan",
-                    skipped_files.len(),
-                    total,
-                    TRIAGE_MAX_DISCARD_RATIO * 100.0
+                    "[Triage] Trust ratio {:.1}% ({}/{}) below threshold; \
+                     analysing {} unclassified file(s) anyway rather than reporting an empty scan",
+                    (classified as f64 / submitted as f64) * 100.0,
+                    classified,
+                    submitted,
+                    unclassified
                 );
-                for path in &skipped_files {
-                    if let Some(file_info) =
-                        files.iter().find(|f| f.path.to_string_lossy() == *path)
-                    {
-                        if !files_to_analyze
-                            .iter()
-                            .any(|f| f.path.to_string_lossy() == *path)
-                        {
-                            files_to_analyze.push(file_info);
-                        }
-                    }
-                }
-                skipped_files.clear();
+                // Fallback already handled in run_triage_cascade; just log
             } else {
                 for f in &skipped_files {
                     tracing::debug!("[Triage] Skipped: {}", f);
@@ -436,7 +430,7 @@ pub async fn run_llm_static_analysis(
                 .path
                 .file_name()
                 .map(|n| n.to_string_lossy().to_string())
-                .unwrap_or_default();
+                .unwrap_or_else(|| file_info.path.to_string_lossy().to_string());
             let is_high_risk = ["main.", "index.", "app.", "server.", "__init__."]
                 .iter()
                 .any(|p| file_name.contains(p));
@@ -597,12 +591,12 @@ pub const TRIAGE_MAX_DISCARD_RATIO: f64 = 0.5;
 /// Split out from the phase so the boundary is testable without an LLM client:
 /// the decision is a comparison, and a comparison asserted only in a test is a
 /// comparison that can drift.
-pub fn should_distrust_triage(kept: usize, skipped: usize) -> bool {
-    let total = kept + skipped;
-    if total == 0 {
+pub fn should_distrust_triage(classified: usize, submitted: usize) -> bool {
+    if submitted == 0 {
         return false;
     }
-    skipped as f64 / total as f64 > TRIAGE_MAX_DISCARD_RATIO
+    let unclassified = submitted - classified;
+    unclassified as f64 / submitted as f64 > TRIAGE_MAX_DISCARD_RATIO
 }
 
 /// First `max_lines` lines of a file, flattened, for the triage prompt.
@@ -656,7 +650,7 @@ pub async fn run_triage_cascade<'a>(
     analyzed_files: &[String],
     batch_size: u8,
     suspicion_threshold: f32,
-) -> (Vec<&'a crate::indexer::FileInfo>, Vec<String>) {
+) -> (Vec<&'a crate::indexer::FileInfo>, Vec<String>, usize, usize) {
     use serde::Serialize;
 
     #[derive(Serialize)]
@@ -673,6 +667,8 @@ pub async fn run_triage_cascade<'a>(
     let mut files_to_analyze = Vec::new();
     let mut skipped_files = Vec::new();
     let mut unreadable_files: Vec<String> = Vec::new();
+    let mut submitted = 0usize;
+    let mut classified = 0usize;
 
     // The cursor arithmetic is extracted so it can be asserted directly. Running
     // the loop to observe a hang does not work: a `while` that never yields
@@ -709,6 +705,9 @@ pub async fn run_triage_cascade<'a>(
             continue;
         }
 
+        // Track submitted files for this batch
+        submitted += batch_files.len();
+
         // Build triage prompt
         let request = TriageRequest {
             files: batch_files.clone(),
@@ -726,7 +725,8 @@ Respond with JSON in this exact format:
 
 Files to analyze:
 {}"#,
-            serde_json::to_string_pretty(&request).unwrap_or_default()
+            serde_json::to_string_pretty(&request)
+                .expect("triage request serialization is infallible for String-only structs")
         );
 
         let messages = vec![
@@ -750,6 +750,7 @@ Files to analyze:
 
                 match serde_json::from_str::<TriageResponse>(cleaned) {
                     Ok(triage_response) => {
+                        // Track classified files from LLM response
                         for finding in triage_response.findings {
                             if should_analyze_file(finding.suspicion, suspicion_threshold) {
                                 // Find the original file info
@@ -758,6 +759,7 @@ Files to analyze:
                                     .find(|f| f.path.to_string_lossy() == finding.file)
                                 {
                                     files_to_analyze.push(file_info);
+                                    classified += 1;
                                     tracing::debug!(
                                         "[Triage] File {} passed (suspicion: {}) — {}",
                                         finding.file,
@@ -768,6 +770,7 @@ Files to analyze:
                             } else {
                                 let file_path = finding.file.clone();
                                 skipped_files.push(file_path.clone());
+                                classified += 1;
                                 tracing::debug!(
                                     "[Triage] File {} skipped (suspicion: {} < threshold: {}) — {}",
                                     file_path,
@@ -795,24 +798,16 @@ Files to analyze:
                 // A malformed reply is handled above; a well-formed one that
                 // simply omits a file is not a failure, and treating it as a
                 // verdict is what produced scans reporting zero findings.
-                let mut unnamed = 0usize;
                 for f in batch {
                     let path = f.path.to_string_lossy().to_string();
-                    let classified = files_to_analyze
+                    let is_classified = files_to_analyze
                         .iter()
                         .any(|x| x.path.to_string_lossy() == path)
                         || skipped_files.contains(&path);
-                    if !classified && !analyzed_files.contains(&path) {
+                    if !is_classified && !analyzed_files.contains(&path) {
                         files_to_analyze.push(f);
-                        unnamed += 1;
+                        // Do not increment classified; these are unclassified files
                     }
-                }
-                if unnamed > 0 {
-                    tracing::warn!(
-                        "[Triage] {} submitted file(s) were not named in the triage reply \
-                         and were not classified; analysing them anyway",
-                        unnamed
-                    );
                 }
             }
             Err(e) => {
@@ -840,7 +835,7 @@ Files to analyze:
         );
     }
 
-    (files_to_analyze, skipped_files)
+    (files_to_analyze, skipped_files, submitted, classified)
 }
 
 /// Compute priority score for a file (T18)
@@ -857,7 +852,7 @@ pub fn compute_file_priority_score(
         .path
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
-        .unwrap_or_default();
+        .unwrap_or_else(|| file_info.path.to_string_lossy().to_string());
 
     // Entry-point boost: configurable patterns or built-in defaults
     if !priority.entry_point_patterns.is_empty() {

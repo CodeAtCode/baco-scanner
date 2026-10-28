@@ -27,3 +27,6 @@ mod cpp_detection;
 
 // Eval harness oracle scoring tests
 mod eval_oracle;
+
+// Lane 4: Class C method-call sink e2e regression test
+mod lane4_class_c_sink;

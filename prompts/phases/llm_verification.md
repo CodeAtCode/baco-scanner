@@ -50,3 +50,19 @@ Answer these four questions against the CODE SHOWN before confirming any finding
 3. **Explicit boundary defeated?** — Does the exploit path defeat an explicit security boundary (acting past an enforced role), or is it own-data-only?
 4. **Real citation?** — Is the cited file/line/symbol real and present in the code shown, or am I hallucinating from patterns?
 
+## B3: Absence Detection
+
+When a finding describes a sensitive-state mutation and the function body lacks
+any security primitive, the finding is likely a true positive.
+
+**Sensitive-state categories:**
+- Privilege escalation
+- Role/permission change
+- Authentication state
+- Session manipulation
+- CSRF protection absence
+
+**Required primitives** (by language) must be present before any privileged
+action. If NONE of the primitives for the language appear in the function body,
+treat the ABSENCE as confirmation evidence and upgrade the finding to confirmed.
+

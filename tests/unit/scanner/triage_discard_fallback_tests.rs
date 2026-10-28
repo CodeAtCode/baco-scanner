@@ -19,13 +19,15 @@ fn test_discard_limit_is_strictly_above_half() {
 fn test_healthy_triage_stays_a_filter() {
     // The common case must not be disturbed by the fallback, otherwise every
     // scan pays full cost and the triage phase does nothing.
+    // (classified, submitted) semantics: 8 classified out of 10 submitted = 20% unclassified
     assert!(
-        !should_distrust_triage(8, 2),
-        "20% discarded stays a filter"
+        !should_distrust_triage(8, 10),
+        "20% unclassified stays a filter"
     );
+    // 9 classified out of 10 submitted = 10% unclassified
     assert!(
-        !should_distrust_triage(9, 1),
-        "10% discarded stays a filter"
+        !should_distrust_triage(9, 10),
+        "10% unclassified stays a filter"
     );
 }
 
@@ -33,32 +35,37 @@ fn test_healthy_triage_stays_a_filter() {
 fn test_exactly_half_is_allowed() {
     // The comparison is `>`, so a batch split exactly in half still trusts the
     // triage result. This is the case that decides between `>` and `>=`.
+    // 5 classified out of 10 submitted = 50% unclassified
     assert!(
-        !should_distrust_triage(5, 5),
+        !should_distrust_triage(5, 10),
         "exactly 50% must not trip the fallback"
     );
 }
 
 #[test]
 fn test_more_than_half_is_distrusted() {
-    // The case that motivated the fallback: ten files scanned, none analysed.
+    // The case that motivated the fallback: ten files submitted, only four classified.
+    // 4 classified out of 10 submitted = 60% unclassified
     assert!(
-        should_distrust_triage(4, 6),
-        "60% discarded must trip the fallback"
+        should_distrust_triage(4, 10),
+        "60% unclassified must trip the fallback"
     );
+    // 1 classified out of 3 submitted = 66.7% unclassified
     assert!(
-        should_distrust_triage(1, 2),
-        "a third kept is already the problem"
+        should_distrust_triage(1, 3),
+        "a third classified is already the problem"
     );
 }
 
 #[test]
-fn test_total_wipeout_is_distrusted() {
-    // The degenerate case: triage kept nothing at all.
+fn test_empty_llm_response_is_distrusted() {
+    // The core bug scenario: LLM returned valid JSON but classified nothing.
+    // 0 classified out of 10 submitted = 100% unclassified
     assert!(
         should_distrust_triage(0, 10),
-        "100% discarded must trip the fallback"
+        "100% unclassified must trip the fallback"
     );
+    // 0 classified out of 1 submitted = 100% unclassified
     assert!(
         should_distrust_triage(0, 1),
         "a single dropped file is also total wipeout"
@@ -67,7 +74,7 @@ fn test_total_wipeout_is_distrusted() {
 
 #[test]
 fn test_empty_batch_is_not_distrusted() {
-    // total == 0 would be a division by zero. It must be a plain "no", not a
+    // submitted == 0 would be a division by zero. It must be a plain "no", not a
     // NaN that compares false against everything and silently skips the
     // fallback for a batch that was never triaged.
     assert!(!should_distrust_triage(0, 0));
@@ -75,5 +82,6 @@ fn test_empty_batch_is_not_distrusted() {
 
 #[test]
 fn test_nothing_skipped_is_never_distrusted() {
-    assert!(!should_distrust_triage(10, 0));
+    // 10 classified out of 10 submitted = 0% unclassified
+    assert!(!should_distrust_triage(10, 10));
 }

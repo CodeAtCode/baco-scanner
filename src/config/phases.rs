@@ -82,6 +82,14 @@ pub const DEFAULT_ENABLE_VARIANT_SEARCH: bool = true;
 pub fn default_enable_variant_search() -> bool {
     DEFAULT_ENABLE_VARIANT_SEARCH
 }
+pub const DEFAULT_ENABLE_ABSENCE_DETECTION: bool = true;
+pub fn default_enable_absence_detection() -> bool {
+    DEFAULT_ENABLE_ABSENCE_DETECTION
+}
+pub const DEFAULT_ENABLE_MERGE_ORDER_DETECTION: bool = true;
+pub fn default_enable_merge_order_detection() -> bool {
+    DEFAULT_ENABLE_MERGE_ORDER_DETECTION
+}
 /// Normalization tier for confidence calibration.
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize, PartialEq, Default)]
 pub enum NormalizationTier {

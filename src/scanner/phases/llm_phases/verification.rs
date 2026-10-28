@@ -150,6 +150,105 @@ pub fn refute_with_primitive_check(
     }
 }
 
+/// Upgrade a NeedsReview finding by checking for absent security primitives.
+///
+/// The inverse of `refute_with_primitive_check`: when a finding describes a
+/// sensitive-state mutation and the function body contains NO security primitive,
+/// the finding is likely a true positive and should be upgraded from NeedsReview
+/// to Confirmed.
+///
+/// Sensitive-state categories (matched by keyword in title/description):
+/// - Privilege escalation
+/// - Role/permission change
+/// - Authentication state change
+/// - Session manipulation
+/// - CSRF protection absence
+///
+/// Only acts when `status == VerificationStatus::NeedsReview`. A Confirmed
+/// finding is left alone. Returns `(status, notes)` unchanged if the finding
+/// does not match the sensitive-state pattern or if a primitive IS found.
+pub fn upgrade_for_absent_primitive(
+    finding: &VulnerabilityFinding,
+    status: VerificationStatus,
+    notes: &str,
+    primitives: &std::collections::HashMap<String, Vec<String>>,
+    enable_absence_detection: bool,
+) -> (VerificationStatus, String) {
+    if !enable_absence_detection {
+        return (status, notes.to_string());
+    }
+    if status != VerificationStatus::NeedsReview {
+        return (status, notes.to_string());
+    }
+    if !is_sensitive_state_mutation(finding) {
+        return (status, notes.to_string());
+    }
+    match anchored_body_containing_primitive(finding, primitives) {
+        Some(Ok((_body, found))) => {
+            let reason = format!(
+                "not confirmed by absence: {} found in the body of the function this finding names",
+                found
+            );
+            let merged = if notes.trim().is_empty() {
+                reason
+            } else {
+                format!("{notes} ({reason})")
+            };
+            (VerificationStatus::NeedsReview, merged)
+        }
+        Some(Err(read_error)) => {
+            let reason = format!(
+                "not confirmed by absence: cannot read file to check for primitive ({read_error}: {path})",
+                path = finding.file_path
+            );
+            let merged = if notes.trim().is_empty() {
+                reason
+            } else {
+                format!("{notes} ({reason})")
+            };
+            (VerificationStatus::NeedsReview, merged)
+        }
+        None => {
+            let reason = "confirmed by absence: no security primitive found in the body of the function this finding names";
+            let merged = if notes.trim().is_empty() {
+                reason.to_string()
+            } else {
+                format!("{notes} ({reason})")
+            };
+            (VerificationStatus::Confirmed, merged)
+        }
+    }
+}
+
+/// Check if a finding describes a sensitive-state mutation.
+///
+/// Matches keywords in the title and description that indicate:
+/// - Privilege escalation
+/// - Role/permission change
+/// - Authentication state change
+/// - Session manipulation
+/// - CSRF protection absence
+fn is_sensitive_state_mutation(finding: &VulnerabilityFinding) -> bool {
+    let text = format!(
+        "{} {}",
+        finding.title.to_lowercase(),
+        finding.description.to_lowercase()
+    );
+    let sensitive_keywords = [
+        "privilege",
+        "escalat",
+        "role",
+        "permission",
+        "auth",
+        "session",
+        "capability",
+        "csrf",
+        "nonce",
+        "token",
+    ];
+    sensitive_keywords.iter().any(|kw| text.contains(*kw))
+}
+
 /// The body of the function the title names, if it contains a primitive.
 ///
 /// Returns:
@@ -756,6 +855,13 @@ pub async fn run_llm_verification(
                         status,
                         &notes,
                         &config.knowledge.required_security_primitives,
+                    );
+                    let (status, notes) = upgrade_for_absent_primitive(
+                        finding,
+                        status,
+                        &notes,
+                        &config.knowledge.required_security_primitives,
+                        config.scanner.performance.enable_absence_detection,
                     );
                     finding.verification_status = Some(status);
                     finding.verification_notes = Some(notes.clone());

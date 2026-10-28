@@ -7,6 +7,24 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
+/// Strip content between two markers (inclusive of markers).
+///
+/// Used to conditionally remove prompt sections based on config toggles.
+pub fn strip_between_markers(content: &str, start_marker: &str, end_marker: &str) -> String {
+    let pattern = format!(
+        r"{}[\s\S]*?{}",
+        regex::escape(start_marker),
+        regex::escape(end_marker)
+    );
+    let re = Regex::new(&pattern).ok();
+
+    if let Some(re) = re {
+        re.replace_all(content, "").to_string()
+    } else {
+        content.to_string()
+    }
+}
+
 /// Sink call tokens for RAG query building (T22)
 const SINK_TOKENS: &[&str] = &[
     "eval",
@@ -706,6 +724,8 @@ pub struct LlmAnalyzer {
     context_prefix: Option<String>,
     /// Enable structured JSON output using response_format with JSON schema
     enable_structured_output: bool,
+    /// Enable merge-order detection (CWE-915)
+    enable_merge_order_detection: bool,
 }
 
 impl LlmAnalyzer {
@@ -749,6 +769,7 @@ impl LlmAnalyzer {
             cwe_kb,
             context_prefix: None,
             enable_structured_output: false,
+            enable_merge_order_detection: config.scanner.performance.enable_merge_order_detection,
         }
     }
 
@@ -830,9 +851,12 @@ impl LlmAnalyzer {
         };
 
         if content.len() <= self.max_file_size {
-            return self.analyze_single_shot(path, &content).await;
+            return self
+                .analyze_single_shot(path, &content, self.enable_merge_order_detection)
+                .await;
         }
-        self.analyze_chunked(path, &content).await
+        self.analyze_chunked(path, &content, self.enable_merge_order_detection)
+            .await
     }
 
     /// Single-shot analysis for files within the configured size limit.
@@ -840,6 +864,7 @@ impl LlmAnalyzer {
         &self,
         path: &Path,
         content: &str,
+        enable_merge_order_detection: bool,
     ) -> Result<Vec<VulnerabilityFinding>, String> {
         let file_path = path.to_string_lossy().to_string();
         let extension = path.extension().and_then(|e| e.to_str()).unwrap_or("");
@@ -848,7 +873,7 @@ impl LlmAnalyzer {
         let cwe_specs = self.retrieve_cwe_specs(&file_path, content);
 
         // Use loaded prompt template with variable substitution
-        let prompt = self
+        let mut prompt = self
             .prompt_template
             .replace("%%LANGUAGE%%", extension)
             .replace("%%FILE_PATH%%", &file_path)
@@ -856,6 +881,15 @@ impl LlmAnalyzer {
             .replace("%%CONTEXT_LINES%%", "3")
             .replace("%%CODE_CONTENT%%", &self.truncate_code(content))
             .replace("%%CWE_SPECS%%", &cwe_specs);
+
+        // Conditionally include/exclude the merge order detection section
+        if !enable_merge_order_detection {
+            prompt = strip_between_markers(
+                &prompt,
+                "[MERGE_ORDER_SECTION_START]",
+                "[MERGE_ORDER_SECTION_END]",
+            );
+        }
 
         // Debug: log prompt length and first 300 chars
         tracing::info!(
@@ -956,6 +990,7 @@ impl LlmAnalyzer {
         &self,
         path: &Path,
         content: &str,
+        enable_merge_order_detection: bool,
     ) -> Result<Vec<VulnerabilityFinding>, String> {
         let file_path = path.to_string_lossy().to_string();
         let extension = path.extension().and_then(|e| e.to_str()).unwrap_or("");
@@ -1001,7 +1036,7 @@ impl LlmAnalyzer {
 
         for chunk in &chunks {
             let line_range = format!("{}-{}", chunk.start_line, chunk.end_line);
-            let prompt = self
+            let mut prompt = self
                 .prompt_template
                 .replace("%%LANGUAGE%%", extension)
                 .replace("%%FILE_PATH%%", &file_path)
@@ -1009,6 +1044,15 @@ impl LlmAnalyzer {
                 .replace("%%CONTEXT_LINES%%", "3")
                 .replace("%%CODE_CONTENT%%", &self.truncate_code(&chunk.text))
                 .replace("%%CWE_SPECS%%", &cwe_specs);
+
+            // Conditionally include/exclude the merge order detection section
+            if !enable_merge_order_detection {
+                prompt = strip_between_markers(
+                    &prompt,
+                    "[MERGE_ORDER_SECTION_START]",
+                    "[MERGE_ORDER_SECTION_END]",
+                );
+            }
 
             let user_prompt = if let Some(prefix) = &self.context_prefix {
                 format!("{}\n\n{}", prefix, prompt)

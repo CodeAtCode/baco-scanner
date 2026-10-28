@@ -1,0 +1,228 @@
+# BACO preset — Generic PHP (non-WordPress)
+[project]
+name = "php"
+languages = ["php"]
+
+[scanner]
+max_file_size_kb = 512
+exclude_paths = [
+  "vendor/*",
+  "node_modules/*",
+  "tests/*",
+  "test/*",
+  "spec/*",
+  "cypress/*",
+  "playwright/*",
+  "*.min.js",
+  "*.min.css",
+  "*.map",
+]
+
+[scanner.semgrep]
+rulesets = ["p/php", "p/security"]
+custom_rules = ['''
+rules:
+  - id: php-template-render-sink-high
+    languages: [php]
+    severity: ERROR
+    message: >
+      PHP template render/display method call with variable input. Code injection
+      or XSS risk if user input flows into these calls without proper escaping.
+    metadata:
+      cwe:
+        - "CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code"
+        - "CWE-79: Improper Neutralization of Input During Web Page Generation"
+    pattern-either:
+      - pattern: $OBJ->render($VAR)
+      - pattern: $OBJ->display($VAR)
+      - pattern: $OBJ->execute($VAR)
+
+  - id: php-db-method-call-sink-high
+    languages: [php]
+    severity: ERROR
+    message: >
+      PHP database query method call with variable input. SQL injection risk if
+      user input flows into these calls without proper parameterization.
+    metadata:
+      cwe:
+        - "CWE-89: Improper Neutralization of Special Elements used in an SQL Command"
+    pattern-either:
+      - pattern: $DB->query($SQL)
+      - pattern: $DB->prepare($SQL)
+      - pattern: $MYSQLI->query($SQL)
+      - pattern: $PDO->query($SQL)
+      - pattern: $PDO->prepare($SQL)
+
+  - id: php-raw-file-read-high
+    languages: [php]
+    severity: ERROR
+    message: >
+      Reads a file path from variable input, allowing arbitrary file read /
+      path traversal.
+    metadata:
+      cwe:
+        - "CWE-22: Improper Limitation of a Pathname to a Restricted Directory"
+    pattern-either:
+      - pattern: file_get_contents($VAR)
+      - pattern: readfile($VAR)
+      - pattern: fopen($VAR, $MODE)
+
+  - id: php-weak-hash-md5-medium
+    languages: [php]
+    severity: WARNING
+    message: >
+      MD5 over concatenated inputs used as a security value (predictable token).
+    metadata:
+      cwe:
+        - "CWE-327: Use of a Broken or Risky Cryptographic Algorithm"
+    pattern-either:
+      - pattern: md5($A . $B)
+      - pattern: md5($VAR)
+      - pattern: md5(uniqid())
+
+  - id: php-eval-execution-high
+    languages: [php]
+    severity: ERROR
+    message: >
+      eval on variable input, allowing remote code execution.
+    metadata:
+      cwe:
+        - "CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code"
+    pattern-either:
+      - pattern: eval($VAR)
+      - pattern: assert($VAR)
+
+  - id: wp-db-method-call-sink-high
+    languages: [php]
+    severity: ERROR
+    message: >
+      WordPress $wpdb method call with variable input. SQL injection risk if
+      user input flows into these calls without proper sanitization.
+    metadata:
+      cwe:
+        - "CWE-89: Improper Neutralization of Special Elements used in an SQL Command"
+    pattern-either:
+      - pattern: $wpdb->insert($TABLE, $DATA)
+      - pattern: $wpdb->update($TABLE, $DATA, $WHERE)
+      - pattern: $wpdb->delete($TABLE, $WHERE)
+      - pattern: $wpdb->query($SQL)
+
+  - id: wp-sticky-option-sink-medium
+    languages: [php]
+    severity: WARNING
+    message: >
+      WordPress sticky post or option manipulation. Settings injection risk if
+      user input controls sticky status or option values without authorization.
+    metadata:
+      cwe:
+        - "CWE-863: Incorrect Authorization"
+    pattern-either:
+      - pattern: $OBJ->add_sticky($POST_ID)
+      - pattern: $OBJ->add_option($OPTION, $VALUE)
+      - pattern: $OBJ->update_option($OPTION, $VALUE)
+''']
+
+[scanner.performance]
+enable_variant_search = true
+enable_cve_bootstrap = true
+
+[llm]
+temperature = 0.2
+max_concurrent = 4
+enable_llm_cache = true
+
+[llm.phases.discovery]
+models = ["mistral-small"]
+
+[llm.phases.verification]
+model = "mistral-medium"
+
+[llm.phases.aggregation]
+model = "mistral-medium"
+
+[triage]
+enabled = true
+model = "mistral-small"
+batch_size = 8
+suspicion_threshold = 0.30
+
+[priority]
+entry_point_patterns = [
+  "Route::",
+  "router/",
+  "index.php",
+  "app.php",
+  "bootstrap.php",
+  "public/index.php",
+  "Controller",
+  "__invoke",
+  "handle(",
+]
+sink_patterns = [
+  "eval(",
+  "assert(",
+  "preg_replace(",
+  "file_get_contents(",
+  "fopen(",
+  "include",
+  "require",
+  "exec(",
+  "system(",
+  "shell_exec",
+  "passthru",
+  "proc_open",
+  "curl_exec",
+  "->query(",
+  "->prepare(",
+  "->render(",
+  "->display(",
+  "->execute(",
+]
+
+[budget]
+enabled = true
+max_llm_calls = 250
+
+[knowledge.fp_patterns]
+"CWE-79" = [
+  "htmlspecialchars(",
+  "htmlentities(",
+  "esc_html(",
+  "esc_attr(",
+  "esc_url(",
+  "wp_kses",
+  "strip_tags(",
+]
+"CWE-89" = [
+  "->bindParam(",
+  "->bindValue(",
+  "->quote(",
+  "mysqli_real_escape_string(",
+  "pdo::quote(",
+]
+"CWE-352" = [
+  "session_regenerate_id(",
+  "token",
+  "csrf",
+]
+"CWE-862" = [
+  "auth(",
+  "isLoggedIn(",
+  "isAdmin(",
+  "checkAuth(",
+]
+
+[knowledge.required_security_primitives]
+"php" = ["htmlspecialchars", "htmlentities", "esc_html", "esc_attr", "esc_sql", "intval", "wp_kses"]
+
+[knowledge.hook_registry.php]
+hook_label = "route"
+registrations = [
+  '''(?si)\b(?:Route|router)\s*::\s*(?:get|post|put|patch|delete|options|any)\s*\(\s*[\x27\x22]([^\x27\x22]*)[\x27\x22]\s*,\s*''',
+]
+handler_patterns = [
+  '''^[ \t]*[\x27\x22]([a-zA-Z_\x5c][a-zA-Z0-9_\x5c]*@[a-zA-Z_][a-zA-Z0-9_]*)[\x27\x22]''',
+]
+
+[agent]
+enabled = false

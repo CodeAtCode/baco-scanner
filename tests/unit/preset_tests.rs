@@ -33,6 +33,52 @@ fn test_wordpress_plugin_preset_parses() {
 }
 
 #[test]
+fn test_php_preset_parses() {
+    let preset = preset::load_preset("php");
+    assert!(preset.is_ok(), "php preset should load");
+
+    let overlay = preset.unwrap();
+    let mut config = ScannerConfig::default();
+    overlay.merge_into(&mut config);
+
+    // Verify preset-specific fields
+    assert_eq!(config.project.name, "php");
+    assert!(config.project.languages.contains(&"php".to_string()));
+    // Verify custom_rules are populated
+    assert!(
+        !config.scanner.semgrep.custom_rules.is_empty(),
+        "php preset should have custom_rules"
+    );
+    // Verify required_security_primitives contains the expected primitives
+    let primitives = config.knowledge.required_security_primitives.get("php");
+    assert!(
+        primitives.is_some(),
+        "php preset should have php primitives"
+    );
+    let primitives = primitives.unwrap();
+    assert!(
+        primitives.contains(&"esc_html".to_string()),
+        "php primitives should contain esc_html"
+    );
+    assert!(
+        primitives.contains(&"esc_attr".to_string()),
+        "php primitives should contain esc_attr"
+    );
+    assert!(
+        primitives.contains(&"esc_sql".to_string()),
+        "php primitives should contain esc_sql"
+    );
+    assert!(
+        primitives.contains(&"intval".to_string()),
+        "php primitives should contain intval"
+    );
+    assert!(
+        primitives.contains(&"wp_kses".to_string()),
+        "php primitives should contain wp_kses"
+    );
+}
+
+#[test]
 fn test_litellm_preset_parses() {
     let preset = preset::load_preset("litellm");
     assert!(preset.is_ok(), "litellm preset should load");
@@ -93,6 +139,7 @@ fn test_preset_list_contains_all_builtins() {
     let builtins = [
         "wordpress-core",
         "wordpress-plugin",
+        "php",
         "litellm",
         "oss-python",
         "oss-monorepo",
@@ -189,6 +236,7 @@ fn test_presets_use_rulesets_key() {
     let preset_names = [
         "wordpress-core",
         "wordpress-plugin",
+        "php",
         "litellm",
         "oss-python",
         "oss-monorepo",
@@ -279,6 +327,7 @@ fn test_presets_contain_only_known_keys() {
     let preset_names = [
         "wordpress-core",
         "wordpress-plugin",
+        "php",
         "litellm",
         "oss-python",
         "oss-monorepo",
@@ -529,6 +578,7 @@ fn test_preset_unknown_key_rejection() {
         "django",
         "laravel",
         "cpp",
+        "php",
         "litellm",
         "oss-python",
         "oss-monorepo",

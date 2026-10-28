@@ -96,7 +96,7 @@ async fn test_a_file_the_reply_omits_is_still_analysed() {
         asked: Arc::new(Mutex::new(Vec::new())),
     };
 
-    let (to_analyze, skipped) = run_triage_cascade(&client, &files, &[], 10, 0.5).await;
+    let (to_analyze, skipped, _, _) = run_triage_cascade(&client, &files, &[], 10, 0.5).await;
 
     let analysed = names_of(&to_analyze);
     let b = files[1].path.to_string_lossy().to_string();
@@ -122,7 +122,7 @@ async fn test_an_empty_findings_array_analyses_everything() {
         asked: Arc::new(Mutex::new(Vec::new())),
     };
 
-    let (to_analyze, skipped) = run_triage_cascade(&client, &files, &[], 10, 0.5).await;
+    let (to_analyze, skipped, _, _) = run_triage_cascade(&client, &files, &[], 10, 0.5).await;
 
     assert_eq!(
         to_analyze.len(),
@@ -146,7 +146,7 @@ async fn test_a_low_suspicion_file_is_still_skipped_not_reanalysed() {
         asked: Arc::new(Mutex::new(Vec::new())),
     };
 
-    let (to_analyze, skipped) = run_triage_cascade(&client, &files, &[], 10, 0.5).await;
+    let (to_analyze, skipped, _, _) = run_triage_cascade(&client, &files, &[], 10, 0.5).await;
 
     assert!(
         to_analyze.is_empty(),
@@ -172,7 +172,7 @@ async fn test_a_named_file_is_not_added_twice() {
         asked: Arc::new(Mutex::new(Vec::new())),
     };
 
-    let (to_analyze, skipped) = run_triage_cascade(&client, &files, &[], 10, 0.5).await;
+    let (to_analyze, skipped, _, _) = run_triage_cascade(&client, &files, &[], 10, 0.5).await;
 
     assert_eq!(
         names_of(&to_analyze).len(),
@@ -196,7 +196,7 @@ async fn test_a_skipped_file_named_by_the_reply_is_not_readded() {
         asked: Arc::new(Mutex::new(Vec::new())),
     };
 
-    let (to_analyze, skipped) = run_triage_cascade(&client, &files, &[], 10, 0.5).await;
+    let (to_analyze, skipped, _, _) = run_triage_cascade(&client, &files, &[], 10, 0.5).await;
 
     let analysed = names_of(&to_analyze);
     let a = files[0].path.to_string_lossy().to_string();
@@ -218,7 +218,7 @@ async fn test_reconciliation_spans_every_batch() {
         asked: Arc::new(Mutex::new(Vec::new())),
     };
 
-    let (to_analyze, _) = run_triage_cascade(&client, &files, &[], 2, 0.5).await;
+    let (to_analyze, _, _, _) = run_triage_cascade(&client, &files, &[], 2, 0.5).await;
 
     assert_eq!(
         to_analyze.len(),
@@ -240,7 +240,7 @@ async fn test_an_already_analysed_file_is_not_resubmitted_or_reanalysed() {
         asked: Arc::clone(&asked),
     };
 
-    let (to_analyze, _) = run_triage_cascade(&client, &files, &already, 10, 0.5).await;
+    let (to_analyze, _, _, _) = run_triage_cascade(&client, &files, &already, 10, 0.5).await;
 
     assert_eq!(
         names_of(&to_analyze),
@@ -265,7 +265,7 @@ async fn test_a_malformed_reply_still_falls_back_to_everything() {
         asked: Arc::new(Mutex::new(Vec::new())),
     };
 
-    let (to_analyze, _) = run_triage_cascade(&client, &files, &[], 10, 0.5).await;
+    let (to_analyze, _, _, _) = run_triage_cascade(&client, &files, &[], 10, 0.5).await;
 
     assert_eq!(to_analyze.len(), 2, "got {:?}", names_of(&to_analyze));
 }

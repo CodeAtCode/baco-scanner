@@ -95,6 +95,12 @@ pub struct PerformanceSettings {
     pub enable_cve_bootstrap: bool,
     #[serde(default = "crate::config::default_enable_variant_search")]
     pub enable_variant_search: bool,
+    /// Class A: absence detection — flag functions handling sensitive state with no auth/nonce primitive.
+    #[serde(default = "crate::config::default_enable_absence_detection")]
+    pub enable_absence_detection: bool,
+    /// Class B: merge-order detection — flag merges where user-controlled input wins over trusted defaults.
+    #[serde(default = "crate::config::default_enable_merge_order_detection")]
+    pub enable_merge_order_detection: bool,
     /// Domain-routed hunt prompts: select per-attack-class prompt modules
     /// from the target's languages during LLM discovery
     #[serde(default)]
@@ -132,6 +138,8 @@ impl Default for PerformanceSettings {
             enable_confidence_refinement: crate::config::default_enable_confidence_refinement(),
             enable_cve_bootstrap: crate::config::default_enable_cve_bootstrap(),
             enable_variant_search: crate::config::default_enable_variant_search(),
+            enable_absence_detection: crate::config::default_enable_absence_detection(),
+            enable_merge_order_detection: crate::config::default_enable_merge_order_detection(),
             enable_hunt_prompts: false,
             never_submit_enabled: crate::config::default_never_submit_enabled(),
             never_submit_multiplier: crate::config::default_never_submit_multiplier(),
