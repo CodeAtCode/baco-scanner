@@ -1109,6 +1109,7 @@ async fn test_verify_finding_with_minimal_finding() {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     };
 
     let result = session.verify_finding("test.rs", &finding).await;
@@ -1280,6 +1281,7 @@ async fn test_verify_finding_with_mock_llm() {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     };
 
     let result = session.verify_finding("test.rs", &finding).await;

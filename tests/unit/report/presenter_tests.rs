@@ -48,6 +48,7 @@ fn make_finding_presenter(
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     }
 }
 
@@ -85,6 +86,7 @@ fn make_finding_with_cwe(id: &str, cwe: &str) -> VulnerabilityFinding {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     }
 }
 
@@ -124,6 +126,7 @@ fn make_finding_with_all_metadata() -> VulnerabilityFinding {
         triage_verdict: Some(TriageVerdict::Pass),
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     }
 }
 

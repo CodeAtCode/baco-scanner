@@ -19,5 +19,12 @@ mod core_tests;
 // Include multi-hit aggregation path tests
 mod aggregate_path_tests;
 mod custom_rules_tests;
+mod default_taint_rules_tests;
 mod inline_migrated_tests;
 mod severity_mapping_tests;
+
+// Include partial result handling tests (Bug 1 & Bug 2 fixes)
+mod partial_result_tests;
+
+// Include force_scan flag tests
+mod force_scan_tests;

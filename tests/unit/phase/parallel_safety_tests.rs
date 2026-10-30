@@ -179,6 +179,7 @@ async fn test_phase_context_isolation() {
                     triage_verdict: None,
                     evidence: vec![],
                     verification_tier: None,
+                    verification_gate_answers: None,
                 };
 
                 scanner.add_finding(finding.clone());
@@ -291,6 +292,7 @@ async fn test_report_generation_isolation() {
                         triage_verdict: None,
                         evidence: vec![],
                         verification_tier: None,
+                        verification_gate_answers: None,
                     };
                     scanner.add_finding(finding);
                 }

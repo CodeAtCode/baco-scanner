@@ -1011,12 +1011,36 @@ impl ChatMessage {
 #[cfg_attr(test, mockall::automock)]
 pub trait LlmChatClient: Send + Sync {
     async fn chat(&self, messages: &[ChatMessage]) -> Result<ChatResponseWithModel, ScanError>;
+
+    /// Chat with tool support - default impl delegates to chat() with empty tool_calls
+    /// Production LlmClient overrides this to enable actual tool calling
+    async fn chat_with_tools(
+        &self,
+        messages: &[ChatMessage],
+        _tools: &[ToolSchema],
+    ) -> Result<ChatResponse, ScanError> {
+        let resp = self.chat(messages).await?;
+        Ok(ChatResponse {
+            content: resp.content,
+            tool_calls: Vec::new(),
+            raw: serde_json::Value::Null,
+            model_used: resp.model_used,
+        })
+    }
 }
 
 /// Implement LlmChatClient for LlmClient
 impl LlmChatClient for LlmClient {
     async fn chat(&self, messages: &[ChatMessage]) -> Result<ChatResponseWithModel, ScanError> {
         self.chat(messages).await
+    }
+
+    async fn chat_with_tools(
+        &self,
+        messages: &[ChatMessage],
+        tools: &[ToolSchema],
+    ) -> Result<ChatResponse, ScanError> {
+        LlmClient::chat_with_tools(self, messages, tools).await
     }
 }
 

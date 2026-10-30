@@ -18,7 +18,9 @@ name = "libxml2"
 # Path to the target directory to scan (must exist)
 path = "./libxml2-test"
 # Languages to scan (file extensions will be detected automatically)
-languages = ["c", "python"]
+# BACO supports: C, Python, JavaScript, TypeScript, Go, PHP, and Ruby.
+# Only languages with installed presets will be scanned.
+languages = ["c", "python", "javascript", "typescript", "go"]
 
 # Output configuration
 [output]
@@ -51,6 +53,7 @@ rulesets = [
     # "p/javascript",  # Example: JavaScript security rules
 ]
 exclude_rules = ["html.security.plaintext-http-link", "html.security.plaintext-http-link.plaintext-http-link"]
+# force_scan = false  # pass --no-git-ignore: scan git-ignored/untracked files (does NOT bypass .semgrepignore, so tests/ stays skipped)
 
 [scanner.performance]
 # Maximum number of parallel tasks for scanning operations

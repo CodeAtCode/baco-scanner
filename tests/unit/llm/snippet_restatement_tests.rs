@@ -52,6 +52,7 @@ fn finding(title: &str, line: Option<u32>, snippet: Option<&str>) -> Vulnerabili
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     }
 }
 

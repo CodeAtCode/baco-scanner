@@ -66,6 +66,7 @@ fn create_minimal_finding() -> VulnerabilityFinding {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     }
 }
 
@@ -379,7 +380,7 @@ fn test_file_read_missing_file_error() {
     let result = tool.execute(args, &sandbox);
 
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("Open/read failed"));
+    assert!(result.unwrap_err().contains("Path does not exist"));
 }
 
 #[test]

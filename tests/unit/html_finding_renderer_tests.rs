@@ -861,6 +861,7 @@ fn test_render_finding_with_all_fields_populated() {
         triage_verdict: Some(TriageVerdict::Pass),
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     };
 
     let html = baco::report::html::finding_renderer::render_finding(&finding, 58);

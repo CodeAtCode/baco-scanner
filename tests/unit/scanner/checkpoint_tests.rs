@@ -871,6 +871,7 @@ fn test_checkpoint_with_findings_inline_migrated() {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     };
     checkpoint.findings_so_far.push(finding);
 

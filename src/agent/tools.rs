@@ -14,12 +14,15 @@ impl Tool for FileReadTool {
     ) -> Result<ToolResult, String> {
         let path = args["path"].as_str().ok_or("Missing 'path' argument")?;
 
-        // Check for path traversal
-        if path.contains("..") {
-            return Err(format!("Path traversal: {}", path));
-        }
+        // Use resolve_safe_path which validates containment and rejects symlinks
+        let full_path = sandbox.resolve_safe_path(path)?;
 
-        let full_path = sandbox.temp_dir().join(path);
+        // Additional check: verify the resolved path is not a symlink escaping sandbox
+        let metadata = std::fs::symlink_metadata(&full_path)
+            .map_err(|e| format!("Cannot read metadata: {}", e))?;
+        if metadata.file_type().is_symlink() {
+            return Err(format!("Symlink not allowed: {}", path));
+        }
         let mut content = String::new();
         std::fs::File::open(&full_path)
             .and_then(|mut f| f.read_to_string(&mut content))

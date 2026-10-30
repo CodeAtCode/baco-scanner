@@ -153,7 +153,8 @@ fn test_is_path_allowed_nonexistent_path() {
     let tmpdir = tempfile::tempdir().unwrap();
     let sandbox = ToolSandbox::new(tmpdir.path().to_path_buf(), 30);
 
-    // Path that doesn't exist but parent is within tempdir
+    // Create parent so path containment can be verified against a real directory
+    std::fs::create_dir(tmpdir.path().join("subdir")).unwrap();
     let non_existent = tmpdir.path().join("subdir").join("file.txt");
     let allowed = sandbox.is_path_allowed(&non_existent);
     assert!(allowed);

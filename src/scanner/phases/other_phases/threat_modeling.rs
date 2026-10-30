@@ -97,6 +97,7 @@ pub async fn run_threat_modeling(
                         timestamp: chrono::Utc::now(),
                     }],
                     verification_tier: None,
+                    verification_gate_answers: None,
                 };
                 findings.push(finding);
             }

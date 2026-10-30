@@ -146,6 +146,7 @@ mod eval_tests;
 mod evidence_gate_e2e_tests;
 mod evidence_tests;
 mod file_hash_tests;
+mod findings_id_tests;
 mod findings_tests;
 mod fixtures;
 mod git_analysis;
@@ -211,6 +212,7 @@ mod variant_search_tests;
 mod verification;
 mod verification_batch_index_tests;
 mod verification_blind_cap_tests;
+mod verification_bug_fixes_tests;
 mod verification_gate_tests;
 mod verification_primitive_refutation_tests;
 mod verification_verdict_tests;
@@ -229,4 +231,9 @@ mod verification_batch_guard_tests;
 mod verification_prompt_guard_tests;
 
 mod strip_between_markers_tests;
+mod upgrade_absence_confirmed_tests;
 mod upgrade_absence_read_error_tests;
+mod verification_tools_test;
+
+// max_file_size_kb range validation regression tests
+mod max_file_size_validation_tests;

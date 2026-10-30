@@ -35,6 +35,7 @@ fn make_finding(severity: Severity, file: &str, line: Option<u32>) -> Vulnerabil
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     }
 }
 
@@ -383,6 +384,7 @@ fn test_render_finding_with_all_metadata() {
         triage_verdict: Some(TriageVerdict::Pass),
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     };
 
     let html = render_finding(&finding, 28);

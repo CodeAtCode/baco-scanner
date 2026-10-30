@@ -48,6 +48,8 @@ pub fn validate_findings(path: &Path) -> Result<Vec<VulnerabilityFinding>, Strin
                 &finding.file_path,
                 finding.line_number,
                 finding.cwe_id.as_deref().unwrap_or("CWE-000"),
+                &finding.title, // Use title as rule_id fallback
+                finding.code_snippet.as_deref(),
             );
             tracing::debug!("Generated missing ID for finding {}: {}", i, finding.id);
         }

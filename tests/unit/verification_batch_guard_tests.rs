@@ -48,15 +48,29 @@ fn findings(n: usize) -> Vec<VulnerabilityFinding> {
         .collect()
 }
 
-async fn run(batch_size: usize) -> (Vec<(VerificationStatus, String)>, u64, usize) {
+async fn run(
+    batch_size: usize,
+) -> (
+    Vec<(VerificationStatus, String, Option<Vec<(String, bool)>>)>,
+    u64,
+    usize,
+) {
     let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let client = MustNotBeCalled {
         calls: std::sync::Arc::clone(&calls),
     };
     let prompts: HashMap<String, String> = HashMap::new();
     let primitives: HashMap<String, Vec<String>> = HashMap::new();
-    let (results, fallback) =
-        verify_findings_batched(&client, &findings(3), batch_size, &prompts, &primitives).await;
+    let (results, fallback) = verify_findings_batched(
+        &client,
+        &findings(3),
+        batch_size,
+        &prompts,
+        &primitives,
+        &std::env::temp_dir(),
+        0,
+    )
+    .await;
     let seen = calls.load(std::sync::atomic::Ordering::Relaxed);
     (results, fallback, seen)
 }

@@ -64,6 +64,7 @@ fn create_mock_findings() -> Vec<VulnerabilityFinding> {
             triage_verdict: None,
             evidence: vec![],
             verification_tier: None,
+            verification_gate_answers: None,
         },
         VulnerabilityFinding {
             id: "finding-2".to_string(),
@@ -98,6 +99,7 @@ fn create_mock_findings() -> Vec<VulnerabilityFinding> {
             triage_verdict: None,
             evidence: vec![],
             verification_tier: None,
+            verification_gate_answers: None,
         },
         VulnerabilityFinding {
             id: "finding-3".to_string(),
@@ -132,6 +134,7 @@ fn create_mock_findings() -> Vec<VulnerabilityFinding> {
             triage_verdict: None,
             evidence: vec![],
             verification_tier: None,
+            verification_gate_answers: None,
         },
         VulnerabilityFinding {
             id: "finding-4".to_string(),
@@ -166,6 +169,7 @@ fn create_mock_findings() -> Vec<VulnerabilityFinding> {
             triage_verdict: None,
             evidence: vec![],
             verification_tier: None,
+            verification_gate_answers: None,
         },
     ]
 }
@@ -204,6 +208,7 @@ fn create_single_finding(severity: Severity, file_path: &str) -> Vec<Vulnerabili
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     }]
 }
 
@@ -895,6 +900,7 @@ fn test_generate_with_special_characters_in_file_paths() {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     }];
 
     let tm = ThreatModelFile::generate(&ctx, &findings);
@@ -1005,6 +1011,7 @@ fn test_performance_generate_many_findings() {
             triage_verdict: None,
             evidence: vec![],
             verification_tier: None,
+            verification_gate_answers: None,
         });
     }
 

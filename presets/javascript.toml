@@ -1,0 +1,232 @@
+# BACO preset — JavaScript/TypeScript
+[project]
+name = "javascript"
+languages = ["javascript", "typescript"]
+
+[scanner]
+max_file_size_kb = 512
+exclude_paths = [
+  "vendor/*",
+  "node_modules/*",
+  "tests/*",
+  "test/*",
+  "spec/*",
+  "cypress/*",
+  "playwright/*",
+  "*.min.js",
+  "*.min.css",
+  "*.map",
+]
+
+[scanner.semgrep]
+rulesets = ["p/javascript", "p/security"]
+custom_rules = ['''
+rules:
+  - id: js-eval-execution-high
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >
+      eval() or Function() on variable input, allowing remote code execution.
+    metadata:
+      cwe:
+        - "CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code"
+    pattern-either:
+      - pattern: eval($VAR)
+      - pattern: new Function($VAR)
+
+  - id: js-document-write-xss-high
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >
+      document.write() with variable input, XSS risk if user input flows here.
+    metadata:
+      cwe:
+        - "CWE-79: Improper Neutralization of Input During Web Page Generation"
+    pattern: document.write($VAR)
+
+  - id: js-innerhtml-xss-high
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >
+      Setting innerHTML with variable input, XSS risk if user input flows here.
+    metadata:
+      cwe:
+        - "CWE-79: Improper Neutralization of Input During Web Page Generation"
+    patterns:
+      - pattern: $EL.innerHTML = $VAR
+
+  - id: js-dangerous-require-high
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >
+      Dynamic require() with variable input, path traversal or code injection risk.
+    metadata:
+      cwe:
+        - "CWE-22: Improper Limitation of a Pathname to a Restricted Directory"
+        - "CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code"
+    pattern: require($VAR)
+
+  - id: js-child-process-exec-high
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >
+      child_process.exec() with variable input, command injection risk.
+    metadata:
+      cwe:
+        - "CWE-78: Improper Neutralization of Special Elements used in an OS Command"
+    pattern-either:
+      - pattern: child_process.exec($VAR)
+      - pattern: child_process.execSync($VAR)
+
+  - id: js-weak-crypto-md5-medium
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: >
+      MD5 hash used for security purposes, cryptographically broken.
+    metadata:
+      cwe:
+        - "CWE-327: Use of a Broken or Risky Cryptographic Algorithm"
+    pattern: crypto.createHash("md5", $VAR)
+
+  - id: js-taint-sqli-high
+    languages: [javascript, typescript]
+    mode: taint
+    severity: ERROR
+    message: >
+      User input flows into database query without sanitization, SQL injection risk.
+    metadata:
+      cwe:
+        - "CWE-89: Improper Neutralization of Special Elements used in an SQL Command"
+    pattern-sources:
+      - pattern: req.query[$X]
+      - pattern: req.body[$X]
+      - pattern: req.params[$X]
+    pattern-sinks:
+      - pattern: db.query($SQL)
+      - pattern: connection.query($SQL)
+      - pattern: pool.query($SQL)
+
+  - id: js-taint-cmdi-high
+    languages: [javascript, typescript]
+    mode: taint
+    severity: ERROR
+    message: >
+      User input flows into command execution without sanitization, command injection risk.
+    metadata:
+      cwe:
+        - "CWE-78: Improper Neutralization of Special Elements used in an OS Command"
+    pattern-sources:
+      - pattern: req.query[$X]
+      - pattern: req.body[$X]
+    pattern-sinks:
+      - pattern: child_process.exec($CMD)
+      - pattern: execSync($CMD)
+
+  - id: js-taint-path-traversal-high
+    languages: [javascript, typescript]
+    mode: taint
+    severity: ERROR
+    message: >
+      User input flows into file operations without validation, path traversal risk.
+    metadata:
+      cwe:
+        - "CWE-22: Improper Limitation of a Pathname to a Restricted Directory"
+    pattern-sources:
+      - pattern: req.query[$X]
+      - pattern: req.params[$X]
+    pattern-sinks:
+      - pattern: fs.readFile($PATH)
+      - pattern: fs.writeFile($PATH, $DATA)
+      - pattern: fs.unlink($PATH)
+''']
+
+[scanner.performance]
+enable_variant_search = true
+enable_cve_bootstrap = true
+
+[llm]
+temperature = 0.2
+max_concurrent = 4
+enable_llm_cache = true
+
+[llm.phases.discovery]
+models = ["mistral-small"]
+
+[llm.phases.verification]
+model = "mistral-medium"
+
+[llm.phases.aggregation]
+model = "mistral-medium"
+
+[triage]
+enabled = true
+model = "mistral-small"
+batch_size = 8
+suspicion_threshold = 0.30
+
+[priority]
+entry_point_patterns = [
+  "app.get(",
+  "app.post(",
+  "router.",
+  "express(",
+  "index.js",
+  "server.js",
+  "app.ts",
+  "server.ts",
+  "Controller",
+  "Handler",
+]
+sink_patterns = [
+  "eval(",
+  "Function(",
+  "document.write(",
+  "innerHTML =",
+  "require(",
+  "exec(",
+  "execSync(",
+  "spawn(",
+  "execFile(",
+  "->query(",
+  "->execute(",
+]
+
+[budget]
+enabled = true
+max_llm_calls = 250
+
+[knowledge.fp_patterns]
+"CWE-79" = [
+  "escapeHtml(",
+  "escapeHtmlTag(",
+  "sanitize(",
+  "DOMPurify.",
+  "xss(",
+]
+"CWE-89" = [
+  "->param(",
+  "->bind(",
+  "?",
+  "$1",
+]
+"CWE-352" = [
+  "csrf",
+  "CSRF",
+  "token",
+  "nonce",
+]
+"CWE-862" = [
+  "auth(",
+  "authenticate(",
+  "isLoggedIn(",
+  "isAuthenticated(",
+  "checkAuth(",
+  "requireAuth(",
+]
+
+[knowledge.required_security_primitives]
+"javascript" = ["escapeHtml", "escapeHtmlTag", "sanitize", "DOMPurify", "xss", "param", "bind"]
+"typescript" = ["escapeHtml", "escapeHtmlTag", "sanitize", "DOMPurify", "xss", "param", "bind"]
+
+[agent]
+enabled = false

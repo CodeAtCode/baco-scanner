@@ -1,0 +1,191 @@
+# BACO preset — Go
+[project]
+name = "go"
+languages = ["go"]
+
+[scanner]
+max_file_size_kb = 512
+exclude_paths = [
+  "vendor/*",
+  "node_modules/*",
+  "tests/*",
+  "test/*",
+  "spec/*",
+  "cypress/*",
+  "playwright/*",
+  "*.min.js",
+  "*.min.css",
+  "*.map",
+]
+
+[scanner.semgrep]
+rulesets = ["p/go"]
+custom_rules = ['''
+rules:
+  - id: go-template-html-high
+    languages: [go]
+    severity: ERROR
+    message: >
+      template.HTML conversion without escaping, XSS risk if user input flows here.
+    metadata:
+      cwe:
+        - "CWE-79: Improper Neutralization of Input During Web Page Generation"
+    pattern: template.HTML($VAR)
+
+  - id: go-weak-hash-md5-medium
+    languages: [go]
+    severity: WARNING
+    message: >
+      MD5 hash used for security purposes, cryptographically broken.
+    metadata:
+      cwe:
+        - "CWE-327: Use of a Broken or Risky Cryptographic Algorithm"
+    pattern-either:
+      - pattern: md5.New()
+      - pattern: md5.Sum($VAR)
+
+  - id: go-exec-command-high
+    languages: [go]
+    severity: ERROR
+    message: >
+      exec.Command() with variable input, command injection risk.
+    metadata:
+      cwe:
+        - "CWE-78: Improper Neutralization of Special Elements used in an OS Command"
+    pattern-either:
+      - pattern: exec.Command($CMD)
+      - pattern: exec.CommandContext($CTX, $CMD)
+
+  - id: go-taint-sqli-high
+    languages: [go]
+    mode: taint
+    severity: ERROR
+    message: >
+      User input flows into database query without sanitization, SQL injection risk.
+    metadata:
+      cwe:
+        - "CWE-89: Improper Neutralization of Special Elements used in an SQL Command"
+    pattern-sources:
+      - pattern: r.URL.Query().Get($KEY)
+      - pattern: r.FormValue($KEY)
+      - pattern: r.PostFormValue($KEY)
+    pattern-sinks:
+      - pattern: db.Query($SQL)
+      - pattern: db.Exec($SQL)
+      - pattern: db.QueryRow($SQL)
+      - pattern: db.Prepare($SQL)
+
+  - id: go-taint-cmdi-high
+    languages: [go]
+    mode: taint
+    severity: ERROR
+    message: >
+      User input flows into command execution without sanitization, command injection risk.
+    metadata:
+      cwe:
+        - "CWE-78: Improper Neutralization of Special Elements used in an OS Command"
+    pattern-sources:
+      - pattern: r.URL.Query().Get($KEY)
+    pattern-sinks:
+      - pattern: exec.Command($CMD)
+
+  - id: go-taint-path-traversal-high
+    languages: [go]
+    mode: taint
+    severity: ERROR
+    message: >
+      User input flows into file operations without validation, path traversal risk.
+    metadata:
+      cwe:
+        - "CWE-22: Improper Limitation of a Pathname to a Restricted Directory"
+    pattern-sources:
+      - pattern: r.URL.Query().Get($KEY)
+    pattern-sinks:
+      - pattern: os.Open($PATH)
+      - pattern: os.ReadFile($PATH)
+      - pattern: os.Create($PATH)
+      - pattern: os.Remove($PATH)
+''']
+
+[scanner.performance]
+enable_variant_search = true
+enable_cve_bootstrap = true
+
+[llm]
+temperature = 0.2
+max_concurrent = 4
+enable_llm_cache = true
+
+[llm.phases.discovery]
+models = ["mistral-small"]
+
+[llm.phases.verification]
+model = "mistral-medium"
+
+[llm.phases.aggregation]
+model = "mistral-medium"
+
+[triage]
+enabled = true
+model = "mistral-small"
+batch_size = 8
+suspicion_threshold = 0.30
+
+[priority]
+entry_point_patterns = [
+  "http.HandleFunc",
+  "router.",
+  "gin.",
+  "echo.",
+  "main.go",
+  "cmd/",
+  "handlers/",
+  "controllers/",
+]
+sink_patterns = [
+  "template.HTML(",
+  "md5.New(",
+  "md5.Sum(",
+  "exec.Command(",
+  "exec.CommandContext(",
+  "db.Query(",
+  "db.Exec(",
+  "os.Open(",
+  "os.ReadFile(",
+]
+
+[budget]
+enabled = true
+max_llm_calls = 250
+
+[knowledge.fp_patterns]
+"CWE-79" = [
+  "template.HTMLEscapeString(",
+  "template.HTMLAttr(",
+  "html.EscapeString(",
+  "HTMLEscapeString(",
+]
+"CWE-89" = [
+  "?",
+  "$1",
+  "sql.Named(",
+]
+"CWE-352" = [
+  "csrf",
+  "CSRF",
+  "token",
+  "nonce",
+]
+"CWE-862" = [
+  "Auth(",
+  "Authenticate(",
+  "IsAuthenticated(",
+  "CheckAuth(",
+  "RequireAuth(",
+]
+
+[knowledge.required_security_primitives]
+"go" = ["template.HTMLEscapeString", "template.HTMLAttr", "html.EscapeString", "HTMLEscapeString"]
+
+[agent]
+enabled = false

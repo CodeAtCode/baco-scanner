@@ -8,6 +8,24 @@ use crate::llm::{ChatMessage, ChatResponse};
 use std::path::PathBuf;
 use std::sync::Arc;
 
+/// Maximum size for tool output to prevent context saturation (Bug E fix)
+pub const MAX_TOOL_OUTPUT_BYTES: usize = 8192;
+
+/// Truncate tool output to prevent context saturation.
+/// Output exceeding `MAX_TOOL_OUTPUT_BYTES` is cut and marked with an
+/// omission notice so the agent knows data was dropped.
+pub fn truncate_tool_output(output: &str) -> String {
+    if output.len() <= MAX_TOOL_OUTPUT_BYTES {
+        return output.to_string();
+    }
+    let omitted = output.len() - MAX_TOOL_OUTPUT_BYTES;
+    format!(
+        "{}\n\n[... truncated: {} bytes omitted ...]",
+        &output[..MAX_TOOL_OUTPUT_BYTES],
+        omitted
+    )
+}
+
 pub type ProgressCallback = Arc<dyn Fn(String) + Send + Sync>;
 
 /// Create an empty AgentFinding with default values
@@ -51,6 +69,7 @@ pub fn create_empty_finding(
             triage_verdict: None,
             evidence: vec![],
             verification_tier: None,
+            verification_gate_answers: None,
         },
         compile_path: None,
         test_source_path: None,
@@ -102,6 +121,7 @@ pub fn create_audit_finding(
             triage_verdict: None,
             evidence: vec![],
             verification_tier: None,
+            verification_gate_answers: None,
         },
         compile_path: None,
         test_source_path: None,
@@ -143,7 +163,10 @@ pub async fn execute_tool_calls(
 
             let result = tool.execute(tool_call.arguments.clone(), sandbox);
             let result_str = match &result {
-                Ok(r) => format!("Tool {} result: {}\n\n", r.success, r.output),
+                Ok(r) => {
+                    let output = truncate_tool_output(&r.output);
+                    format!("Tool {} result: {}\n\n", r.success, output)
+                }
                 Err(e) => format!("Tool {} error: {}\n\n", tool_call.name, e),
             };
 

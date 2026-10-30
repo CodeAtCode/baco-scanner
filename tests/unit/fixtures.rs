@@ -121,6 +121,7 @@ pub fn create_minimal_finding() -> VulnerabilityFinding {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     }
 }
 
@@ -163,6 +164,7 @@ pub fn create_complete_finding() -> VulnerabilityFinding {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     }
 }
 
@@ -790,6 +792,7 @@ pub fn make_aggregation_finding(
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     }
 }
 

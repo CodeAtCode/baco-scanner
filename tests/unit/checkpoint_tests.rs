@@ -48,6 +48,7 @@ fn make_test_finding_with_evidence() -> VulnerabilityFinding {
             timestamp: Utc::now(),
         }],
         verification_tier: Some(VerificationTier::Supported),
+        verification_gate_answers: None,
     }
 }
 

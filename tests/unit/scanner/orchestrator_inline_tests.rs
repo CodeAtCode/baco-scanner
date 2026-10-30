@@ -72,6 +72,7 @@ mod tests {
             triage_verdict: None,
             evidence: vec![],
             verification_tier: None,
+            verification_gate_answers: None,
         }];
 
         let has_valid = findings.iter().all(|f| f.description.is_empty());
@@ -114,6 +115,7 @@ mod tests {
             triage_verdict: None,
             evidence: vec![],
             verification_tier: None,
+            verification_gate_answers: None,
         };
 
         let checkpoint_findings = vec![valid_finding];
@@ -161,6 +163,7 @@ mod tests {
                 triage_verdict: None,
                 evidence: vec![],
                 verification_tier: None,
+                verification_gate_answers: None,
             },
             VulnerabilityFinding {
                 id: "test-2".to_string(),
@@ -195,6 +198,7 @@ mod tests {
                 triage_verdict: None,
                 evidence: vec![],
                 verification_tier: None,
+                verification_gate_answers: None,
             },
         ];
 
@@ -445,6 +449,7 @@ mod tests {
             triage_verdict: None,
             evidence: vec![],
             verification_tier: None,
+            verification_gate_answers: None,
         }];
 
         findings.append(&mut indexing_findings.clone());
@@ -483,6 +488,7 @@ mod tests {
             triage_verdict: None,
             evidence: vec![],
             verification_tier: None,
+            verification_gate_answers: None,
         }];
 
         findings.append(&mut semgrep_findings.clone());
@@ -635,6 +641,7 @@ mod tests {
                 triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
             }],
             vec!["file.rs".to_string()],
         ));
@@ -691,6 +698,7 @@ mod tests {
             triage_verdict: None,
             evidence: vec![],
             verification_tier: None,
+            verification_gate_answers: None,
         }];
         let has_valid_single = !single_empty_desc.is_empty()
             && single_empty_desc.iter().any(|f| !f.description.is_empty());

@@ -5,6 +5,7 @@ mod executor_scenarios_tests;
 mod executor_tests;
 mod flow_tests;
 mod mock_llm_tests;
+mod sandbox_containment_tests;
 mod sandbox_path_tests;
 mod sandbox_scenarios_tests;
 mod sandbox_tests;

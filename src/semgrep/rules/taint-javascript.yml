@@ -1,0 +1,51 @@
+rules:
+  - id: js-taint-sqli-high
+    languages: [javascript, typescript]
+    mode: taint
+    severity: ERROR
+    message: >
+      User input flows into database query without sanitization, SQL injection risk.
+    metadata:
+      cwe:
+        - "CWE-89: Improper Neutralization of Special Elements used in an SQL Command"
+    pattern-sources:
+      - pattern: req.query[$X]
+      - pattern: req.body[$X]
+      - pattern: req.params[$X]
+    pattern-sinks:
+      - pattern: db.query($SQL)
+      - pattern: connection.query($SQL)
+      - pattern: pool.query($SQL)
+
+  - id: js-taint-cmdi-high
+    languages: [javascript, typescript]
+    mode: taint
+    severity: ERROR
+    message: >
+      User input flows into command execution without sanitization, command injection risk.
+    metadata:
+      cwe:
+        - "CWE-78: Improper Neutralization of Special Elements used in an OS Command"
+    pattern-sources:
+      - pattern: req.query[$X]
+      - pattern: req.body[$X]
+    pattern-sinks:
+      - pattern: child_process.exec($CMD)
+      - pattern: execSync($CMD)
+
+  - id: js-taint-path-traversal-high
+    languages: [javascript, typescript]
+    mode: taint
+    severity: ERROR
+    message: >
+      User input flows into file operations without validation, path traversal risk.
+    metadata:
+      cwe:
+        - "CWE-22: Improper Limitation of a Pathname to a Restricted Directory"
+    pattern-sources:
+      - pattern: req.query[$X]
+      - pattern: req.params[$X]
+    pattern-sinks:
+      - pattern: fs.readFile($PATH)
+      - pattern: fs.writeFile($PATH, $DATA)
+      - pattern: fs.unlink($PATH)

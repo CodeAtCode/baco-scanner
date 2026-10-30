@@ -57,6 +57,7 @@ fn make_finding(id: &str, evidence: Vec<Evidence>) -> VulnerabilityFinding {
         triage_verdict: None,
         evidence,
         verification_tier: None,
+        verification_gate_answers: None,
     }
 }
 
@@ -100,6 +101,7 @@ fn make_html_finding(
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     }
 }
 

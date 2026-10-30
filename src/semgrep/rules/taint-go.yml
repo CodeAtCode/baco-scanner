@@ -1,0 +1,50 @@
+rules:
+  - id: go-taint-sqli-high
+    languages: [go]
+    mode: taint
+    severity: ERROR
+    message: >
+      User input flows into database query without sanitization, SQL injection risk.
+    metadata:
+      cwe:
+        - "CWE-89: Improper Neutralization of Special Elements used in an SQL Command"
+    pattern-sources:
+      - pattern: r.URL.Query().Get($KEY)
+      - pattern: r.FormValue($KEY)
+      - pattern: r.PostFormValue($KEY)
+    pattern-sinks:
+      - pattern: db.Query($SQL)
+      - pattern: db.Exec($SQL)
+      - pattern: db.QueryRow($SQL)
+      - pattern: db.Prepare($SQL)
+
+  - id: go-taint-cmdi-high
+    languages: [go]
+    mode: taint
+    severity: ERROR
+    message: >
+      User input flows into command execution without sanitization, command injection risk.
+    metadata:
+      cwe:
+        - "CWE-78: Improper Neutralization of Special Elements used in an OS Command"
+    pattern-sources:
+      - pattern: r.URL.Query().Get($KEY)
+    pattern-sinks:
+      - pattern: exec.Command($CMD)
+
+  - id: go-taint-path-traversal-high
+    languages: [go]
+    mode: taint
+    severity: ERROR
+    message: >
+      User input flows into file operations without validation, path traversal risk.
+    metadata:
+      cwe:
+        - "CWE-22: Improper Limitation of a Pathname to a Restricted Directory"
+    pattern-sources:
+      - pattern: r.URL.Query().Get($KEY)
+    pattern-sinks:
+      - pattern: os.Open($PATH)
+      - pattern: os.ReadFile($PATH)
+      - pattern: os.Create($PATH)
+      - pattern: os.Remove($PATH)

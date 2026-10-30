@@ -68,6 +68,15 @@ pub struct SemgrepSettings {
     /// at scan time so presets stay self-contained.
     #[serde(default)]
     pub custom_rules: Vec<String>,
+    /// Max file size for semgrep targets in bytes (passed as --max-target-bytes)
+    #[serde(default)]
+    pub max_target_bytes: Option<u64>,
+    /// When true, pass `--no-git-ignore` to semgrep to scan files ignored by
+    /// `.gitignore` (git-ignored and untracked files). Does NOT bypass the
+    /// built-in `.semgrepignore`, so directories like `tests/` stay skipped.
+    /// Default: false — preserves current behavior.
+    #[serde(default)]
+    pub force_scan: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

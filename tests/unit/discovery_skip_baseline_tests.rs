@@ -40,6 +40,7 @@ mod discovery_skip_tests {
             triage_verdict: None,
             evidence: Vec::new(),
             verification_tier: None,
+            verification_gate_answers: None,
         };
 
         for source in evidence_sources {

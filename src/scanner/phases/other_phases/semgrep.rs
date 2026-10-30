@@ -20,12 +20,21 @@ pub async fn run_semgrep(
     } = cfg;
 
     tracing::info!("Running Semgrep phase on {:?}", target_path);
-    let runner = crate::semgrep::SemgrepRunner::new(
+    let mut runner = crate::semgrep::SemgrepRunner::new(
         config.scanner.semgrep.rulesets.clone(),
         config.scanner.semgrep.exclude_rules.clone(),
     )
     .with_languages(config.project.languages.clone())
     .with_custom_rules(config.scanner.semgrep.custom_rules.clone());
+
+    // Set max_target_bytes if configured
+    if let Some(max_bytes) = config.scanner.semgrep.max_target_bytes {
+        runner = runner.with_max_target_bytes(max_bytes);
+    }
+
+    // Set force_scan if configured
+    runner = runner.with_force_scan(config.scanner.semgrep.force_scan);
+
     let phase_num = crate::scanner::pipeline::orchestrator::phase_index(&ScanPhase::Semgrep);
     let total = crate::scanner::pipeline::orchestrator::total_phases();
     pb.set_message(format!("Phase {}/{}: Running Semgrep static analysis (scanning for known vulnerability patterns)...", phase_num, total));

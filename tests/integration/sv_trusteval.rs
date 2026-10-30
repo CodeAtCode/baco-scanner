@@ -448,6 +448,7 @@ fn test_finding_json_roundtrip_with_fixture_context() {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     };
 
     let json = serde_json::to_string(&finding).unwrap();

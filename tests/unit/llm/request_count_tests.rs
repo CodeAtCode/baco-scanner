@@ -85,6 +85,7 @@ fn create_finding(id: usize) -> VulnerabilityFinding {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     }
 }
 
@@ -107,8 +108,16 @@ async fn test_verification_n_findings_leq_batch_size() {
     ];
 
     let client = CountingLlmClient::new(responses);
-    let (results, _fallback_count) =
-        verify_findings_batched(&client, &findings, 8, &hunt_prompts, &empty_primitives()).await;
+    let (results, _fallback_count) = verify_findings_batched(
+        &client,
+        &findings,
+        8,
+        &hunt_prompts,
+        &empty_primitives(),
+        &std::env::temp_dir(),
+        0,
+    )
+    .await;
 
     assert_eq!(
         client.get_call_count(),
@@ -144,8 +153,16 @@ async fn test_verification_n_findings_spanning_k_batches() {
     ];
 
     let client = CountingLlmClient::new(responses);
-    let (results, _fallback_count) =
-        verify_findings_batched(&client, &findings, 8, &hunt_prompts, &empty_primitives()).await;
+    let (results, _fallback_count) = verify_findings_batched(
+        &client,
+        &findings,
+        8,
+        &hunt_prompts,
+        &empty_primitives(),
+        &std::env::temp_dir(),
+        0,
+    )
+    .await;
 
     assert_eq!(
         client.get_call_count(),
@@ -197,8 +214,16 @@ async fn test_empty_findings_zero_calls() {
     let hunt_prompts: HashMap<String, String> = HashMap::new();
 
     let client = CountingLlmClient::new(vec![]);
-    let results =
-        verify_findings_batched(&client, &findings, 8, &hunt_prompts, &empty_primitives()).await;
+    let results = verify_findings_batched(
+        &client,
+        &findings,
+        8,
+        &hunt_prompts,
+        &empty_primitives(),
+        &std::env::temp_dir(),
+        0,
+    )
+    .await;
 
     assert_eq!(
         client.get_call_count(),
@@ -218,8 +243,16 @@ async fn test_parse_failure_batch_counts_as_one_call() {
     let responses = vec!["This is not valid JSON".to_string()];
 
     let client = CountingLlmClient::new(responses);
-    let (results, _fallback_count) =
-        verify_findings_batched(&client, &findings, 8, &hunt_prompts, &empty_primitives()).await;
+    let (results, _fallback_count) = verify_findings_batched(
+        &client,
+        &findings,
+        8,
+        &hunt_prompts,
+        &empty_primitives(),
+        &std::env::temp_dir(),
+        0,
+    )
+    .await;
 
     assert_eq!(
         client.get_call_count(),
@@ -229,7 +262,7 @@ async fn test_parse_failure_batch_counts_as_one_call() {
     assert_eq!(results.len(), 5, "Expected 5 results");
 
     // All should be NeedsReview since the batch parse failed
-    for (i, (status, notes)) in results.iter().enumerate() {
+    for (i, (status, notes, _)) in results.iter().enumerate() {
         assert_eq!(
             *status,
             VerificationStatus::NeedsReview,
@@ -259,13 +292,21 @@ impl LlmChatClient for FailingLlmClient {
 async fn verify_batch_client_error_marks_all_needs_review() {
     let client = FailingLlmClient;
     let findings = vec![create_finding(1), create_finding(2)];
-    let (results, fallback) =
-        verify_findings_batched(&client, &findings, 8, &HashMap::new(), &HashMap::new()).await;
+    let (results, fallback) = verify_findings_batched(
+        &client,
+        &findings,
+        8,
+        &HashMap::new(),
+        &HashMap::new(),
+        &std::env::temp_dir(),
+        0,
+    )
+    .await;
     assert_eq!(results.len(), 2);
     assert!(
         results
             .iter()
-            .all(|(status, _)| *status == VerificationStatus::NeedsReview)
+            .all(|(status, _, _)| *status == VerificationStatus::NeedsReview)
     );
     assert_eq!(fallback, 0);
 }
@@ -276,8 +317,16 @@ async fn verify_batch_missing_index_counts_positional_fallback() {
         r#"[{"verification_status": "confirmed", "verification_notes": "ok"}, {"verification_status": "false_positive", "verification_notes": "no"}]"#.to_string(),
     ]);
     let findings = vec![create_finding(1), create_finding(2)];
-    let (results, fallback) =
-        verify_findings_batched(&client, &findings, 8, &HashMap::new(), &HashMap::new()).await;
+    let (results, fallback) = verify_findings_batched(
+        &client,
+        &findings,
+        8,
+        &HashMap::new(),
+        &HashMap::new(),
+        &std::env::temp_dir(),
+        0,
+    )
+    .await;
     assert_eq!(results.len(), 2);
     assert_eq!(fallback, 2);
     assert_eq!(client.get_call_count(), 1);

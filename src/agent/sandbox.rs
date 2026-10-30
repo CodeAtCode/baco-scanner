@@ -344,9 +344,16 @@ impl ToolSandbox {
         // Pre-condition: validate path containment before write
         let full = validate_path_containment(&self.temp_dir, path)?;
 
-        // Write the file
-        std::fs::File::create(&full)
-            .and_then(|mut f| f.write_all(content.as_bytes()))
+        // Create the file with O_NOFOLLOW to prevent symlink-based TOCTOU attacks.
+        // create_new (O_CREAT|O_EXCL) ensures we don't clobber an existing file.
+        use std::os::unix::fs::OpenOptionsExt;
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .custom_flags(libc::O_NOFOLLOW)
+            .open(&full)
+            .map_err(|e| format!("Create failed: {}", e))?;
+        file.write_all(content.as_bytes())
             .map_err(|e| format!("Write failed: {}", e))?;
 
         // Post-condition: verify containment after write (catches symlink swaps)
@@ -367,6 +374,12 @@ impl ToolSandbox {
     }
 
     pub fn is_path_allowed(&self, path: &Path) -> bool {
+        if path
+            .components()
+            .any(|c| c == std::path::Component::ParentDir)
+        {
+            return false;
+        }
         let canonical = match path.canonicalize() {
             Ok(p) => p,
             Err(_) => {

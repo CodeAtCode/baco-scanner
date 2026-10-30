@@ -120,6 +120,86 @@ rules:
       - pattern: $OBJ->add_sticky($POST_ID)
       - pattern: $OBJ->add_option($OPTION, $VALUE)
       - pattern: $OBJ->update_option($OPTION, $VALUE)
+
+  - id: php-taint-sqli-high
+    languages: [php]
+    mode: taint
+    severity: ERROR
+    message: >
+      User input flows into database query without sanitization, SQL injection risk.
+    metadata:
+      cwe:
+        - "CWE-89: Improper Neutralization of Special Elements used in an SQL Command"
+    pattern-sources:
+      - pattern: $_GET[$KEY]
+      - pattern: $_POST[$KEY]
+      - pattern: $_REQUEST[$KEY]
+      - pattern: $_COOKIE[$KEY]
+    pattern-sinks:
+      - pattern: $DB->query($SQL)
+      - pattern: $DB->exec($SQL)
+      - pattern: mysqli_query($DB, $SQL)
+
+  - id: php-taint-cmdi-high
+    languages: [php]
+    mode: taint
+    severity: ERROR
+    message: >
+      User input flows into command execution without sanitization, command injection risk.
+    metadata:
+      cwe:
+        - "CWE-78: Improper Neutralization of Special Elements used in an OS Command"
+    pattern-sources:
+      - pattern: $_GET[$KEY]
+      - pattern: $_POST[$KEY]
+    pattern-sinks:
+      - pattern: system($CMD)
+      - pattern: exec($CMD)
+      - pattern: shell_exec($CMD)
+      - pattern: passthru($CMD)
+      - pattern: proc_open($CMD, ...)
+      - pattern: popen($CMD, ...)
+
+  - id: php-taint-path-traversal-high
+    languages: [php]
+    mode: taint
+    severity: ERROR
+    message: >
+      User input flows into file operations without validation, path traversal risk.
+    metadata:
+      cwe:
+        - "CWE-22: Improper Limitation of a Pathname to a Restricted Directory"
+    pattern-sources:
+      - pattern: $_GET[$KEY]
+      - pattern: $_POST[$KEY]
+    pattern-sinks:
+      - pattern: file_get_contents($PATH)
+      - pattern: fopen($PATH, $MODE)
+      - pattern: readfile($PATH)
+      - pattern: include($PATH)
+      - pattern: require($PATH)
+
+  - id: php-unserialize-high
+    languages: [php]
+    severity: ERROR
+    message: >
+      unserialize() on variable input, insecure deserialization risk allowing
+      remote code execution or object injection attacks.
+    metadata:
+      cwe:
+        - "CWE-502: Deserialization of Untrusted Data"
+    pattern: unserialize($VAR)
+
+  - id: php-file-upload-high
+    languages: [php]
+    severity: WARNING
+    message: >
+      move_uploaded_file() without authorization check or file type validation,
+      unrestricted file upload risk allowing malicious file execution.
+    metadata:
+      cwe:
+        - "CWE-434: Unrestricted Upload of File with Dangerous Type"
+    pattern: move_uploaded_file($SRC, $DST)
 ''']
 
 [scanner.performance]

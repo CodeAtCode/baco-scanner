@@ -50,6 +50,7 @@ fn mock_findings() -> Vec<VulnerabilityFinding> {
             triage_verdict: None,
             evidence: vec![],
             verification_tier: None,
+            verification_gate_answers: None,
         },
         VulnerabilityFinding {
             id: "test-2".to_string(),
@@ -84,6 +85,7 @@ fn mock_findings() -> Vec<VulnerabilityFinding> {
             triage_verdict: None,
             evidence: vec![],
             verification_tier: None,
+            verification_gate_answers: None,
         },
     ]
 }

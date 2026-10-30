@@ -1600,6 +1600,8 @@ impl LlmAnalyzer {
                         file_path,
                         Some(line as u32),
                         cwe_id_for_hash,
+                        title, // Use title as rule_id (LLM discovery doesn't have semgrep rule IDs)
+                        None,  // No code snippet at this stage
                     ),
                     title: title.to_string(),
                     description,
@@ -1643,6 +1645,7 @@ impl LlmAnalyzer {
                         timestamp: chrono::Utc::now(),
                     }],
                     verification_tier: None,
+                    verification_gate_answers: None,
                 });
             }
         }
@@ -1813,6 +1816,8 @@ impl LlmAnalyzer {
                             file_path,
                             Some(line as u32),
                             cwe_id_for_hash,
+                            title, // Use title as rule_id (LLM discovery doesn't have semgrep rule IDs)
+                            Some(&code_snippet),
                         ),
                         title: title.to_string(),
                         description: description.clone(), // Use the description (possibly fallback)
@@ -1856,6 +1861,7 @@ impl LlmAnalyzer {
                             timestamp: chrono::Utc::now(),
                         }],
                         verification_tier: None,
+                        verification_gate_answers: None,
                     });
                 }
             }

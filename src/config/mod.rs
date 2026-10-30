@@ -328,6 +328,24 @@ impl ScannerConfig {
             &self.llm.phases.aggregation,
             &self.llm.base_url,
         )?;
+        // Validate scanner.max_file_size_kb range
+        // Reject 0 (would filter out all non-empty files) and values that overflow on * 1024
+        if self.scanner.max_file_size_kb == 0 {
+            return Err(ConfigError::Validation {
+                field: "scanner.max_file_size_kb".to_string(),
+                message: format!("must be > 0, got {}", self.scanner.max_file_size_kb),
+            });
+        }
+        let max_allowed = u64::MAX / 1024;
+        if self.scanner.max_file_size_kb > max_allowed {
+            return Err(ConfigError::Validation {
+                field: "scanner.max_file_size_kb".to_string(),
+                message: format!(
+                    "must be <= {} (to avoid overflow on * 1024), got {}",
+                    max_allowed, self.scanner.max_file_size_kb
+                ),
+            });
+        }
         let project_path = PathBuf::from(&self.project.path);
         if !project_path.exists() {
             return Err(ConfigError::Validation {

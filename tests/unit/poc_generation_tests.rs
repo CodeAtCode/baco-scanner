@@ -76,6 +76,7 @@ fn create_test_finding_with_category(
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     }
 }
 
@@ -1205,5 +1206,6 @@ fn create_test_finding_inline(cwe_id: &str) -> VulnerabilityFinding {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     }
 }

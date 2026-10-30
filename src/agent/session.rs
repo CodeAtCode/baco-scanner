@@ -11,6 +11,7 @@ use std::sync::Arc;
 pub type ProgressCallback = Arc<dyn Fn(String) + Send + Sync>;
 
 /// Trait for LLM clients used by the agent (supports both real and mock clients)
+#[allow(clippy::double_must_use)]
 #[async_trait]
 pub trait AgentLlmClient: Send + Sync {
     async fn chat_with_tools(
@@ -275,6 +276,7 @@ impl AgentSession {
                                     timestamp: chrono::Utc::now(),
                                 }],
                                 verification_tier: None,
+                                verification_gate_answers: None,
                             },
                             compile_path,
                             test_source_path,

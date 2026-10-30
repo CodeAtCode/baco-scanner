@@ -36,6 +36,7 @@ fn make_test_finding(id: &str, title: &str) -> VulnerabilityFinding {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     }
 }
 

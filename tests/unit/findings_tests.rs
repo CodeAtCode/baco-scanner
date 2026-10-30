@@ -40,15 +40,19 @@ fn test_verification_status_display_failed() {
 
 #[test]
 fn test_generate_id_deterministic_inline_migrated() {
-    let id1 = VulnerabilityFinding::generate_id("test.c", Some(42), "CWE-79");
-    let id2 = VulnerabilityFinding::generate_id("test.c", Some(42), "CWE-79");
+    let id1 =
+        VulnerabilityFinding::generate_id("test.c", Some(42), "CWE-79", "rule-1", Some("code"));
+    let id2 =
+        VulnerabilityFinding::generate_id("test.c", Some(42), "CWE-79", "rule-1", Some("code"));
     assert_eq!(id1, id2);
 }
 
 #[test]
 fn test_generate_id_different_inputs_inline_migrated() {
-    let id1 = VulnerabilityFinding::generate_id("test.c", Some(42), "CWE-79");
-    let id2 = VulnerabilityFinding::generate_id("test.c", Some(43), "CWE-79");
+    let id1 =
+        VulnerabilityFinding::generate_id("test.c", Some(42), "CWE-79", "rule-1", Some("code"));
+    let id2 =
+        VulnerabilityFinding::generate_id("test.c", Some(43), "CWE-79", "rule-1", Some("code"));
     assert_ne!(id1, id2);
 }
 
@@ -87,6 +91,7 @@ fn test_json_roundtrip_inline_migrated() {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     };
 
     let json = serde_json::to_string(&finding).unwrap();
@@ -777,6 +782,7 @@ fn test_vulnerability_finding_construction() {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     };
 
     assert_eq!(finding.id, "test-id");
@@ -789,36 +795,44 @@ fn test_vulnerability_finding_construction() {
 
 #[test]
 fn test_vulnerability_finding_generate_id_deterministic() {
-    let id1 = VulnerabilityFinding::generate_id("test.c", Some(42), "CWE-79");
-    let id2 = VulnerabilityFinding::generate_id("test.c", Some(42), "CWE-79");
+    let id1 =
+        VulnerabilityFinding::generate_id("test.c", Some(42), "CWE-79", "rule-1", Some("code"));
+    let id2 =
+        VulnerabilityFinding::generate_id("test.c", Some(42), "CWE-79", "rule-1", Some("code"));
     assert_eq!(id1, id2);
 }
 
 #[test]
 fn test_vulnerability_finding_generate_id_different_file() {
-    let id1 = VulnerabilityFinding::generate_id("file1.c", Some(42), "CWE-79");
-    let id2 = VulnerabilityFinding::generate_id("file2.c", Some(42), "CWE-79");
+    let id1 =
+        VulnerabilityFinding::generate_id("file1.c", Some(42), "CWE-79", "rule-1", Some("code"));
+    let id2 =
+        VulnerabilityFinding::generate_id("file2.c", Some(42), "CWE-79", "rule-1", Some("code"));
     assert_ne!(id1, id2);
 }
 
 #[test]
 fn test_vulnerability_finding_generate_id_different_line() {
-    let id1 = VulnerabilityFinding::generate_id("test.c", Some(42), "CWE-79");
-    let id2 = VulnerabilityFinding::generate_id("test.c", Some(43), "CWE-79");
+    let id1 =
+        VulnerabilityFinding::generate_id("test.c", Some(42), "CWE-79", "rule-1", Some("code"));
+    let id2 =
+        VulnerabilityFinding::generate_id("test.c", Some(43), "CWE-79", "rule-1", Some("code"));
     assert_ne!(id1, id2);
 }
 
 #[test]
 fn test_vulnerability_finding_generate_id_different_cwe() {
-    let id1 = VulnerabilityFinding::generate_id("test.c", Some(42), "CWE-79");
-    let id2 = VulnerabilityFinding::generate_id("test.c", Some(42), "CWE-89");
+    let id1 =
+        VulnerabilityFinding::generate_id("test.c", Some(42), "CWE-79", "rule-1", Some("code"));
+    let id2 =
+        VulnerabilityFinding::generate_id("test.c", Some(42), "CWE-89", "rule-1", Some("code"));
     assert_ne!(id1, id2);
 }
 
 #[test]
 fn test_vulnerability_finding_generate_id_no_line() {
-    let id1 = VulnerabilityFinding::generate_id("test.c", None, "CWE-79");
-    let id2 = VulnerabilityFinding::generate_id("test.c", None, "CWE-79");
+    let id1 = VulnerabilityFinding::generate_id("test.c", None, "CWE-79", "rule-1", None);
+    let id2 = VulnerabilityFinding::generate_id("test.c", None, "CWE-79", "rule-1", None);
     assert_eq!(id1, id2);
 }
 
@@ -857,6 +871,7 @@ fn test_vulnerability_finding_serialize() {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     };
 
     let json = serde_json::to_string(&finding).unwrap();
@@ -956,6 +971,7 @@ fn test_vulnerability_finding_roundtrip() {
         }),
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     };
 
     let json = serde_json::to_string(&finding).unwrap();
@@ -998,6 +1014,7 @@ fn test_vulnerability_finding_field_access() {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     };
 
     assert_eq!(finding.id, "access-test");

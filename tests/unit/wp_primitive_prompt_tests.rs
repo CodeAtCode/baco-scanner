@@ -41,6 +41,7 @@ fn make_test_finding(file_path: &str, cwe_id: Option<&str>) -> VulnerabilityFind
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     }
 }
 

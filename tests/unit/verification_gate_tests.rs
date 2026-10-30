@@ -57,12 +57,13 @@ fn test_a_full_pass_stays_confirmed() {
 
 #[test]
 fn test_not_reachable_kills_the_finding() {
+    // Graduated gate: reachability=NO downgrades to NeedsReview, not FalsePositive
     let body = verdict_with(
         r#"{"reachability":"no","controllability":"yes","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"}"#,
         GOOD_PROOF,
     );
     let out = parse_batch_verification_verdict(&body, 1);
-    assert_eq!(out[0].0, VerificationStatus::FalsePositive);
+    assert_eq!(out[0].0, VerificationStatus::NeedsReview);
     assert!(
         out[0].1.contains("not reachable"),
         "the reason must say which gate answer killed it, got {:?}",
@@ -72,12 +73,13 @@ fn test_not_reachable_kills_the_finding() {
 
 #[test]
 fn test_uncontrollable_input_kills_the_finding() {
+    // Graduated gate: controllability=NO downgrades to NeedsReview, not FalsePositive
     let body = verdict_with(
         r#"{"reachability":"yes","controllability":"no","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"}"#,
         GOOD_PROOF,
     );
     let out = parse_batch_verification_verdict(&body, 1);
-    assert_eq!(out[0].0, VerificationStatus::FalsePositive);
+    assert_eq!(out[0].0, VerificationStatus::NeedsReview);
     assert!(out[0].1.contains("does not control"));
 }
 
@@ -148,12 +150,13 @@ fn test_case_and_spacing_in_answers_do_not_matter() {
 
 #[test]
 fn test_no_concrete_impact_kills_the_finding() {
+    // Graduated gate: impact=NO downgrades to NeedsReview, not FalsePositive
     let body = verdict_with(
         r#"{"reachability":"yes","controllability":"yes","preconditions":"no","impact":"no","context":"yes","evidence":"yes","confidence":"yes"}"#,
         GOOD_PROOF,
     );
     let out = parse_batch_verification_verdict(&body, 1);
-    assert_eq!(out[0].0, VerificationStatus::FalsePositive);
+    assert_eq!(out[0].0, VerificationStatus::NeedsReview);
 }
 
 #[test]
@@ -231,18 +234,19 @@ fn test_gate_fires_on_a_finding_it_should_downgrade() {
     // downgraded.
     //
     // The prompt asks for the gate; the model returns it with reachability=no.
-    // The gate must downgrade this to FalsePositive.
-    let body = r#"[{  "index": 0,  "verification_status": "confirmed",  "verification_notes": "the handler looks real",  "seven_question_gate": {"reachability":"no","controllability":"yes","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"},  "concrete_impact_proof": {"attack_vector":"POST reaches line 4","consequence":"order marked paid","is_theoretical":false}}]"#;
+    // The gate must downgrade this to NeedsReview (graduated gate).
+    let body = r#"[{  "index": 0,  "verification_status": "confirmed",  "verification_notes": "the handler looks real",  "seven_question_gate": {"reachability":"no","controllability":"yes","preconditions":"no","impact":"yes","context":"yes","evidence":"yes","confidence":"yes"},  "concrete_impact_proof": {"attack_vector":"POST reaches line 4","is_theoretical":false}}]"#;
     let out = parse_batch_verification_verdict(body, 1);
     // Assert exact VerificationStatus value
     assert_eq!(
         out[0].0,
-        VerificationStatus::FalsePositive,
-        "the gate must downgrade a confirmed finding with reachability=no"
+        VerificationStatus::NeedsReview,
+        "the gate must downgrade a confirmed finding with reachability=no to NeedsReview"
     );
     // Assert exact reason string
     assert_eq!(
-        out[0].1, "the handler looks real (gate: not reachable from user input)",
+        out[0].1,
+        "the handler looks real (gate: not reachable from user input (needs human review))",
         "the reason must name the gate answer that killed it"
     );
 }
@@ -318,4 +322,201 @@ fn test_verification_prompt_loaded_from_file_not_hardcoded() {
         // which would indicate a hardcoded string
         // For now, we just note this - the test passes either way
     }
+}
+
+// ============================================================================
+// Graduated Gate Tests (Problem 1: Binary Kill Questions)
+// These tests verify that the gate uses graduated logic instead of binary kills
+// ============================================================================
+
+#[test]
+fn test_reachability_no_downgrades_to_needs_review_not_false_positive() {
+    // Graduated gate: reachability = NO should downgrade to NeedsReview, not FalsePositive
+    // Rationale: the finding may still be real, just not confirmed by this gate
+    use baco::findings::VerificationStatus;
+    use baco::scanner::phases::llm_phases::verification::apply_gate_parts;
+
+    let mut status = VerificationStatus::Confirmed;
+    let gate = baco::scanner::phases::llm_phases::verification::SevenQuestionGate {
+        reachability: Some("no".to_string()),
+        controllability: Some("yes".to_string()),
+        preconditions: Some("no".to_string()),
+        impact: Some("yes".to_string()),
+        context: Some("yes".to_string()),
+        evidence: Some("yes".to_string()),
+        confidence: Some("yes".to_string()),
+    };
+    let proof = Some(
+        baco::scanner::phases::llm_phases::verification::ImpactProof {
+            attack_vector: Some("POST reaches line 4".to_string()),
+            is_theoretical: Some(false),
+        },
+    );
+
+    let reason = apply_gate_parts(&mut status, Some(&gate), proof.as_ref());
+
+    assert_eq!(
+        status,
+        VerificationStatus::NeedsReview,
+        "reachability=NO should downgrade to NeedsReview, not FalsePositive"
+    );
+    let reason_str = reason.unwrap();
+    assert!(
+        reason_str.contains("not reachable"),
+        "reason must explain why: {:?}",
+        reason_str
+    );
+}
+
+#[test]
+fn test_controllability_no_downgrades_to_needs_review_not_false_positive() {
+    // Graduated gate: controllability = NO should downgrade to NeedsReview, not FalsePositive
+    use baco::findings::VerificationStatus;
+    use baco::scanner::phases::llm_phases::verification::apply_gate_parts;
+
+    let mut status = VerificationStatus::Confirmed;
+    let gate = baco::scanner::phases::llm_phases::verification::SevenQuestionGate {
+        reachability: Some("yes".to_string()),
+        controllability: Some("no".to_string()),
+        preconditions: Some("no".to_string()),
+        impact: Some("yes".to_string()),
+        context: Some("yes".to_string()),
+        evidence: Some("yes".to_string()),
+        confidence: Some("yes".to_string()),
+    };
+    let proof = Some(
+        baco::scanner::phases::llm_phases::verification::ImpactProof {
+            attack_vector: Some("POST reaches line 4".to_string()),
+            is_theoretical: Some(false),
+        },
+    );
+
+    let reason = apply_gate_parts(&mut status, Some(&gate), proof.as_ref());
+
+    assert_eq!(
+        status,
+        VerificationStatus::NeedsReview,
+        "controllability=NO should downgrade to NeedsReview, not FalsePositive"
+    );
+    let reason_str = reason.unwrap();
+    assert!(
+        reason_str.contains("does not control"),
+        "reason must explain why: {:?}",
+        reason_str
+    );
+}
+
+#[test]
+fn test_preconditions_yes_still_downgrades_to_false_positive() {
+    // Preconditions = YES means explicit sanitization blocking the attack - real false positive
+    use baco::findings::VerificationStatus;
+    use baco::scanner::phases::llm_phases::verification::apply_gate_parts;
+
+    let mut status = VerificationStatus::Confirmed;
+    let gate = baco::scanner::phases::llm_phases::verification::SevenQuestionGate {
+        reachability: Some("yes".to_string()),
+        controllability: Some("yes".to_string()),
+        preconditions: Some("yes".to_string()),
+        impact: Some("yes".to_string()),
+        context: Some("yes".to_string()),
+        evidence: Some("yes".to_string()),
+        confidence: Some("yes".to_string()),
+    };
+    let proof = Some(
+        baco::scanner::phases::llm_phases::verification::ImpactProof {
+            attack_vector: Some("POST reaches line 4".to_string()),
+            is_theoretical: Some(false),
+        },
+    );
+
+    let reason = apply_gate_parts(&mut status, Some(&gate), proof.as_ref());
+
+    assert_eq!(
+        status,
+        VerificationStatus::FalsePositive,
+        "preconditions=YES should still downgrade to FalsePositive (explicit sanitization)"
+    );
+    let reason_str = reason.unwrap();
+    assert!(
+        reason_str.contains("validation"),
+        "reason must mention validation: {:?}",
+        reason_str
+    );
+}
+
+#[test]
+fn test_context_no_still_downgrades_to_false_positive() {
+    // Context = NO means test/example code - real false positive
+    use baco::findings::VerificationStatus;
+    use baco::scanner::phases::llm_phases::verification::apply_gate_parts;
+
+    let mut status = VerificationStatus::Confirmed;
+    let gate = baco::scanner::phases::llm_phases::verification::SevenQuestionGate {
+        reachability: Some("yes".to_string()),
+        controllability: Some("yes".to_string()),
+        preconditions: Some("no".to_string()),
+        impact: Some("yes".to_string()),
+        context: Some("no".to_string()),
+        evidence: Some("yes".to_string()),
+        confidence: Some("yes".to_string()),
+    };
+    let proof = Some(
+        baco::scanner::phases::llm_phases::verification::ImpactProof {
+            attack_vector: Some("POST reaches line 4".to_string()),
+            is_theoretical: Some(false),
+        },
+    );
+
+    let reason = apply_gate_parts(&mut status, Some(&gate), proof.as_ref());
+
+    assert_eq!(
+        status,
+        VerificationStatus::FalsePositive,
+        "context=NO should still downgrade to FalsePositive (test code)"
+    );
+    let reason_str = reason.unwrap();
+    assert!(
+        reason_str.contains("test"),
+        "reason must mention test code: {:?}",
+        reason_str
+    );
+}
+
+#[test]
+fn test_impact_no_downgrades_to_needs_review_not_false_positive() {
+    // Graduated gate: impact = NO should downgrade to NeedsReview, not FalsePositive
+    // Rationale: absence of evidence is not evidence of absence
+    use baco::findings::VerificationStatus;
+    use baco::scanner::phases::llm_phases::verification::apply_gate_parts;
+
+    let mut status = VerificationStatus::Confirmed;
+    let gate = baco::scanner::phases::llm_phases::verification::SevenQuestionGate {
+        reachability: Some("yes".to_string()),
+        controllability: Some("yes".to_string()),
+        preconditions: Some("no".to_string()),
+        impact: Some("no".to_string()),
+        context: Some("yes".to_string()),
+        evidence: Some("yes".to_string()),
+        confidence: Some("yes".to_string()),
+    };
+    let proof = Some(
+        baco::scanner::phases::llm_phases::verification::ImpactProof {
+            attack_vector: Some("POST reaches line 4".to_string()),
+            is_theoretical: Some(false),
+        },
+    );
+
+    let reason = apply_gate_parts(&mut status, Some(&gate), proof.as_ref());
+
+    assert_eq!(
+        status,
+        VerificationStatus::NeedsReview,
+        "impact=NO should downgrade to NeedsReview, not FalsePositive"
+    );
+    let reason_str = reason.unwrap();
+    assert!(
+        reason_str.contains("no concrete security impact"),
+        "reason must explain why: {:?}",
+        reason_str
+    );
 }

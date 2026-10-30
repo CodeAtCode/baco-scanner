@@ -54,6 +54,7 @@ fn test_analyze_with_findings() {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     }];
 
     let result = CrossFileAnalyzer::analyze_cross_file_references(&findings);
@@ -100,6 +101,7 @@ fn test_multi_file_findings_same_cwe() {
             triage_verdict: None,
             evidence: vec![],
             verification_tier: None,
+            verification_gate_answers: None,
         },
         VulnerabilityFinding {
             id: "find2".to_string(),
@@ -134,6 +136,7 @@ fn test_multi_file_findings_same_cwe() {
             triage_verdict: None,
             evidence: vec![],
             verification_tier: None,
+            verification_gate_answers: None,
         },
     ];
 
@@ -192,6 +195,7 @@ fn test_cross_file_taint_tracking_same_severity_source() {
             triage_verdict: None,
             evidence: vec![],
             verification_tier: None,
+            verification_gate_answers: None,
         },
         VulnerabilityFinding {
             id: "sink1".to_string(),
@@ -226,6 +230,7 @@ fn test_cross_file_taint_tracking_same_severity_source() {
             triage_verdict: None,
             evidence: vec![],
             verification_tier: None,
+            verification_gate_answers: None,
         },
     ];
 
@@ -297,6 +302,7 @@ fn test_single_file_no_cross_reference() {
             triage_verdict: None,
             evidence: vec![],
             verification_tier: None,
+            verification_gate_answers: None,
         },
         VulnerabilityFinding {
             id: "find2".to_string(),
@@ -331,6 +337,7 @@ fn test_single_file_no_cross_reference() {
             triage_verdict: None,
             evidence: vec![],
             verification_tier: None,
+            verification_gate_answers: None,
         },
     ];
 
@@ -386,6 +393,7 @@ fn test_mixed_same_and_different_cwe() {
             triage_verdict: None,
             evidence: vec![],
             verification_tier: None,
+            verification_gate_answers: None,
         },
         VulnerabilityFinding {
             id: "cwe1_b".to_string(),
@@ -420,6 +428,7 @@ fn test_mixed_same_and_different_cwe() {
             triage_verdict: None,
             evidence: vec![],
             verification_tier: None,
+            verification_gate_answers: None,
         },
         VulnerabilityFinding {
             id: "cwe2".to_string(),
@@ -454,6 +463,7 @@ fn test_mixed_same_and_different_cwe() {
             triage_verdict: None,
             evidence: vec![],
             verification_tier: None,
+            verification_gate_answers: None,
         },
     ];
 

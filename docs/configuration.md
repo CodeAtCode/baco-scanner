@@ -98,6 +98,10 @@ rulesets = [
 ]
 # Rules to exclude (supports exact match and prefix match)
 exclude_rules = ["html.security.plaintext-http-link"]
+# Max file size (in bytes) passed to semgrep via --max-target-bytes.
+# Files larger than this are skipped by semgrep without aborting the scan.
+# When unset, semgrep uses its own default (~1 MiB).
+# max_target_bytes = 1048576
 # Inline rule YAML documents (full `rules:` blocks) - materialized to temp files at scan time
 custom_rules = ['''
 rules:

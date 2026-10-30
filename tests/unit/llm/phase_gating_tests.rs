@@ -466,7 +466,7 @@ fn test_parse_batch_verification_malformed_json_returns_needs_review() {
         3,
         "Should return placeholder for all expected findings"
     );
-    for (status, notes) in &results {
+    for (status, notes, _) in &results {
         assert_eq!(
             *status,
             VerificationStatus::NeedsReview,

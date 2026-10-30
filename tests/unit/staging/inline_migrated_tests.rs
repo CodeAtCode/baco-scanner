@@ -1073,6 +1073,7 @@ async fn test_autopatcher_execute_batch_respects_max_patches() {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     };
 
     let finding2 = baco::findings::VulnerabilityFinding {
@@ -1108,6 +1109,7 @@ async fn test_autopatcher_execute_batch_respects_max_patches() {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     };
 
     let findings = vec![finding1, finding2];
@@ -1162,6 +1164,7 @@ async fn test_autopatcher_execute_batch_skips_missing_code_snippet() {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     };
 
     let findings = vec![finding];
@@ -1213,6 +1216,7 @@ async fn test_autopatcher_execute_batch_with_multiple_findings() {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     };
 
     let finding2 = baco::findings::VulnerabilityFinding {
@@ -1248,6 +1252,7 @@ async fn test_autopatcher_execute_batch_with_multiple_findings() {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     };
 
     let finding3 = baco::findings::VulnerabilityFinding {
@@ -1283,6 +1288,7 @@ async fn test_autopatcher_execute_batch_with_multiple_findings() {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     };
 
     let findings = vec![finding1, finding2, finding3];
@@ -2430,6 +2436,7 @@ async fn test_autopatcher_execute_batch_max_patches() {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     };
     let finding2 = baco::findings::VulnerabilityFinding {
         id: "f2".into(),
@@ -2464,6 +2471,7 @@ async fn test_autopatcher_execute_batch_max_patches() {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     };
 
     let result = autopatcher

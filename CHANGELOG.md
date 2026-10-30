@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Taint-mode semgrep presets for JavaScript (`presets/javascript.toml`) and Go (`presets/go.toml`), with taint-source/sink rules for SQLi, command injection, and path traversal
+- Taint-mode rules added to existing PHP and Python presets
+- `max_target_bytes` config field under `[scanner.semgrep]` to cap file size passed to semgrep via `--max-target-bytes`
+- Graduated verification gate: individual check results (reachability, controllability, preconditions, context, impact) are recorded separately instead of a single binary kill
+
+### Changed
+- Default `project.languages` in `config.example.toml` expanded from `["c", "python"]` to include `go`, `javascript`, `php`
+- Semgrep runner no longer aborts the entire scan on a non-zero exit code; partial JSON findings from stdout are preserved
+- Verification gate downgrades to `NeedsReview` instead of `FalsePositive` when a single check fails, preserving incremental evidence
+
+### Fixed
+- Finding ID collisions: `generate_id` now includes `rule_id` and a snippet discriminator byte in the hash, preventing distinct vulnerabilities on the same file/line/CWE from sharing an ID
+- `generate_id` distinguishes `None` from `Some("")` snippets via a discriminator byte
 
 ## [1.1.0] - 2026-09-15
 

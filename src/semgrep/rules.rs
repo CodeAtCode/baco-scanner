@@ -3,6 +3,15 @@ use crate::findings::Severity;
 /// Default per-run semgrep timeout (client side) in seconds.
 pub const DEFAULT_SEMGREP_TIMEOUT_SECS: u64 = 300;
 
+/// Bundled taint-mode rules for Python (derived from presets/oss-python.toml)
+const TAINT_PYTHON_RULES: &str = include_str!("rules/taint-python.yml");
+
+/// Bundled taint-mode rules for JavaScript/TypeScript (derived from presets/javascript.toml)
+const TAINT_JAVASCRIPT_RULES: &str = include_str!("rules/taint-javascript.yml");
+
+/// Bundled taint-mode rules for Go (derived from presets/go.toml)
+const TAINT_GO_RULES: &str = include_str!("rules/taint-go.yml");
+
 #[derive(Clone)]
 pub struct SemgrepRunner {
     pub rulesets: Vec<String>,
@@ -14,6 +23,12 @@ pub struct SemgrepRunner {
     pub custom_rules: Vec<String>,
     /// Project languages for deriving default rulesets
     pub languages: Vec<String>,
+    /// Max file size for semgrep targets in bytes (passed as --max-target-bytes)
+    pub max_target_bytes: Option<u64>,
+    /// When true, pass `--no-git-ignore` to semgrep to scan files ignored by
+    /// `.gitignore` (git-ignored and untracked files). Does NOT bypass the
+    /// built-in `.semgrepignore`, so directories like `tests/` stay skipped.
+    pub force_scan: bool,
 }
 
 impl SemgrepRunner {
@@ -24,6 +39,8 @@ impl SemgrepRunner {
             timeout_secs: DEFAULT_SEMGREP_TIMEOUT_SECS,
             custom_rules: Vec::new(),
             languages: Vec::new(),
+            max_target_bytes: None,
+            force_scan: false,
         }
     }
 
@@ -42,6 +59,18 @@ impl SemgrepRunner {
     /// Builder: attach inline rule YAML documents from preset `custom_rules`.
     pub fn with_custom_rules(mut self, custom_rules: Vec<String>) -> Self {
         self.custom_rules = custom_rules;
+        self
+    }
+
+    /// Builder: set max target file size in bytes (passed as --max-target-bytes).
+    pub fn with_max_target_bytes(mut self, max_target_bytes: u64) -> Self {
+        self.max_target_bytes = Some(max_target_bytes);
+        self
+    }
+
+    /// Builder: enable `--no-git-ignore` flag to scan normally ignored files.
+    pub fn with_force_scan(mut self, force_scan: bool) -> Self {
+        self.force_scan = force_scan;
         self
     }
 
@@ -74,6 +103,32 @@ impl SemgrepRunner {
         }
 
         defaults.into_iter().collect()
+    }
+
+    /// Derive default taint-mode custom rules from project languages when
+    /// `custom_rules` is empty. Returns inline YAML documents (one per language)
+    /// so data-flow vulnerabilities are detected by default.
+    pub fn derive_default_custom_rules(&self) -> Vec<String> {
+        if !self.custom_rules.is_empty() {
+            // Explicit custom rules take precedence — return none.
+            return Vec::new();
+        }
+        let mut defaults = Vec::new();
+        for lang in &self.languages {
+            match lang.to_lowercase().as_str() {
+                "python" => defaults.push(TAINT_PYTHON_RULES.to_string()),
+                "javascript" | "js" | "typescript" | "ts" => {
+                    defaults.push(TAINT_JAVASCRIPT_RULES.to_string())
+                }
+                "go" => defaults.push(TAINT_GO_RULES.to_string()),
+                _ => {}
+            }
+        }
+        // Dedup: a project with both "javascript" and "typescript" should get
+        // the JS taint file once, not twice.
+        defaults.sort();
+        defaults.dedup();
+        defaults
     }
 
     /// Check if a rule check_id should be excluded based on exclude_rules patterns.

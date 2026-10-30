@@ -202,6 +202,8 @@ pub fn parse_json_output(
                     &rf.path,
                     Some(rf.line),
                     &rf.cwe_id.clone().unwrap_or_else(|| "unknown".to_string()),
+                    &check_id,
+                    Some(extract_code_snippet(&rf.path, rf.line, 2).as_str()),
                 ),
                 title: check_id.clone(),
                 description: description.clone(),
@@ -239,6 +241,7 @@ pub fn parse_json_output(
                     timestamp: chrono::Utc::now(),
                 }],
                 verification_tier: None,
+                verification_gate_answers: None,
             });
         } else {
             let first = &raw_findings[0];
@@ -319,6 +322,7 @@ pub fn parse_json_output(
                     timestamp: chrono::Utc::now(),
                 }],
                 verification_tier: None,
+                verification_gate_answers: None,
             });
         }
     }

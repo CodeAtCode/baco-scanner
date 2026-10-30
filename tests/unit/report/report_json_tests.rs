@@ -38,6 +38,7 @@ fn make_finding(severity: Severity, file: &str, line: Option<u32>) -> Vulnerabil
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     }
 }
 

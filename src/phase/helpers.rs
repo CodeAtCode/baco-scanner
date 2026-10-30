@@ -55,6 +55,7 @@ pub fn create_test_finding(
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     }
 }
 
@@ -106,6 +107,7 @@ pub fn create_finding_with_params(
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     }
 }
 

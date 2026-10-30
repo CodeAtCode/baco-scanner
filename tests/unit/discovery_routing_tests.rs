@@ -52,6 +52,7 @@ fn create_plain_finding(id: &str, file_path: &str) -> VulnerabilityFinding {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     }
 }
 

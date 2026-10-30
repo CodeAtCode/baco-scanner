@@ -373,6 +373,7 @@ async fn test_execute_batch_with_vuln_spec_enabled_with_security_patch() {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     };
 
     let findings = vec![finding];
@@ -467,6 +468,7 @@ async fn test_execute_batch_with_vuln_spec_disabled() {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     };
 
     let findings = vec![finding];
@@ -613,6 +615,7 @@ async fn test_execute_batch_with_vuln_spec_non_security_patch() {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     };
 
     let findings = vec![finding];

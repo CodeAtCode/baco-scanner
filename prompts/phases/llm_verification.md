@@ -21,17 +21,26 @@ Each finding must pass the following structured 7-question gate. Answer each que
 7. **Confidence**: Given all answers above, is this a true positive? (YES/NO/UNKNOWN)
 
 **Gate Logic**:
-- If Q1 (Reachability) = NO → KILL finding (not reachable)
-- If Q2 (Controllability) = NO → KILL finding (not controllable)
+- If Q1 (Reachability) = NO → downgrade to `needs_review` (not enough context, not a false positive)
+- If Q2 (Controllability) = NO → downgrade to `needs_review` (not enough context, not a false positive)
 - If Q3 (Preconditions) = YES → KILL finding (blocked by sanitization)
-- If Q1-Q3 all pass AND Q4-Q7 all = YES/CONFIRMED → PASS finding
+- If Q4 (Impact) = NO → downgrade to `needs_review` (absence of evidence, not evidence of absence)
+- If Q5 (Context) = NO → KILL finding (test/example code)
 - Otherwise → NEEDS_REVIEW
+
+## Graduated Downgrades
+
+Only downgrade to `false_positive` when you have POSITIVE evidence the finding is wrong:
+- Explicit sanitization blocking the attack (Q3=YES)
+- Test/example code, not production (Q5=NO)
+
+When you lack sufficient context to confirm or deny, use `needs_review` — do not kill a finding merely because you cannot confirm it.
 
 ## B2: Concrete Impact Proof Requirement
 
 You MUST provide a concrete impact scenario:
 - Example: "Attacker sends `; rm -rf /` in the `name` parameter, which reaches `system()` at line 42"
-- If the impact is theoretical ("could potentially lead to..."), downgrade the finding
+- If the impact is theoretical ("could potentially lead to...") AND you have examined the full function body for concrete attack paths, downgrade the finding. If you have NOT seen the full function body, mark impact as UNKNOWN rather than downgrading.
 - The scenario must show the EXACT attack vector and the CONSEQUENCE
 
 ## Skeptical gate — before you emit

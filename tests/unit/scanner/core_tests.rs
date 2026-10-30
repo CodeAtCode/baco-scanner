@@ -969,6 +969,7 @@ async fn test_scanner_run_with_initial_findings_force() {
             triage_verdict: None,
             evidence: vec![],
             verification_tier: None,
+            verification_gate_answers: None,
         })
         .collect();
 
@@ -1122,6 +1123,7 @@ fn create_test_finding_core_migrated(id: &str) -> VulnerabilityFinding {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     }
 }
 
@@ -1176,6 +1178,7 @@ fn test_scanner_with_initial_findings_inline_migrated() {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     }];
 
     let scanner = baco::scanner::Scanner::with_initial_findings(

@@ -150,7 +150,7 @@ fn test_file_read_missing_file() {
 
     let result = tool.execute(args, &*sandbox);
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("Open/read failed"));
+    assert!(result.unwrap_err().contains("Path does not exist"));
 }
 
 #[test]

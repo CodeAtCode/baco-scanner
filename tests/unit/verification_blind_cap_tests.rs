@@ -42,6 +42,7 @@ fn finding(line: Option<u32>, snippet: Option<&str>) -> VulnerabilityFinding {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     }
 }
 

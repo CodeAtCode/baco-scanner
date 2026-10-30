@@ -229,16 +229,45 @@ pub struct VulnerabilityFinding {
     pub evidence: Vec<crate::evidence::Evidence>,
     #[serde(default)]
     pub verification_tier: Option<crate::evidence::VerificationTier>,
+    /// Seven-question gate answers for audit trail (Bug H fix)
+    #[serde(default)]
+    pub verification_gate_answers: Option<Vec<(String, bool)>>,
 }
 
 impl VulnerabilityFinding {
-    pub fn generate_id(file_path: &str, line_number: Option<u32>, cwe_id: &str) -> String {
+    /// Generate a unique ID for a finding.
+    ///
+    /// Hash input: file_path + line_number + cwe_id + rule_id (or title fallback) + code_snippet_hash
+    ///
+    /// NOTE: Changing the hash input changes ALL existing finding IDs. This is acceptable
+    /// because the old IDs could collide (two findings on same line with same CWE got same ID).
+    pub fn generate_id(
+        file_path: &str,
+        line_number: Option<u32>,
+        cwe_id: &str,
+        rule_id: &str,
+        code_snippet: Option<&str>,
+    ) -> String {
         let mut hasher = Sha256::new();
         hasher.update(file_path.as_bytes());
         if let Some(line) = line_number {
             hasher.update(line.to_string().as_bytes());
         }
         hasher.update(cwe_id.as_bytes());
+        // Use rule_id if available, otherwise fall back to title
+        hasher.update(rule_id.as_bytes());
+        // Include a hash of the code snippet to avoid ID collisions from long snippets.
+        // A discriminator byte distinguishes None from Some("") so they don't collide.
+        let mut snippet_hasher = Sha256::new();
+        match code_snippet {
+            None => snippet_hasher.update([0u8]),
+            Some(snippet) => {
+                snippet_hasher.update([1u8]);
+                snippet_hasher.update(snippet.as_bytes());
+            }
+        }
+        let snippet_result = snippet_hasher.finalize();
+        hasher.update(snippet_result);
         let result = hasher.finalize();
         hex::encode(result)
     }

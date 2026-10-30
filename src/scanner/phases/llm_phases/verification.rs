@@ -1,9 +1,12 @@
 use crate::agent;
+use crate::agent::executor::execute_tool_calls;
+use crate::agent::sandbox::ToolSandbox;
+use crate::agent::tool_schema::ToolRegistry;
 use crate::checkpoint::ScanPhase;
 use crate::error::ScanResult;
 use crate::findings::VerificationStatus;
 use crate::findings::VulnerabilityFinding;
-use crate::llm::{ChatMessage, LlmChatClient};
+use crate::llm::{ChatMessage, LlmChatClient, ToolSchema};
 use crate::poc_compiler::PocCompiler;
 use crate::poc_generation::{PoCFormat, PoCGenerationEngine};
 use crate::prompt::loader::{load_hunt_prompts, load_phase_prompts};
@@ -15,6 +18,9 @@ use crate::semgrep::parser::extract_code_snippet;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::Arc;
+
+/// Batch verification result: (status, notes, gate_answers)
+type BatchVerificationResult = (VerificationStatus, String, Option<Vec<(String, bool)>>);
 
 /// Rejected finding with its rejection reason.
 pub type RejectedFinding = (VulnerabilityFinding, String);
@@ -36,29 +42,29 @@ struct BatchVerdictItem {
 }
 
 #[derive(Deserialize, Debug, Default)]
-struct SevenQuestionGate {
+pub struct SevenQuestionGate {
     #[serde(default)]
-    reachability: Option<String>,
+    pub reachability: Option<String>,
     #[serde(default)]
-    controllability: Option<String>,
+    pub controllability: Option<String>,
     #[serde(default)]
-    preconditions: Option<String>,
+    pub preconditions: Option<String>,
     #[serde(default)]
-    impact: Option<String>,
+    pub impact: Option<String>,
     #[serde(default)]
-    context: Option<String>,
+    pub context: Option<String>,
     #[serde(default)]
-    evidence: Option<String>,
+    pub evidence: Option<String>,
     #[serde(default)]
-    confidence: Option<String>,
+    pub confidence: Option<String>,
 }
 
 #[derive(Deserialize, Debug, Default)]
-struct ImpactProof {
+pub struct ImpactProof {
     #[serde(default)]
-    attack_vector: Option<String>,
+    pub attack_vector: Option<String>,
     #[serde(default)]
-    is_theoretical: Option<bool>,
+    pub is_theoretical: Option<bool>,
 }
 
 /// A gate answer as a decision: `Some(true)`/`Some(false)` for a stated yes or
@@ -150,12 +156,11 @@ pub fn refute_with_primitive_check(
     }
 }
 
-/// Upgrade a NeedsReview finding by checking for absent security primitives.
+/// Adjust a finding's status by checking for absent security primitives.
 ///
 /// The inverse of `refute_with_primitive_check`: when a finding describes a
 /// sensitive-state mutation and the function body contains NO security primitive,
-/// the finding is likely a true positive and should be upgraded from NeedsReview
-/// to Confirmed.
+/// the finding is likely a true positive.
 ///
 /// Sensitive-state categories (matched by keyword in title/description):
 /// - Privilege escalation
@@ -164,9 +169,19 @@ pub fn refute_with_primitive_check(
 /// - Session manipulation
 /// - CSRF protection absence
 ///
-/// Only acts when `status == VerificationStatus::NeedsReview`. A Confirmed
-/// finding is left alone. Returns `(status, notes)` unchanged if the finding
-/// does not match the sensitive-state pattern or if a primitive IS found.
+/// Acts on both `NeedsReview` and `Confirmed` findings:
+/// - `NeedsReview` + no primitive → upgrade to `Confirmed`.
+/// - `NeedsReview` + primitive found → stay `NeedsReview`.
+/// - `NeedsReview` + unreadable file → stay `NeedsReview` (never confirm on a
+///   missing file).
+/// - `Confirmed` + no primitive → stay `Confirmed` (absence corroborates).
+/// - `Confirmed` + primitive found → downgrade to `NeedsReview` (the primitive
+///   may be a mitigation the model missed).
+/// - `Confirmed` + unreadable file → stay `Confirmed` (don't downgrade on a
+///   read error).
+///
+/// Returns `(status, notes)` unchanged if the finding does not match the
+/// sensitive-state pattern or if absence detection is disabled.
 pub fn upgrade_for_absent_primitive(
     finding: &VulnerabilityFinding,
     status: VerificationStatus,
@@ -177,7 +192,8 @@ pub fn upgrade_for_absent_primitive(
     if !enable_absence_detection {
         return (status, notes.to_string());
     }
-    if status != VerificationStatus::NeedsReview {
+    let was_confirmed = status == VerificationStatus::Confirmed;
+    if status != VerificationStatus::NeedsReview && !was_confirmed {
         return (status, notes.to_string());
     }
     if !is_sensitive_state_mutation(finding) {
@@ -185,10 +201,15 @@ pub fn upgrade_for_absent_primitive(
     }
     match anchored_body_containing_primitive(finding, primitives) {
         Some(Ok((_body, found))) => {
-            let reason = format!(
-                "not confirmed by absence: {} found in the body of the function this finding names",
-                found
-            );
+            let reason = if was_confirmed {
+                format!(
+                    "downgraded from confirmed: {found} found in the body of the function this finding names — primitive may be a mitigation"
+                )
+            } else {
+                format!(
+                    "not confirmed by absence: {found} found in the body of the function this finding names"
+                )
+            };
             let merged = if notes.trim().is_empty() {
                 reason
             } else {
@@ -206,10 +227,14 @@ pub fn upgrade_for_absent_primitive(
             } else {
                 format!("{notes} ({reason})")
             };
-            (VerificationStatus::NeedsReview, merged)
+            (status, merged)
         }
         None => {
-            let reason = "confirmed by absence: no security primitive found in the body of the function this finding names";
+            let reason = if was_confirmed {
+                "corroborated by absence: no security primitive found in the body of the function this finding names"
+            } else {
+                "confirmed by absence: no security primitive found in the body of the function this finding names"
+            };
             let merged = if notes.trim().is_empty() {
                 reason.to_string()
             } else {
@@ -293,6 +318,37 @@ fn body_of(content: &str, start_line: usize, end_line: usize) -> Option<String> 
     Some(lines[from..to].join("\n"))
 }
 
+/// Extract the full function body containing a finding.
+///
+/// Returns the function body as a string if:
+/// - The finding's title contains a function name
+/// - The file can be read
+/// - The function is found in the AST
+///
+/// Silently returns None if any step fails (fallback to ±5 lines context).
+pub(crate) fn function_body_for_finding(finding: &VulnerabilityFinding) -> Option<String> {
+    // Try to extract a function name from the title
+    let name = crate::llm_analysis::function_names_in_title(&finding.title)
+        .into_iter()
+        .next()?;
+
+    // Try to read the file
+    let content = std::fs::read_to_string(&finding.file_path).ok()?;
+
+    // Get the language from the file path
+    let language = extract_language_from_path(&finding.file_path);
+    if language.is_empty() {
+        return None;
+    }
+
+    // Get function line ranges from the AST
+    let ranges = crate::llm_analysis::function_line_ranges(&content, &language);
+    let (start, end) = *ranges.get(&name)?;
+
+    // Extract and return the function body
+    body_of(&content, start, end)
+}
+
 /// Cap a verdict on a finding the judge was shown nothing for.
 ///
 /// A real finding can reach here without a line: a chunked file whose reported
@@ -316,7 +372,19 @@ pub fn cap_blind_verdict(
     (VerificationStatus::NeedsReview, merged)
 }
 
-fn apply_gate_parts(
+/// Apply the seven-question gate to a verification verdict.
+///
+/// Graduated gate logic:
+/// - Reachability = NO → NeedsReview (not FalsePositive) - insufficient context
+/// - Controllability = NO → NeedsReview (not FalsePositive) - insufficient context
+/// - Preconditions = YES → FalsePositive (explicit sanitization blocking attack)
+/// - Context = NO → FalsePositive (test/example code)
+/// - Impact = NO → NeedsReview (not FalsePositive) - absence of evidence
+/// - Evidence = NO → NeedsReview (already)
+/// - Confidence = NO → NeedsReview (already)
+///
+/// Only downgrade to FalsePositive when there is POSITIVE evidence the finding is wrong.
+pub fn apply_gate_parts(
     status: &mut VerificationStatus,
     gate: Option<&SevenQuestionGate>,
     proof: Option<&ImpactProof>,
@@ -335,25 +403,30 @@ fn apply_gate_parts(
         }
     };
 
+    // Graduated gate: reachability = NO means insufficient context, not a false positive
     if answered_yes(&gate.reachability) == Some(false) {
-        *status = VerificationStatus::FalsePositive;
-        return Some("gate: not reachable from user input".to_string());
+        *status = VerificationStatus::NeedsReview;
+        return Some("gate: not reachable from user input (needs human review)".to_string());
     }
+    // Graduated gate: controllability = NO means insufficient context, not a false positive
     if answered_yes(&gate.controllability) == Some(false) {
-        *status = VerificationStatus::FalsePositive;
-        return Some("gate: attacker does not control the input".to_string());
+        *status = VerificationStatus::NeedsReview;
+        return Some("gate: attacker does not control the input (needs human review)".to_string());
     }
+    // Preconditions = YES means explicit sanitization blocking the attack - real false positive
     if answered_yes(&gate.preconditions) == Some(true) {
         *status = VerificationStatus::FalsePositive;
         return Some("gate: blocked by existing validation".to_string());
     }
+    // Context = NO means test/example code - real false positive
     if answered_yes(&gate.context) == Some(false) {
         *status = VerificationStatus::FalsePositive;
         return Some("gate: test or example code, not a production path".to_string());
     }
+    // Graduated gate: impact = NO means absence of evidence, not evidence of absence
     if answered_yes(&gate.impact) == Some(false) {
-        *status = VerificationStatus::FalsePositive;
-        return Some("gate: no concrete security impact".to_string());
+        *status = VerificationStatus::NeedsReview;
+        return Some("gate: no concrete security impact (needs human review)".to_string());
     }
     if answered_yes(&gate.evidence) == Some(false) {
         *status = VerificationStatus::NeedsReview;
@@ -518,6 +591,14 @@ pub fn build_volatile_verification_tail(
                 "Code context ({}:{}):\n{}\n",
                 finding.file_path, line_num, context
             ));
+
+            // Add full function body for better LLM context
+            if let Some(body) = function_body_for_finding(finding) {
+                tail.push_str(&format!(
+                    "Full function body for context ({}):\n```\n{}\n```\n",
+                    finding.title, body
+                ));
+            }
         }
 
         tail.push_str("\n---\n\n");
@@ -545,7 +626,7 @@ pub fn build_volatile_verification_tail(
 pub fn parse_batch_verification_verdict(
     content: &str,
     expected_count: usize,
-) -> Vec<(VerificationStatus, String)> {
+) -> Vec<BatchVerificationResult> {
     let cleaned = content
         .trim_start_matches("```")
         .trim_end_matches("```")
@@ -554,8 +635,14 @@ pub fn parse_batch_verification_verdict(
 
     match serde_json::from_str::<Vec<BatchVerdictItem>>(cleaned) {
         Ok(items) => {
-            let mut results =
-                vec![(VerificationStatus::NeedsReview, String::new()); expected_count];
+            let _results = vec![
+                (
+                    VerificationStatus::NeedsReview,
+                    String::new(),
+                    None::<Vec<(String, bool)>>
+                );
+                expected_count
+            ];
 
             // Check if any item is missing index → positional fallback
             let has_index = items.iter().any(|item| item.index.is_some());
@@ -568,6 +655,9 @@ pub fn parse_batch_verification_verdict(
                 );
             }
 
+            let mut results =
+                vec![(VerificationStatus::NeedsReview, String::new(), None); expected_count];
+
             for (pos, item) in items.into_iter().enumerate() {
                 let idx = if let Some(index) = item.index {
                     index
@@ -575,7 +665,6 @@ pub fn parse_batch_verification_verdict(
                     // Positional fallback
                     pos
                 };
-
                 if idx < expected_count {
                     let mut status = match item.verification_status.as_str() {
                         "confirmed" => VerificationStatus::Confirmed,
@@ -587,6 +676,41 @@ pub fn parse_batch_verification_verdict(
                     } else {
                         item.verification_notes.clone().unwrap_or_default()
                     };
+
+                    // Parse gate answers from the seven_question_gate field
+                    let gate_answers = item.seven_question_gate.as_ref().map(|gate| {
+                        vec![
+                            (
+                                "reachability".to_string(),
+                                answered_yes(&gate.reachability).unwrap_or(false),
+                            ),
+                            (
+                                "controllability".to_string(),
+                                answered_yes(&gate.controllability).unwrap_or(false),
+                            ),
+                            (
+                                "preconditions".to_string(),
+                                answered_yes(&gate.preconditions).unwrap_or(false),
+                            ),
+                            (
+                                "context".to_string(),
+                                answered_yes(&gate.context).unwrap_or(false),
+                            ),
+                            (
+                                "impact".to_string(),
+                                answered_yes(&gate.impact).unwrap_or(false),
+                            ),
+                            (
+                                "evidence".to_string(),
+                                answered_yes(&gate.evidence).unwrap_or(false),
+                            ),
+                            (
+                                "confidence".to_string(),
+                                answered_yes(&gate.confidence).unwrap_or(false),
+                            ),
+                        ]
+                    });
+
                     if let Some(reason) = apply_gate_parts(
                         &mut status,
                         item.seven_question_gate.as_ref(),
@@ -598,7 +722,7 @@ pub fn parse_batch_verification_verdict(
                             format!("{notes} ({reason})")
                         };
                     }
-                    results[idx] = (status, notes);
+                    results[idx] = (status, notes, gate_answers);
                 }
             }
 
@@ -613,26 +737,45 @@ pub fn parse_batch_verification_verdict(
         }
         Err(_) => {
             // Entire batch failed - return all NeedsReview with raw content
-            vec![(VerificationStatus::NeedsReview, content.to_string()); expected_count]
+            vec![(VerificationStatus::NeedsReview, content.to_string(), None); expected_count]
         }
     }
 }
 
 /// Verify findings in batches to reduce LLM API calls.
 /// Returns tuple of (results Vec, positional_fallback_count).
+#[allow(clippy::too_many_arguments)]
 pub async fn verify_findings_batched<C: LlmChatClient>(
     client: &C,
     findings: &[VulnerabilityFinding],
     batch_size: usize,
     hunt_prompts: &HashMap<String, String>,
     required_primitives: &HashMap<String, Vec<String>>,
-) -> (Vec<(VerificationStatus, String)>, u64) {
+    project_root: &std::path::Path,
+    max_turns: u32,
+) -> (Vec<BatchVerificationResult>, u64) {
     if batch_size <= 1 || findings.is_empty() {
         // Signal fallback needed by returning empty vec
         return (Vec::new(), 0);
     }
 
-    let mut all_results = Vec::with_capacity(findings.len());
+    // Build tool infrastructure once (read-only tools only)
+    let tool_registry = {
+        let mut reg = ToolRegistry::new();
+        // Only include READ-ONLY tools: file_read and pattern_search
+        reg.register(Box::new(crate::agent::tools::FileReadTool));
+        reg.register(Box::new(crate::agent::tools::PatternSearchTool));
+        reg
+    };
+    let sandbox = ToolSandbox::new(project_root.to_path_buf(), 30);
+    let tool_schemas: Vec<ToolSchema> = tool_registry
+        .get_definitions()
+        .iter()
+        .filter_map(|v| serde_json::from_value(v.clone()).ok())
+        .collect();
+    let progress_cb: Arc<dyn Fn(String) + Send + Sync> = Arc::new(|_msg: String| {});
+
+    let mut all_results: Vec<BatchVerificationResult> = Vec::with_capacity(findings.len());
     let mut batch_start = 0;
     let mut total_fallback_count = 0u64;
 
@@ -645,51 +788,129 @@ pub async fn verify_findings_batched<C: LlmChatClient>(
             build_stable_verification_prefix(batch, hunt_prompts, required_primitives),
             build_volatile_verification_tail(batch, hunt_prompts)
         );
-        let messages = vec![
-            ChatMessage::system(
-                "You are a security vulnerability verifier. Analyze findings and return JSON array verdicts.\n\
-                 STRICT OUTPUT FORMAT: Return ONLY valid JSON array with no prose outside.\n\
-                 Do NOT include any text before or after the JSON.",
-            ),
-            ChatMessage::user(&prompt_text),
-        ];
 
-        match client.chat(&messages).await {
-            Ok(response) => {
-                let results = parse_batch_verification_verdict(&response.content, batch.len());
+        // If max_turns == 0, skip tool loop entirely (backward-compatible behavior)
+        let final_content = if max_turns == 0 {
+            match client
+                .chat_with_tools(
+                    &[ChatMessage::system(
+                        "You are a security vulnerability verifier. Analyze findings and return JSON array verdicts.\n\
+                         STRICT OUTPUT FORMAT: Return ONLY valid JSON array with no prose outside.\n\
+                         Do NOT include any text before or after the JSON.",
+                    ), ChatMessage::user(&prompt_text),],
+                    &tool_schemas,
+                )
+                .await
+            {
+                Ok(response) => response.content,
+                Err(e) => {
+                    tracing::warn!("Batch verification failed: {}", e);
+                    for finding in batch.iter() {
+                        // Bug I fix: preserve Confirmed status on error
+                        let new_status = if matches!(finding.verification_status, Some(VerificationStatus::Confirmed)) {
+                            finding.verification_status
+                        } else {
+                            Some(VerificationStatus::NeedsReview)
+                        };
+                        all_results.push((
+                            new_status.unwrap_or(VerificationStatus::NeedsReview),
+                            format!("Batch error: {}", e),
+                            None,
+                        ));
+                    }
+                    batch_start = batch_end;
+                    continue;
+                }
+            }
+        } else {
+            // Agentic loop with tool execution
+            let mut messages = vec![
+                ChatMessage::system(
+                    "You are a security vulnerability verifier. Analyze findings and return JSON array verdicts.\n\
+                     STRICT OUTPUT FORMAT: Return ONLY valid JSON array with no prose outside.\n\
+                     Do NOT include any text before or after the JSON.",
+                ),
+                ChatMessage::user(&prompt_text),
+            ];
+            let final_content_opt: Option<String>;
+            let mut turn = 0u32;
 
-                // Count positional fallbacks
-                let cleaned = response
-                    .content
-                    .trim_start_matches("```")
-                    .trim_end_matches("```")
-                    .trim_start_matches("json")
-                    .trim();
-                if let Ok(items) = serde_json::from_str::<Vec<BatchVerdictItem>>(cleaned) {
-                    let has_index = items.iter().any(|item| item.index.is_some());
-                    if !has_index && !items.is_empty() {
-                        total_fallback_count += items.len() as u64;
-                        tracing::warn!(
-                            "Batch verification response missing 'index' fields for {} items; using positional fallback",
-                            items.len()
-                        );
+            loop {
+                match client.chat_with_tools(&messages, &tool_schemas).await {
+                    Ok(response) => {
+                        if response.tool_calls.is_empty() || turn >= max_turns {
+                            final_content_opt = Some(response.content);
+                            break;
+                        }
+                        // Execute tool calls, append results to messages
+                        let (_, _, _, updated_messages) = execute_tool_calls(
+                            &tool_registry,
+                            &sandbox,
+                            &response,
+                            messages,
+                            &progress_cb,
+                            project_root,
+                            turn,
+                            max_turns,
+                            "verification",
+                        )
+                        .await;
+                        messages = updated_messages;
+                        turn += 1;
+                    }
+                    Err(e) => {
+                        tracing::warn!("Batch verification failed: {}", e);
+                        for finding in batch.iter() {
+                            // Bug I fix: preserve Confirmed status on error
+                            let new_status = if matches!(
+                                finding.verification_status,
+                                Some(VerificationStatus::Confirmed)
+                            ) {
+                                finding.verification_status
+                            } else {
+                                Some(VerificationStatus::NeedsReview)
+                            };
+                            all_results.push((
+                                new_status.unwrap_or(VerificationStatus::NeedsReview),
+                                format!("Batch error: {}", e),
+                                None,
+                            ));
+                        }
+                        final_content_opt = None;
+                        break;
                     }
                 }
-
-                all_results.extend(results);
             }
-            Err(e) => {
-                // Batch failed - mark all as NeedsReview
-                tracing::warn!("Batch verification failed: {}", e);
-                for _ in 0..batch.len() {
-                    all_results.push((
-                        VerificationStatus::NeedsReview,
-                        format!("Batch error: {}", e),
-                    ));
+
+            match final_content_opt {
+                Some(content) => content,
+                None => {
+                    batch_start = batch_end;
+                    continue;
                 }
+            }
+        };
+
+        let results = parse_batch_verification_verdict(&final_content, batch.len());
+
+        // Count positional fallbacks
+        let cleaned = final_content
+            .trim_start_matches("```")
+            .trim_end_matches("```")
+            .trim_start_matches("json")
+            .trim();
+        if let Ok(items) = serde_json::from_str::<Vec<BatchVerdictItem>>(cleaned) {
+            let has_index = items.iter().any(|item| item.index.is_some());
+            if !has_index && !items.is_empty() {
+                total_fallback_count += items.len() as u64;
+                tracing::warn!(
+                    "Batch verification response missing 'index' fields for {} items; using positional fallback",
+                    items.len()
+                );
             }
         }
 
+        all_results.extend(results);
         batch_start = batch_end;
     }
 
@@ -831,6 +1052,8 @@ pub async fn run_llm_verification(
                 8,
                 &hunt_prompts,
                 &config.knowledge.required_security_primitives,
+                target_path,
+                config.agent.max_turns,
             )
             .await;
 
@@ -848,7 +1071,7 @@ pub async fn run_llm_verification(
                 ));
 
                 if i < batch_results.len() {
-                    let (status, notes) = &batch_results[i];
+                    let (status, notes, gate_answers) = &batch_results[i];
                     let (status, notes) = cap_blind_verdict(*status, finding, notes);
                     let (status, notes) = refute_with_primitive_check(
                         finding,
@@ -865,6 +1088,8 @@ pub async fn run_llm_verification(
                     );
                     finding.verification_status = Some(status);
                     finding.verification_notes = Some(notes.clone());
+                    // Bug H fix: persist gate answers on the finding
+                    finding.verification_gate_answers = gate_answers.clone();
                     finding.add_evidence(
                         crate::evidence::EvidenceSource::LlmAnalysis("verification".into()),
                         0.8,

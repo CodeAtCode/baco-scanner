@@ -21,7 +21,13 @@ fn make_finding(
     snippet: Option<&str>,
 ) -> VulnerabilityFinding {
     VulnerabilityFinding {
-        id: VulnerabilityFinding::generate_id(path, Some(line), cwe.unwrap_or("CWE-000")),
+        id: VulnerabilityFinding::generate_id(
+            path,
+            Some(line),
+            cwe.unwrap_or("CWE-000"),
+            title,
+            snippet,
+        ),
         title: title.to_string(),
         description: "test finding".to_string(),
         severity: Severity::High,
@@ -53,6 +59,7 @@ fn make_finding(
         triage_verdict: None,
         evidence: Vec::new(),
         verification_tier: None,
+        verification_gate_answers: None,
     }
 }
 

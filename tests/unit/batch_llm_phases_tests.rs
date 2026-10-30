@@ -81,6 +81,7 @@ fn create_finding(id: usize) -> VulnerabilityFinding {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     }
 }
 
@@ -128,8 +129,16 @@ async fn test_verification_batching_call_count() {
     ];
 
     let client = CountingLlmClient::new(responses);
-    let results =
-        verify_findings_batched(&client, &findings, 8, &hunt_prompts, &HashMap::new()).await;
+    let results = verify_findings_batched(
+        &client,
+        &findings,
+        8,
+        &hunt_prompts,
+        &HashMap::new(),
+        &std::env::temp_dir(),
+        0,
+    )
+    .await;
     let (results, _fallback_count) = results;
 
     // Assert exactly 3 calls were made
@@ -162,8 +171,16 @@ async fn test_verification_batch_single_bad_item() {
     ];
 
     let client = CountingLlmClient::new(responses);
-    let results =
-        verify_findings_batched(&client, &findings, 8, &hunt_prompts, &HashMap::new()).await;
+    let results = verify_findings_batched(
+        &client,
+        &findings,
+        8,
+        &hunt_prompts,
+        &HashMap::new(),
+        &std::env::temp_dir(),
+        0,
+    )
+    .await;
     let (results, _fallback_count) = results;
 
     assert_eq!(client.get_call_count(), 1, "Expected 1 LLM call");
@@ -191,8 +208,16 @@ async fn test_verification_batch_whole_batch_garbage_fallback() {
     let responses = vec!["This is not valid JSON at all".to_string()];
 
     let client = CountingLlmClient::new(responses);
-    let results =
-        verify_findings_batched(&client, &findings, 8, &hunt_prompts, &HashMap::new()).await;
+    let results = verify_findings_batched(
+        &client,
+        &findings,
+        8,
+        &hunt_prompts,
+        &HashMap::new(),
+        &std::env::temp_dir(),
+        0,
+    )
+    .await;
     let (results, _fallback_count) = results;
 
     // Should have made 1 batch call
@@ -200,7 +225,7 @@ async fn test_verification_batch_whole_batch_garbage_fallback() {
     assert_eq!(results.len(), 5, "Expected 5 results");
 
     // All should be NeedsReview since the batch parse failed
-    for (i, (status, notes)) in results.iter().enumerate() {
+    for (i, (status, notes, _)) in results.iter().enumerate() {
         assert_eq!(
             *status,
             VerificationStatus::NeedsReview,
@@ -348,8 +373,16 @@ async fn test_verification_batch_exact_boundary() {
     ];
 
     let client = CountingLlmClient::new(responses);
-    let results =
-        verify_findings_batched(&client, &findings, 8, &hunt_prompts, &HashMap::new()).await;
+    let results = verify_findings_batched(
+        &client,
+        &findings,
+        8,
+        &hunt_prompts,
+        &HashMap::new(),
+        &std::env::temp_dir(),
+        0,
+    )
+    .await;
     let (results, _fallback_count) = results;
 
     assert_eq!(

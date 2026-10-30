@@ -734,6 +734,7 @@ fn test_cve_enrichment_cwe_match() {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     };
 
     // Simulate enrichment by adding CVE evidence manually
@@ -800,6 +801,7 @@ fn test_cve_enrichment_no_match() {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     };
 
     // Simulate no matching CVE (CWE-79 not in fetched CVEs)

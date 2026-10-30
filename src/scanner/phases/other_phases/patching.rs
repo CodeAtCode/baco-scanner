@@ -262,6 +262,7 @@ pub async fn run_variant_search(
                         triage_verdict: None,
                         evidence: vec![],
                         verification_tier: None,
+                        verification_gate_answers: None,
                     }
                 })
                 .collect();

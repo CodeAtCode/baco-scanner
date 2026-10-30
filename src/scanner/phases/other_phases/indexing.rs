@@ -71,12 +71,14 @@ fn unprotected_hook_finding(
 
     let line = unprotected.line as u32;
 
+    let title = format!(
+        "Missing security primitive on request entry point {}",
+        unprotected.hook
+    );
+
     VulnerabilityFinding {
-        id: VulnerabilityFinding::generate_id(path, Some(line), cwe),
-        title: format!(
-            "Missing security primitive on request entry point {}",
-            unprotected.hook
-        ),
+        id: VulnerabilityFinding::generate_id(path, Some(line), cwe, &title, None),
+        title,
         description: format!(
             "Hook `{}` is registered against `{}` at {}:{}, and it is {}.\n\n\
              None of the required security primitives ({}) appear in that \
@@ -115,6 +117,7 @@ fn unprotected_hook_finding(
         triage_verdict: None,
         evidence: Vec::new(),
         verification_tier: None,
+        verification_gate_answers: None,
     }
 }
 

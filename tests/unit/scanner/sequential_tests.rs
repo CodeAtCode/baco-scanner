@@ -197,6 +197,7 @@ fn test_finding_creation_with_critical_severity() {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     };
 
     assert_eq!(finding.severity, Severity::Critical);
@@ -240,6 +241,7 @@ fn test_finding_optional_fields_none() {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     };
 
     assert!(finding.cwe_id.is_none());
@@ -284,6 +286,7 @@ fn test_finding_sources_empty() {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     };
 
     assert!(finding.sources.is_empty());
@@ -324,6 +327,7 @@ fn test_finding_already_reported_flag() {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     };
 
     assert!(!finding.already_reported);
@@ -366,6 +370,7 @@ fn test_finding_agent_mode_flag() {
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     };
 
     assert!(finding.agent_mode);
@@ -419,6 +424,7 @@ fn test_finding_with_all_phases() {
             triage_verdict: None,
             evidence: vec![],
             verification_tier: None,
+            verification_gate_answers: None,
         };
 
         // Verify the finding has the expected phase in its id and sources

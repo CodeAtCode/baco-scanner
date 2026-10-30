@@ -1,124 +1,103 @@
-// Failure injection tests for Semgrep phase
-// Tests that Semgrep failures result in graceful degradation with warnings, not panics
+// Failure injection tests for Semgrep parser
+// Tests that parse_json_output handles various error conditions correctly
 
 #[cfg(test)]
 mod tests {
-    use std::process::Command;
+    use baco::semgrep::parser::parse_json_output;
 
-    /// Helper to simulate Semgrep not installed by making semgrep command fail
-    fn semgrep_not_installed() -> Result<(), String> {
-        // Simulate by running a command that definitely doesn't exist
-        let status = Command::new("semgrep-nonexistent-command")
-            .status()
-            .map_err(|e| format!("Expected error (semgrep not installed simulated): {}", e))?;
+    #[test]
+    fn test_parse_invalid_json_returns_error() {
+        let result = parse_json_output(b"not json at all", &[], &[]);
 
-        if !status.success() {
-            Ok(())
-        } else {
-            Err("Command unexpectedly succeeded".to_string())
-        }
+        assert!(result.is_err(), "Invalid JSON should return an error");
     }
 
     #[test]
-    fn test_semgrep_not_installed_graceful_degradation() {
-        // Simulate what happens when semgrep is not installed
-        let result = semgrep_not_installed();
+    fn test_parse_missing_results_key_returns_empty() {
+        let result = parse_json_output(br#"{"other":"value"}"#, &[], &[]);
 
-        // We expect an error, but not a panic
+        assert!(result.is_ok(), "Missing 'results' key should return Ok");
+        let findings = result.unwrap();
         assert!(
-            result.is_err(),
-            "Should simulate semgrep not installed error"
+            findings.is_empty(),
+            "Missing 'results' key should return empty vector"
         );
     }
 
     #[test]
-    fn test_semgrep_crash_handling() {
-        // Simulate semgrep crashing (exit code != 0)
-        let status = Command::new("sh").arg("-c").arg("exit 1").status().unwrap();
+    fn test_parse_empty_results_array_returns_empty() {
+        let result = parse_json_output(br#"{"results":[]}"#, &[], &[]);
 
+        assert!(result.is_ok(), "Empty results array should return Ok");
+        let findings = result.unwrap();
         assert!(
-            !status.success(),
-            "Command should fail as if semgrep crashed"
-        );
-
-        // In SemgrepRunner::run(), non-zero exit codes are caught in:
-        // .output()
-        //     .map_err(|e| format!("Failed to run semgrep: {}", e))?
-        //         if !output.status.success() {
-        //             return Err(format!("Semgrep failed: {}", ...))
-        //         }
-    }
-
-    #[test]
-    fn test_semgrep_non_json_output_parsing() {
-        // Test that non-JSON output from semgrep results in a parse error
-        // rather than a panic or crash
-
-        let invalid_json = b"This is not JSON output from semgrep";
-        let result = serde_json::from_slice::<serde_json::Value>(invalid_json);
-
-        assert!(result.is_err(), "Invalid JSON should fail to parse");
-
-        // In SemgrepRunner::parse_json_output(), serde_json::from_slice error is caught:
-        // let results: serde_json::Value = serde_json::from_slice(json)
-        //     .map_err(|e| format!("Failed to parse semgrep JSON: {}", e))?;
-    }
-
-    #[test]
-    fn test_semgrep_json_missing_results_key() {
-        // Semgrep JSON should have "results" key; if it's missing,
-        // semantic logic handles it via .get("results").and_then(|r| r.as_array())
-
-        // Validate that we can detect missing key topologically
-        let value: serde_json::Value = serde_json::json!({"other": "value"});
-        let has_results = value.get("results").is_some();
-        assert!(
-            !has_results,
-            "Mock JSON doesn't have 'results' key as expected"
+            findings.is_empty(),
+            "Empty results array should return empty vector"
         );
     }
 
     #[test]
-    fn test_semgrep_empty_results_array() {
-        // When semgrep returns valid JSON with empty "results": [] array
-        let empty_results: Vec<serde_json::Value> = vec![];
+    fn test_parse_malformed_json_returns_error() {
+        let result = parse_json_output(b"{\"results\": [invalid syntax here", &[], &[]);
+
+        assert!(result.is_err(), "Malformed JSON should return an error");
+    }
+
+    #[test]
+    fn test_parse_result_with_missing_fields_skipped() {
+        let result = parse_json_output(br#"{"results":[{"other_field":"value"}]}"#, &[], &[]);
+
         assert!(
-            empty_results.is_empty(),
-            "Empty vector is correct output for no findings"
+            result.is_ok(),
+            "Result with missing required fields should return Ok"
+        );
+        let findings = result.unwrap();
+        assert!(
+            findings.is_empty(),
+            "Results missing check_id/path should be skipped, returning empty vector"
         );
     }
 
     #[test]
-    fn test_semgrep_invalid_json_structure() {
-        // Semgrep returns malformed JSON that fails to parse entirely
-        // Error caught at parse level, wrapped, returned as Err
+    fn test_parse_valid_result_produces_finding() {
+        let json = br#"{"results":[{"check_id":"test.rule","path":"foo.php","start":{"line":1},"end":{"line":1},"extra":{"severity":"ERROR","message":"test vuln"}}]}"#;
+        let result = parse_json_output(json, &[], &[]);
 
-        let malformed_json = b"{\"results\": [invalid syntax here";
-        let result: Result<serde_json::Value, _> = serde_json::from_slice(malformed_json);
+        assert!(result.is_ok(), "Valid JSON should return Ok");
+        let findings = result.unwrap();
 
-        assert!(result.is_err(), "Malformed JSON should fail parse");
-    }
-
-    #[test]
-    fn test_semgrep_parse_completeness_continue_paths_exist() {
-        // The parse_json_output uses .and_then and .and_then chains with continue
-        // These idioms exist in the code and handle missing fields gracefully:
-        // .and_then(|v| v.as_array()) on missing "results" → None → unwrap_or(&vec![]) → []
-        // .and_then(|v| v.as_u64())  → Some if line present, else None → continue
-        // .and_then(|v| v.as_str())  → Some if check_id present, else None → continue
-
-        // Verify the pattern exists by testing that missing fields result in empty/default values
-        let binding = vec![];
-        let value: serde_json::Value = serde_json::json!({"results": [{"other_field": "value"}]});
-        let results = value
-            .get("results")
-            .and_then(|r| r.as_array())
-            .unwrap_or(&binding);
-        // When "results" exists but has no expected fields, we get an empty array after processing
         assert_eq!(
-            results.len(),
+            findings.len(),
             1,
-            "Results array has one element with missing fields"
+            "Valid result should produce exactly one finding"
+        );
+
+        let finding = &findings[0];
+        assert_eq!(
+            finding.title, "test.rule",
+            "Finding title should match check_id"
+        );
+        assert_eq!(
+            finding.file_path, "foo.php",
+            "Finding file_path should match path"
+        );
+    }
+
+    #[test]
+    fn test_parse_exclude_rules_filters_findings() {
+        let json = br#"{"results":[{"check_id":"test.rule","path":"foo.php","start":{"line":1},"end":{"line":1},"extra":{"severity":"ERROR","message":"test vuln"}}]}"#;
+        let exclude_rules = vec!["test.rule".to_string()];
+        let result = parse_json_output(json, &exclude_rules, &[]);
+
+        assert!(
+            result.is_ok(),
+            "Valid JSON with exclude rules should return Ok"
+        );
+        let findings = result.unwrap();
+
+        assert!(
+            findings.is_empty(),
+            "Finding matching exclude rule should be filtered out"
         );
     }
 }

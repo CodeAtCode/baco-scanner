@@ -153,6 +153,7 @@ fn make_finding(file_path: &str, line: u32, cwe_id: &str) -> VulnerabilityFindin
         triage_verdict: None,
         evidence: vec![],
         verification_tier: None,
+        verification_gate_answers: None,
     }
 }
 

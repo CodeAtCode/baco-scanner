@@ -1,0 +1,52 @@
+rules:
+  - id: py-taint-sqli-high
+    languages: [python]
+    mode: taint
+    severity: ERROR
+    message: >
+      User input flows into database query without sanitization, SQL injection risk.
+    metadata:
+      cwe:
+        - "CWE-89: Improper Neutralization of Special Elements used in an SQL Command"
+    pattern-sources:
+      - pattern: request.args.get($KEY)
+      - pattern: request.form.get($KEY)
+      - pattern: request.values.get($KEY)
+      - pattern: request.json.get($KEY)
+    pattern-sinks:
+      - pattern: cursor.execute($SQL)
+      - pattern: session.execute($SQL)
+      - pattern: db.execute($SQL)
+
+  - id: py-taint-cmdi-high
+    languages: [python]
+    mode: taint
+    severity: ERROR
+    message: >
+      User input flows into command execution without sanitization, command injection risk.
+    metadata:
+      cwe:
+        - "CWE-78: Improper Neutralization of Special Elements used in an OS Command"
+    pattern-sources:
+      - pattern: request.args.get($KEY)
+      - pattern: request.form.get($KEY)
+    pattern-sinks:
+      - pattern: subprocess.call($CMD, shell=True)
+      - pattern: subprocess.Popen($CMD, shell=True)
+      - pattern: os.system($CMD)
+
+  - id: py-taint-path-traversal-high
+    languages: [python]
+    mode: taint
+    severity: ERROR
+    message: >
+      User input flows into file operations without validation, path traversal risk.
+    metadata:
+      cwe:
+        - "CWE-22: Improper Limitation of a Pathname to a Restricted Directory"
+    pattern-sources:
+      - pattern: request.args.get($KEY)
+      - pattern: request.form.get($KEY)
+    pattern-sinks:
+      - pattern: open($PATH)
+      - pattern: os.open($PATH, $MODE)
