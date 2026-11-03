@@ -1,0 +1,67 @@
+rules:
+  - id: ruby-taint-sqli-high
+    languages: [ruby]
+    mode: taint
+    severity: ERROR
+    message: >
+      User input flows into database query without sanitization, SQL injection risk.
+    metadata:
+      cwe:
+        - "CWE-89: Improper Neutralization of Special Elements used in an SQL Command"
+    pattern-sources:
+      - pattern: params[$KEY]
+      - pattern: request.params[$KEY]
+    pattern-sinks:
+      - pattern: $CONN.execute($SQL)
+      - pattern: find_by_sql($SQL)
+      - pattern: where($SQL)
+
+  - id: ruby-taint-cmdi-high
+    languages: [ruby]
+    mode: taint
+    severity: ERROR
+    message: >
+      User input flows into command execution without sanitization, command injection risk.
+    metadata:
+      cwe:
+        - "CWE-78: Improper Neutralization of Special Elements used in an OS Command"
+    pattern-sources:
+      - pattern: params[$KEY]
+      - pattern: request.params[$KEY]
+    pattern-sinks:
+      - pattern: system($CMD)
+      - pattern: exec($CMD)
+      - pattern: "shell($CMD)"
+
+  - id: ruby-taint-path-traversal-high
+    languages: [ruby]
+    mode: taint
+    severity: ERROR
+    message: >
+      User input flows into file operations without validation, path traversal risk.
+    metadata:
+      cwe:
+        - "CWE-22: Improper Limitation of a Pathname to a Restricted Directory"
+    pattern-sources:
+      - pattern: params[$KEY]
+      - pattern: request.params[$KEY]
+    pattern-sinks:
+      - pattern: File.read($PATH)
+      - pattern: File.open($PATH)
+      - pattern: IO.read($PATH)
+
+  - id: ruby-taint-code-injection-high
+    languages: [ruby]
+    mode: taint
+    severity: ERROR
+    message: >
+      User input flows into code evaluation without sanitization, code injection risk.
+    metadata:
+      cwe:
+        - "CWE-94: Improper Control of Generation of Code"
+    pattern-sources:
+      - pattern: params[$KEY]
+      - pattern: request.params[$KEY]
+    pattern-sinks:
+      - pattern: eval($CODE)
+      - pattern: instance_eval($CODE)

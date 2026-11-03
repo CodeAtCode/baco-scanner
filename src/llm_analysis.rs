@@ -114,6 +114,7 @@ fn is_function_like(kind: &str) -> bool {
             | "method_definition"
             | "function_declaration"
             | "function_item"
+            | "method"
     )
 }
 
@@ -708,6 +709,10 @@ fn tree_sitter_language(language: &str) -> Option<tree_sitter::Language> {
         "python" => Some(tree_sitter_python::LANGUAGE.into()),
         "javascript" | "typescript" | "tsx" => Some(tree_sitter_javascript::LANGUAGE.into()),
         "php" => Some(tree_sitter_php::LANGUAGE_PHP.into()),
+        "go" => Some(tree_sitter_go::LANGUAGE.into()),
+        "java" => Some(tree_sitter_java::LANGUAGE.into()),
+        "ruby" => Some(tree_sitter_ruby::LANGUAGE.into()),
+        "csharp" | "c#" | "cs" => Some(tree_sitter_c_sharp::LANGUAGE.into()),
         _ => None,
     }
 }

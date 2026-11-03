@@ -122,7 +122,7 @@ See technique #5 in [`docs/argus-analysis.md`](argus-analysis.md).
 
 ### Domain-Routed Hunt Prompts (Discovery Phase)
 
-Per-attack-class prompt modules from `prompts/hunt/` (injection, auth, authz_absence, xss, path_traversal, crypto, resource, deserialization, memory_safety) selected by target languages and appended to discovery prompts. Each module includes scope/lane discipline sections; the verification prompt has a skeptical self-refutation gate + untrusted-content framing.
+Per-attack-class prompt modules from `prompts/hunt/` (injection, auth, authz_absence, xss, path_traversal, crypto, resource, deserialization, memory_safety) selected by target languages and appended to discovery prompts. Each module includes scope/lane discipline sections; the verification prompt has a skeptical self-refutation gate + untrusted-content framing. Hunt prompts are enabled by default (`enable_hunt_prompts = true`).
 
 Configured via `[scanner.performance] enable_hunt_prompts = true`.
 

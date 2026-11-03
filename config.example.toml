@@ -102,8 +102,8 @@ enable_cve_bootstrap = true
 enable_variant_search = true
 # Domain-routed hunt prompts: select per-attack-class prompt modules from
 # prompts/hunt/ based on the target's languages during LLM discovery
-# Default: false
-enable_hunt_prompts = false
+# Default: true
+enable_hunt_prompts = true
 
 # LLM configuration with per-phase settings
 [llm]

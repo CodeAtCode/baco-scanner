@@ -30,3 +30,6 @@ mod eval_oracle;
 
 // Lane 4: Class C method-call sink e2e regression test
 mod lane4_class_c_sink;
+
+// Taint rule detection across multiple languages
+mod taint_languages_e2e;

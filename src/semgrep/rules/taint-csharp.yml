@@ -1,0 +1,63 @@
+rules:
+  - id: csharp-taint-sqli-high
+    languages: [csharp]
+    mode: taint
+    severity: ERROR
+    message: >
+      User input flows into database query without sanitization, SQL injection risk.
+    metadata:
+      cwe:
+        - "CWE-89: Improper Neutralization of Special Elements used in an SQL Command"
+    pattern-sources:
+      - pattern: Request.QueryString[$KEY]
+      - pattern: Request.Form[$KEY]
+    pattern-sinks:
+      - pattern: new SqlCommand($SQL)
+      - pattern: $CMD.ExecuteReader()
+      - pattern: $CMD.ExecuteNonQuery()
+
+  - id: csharp-taint-cmdi-high
+    languages: [csharp]
+    mode: taint
+    severity: ERROR
+    message: >
+      User input flows into command execution without sanitization, command injection risk.
+    metadata:
+      cwe:
+        - "CWE-78: Improper Neutralization of Special Elements used in an OS Command"
+    pattern-sources:
+      - pattern: Request.QueryString[$KEY]
+      - pattern: Request.Form[$KEY]
+    pattern-sinks:
+      - pattern: Process.Start($CMD)
+
+  - id: csharp-taint-path-traversal-high
+    languages: [csharp]
+    mode: taint
+    severity: ERROR
+    message: >
+      User input flows into file operations without validation, path traversal risk.
+    metadata:
+      cwe:
+        - "CWE-22: Improper Limitation of a Pathname to a Restricted Directory"
+    pattern-sources:
+      - pattern: Request.QueryString[$KEY]
+      - pattern: Request.Form[$KEY]
+    pattern-sinks:
+      - pattern: File.ReadAllText($PATH)
+      - pattern: File.Open($PATH, $MODE)
+
+  - id: csharp-taint-deserialization-high
+    languages: [csharp]
+    mode: taint
+    severity: ERROR
+    message: >
+      User input flows into object deserialization without validation, unsafe deserialization risk.
+    metadata:
+      cwe:
+        - "CWE-502: Deserialization of Unsafe Data"
+    pattern-sources:
+      - pattern: Request.QueryString[$KEY]
+      - pattern: Request.Form[$KEY]
+    pattern-sinks:
+      - pattern: new BinaryFormatter().Deserialize($STREAM)

@@ -2565,3 +2565,27 @@ fn test_default_triage_batch_size_is_eight() {
         "zero would pin the triage cursor and never terminate"
     );
 }
+
+#[test]
+fn test_performance_settings_default_hunt_prompts() {
+    // Verify that PerformanceSettings::default() has enable_hunt_prompts = true
+    let settings = PerformanceSettings::default();
+    assert!(
+        settings.enable_hunt_prompts,
+        "PerformanceSettings::default() should have enable_hunt_prompts = true"
+    );
+}
+
+#[test]
+fn test_deserialize_empty_scanner_performance() {
+    // Verify that deserializing an empty [scanner.performance] table yields enable_hunt_prompts = true
+    let toml_str = r#"
+[scanner]
+[scanner.performance]
+"#;
+    let config: ScannerConfig = toml::from_str(toml_str).expect("Should parse");
+    assert!(
+        config.scanner.performance.enable_hunt_prompts,
+        "Deserializing empty [scanner.performance] should yield enable_hunt_prompts = true"
+    );
+}

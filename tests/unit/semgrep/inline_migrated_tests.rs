@@ -731,7 +731,7 @@ fn test_derive_default_rulesets_explicit_not_overridden() {
 #[test]
 fn test_derive_default_rulesets_unknown_language_ignored() {
     let runner = SemgrepRunner::new(vec![], vec![])
-        .with_languages(vec!["rust".to_string(), "go".to_string()]);
+        .with_languages(vec!["rust".to_string(), "swift".to_string()]);
 
     let defaults = runner.derive_default_rulesets();
     assert!(defaults.is_empty());

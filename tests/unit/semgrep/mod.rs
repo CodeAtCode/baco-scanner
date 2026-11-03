@@ -28,3 +28,6 @@ mod partial_result_tests;
 
 // Include force_scan flag tests
 mod force_scan_tests;
+
+// Include taint rule YAML structure tests
+mod taint_rule_yaml_tests;

@@ -12,6 +12,21 @@ const TAINT_JAVASCRIPT_RULES: &str = include_str!("rules/taint-javascript.yml");
 /// Bundled taint-mode rules for Go (derived from presets/go.toml)
 const TAINT_GO_RULES: &str = include_str!("rules/taint-go.yml");
 
+/// Bundled taint-mode rules for PHP
+const TAINT_PHP_RULES: &str = include_str!("rules/taint-php.yml");
+
+/// Bundled taint-mode rules for C/C++
+const TAINT_C_RULES: &str = include_str!("rules/taint-c.yml");
+
+/// Bundled taint-mode rules for Java
+const TAINT_JAVA_RULES: &str = include_str!("rules/taint-java.yml");
+
+/// Bundled taint-mode rules for Ruby
+const TAINT_RUBY_RULES: &str = include_str!("rules/taint-ruby.yml");
+
+/// Bundled taint-mode rules for C#
+const TAINT_CSHARP_RULES: &str = include_str!("rules/taint-csharp.yml");
+
 #[derive(Clone)]
 pub struct SemgrepRunner {
     pub rulesets: Vec<String>,
@@ -98,6 +113,18 @@ impl SemgrepRunner {
                 "c" | "cpp" | "cxx" => {
                     defaults.insert("p/c".to_string());
                 }
+                "go" => {
+                    defaults.insert("p/golang".to_string());
+                }
+                "java" => {
+                    defaults.insert("p/java".to_string());
+                }
+                "ruby" => {
+                    defaults.insert("p/ruby".to_string());
+                }
+                "csharp" | "cs" => {
+                    defaults.insert("p/csharp".to_string());
+                }
                 _ => { /* No default for unknown languages */ }
             }
         }
@@ -105,14 +132,12 @@ impl SemgrepRunner {
         defaults.into_iter().collect()
     }
 
-    /// Derive default taint-mode custom rules from project languages when
-    /// `custom_rules` is empty. Returns inline YAML documents (one per language)
-    /// so data-flow vulnerabilities are detected by default.
+    /// Derive default taint-mode custom rules from project languages.
+    /// Returns inline YAML documents (one per language) so data-flow vulnerabilities
+    /// are detected by default. Does NOT suppress derived rules when explicit custom
+    /// rules are present — explicit rules are merged with derived rules, with explicit
+    /// rules taking precedence on id collision.
     pub fn derive_default_custom_rules(&self) -> Vec<String> {
-        if !self.custom_rules.is_empty() {
-            // Explicit custom rules take precedence — return none.
-            return Vec::new();
-        }
         let mut defaults = Vec::new();
         for lang in &self.languages {
             match lang.to_lowercase().as_str() {
@@ -121,6 +146,11 @@ impl SemgrepRunner {
                     defaults.push(TAINT_JAVASCRIPT_RULES.to_string())
                 }
                 "go" => defaults.push(TAINT_GO_RULES.to_string()),
+                "php" => defaults.push(TAINT_PHP_RULES.to_string()),
+                "c" | "cpp" | "cxx" => defaults.push(TAINT_C_RULES.to_string()),
+                "java" => defaults.push(TAINT_JAVA_RULES.to_string()),
+                "ruby" => defaults.push(TAINT_RUBY_RULES.to_string()),
+                "csharp" | "c#" | "cs" => defaults.push(TAINT_CSHARP_RULES.to_string()),
                 _ => {}
             }
         }
@@ -176,4 +206,85 @@ pub fn parse_severity(check_id: &str) -> Severity {
         s if s.contains("low") => Severity::Low,
         _ => Severity::Info,
     }
+}
+
+/// Collect rule IDs from a list of YAML documents.
+/// Each document is expected to have a `rules` list with `id` fields.
+/// Returns a BTreeSet of all rule IDs found, or an error naming the document index
+/// and the serde error if any document is invalid YAML.
+pub fn collect_rule_ids(docs: &[String]) -> Result<std::collections::BTreeSet<String>, String> {
+    use serde::Deserialize;
+
+    #[derive(Deserialize)]
+    struct Rule {
+        id: String,
+    }
+
+    #[derive(Deserialize)]
+    struct RulesDoc {
+        rules: Option<Vec<Rule>>,
+    }
+
+    let mut ids = std::collections::BTreeSet::new();
+
+    for (i, doc) in docs.iter().enumerate() {
+        let parsed: RulesDoc = serde_yaml::from_str(doc)
+            .map_err(|e| format!("Invalid YAML at document index {}: {}", i, e))?;
+
+        if let Some(rules) = parsed.rules {
+            for rule in rules {
+                ids.insert(rule.id);
+            }
+        }
+    }
+
+    Ok(ids)
+}
+
+/// Filter rules from a YAML document, excluding those whose IDs are in the exclude set.
+/// Returns Ok(None) if no rules remain after filtering, Ok(Some(string)) with the
+/// re-serialized document otherwise. On error, returns a string naming the problem.
+/// The exclude set is not silently ignored — it must be valid.
+pub fn filter_rules_excluding_ids(
+    doc: &str,
+    exclude: &std::collections::BTreeSet<String>,
+) -> Result<Option<String>, String> {
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Deserialize, Serialize)]
+    struct Rule {
+        id: String,
+        #[serde(flatten)]
+        rest: serde_yaml::Value,
+    }
+
+    #[derive(Deserialize, Serialize)]
+    struct RulesDoc {
+        rules: Vec<Rule>,
+        #[serde(flatten)]
+        rest: std::collections::HashMap<String, serde_yaml::Value>,
+    }
+
+    let parsed: RulesDoc =
+        serde_yaml::from_str(doc).map_err(|e| format!("Failed to parse YAML document: {}", e))?;
+
+    let filtered: Vec<Rule> = parsed
+        .rules
+        .into_iter()
+        .filter(|r| !exclude.contains(&r.id))
+        .collect();
+
+    if filtered.is_empty() {
+        return Ok(None);
+    }
+
+    let output = RulesDoc {
+        rules: filtered,
+        rest: parsed.rest,
+    };
+
+    let serialized = serde_yaml::to_string(&output)
+        .map_err(|e| format!("Failed to serialize filtered rules: {}", e))?;
+
+    Ok(Some(serialized))
 }

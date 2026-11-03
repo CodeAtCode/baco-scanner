@@ -112,7 +112,7 @@ pub struct PerformanceSettings {
     pub enable_merge_order_detection: bool,
     /// Domain-routed hunt prompts: select per-attack-class prompt modules
     /// from the target's languages during LLM discovery
-    #[serde(default)]
+    #[serde(default = "crate::config::default_enable_hunt_prompts")]
     pub enable_hunt_prompts: bool,
     /// Never-submit pattern filter - heavily penalizes findings matching known false-positive patterns
     #[serde(default = "crate::config::default_never_submit_enabled")]
@@ -149,7 +149,7 @@ impl Default for PerformanceSettings {
             enable_variant_search: crate::config::default_enable_variant_search(),
             enable_absence_detection: crate::config::default_enable_absence_detection(),
             enable_merge_order_detection: crate::config::default_enable_merge_order_detection(),
-            enable_hunt_prompts: false,
+            enable_hunt_prompts: crate::config::default_enable_hunt_prompts(),
             never_submit_enabled: crate::config::default_never_submit_enabled(),
             never_submit_multiplier: crate::config::default_never_submit_multiplier(),
             variant_search_patterns: Vec::new(),

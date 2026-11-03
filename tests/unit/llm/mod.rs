@@ -3,6 +3,7 @@
 
 mod analysis_extra_tests;
 mod analysis_helpers_tests;
+mod ast_anchor_languages_tests;
 mod ast_line_anchor_tests;
 mod cache_tests;
 mod client_infra_tests;
@@ -11,7 +12,7 @@ mod core_edge_tests;
 pub mod llm_analysis_tests;
 pub mod llm_tests;
 mod metrics_legacy_tests;
-pub mod metrics_tests;
+mod metrics_tests;
 pub mod mod_config_tests;
 pub mod model_selector_tests;
 mod phase_gating_tests;

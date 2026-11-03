@@ -540,18 +540,30 @@ mod language_for_extension_tests {
 
     #[test]
     fn test_language_for_extension_go() {
-        // Go is indexed via the unified extension map but has no bundled
-        // tree-sitter grammar, so the chunker-facing lookup returns None
         let lang = LlmAnalyzer::language_for_extension("go");
-        assert!(lang.is_none());
+        assert!(lang.is_some());
+        assert_eq!(lang.unwrap(), "go");
     }
 
     #[test]
     fn test_language_for_extension_java() {
-        // Java is indexed via the unified extension map but has no bundled
-        // tree-sitter grammar, so the chunker-facing lookup returns None
         let lang = LlmAnalyzer::language_for_extension("java");
-        assert!(lang.is_none());
+        assert!(lang.is_some());
+        assert_eq!(lang.unwrap(), "java");
+    }
+
+    #[test]
+    fn test_language_for_extension_ruby() {
+        let lang = LlmAnalyzer::language_for_extension("rb");
+        assert!(lang.is_some());
+        assert_eq!(lang.unwrap(), "ruby");
+    }
+
+    #[test]
+    fn test_language_for_extension_csharp() {
+        let lang = LlmAnalyzer::language_for_extension("cs");
+        assert!(lang.is_some());
+        assert_eq!(lang.unwrap(), "csharp");
     }
 
     #[test]

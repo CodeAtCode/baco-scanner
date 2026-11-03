@@ -1,0 +1,76 @@
+rules:
+  - id: php-taint-sqli-high
+    languages: [php]
+    mode: taint
+    severity: ERROR
+    message: >
+      User input flows into database query without sanitization, SQL injection risk.
+    metadata:
+      cwe:
+        - "CWE-89: Improper Neutralization of Special Elements used in an SQL Command"
+    pattern-sources:
+      - pattern: $_GET[$K]
+      - pattern: $_POST[$K]
+      - pattern: $_REQUEST[$K]
+      - pattern: $_COOKIE[$K]
+    pattern-sinks:
+      - pattern: mysqli_query($DB, $SQL)
+      - pattern: $wpdb->query($SQL)
+      - pattern: $wpdb->get_results($SQL)
+
+  - id: php-taint-cmdi-high
+    languages: [php]
+    mode: taint
+    severity: ERROR
+    message: >
+      User input flows into command execution without sanitization, command injection risk.
+    metadata:
+      cwe:
+        - "CWE-78: Improper Neutralization of Special Elements used in an OS Command"
+    pattern-sources:
+      - pattern: $_GET[$K]
+      - pattern: $_POST[$K]
+      - pattern: $_REQUEST[$K]
+    pattern-sinks:
+      - pattern: system($CMD)
+      - pattern: exec($CMD)
+      - pattern: shell_exec($CMD)
+      - pattern: passthru($CMD)
+      - pattern: popen($CMD, $MODE)
+
+  - id: php-taint-path-traversal-high
+    languages: [php]
+    mode: taint
+    severity: ERROR
+    message: >
+      User input flows into file operations without validation, path traversal risk.
+    metadata:
+      cwe:
+        - "CWE-22: Improper Limitation of a Pathname to a Restricted Directory"
+    pattern-sources:
+      - pattern: $_GET[$K]
+      - pattern: $_POST[$K]
+      - pattern: $_REQUEST[$K]
+    pattern-sinks:
+      - pattern: file_get_contents($PATH)
+      - pattern: fopen($PATH, $MODE)
+      - pattern: readfile($PATH)
+      - pattern: include $PATH
+      - pattern: require $PATH
+
+  - id: php-taint-unserialize-high
+    languages: [php]
+    mode: taint
+    severity: ERROR
+    message: >
+      User input flows into unserialize without validation, unsafe deserialization risk.
+    metadata:
+      cwe:
+        - "CWE-502: Deserialization of Unsafe Data"
+    pattern-sources:
+      - pattern: $_GET[$K]
+      - pattern: $_POST[$K]
+      - pattern: $_REQUEST[$K]
+      - pattern: $_COOKIE[$K]
+    pattern-sinks:
+      - pattern: unserialize($DATA)

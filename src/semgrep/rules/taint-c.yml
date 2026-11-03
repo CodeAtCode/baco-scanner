@@ -1,0 +1,37 @@
+rules:
+  - id: c-taint-cmdi-high
+    languages: [c]
+    mode: taint
+    severity: ERROR
+    message: >
+      User input flows into command execution without sanitization, command injection risk.
+    metadata:
+      cwe:
+        - "CWE-78: Improper Neutralization of Special Elements used in an OS Command"
+    pattern-sources:
+      - pattern: getenv($KEY)
+      - pattern: argv[$INDEX]
+      - pattern: fgets($BUF, $SIZE, stdin)
+    pattern-sinks:
+      - pattern: system($CMD)
+      - pattern: popen($CMD, $MODE)
+      - pattern: execl($PATH, $ARG, ...)
+      - pattern: execv($PATH, $ARGV)
+
+  - id: c-taint-path-traversal-high
+    languages: [c]
+    mode: taint
+    severity: ERROR
+    message: >
+      User input flows into file operations without validation, path traversal risk.
+    metadata:
+      cwe:
+        - "CWE-22: Improper Limitation of a Pathname to a Restricted Directory"
+    pattern-sources:
+      - pattern: getenv($KEY)
+      - pattern: argv[$INDEX]
+      - pattern: fgets($BUF, $SIZE, stdin)
+    pattern-sinks:
+      - pattern: fopen($PATH, $MODE)
+      - pattern: open($PATH, $FLAGS)
+      - pattern: unlink($PATH)

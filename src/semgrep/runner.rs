@@ -64,17 +64,28 @@ impl SemgrepRunner {
         Ok(files)
     }
 
-    /// Materialize effective custom rules: explicit custom_rules plus derived
-    /// default taint rules (when explicit rules are absent).
+    /// Materialize effective custom rules: explicit custom_rules merged with derived
+    /// default taint rules. Explicit rules always win on ID collision — derived rules
+    /// with matching IDs are filtered out before materialization.
+    ///
+    /// This ensures data-flow vulnerabilities are detected by default while still
+    /// allowing users to override specific rules with explicit custom_rules.
     pub fn materialize_effective_custom_rules(&self) -> Result<Vec<NamedTempFile>, String> {
+        use super::rules::{collect_rule_ids, filter_rules_excluding_ids};
+
         let mut all_yaml = Vec::new();
 
         // Add explicit custom rules first
         all_yaml.extend(self.custom_rules.clone());
 
-        // Add derived default taint rules if no explicit custom rules
-        if self.custom_rules.is_empty() {
-            all_yaml.extend(self.derive_default_custom_rules());
+        // Collect IDs from explicit rules
+        let explicit_ids = collect_rule_ids(&self.custom_rules)?;
+
+        // Filter derived rules to exclude explicit rule IDs, then add remaining
+        for derived_doc in self.derive_default_custom_rules() {
+            if let Some(filtered) = filter_rules_excluding_ids(&derived_doc, &explicit_ids)? {
+                all_yaml.push(filtered);
+            }
         }
 
         self.materialize_rules_from_yaml(&all_yaml)

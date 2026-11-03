@@ -90,6 +90,10 @@ pub const DEFAULT_ENABLE_MERGE_ORDER_DETECTION: bool = true;
 pub fn default_enable_merge_order_detection() -> bool {
     DEFAULT_ENABLE_MERGE_ORDER_DETECTION
 }
+pub const DEFAULT_ENABLE_HUNT_PROMPTS: bool = true;
+pub fn default_enable_hunt_prompts() -> bool {
+    DEFAULT_ENABLE_HUNT_PROMPTS
+}
 /// Normalization tier for confidence calibration.
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize, PartialEq, Default)]
 pub enum NormalizationTier {

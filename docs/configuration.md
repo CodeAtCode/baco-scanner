@@ -673,14 +673,25 @@ Per-attack-class prompt modules from `prompts/hunt/` selected by target language
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `enable_hunt_prompts` | bool | `false` | Enable domain-routed hunt prompts |
+| `enable_hunt_prompts` | bool | `true` | Enable domain-routed hunt prompts |
 
 ```toml
 [scanner.performance]
-enable_hunt_prompts = false
+enable_hunt_prompts = true
 ```
 
 Available modules: `injection.md`, `auth.md`, `authz_absence.md`, `xss.md`, `path_traversal.md`, `crypto.md`, `resource.md`, `deserialization.md`, `memory_safety.md`.
+
+### Taint rules are derived from the project languages
+
+Taint rules are always merged from the project languages (python, javascript/typescript, go, php, c/cpp, java, ruby, csharp). Explicit `custom_rules` no longer suppress them; when a rule id exists in both, the explicit one wins.
+
+CWE classes covered per language:
+- **SQLi**: CWE-89 (all languages)
+- **Command injection**: CWE-78 (all languages)
+- **Path traversal**: CWE-22 (all languages)
+- **Deserialization**: CWE-502 (php, java, csharp)
+- **Code injection**: CWE-94 (ruby)
 
 ### Exploit Synthesis (T3.2)
 

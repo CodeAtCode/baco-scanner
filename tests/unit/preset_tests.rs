@@ -802,3 +802,22 @@ fn test_preset_merge_does_not_wipe_user_performance_fields() {
         "User early_termination_threshold = 500.0 should be preserved"
     );
 }
+
+#[test]
+fn test_presets_enable_hunt_prompts_true() {
+    // Verify that all presets with [scanner.performance] have enable_hunt_prompts = true
+    // Only test registered presets - go and javascript exist as files but are not in BUILTIN_PRESETS
+    let preset_names = ["oss-python"];
+
+    for name in &preset_names {
+        let preset = preset::load_preset(name).unwrap();
+        let mut config = ScannerConfig::default();
+        preset.merge_into(&mut config);
+
+        assert!(
+            config.scanner.performance.enable_hunt_prompts,
+            "Preset {} should have enable_hunt_prompts = true",
+            name
+        );
+    }
+}

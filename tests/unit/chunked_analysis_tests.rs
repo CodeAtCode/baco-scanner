@@ -173,7 +173,7 @@ fn language_for_extension_maps_bundled_chunkers() {
         LlmAnalyzer::language_for_extension("tsx"),
         Some("typescript")
     );
-    assert_eq!(LlmAnalyzer::language_for_extension("go"), None);
+    assert_eq!(LlmAnalyzer::language_for_extension("go"), Some("go"));
 }
 
 #[test]
