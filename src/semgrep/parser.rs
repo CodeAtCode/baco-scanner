@@ -136,18 +136,16 @@ pub fn parse_json_output(
             .get("extra")
             .and_then(|e| e.get("severity"))
             .and_then(|s| s.as_str());
+        let keyword_severity = parse_severity(&check_id);
         let base_severity = match extra_severity {
             Some("ERROR") => Severity::High,
             Some("WARNING") => Severity::Medium,
             Some("INFO") | Some("INVENTORY") => Severity::Low,
-            _ => parse_severity(&check_id),
+            _ => keyword_severity.unwrap_or_default(),
         };
-        let keyword_severity = parse_severity(&check_id);
-        let severity = if keyword_severity > base_severity {
-            keyword_severity
-        } else {
-            base_severity
-        };
+        let severity = keyword_severity
+            .filter(|ks| *ks > base_severity)
+            .unwrap_or(base_severity);
 
         let cwe_id = result
             .get("extra")

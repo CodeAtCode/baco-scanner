@@ -29,8 +29,11 @@ rules:
         - "CWE-78: Improper Neutralization of Special Elements used in an OS Command"
     pattern-sources:
       - pattern: r.URL.Query().Get($KEY)
+      - pattern: r.FormValue($KEY)
+      - pattern: r.PostFormValue($KEY)
     pattern-sinks:
       - pattern: exec.Command($CMD)
+      - pattern: exec.Command($CMD, ...)
 
   - id: go-taint-path-traversal-high
     languages: [go]
@@ -43,6 +46,8 @@ rules:
         - "CWE-22: Improper Limitation of a Pathname to a Restricted Directory"
     pattern-sources:
       - pattern: r.URL.Query().Get($KEY)
+      - pattern: r.FormValue($KEY)
+      - pattern: r.PostFormValue($KEY)
     pattern-sinks:
       - pattern: os.Open($PATH)
       - pattern: os.ReadFile($PATH)

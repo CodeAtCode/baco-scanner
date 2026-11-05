@@ -149,6 +149,7 @@ mod file_hash_tests;
 mod findings_id_tests;
 mod findings_tests;
 mod fixtures;
+
 mod git_analysis;
 mod glob_exclude_tests;
 mod global_fp;

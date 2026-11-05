@@ -3,13 +3,22 @@
 //! These tests verify that the bundled taint rules actually detect vulnerabilities
 //! when run against real code via the semgrep binary.
 //!
-//! Note: These tests require the semgrep binary to be installed. If semgrep is
-//! not found, the tests will print a skip message and pass (not fail).
+//! These tests require the semgrep binary to be installed. If semgrep is not
+//! found in PATH, the test fails with an assertion error rather than silently
+//! passing.
 
 use baco::semgrep::SemgrepRunner;
 
 #[test]
 fn test_taint_languages_e2e() {
+    assert!(
+        std::process::Command::new("semgrep")
+            .arg("--version")
+            .output()
+            .is_ok(),
+        "semgrep binary required for this integration test but not found in PATH"
+    );
+
     // List of languages to test with their fixture paths and expected rule suffixes
     let test_cases = vec![
         (
@@ -40,20 +49,6 @@ fn test_taint_languages_e2e() {
     ];
 
     for (lang, fixture_path, expected_rule_suffix) in test_cases {
-        // Check if semgrep is available
-        let semgrep_exists = std::process::Command::new("semgrep")
-            .arg("--version")
-            .output()
-            .is_ok();
-
-        if !semgrep_exists {
-            println!(
-                "SKIP: semgrep binary not found - skipping {} taint e2e test",
-                lang
-            );
-            continue;
-        }
-
         // Create runner with the language
         let runner = SemgrepRunner::new(vec![], vec![])
             .with_languages(vec![lang.to_string()])
@@ -95,12 +90,7 @@ fn test_taint_languages_e2e() {
                 );
             }
             Err(e) => {
-                // If semgrep failed, check if it's a "not found" error
-                if e.contains("not found") {
-                    println!("SKIP: semgrep not found for {} - skipping test", lang);
-                } else {
-                    panic!("semgrep run failed for {}: {}", lang, e);
-                }
+                panic!("semgrep run failed for {}: {}", lang, e);
             }
         }
     }

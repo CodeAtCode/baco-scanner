@@ -216,9 +216,16 @@ impl AiAggregationPhase {
             // Check for CWE mismatches
             let cwes: Vec<_> = findings.iter().filter_map(|f| f.cwe_id.as_ref()).collect();
             if cwes.iter().collect::<std::collections::HashSet<_>>().len() > 1 {
-                let conflict =
-                    conflict_resolver::ConflictResolver::resolve_cwe_conflict(location, findings);
-                conflicts.push(conflict);
+                match conflict_resolver::ConflictResolver::resolve_cwe_conflict(location, findings)
+                {
+                    Ok(conflict) => {
+                        conflicts.push(conflict);
+                    }
+                    Err(e) => {
+                        // Log the error but continue - findings with invalid CWEs are incomparable
+                        tracing::warn!("CWE conflict resolution skipped at {}: {}", location, e);
+                    }
+                }
                 continue;
             }
 

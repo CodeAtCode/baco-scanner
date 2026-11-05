@@ -11,6 +11,8 @@ rules:
     pattern-sources:
       - pattern: Request.QueryString[$KEY]
       - pattern: Request.Form[$KEY]
+      - pattern: Request.Query[$KEY]
+      - pattern: Request.Headers[$KEY]
     pattern-sinks:
       - pattern: new SqlCommand($SQL)
       - pattern: $CMD.ExecuteReader()
@@ -28,8 +30,13 @@ rules:
     pattern-sources:
       - pattern: Request.QueryString[$KEY]
       - pattern: Request.Form[$KEY]
+      - pattern: Request.Query[$KEY]
+      - pattern: Request.Headers[$KEY]
     pattern-sinks:
       - pattern: Process.Start($CMD)
+      - pattern: Process.Start($CMD, ...)
+      - pattern: System.Diagnostics.Process.Start($CMD)
+      - pattern: System.Diagnostics.Process.Start($CMD, ...)
 
   - id: csharp-taint-path-traversal-high
     languages: [csharp]
@@ -43,6 +50,8 @@ rules:
     pattern-sources:
       - pattern: Request.QueryString[$KEY]
       - pattern: Request.Form[$KEY]
+      - pattern: Request.Query[$KEY]
+      - pattern: Request.Headers[$KEY]
     pattern-sinks:
       - pattern: File.ReadAllText($PATH)
       - pattern: File.Open($PATH, $MODE)
@@ -59,5 +68,7 @@ rules:
     pattern-sources:
       - pattern: Request.QueryString[$KEY]
       - pattern: Request.Form[$KEY]
+      - pattern: Request.Query[$KEY]
+      - pattern: Request.Headers[$KEY]
     pattern-sinks:
       - pattern: new BinaryFormatter().Deserialize($STREAM)

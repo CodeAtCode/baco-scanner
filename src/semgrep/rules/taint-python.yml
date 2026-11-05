@@ -32,7 +32,9 @@ rules:
       - pattern: request.form.get($KEY)
     pattern-sinks:
       - pattern: subprocess.call($CMD, shell=True)
+      - pattern: subprocess.call($CMD, ...)
       - pattern: subprocess.Popen($CMD, shell=True)
+      - pattern: subprocess.Popen($CMD, ...)
       - pattern: os.system($CMD)
 
   - id: py-taint-path-traversal-high
@@ -49,4 +51,6 @@ rules:
       - pattern: request.form.get($KEY)
     pattern-sinks:
       - pattern: open($PATH)
+      - pattern: open($PATH, ...)
       - pattern: os.open($PATH, $MODE)
+      - pattern: os.open($PATH, ...)

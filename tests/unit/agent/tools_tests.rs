@@ -473,3 +473,32 @@ fn test_test_run_tool_name() {
     let tool = TestRunTool;
     assert_eq!(tool.name(), "test_run");
 }
+
+#[test]
+fn test_pattern_search_pattern_starting_with_dash_is_literal() {
+    // BUG-001: Without "--" before the pattern, a pattern starting with "-"
+    // is interpreted as a grep flag, not a literal search term.
+    // The fix adds "--" to separate options from positional arguments.
+    let tmpdir = tempfile::tempdir().unwrap();
+    let path = tmpdir.path().join("search.txt");
+    std::fs::write(&path, "-e test_pattern\nnormal line\n-e flag").unwrap();
+
+    let tool = PatternSearchTool;
+    let args = serde_json::json!({
+        "pattern": "-e",
+        "path": tmpdir.path().to_string_lossy().to_string()
+    });
+    let sandbox = Box::new(ToolSandbox::new(tmpdir.path().to_path_buf(), 30));
+
+    let result = tool.execute(args, &*sandbox);
+    assert!(result.is_ok(), "tool execution should succeed");
+    let output = result.unwrap();
+    assert!(
+        output.success,
+        "grep should find the literal '-e' pattern, not interpret it as a flag"
+    );
+    assert!(
+        output.output.contains("-e test_pattern"),
+        "output should contain the line matching literal '-e'"
+    );
+}

@@ -30,7 +30,9 @@ rules:
       - pattern: request.getHeader($KEY)
     pattern-sinks:
       - pattern: Runtime.getRuntime().exec($CMD)
+      - pattern: Runtime.getRuntime().exec($CMD, ...)
       - pattern: new ProcessBuilder($CMD)
+      - pattern: new ProcessBuilder($CMD, ...)
 
   - id: java-taint-path-traversal-high
     languages: [java]

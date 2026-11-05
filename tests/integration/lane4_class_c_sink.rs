@@ -44,10 +44,10 @@ mod tests {
 
     #[tokio::test]
     async fn vulnerable_fixture_detects_template_render_sink() {
-        if !semgrep_available() {
-            eprintln!("skipping: semgrep binary not installed");
-            return;
-        }
+        assert!(
+            semgrep_available(),
+            "semgrep binary required for this integration test but not found in PATH"
+        );
 
         let runner = build_php_runner();
         let findings = runner
@@ -95,10 +95,10 @@ mod tests {
 
     #[tokio::test]
     async fn safe_fixture_has_zero_findings() {
-        if !semgrep_available() {
-            eprintln!("skipping: semgrep binary not installed");
-            return;
-        }
+        assert!(
+            semgrep_available(),
+            "semgrep binary required for this integration test but not found in PATH"
+        );
 
         let runner = build_php_runner();
         let findings = runner

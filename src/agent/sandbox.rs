@@ -121,14 +121,10 @@ pub struct ToolSandbox {
 
 impl SandboxLike for ToolSandbox {
     fn temp_dir(&self) -> &Path {
-        &self.temp_dir
+        ToolSandbox::temp_dir(self)
     }
     fn resolve_safe_path(&self, path: &str) -> Result<PathBuf, String> {
-        let full = validate_path_containment(&self.temp_dir, path)?;
-        if !full.exists() {
-            return Err(format!("Path does not exist: {}", path));
-        }
-        Ok(full)
+        ToolSandbox::resolve_safe_path(self, path)
     }
     fn run_with_timeout(
         &self,
@@ -136,74 +132,16 @@ impl SandboxLike for ToolSandbox {
         args: &[&str],
         timeout_secs: Option<u64>,
     ) -> Result<ToolResult, String> {
-        let dur = Duration::from_secs(timeout_secs.unwrap_or(self.timeout_secs));
-        let child = unsafe {
-            Command::new(cmd)
-                .args(args)
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
-                .pre_exec(disable_core_dumps)
-                .spawn()
-        }
-        .map_err(|e| format!("spawn {}: {}", cmd, e))?;
-        let dur = child
-            .wait_with_timeout(dur)
-            .map_err(|e| format!("timeout/err: {}", e))?;
-        let ec = dur.status.code().unwrap_or(-1);
-        let out = format!(
-            "{}{}",
-            String::from_utf8_lossy(&dur.stdout),
-            String::from_utf8_lossy(&dur.stderr)
-        );
-        // Trim whitespace from output for reliable matching
-        Ok(ToolResult {
-            tool_call_id: "sandbox".to_string(),
-            success: ec == 0,
-            output: out.trim().to_string(),
-        })
+        ToolSandbox::run_with_timeout(self, cmd, args, timeout_secs)
     }
     fn validate_test_source(&self, path: &str, content: &str) -> Result<(), String> {
-        validate_test_source_content(path, content)
+        ToolSandbox::validate_test_source(self, path, content)
     }
     fn create_temp_file(&self, path: &str, content: &str) -> Result<PathBuf, String> {
-        self.validate_test_source(path, content)
-            .map_err(|e| format!("Validation failed: {}", e))?;
-
-        // Pre-condition: validate path containment before write
-        let full = validate_path_containment(&self.temp_dir, path)?;
-
-        // Write the file
-        std::fs::File::create(&full)
-            .and_then(|mut f| f.write_all(content.as_bytes()))
-            .map_err(|e| format!("Write failed: {}", e))?;
-
-        // Post-condition: verify containment after write (catches symlink swaps)
-        let canonical_after = full
-            .canonicalize()
-            .map_err(|e| format!("Cannot canonicalize after write {:?}: {}", full, e))?;
-        let canonical_root = self
-            .temp_dir
-            .canonicalize()
-            .map_err(|e| format!("Cannot canonicalize sandbox root: {}", e))?;
-        if !canonical_after.starts_with(&canonical_root) {
-            // File was created via symlink outside sandbox - delete and error
-            let _ = std::fs::remove_file(&full);
-            return Err(format!("Path escapes sandbox after write: {}", path));
-        }
-
-        Ok(full)
+        ToolSandbox::create_temp_file(self, path, content)
     }
     fn is_path_allowed(&self, path: &Path) -> bool {
-        let canonical = match path.canonicalize() {
-            Ok(p) => p,
-            Err(_) => {
-                return match path.parent() {
-                    Some(parent) => parent.starts_with(&self.temp_dir),
-                    None => false,
-                };
-            }
-        };
-        canonical.starts_with(&self.temp_dir)
+        ToolSandbox::is_path_allowed(self, path)
     }
 }
 

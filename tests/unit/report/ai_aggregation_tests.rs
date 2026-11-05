@@ -263,7 +263,8 @@ fn test_conflict_resolver_resolve_cwe_conflict() {
     ];
     let finding_refs: Vec<&VulnerabilityFinding> = findings.iter().collect();
 
-    let conflict = ConflictResolver::resolve_cwe_conflict("src/main.rs:42", &finding_refs);
+    let conflict = ConflictResolver::resolve_cwe_conflict("src/main.rs:42", &finding_refs)
+        .expect("valid CWEs should resolve successfully");
 
     assert_eq!(
         conflict.conflict_type,

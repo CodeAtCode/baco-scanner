@@ -1,5 +1,6 @@
 //! Conflict resolution logic for AI aggregation
 
+use super::ScanError;
 use super::models::*;
 use crate::findings::{Severity, VulnerabilityFinding};
 
@@ -49,10 +50,36 @@ impl ConflictResolver {
     }
 
     /// Resolve CWE conflict by keeping most specific (lowest CWE number)
+    ///
+    /// Returns an error if any finding has an unparseable CWE ID.
+    /// Unparseable CWEs indicate data corruption or model hallucination;
+    /// silently sorting them last biases conflict resolution toward findings
+    /// with parseable CWEs, which is worse than failing explicitly.
     pub fn resolve_cwe_conflict(
         location: &str,
         findings: &[&VulnerabilityFinding],
-    ) -> FindingConflict {
+    ) -> Result<FindingConflict, ScanError> {
+        // Validate all CWEs first - fail fast on unparseable values
+        for (i, finding) in findings.iter().enumerate() {
+            if let Some(cwe) = &finding.cwe_id {
+                // Check if CWE is parseable (format: CWE-NNN or just NNN)
+                let cwe_num = cwe.trim_start_matches("CWE-").parse::<u32>();
+
+                if cwe_num.is_err() {
+                    return Err(ScanError::Parse {
+                        message: format!(
+                            "CWE conflict resolution failed: finding {} has unparseable CWE '{}' at {} \
+                             - findings with invalid CWEs are not comparable",
+                            i + 1,
+                            cwe,
+                            location
+                        ),
+                        source: None,
+                    });
+                }
+            }
+        }
+
         let mut sorted: Vec<_> = findings.iter().collect();
         sorted.sort_by(|a, b| {
             let cwe_num = |cwe: &Option<String>| {
@@ -67,7 +94,7 @@ impl ConflictResolver {
         let conflict_type = ConflictType::CweMismatch;
         let resolution = ConflictResolution::KeptOne;
 
-        FindingConflict {
+        Ok(FindingConflict {
             findings: findings.iter().map(|f| (*f).clone()).collect(),
             conflict_type,
             resolution,
@@ -76,7 +103,7 @@ impl ConflictResolver {
                 most_specific.cwe_id.as_deref().unwrap_or("unknown"),
                 location
             ),
-        }
+        })
     }
 
     /// Resolve confidence conflict by averaging

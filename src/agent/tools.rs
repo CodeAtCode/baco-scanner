@@ -69,6 +69,7 @@ impl Tool for PatternSearchTool {
         let output = std::process::Command::new("grep")
             .arg("-rn")
             .arg(format!("-C{}", ctx))
+            .arg("--")
             .arg(pattern)
             .arg(path)
             .output()

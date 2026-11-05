@@ -416,7 +416,7 @@ fn parse_test_json_missing_fields() -> Vec<VulnerabilityFinding> {
 fn test_parse_semgrep_missing_extra_field() {
     let findings = parse_test_json_missing_fields();
     assert_eq!(findings.len(), 1);
-    assert_eq!(findings[0].severity, Severity::Info); // Default severity
+    assert_eq!(findings[0].severity, Severity::Medium); // Default severity is Medium, not Info
     assert_eq!(findings[0].cwe_id, None);
 }
 
@@ -526,7 +526,7 @@ fn test_parse_semgrep_missing_extra_metadata() {
 fn test_parse_semgrep_missing_extra_object() {
     let findings = parse_test_json_missing_fields();
     assert_eq!(findings.len(), 1);
-    assert_eq!(findings[0].severity, Severity::Info);
+    assert_eq!(findings[0].severity, Severity::Medium);
     assert_eq!(findings[0].cwe_id, None);
 }
 
@@ -856,11 +856,11 @@ fn test_raw_finding_with_none_fields() {
 fn test_severity_mapping_all_variants() {
     use baco::semgrep::rules::parse_severity;
 
-    assert_eq!(parse_severity("critical.issue"), Severity::Critical);
-    assert_eq!(parse_severity("high.issue"), Severity::High);
-    assert_eq!(parse_severity("medium.issue"), Severity::Medium);
-    assert_eq!(parse_severity("low.issue"), Severity::Low);
-    assert_eq!(parse_severity("info.issue"), Severity::Info);
+    assert_eq!(parse_severity("critical.issue"), Some(Severity::Critical));
+    assert_eq!(parse_severity("high.issue"), Some(Severity::High));
+    assert_eq!(parse_severity("medium.issue"), Some(Severity::Medium));
+    assert_eq!(parse_severity("low.issue"), Some(Severity::Low));
+    assert_eq!(parse_severity("info.issue"), Some(Severity::Info));
 }
 
 #[test]
@@ -900,4 +900,96 @@ fn test_parse_json_output_aggregation_logic() {
     // Should use first finding's path
     assert_eq!(findings[0].file_path, "f1.py");
     assert_eq!(findings[0].line_number, Some(1));
+}
+
+// ============================================================================
+// BUG-027: Wall-clock timeout must be separate from per-file timeout
+// ============================================================================
+
+#[test]
+fn test_wall_clock_timeout_separate_from_per_file() {
+    use baco::semgrep::rules::{DEFAULT_SEMGREP_TIMEOUT_SECS, DEFAULT_SEMGREP_WALL_CLOCK_SECS};
+
+    // The wall-clock timeout must be strictly greater than the per-file timeout,
+    // otherwise large projects abort prematurely.
+    const {
+        assert!(DEFAULT_SEMGREP_WALL_CLOCK_SECS > DEFAULT_SEMGREP_TIMEOUT_SECS);
+    }
+    assert_ne!(
+        DEFAULT_SEMGREP_TIMEOUT_SECS, DEFAULT_SEMGREP_WALL_CLOCK_SECS,
+        "per-file and wall-clock timeouts must be distinct constants"
+    );
+
+    let runner = SemgrepRunner::new(vec![], vec![]);
+    assert_eq!(runner.timeout_secs, DEFAULT_SEMGREP_TIMEOUT_SECS);
+    assert_eq!(
+        runner.wall_clock_timeout_secs,
+        DEFAULT_SEMGREP_WALL_CLOCK_SECS
+    );
+
+    let runner = runner.with_timeout(42).with_wall_clock_timeout(999);
+    assert_eq!(runner.timeout_secs, 42);
+    assert_eq!(runner.wall_clock_timeout_secs, 999);
+}
+
+// ============================================================================
+// BUG-031: parse_severity default must be Medium, not Info
+// ============================================================================
+
+#[test]
+fn test_parse_severity_unknown_returns_none() {
+    use baco::semgrep::rules::parse_severity;
+
+    // Unknown check_id with no severity keyword → None (not a fallback severity)
+    assert_eq!(parse_severity("unknown-rule-id"), None);
+    assert_eq!(parse_severity("test.issue"), None);
+    assert_eq!(parse_severity("custom-check"), None);
+
+    // Explicit keyword matches still work
+    assert_eq!(parse_severity("info.rule"), Some(Severity::Info));
+    assert_eq!(parse_severity("INFO.rule"), Some(Severity::Info));
+}
+
+// ============================================================================
+// BUG-038: Malformed YAML must not abort the entire taint rule scan
+// ============================================================================
+
+#[test]
+fn test_collect_rule_ids_skips_malformed_yaml() {
+    use baco::semgrep::rules::collect_rule_ids;
+
+    let valid_doc = "rules:\n  - id: valid-rule-1\n  - id: valid-rule-2\n".to_string();
+    let malformed_doc = "{{{{invalid yaml".to_string();
+    let docs = vec![valid_doc.clone(), malformed_doc, valid_doc];
+
+    let ids = collect_rule_ids(&docs).expect("should not fail on malformed docs");
+
+    // Valid rules from both valid documents are collected; malformed one is skipped
+    assert!(ids.contains("valid-rule-1"));
+    assert!(ids.contains("valid-rule-2"));
+}
+
+#[test]
+fn test_filter_rules_excluding_ids_skips_malformed_yaml() {
+    use baco::semgrep::rules::filter_rules_excluding_ids;
+    use std::collections::BTreeSet;
+
+    let valid_doc = "rules:\n  - id: keep-this\n  - id: exclude-this\n";
+    let exclude = {
+        let mut s = BTreeSet::new();
+        s.insert("exclude-this".to_string());
+        s
+    };
+
+    let result = filter_rules_excluding_ids(valid_doc, &exclude).unwrap();
+    assert!(result.is_some());
+    assert!(result.as_ref().unwrap().contains("keep-this"));
+    assert!(!result.as_ref().unwrap().contains("exclude-this"));
+
+    let malformed_doc = "{{{{invalid yaml";
+    let result = filter_rules_excluding_ids(malformed_doc, &exclude).unwrap();
+    assert!(
+        result.is_none(),
+        "malformed document should return None, not error"
+    );
 }

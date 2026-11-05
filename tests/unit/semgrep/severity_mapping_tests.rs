@@ -252,10 +252,10 @@ fn test_severity_case_insensitive_json_values() {
     sorted.sort_by(|a, b| a.file_path.cmp(&b.file_path));
 
     // Note: JSON severity values are case-sensitive in Semgrep output
-    // These lowercase/mixed-case values won't match, so fall back to check_id (Info)
-    assert_eq!(sorted[0].severity, Severity::Info); // test1.py - no match, fallback
-    assert_eq!(sorted[1].severity, Severity::Info); // test2.py - no match, fallback
-    assert_eq!(sorted[2].severity, Severity::Info); // test3.py - no match, fallback
+    // These lowercase/mixed-case values won't match, so fall back to default (Medium)
+    assert_eq!(sorted[0].severity, Severity::Medium); // test1.py - no match, fallback
+    assert_eq!(sorted[1].severity, Severity::Medium); // test2.py - no match, fallback
+    assert_eq!(sorted[2].severity, Severity::Medium); // test3.py - no match, fallback
 }
 
 #[test]

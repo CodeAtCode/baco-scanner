@@ -49,10 +49,10 @@ mod tests {
 
     #[tokio::test]
     async fn vulnerable_fixture_matches_all_five_rules() {
-        if !semgrep_available() {
-            eprintln!("skipping: semgrep binary not installed");
-            return;
-        }
+        assert!(
+            semgrep_available(),
+            "semgrep binary required for this integration test but not found in PATH"
+        );
 
         let runner = build_cpp_runner();
         let findings = runner
@@ -80,10 +80,10 @@ mod tests {
 
     #[tokio::test]
     async fn safe_fixture_has_zero_findings() {
-        if !semgrep_available() {
-            eprintln!("skipping: semgrep binary not installed");
-            return;
-        }
+        assert!(
+            semgrep_available(),
+            "semgrep binary required for this integration test but not found in PATH"
+        );
 
         let runner = build_cpp_runner();
         let findings = runner
@@ -100,10 +100,10 @@ mod tests {
 
     #[tokio::test]
     async fn cwe_metadata_survives_to_findings() {
-        if !semgrep_available() {
-            eprintln!("skipping: semgrep binary not installed");
-            return;
-        }
+        assert!(
+            semgrep_available(),
+            "semgrep binary required for this integration test but not found in PATH"
+        );
 
         let runner = build_cpp_runner();
         let findings = runner
@@ -149,10 +149,10 @@ mod tests {
 
     #[tokio::test]
     async fn directory_scan_attributes_findings_to_vulnerable_file_only() {
-        if !semgrep_available() {
-            eprintln!("skipping: semgrep binary not installed");
-            return;
-        }
+        assert!(
+            semgrep_available(),
+            "semgrep binary required for this integration test but not found in PATH"
+        );
 
         let runner = build_cpp_runner();
 

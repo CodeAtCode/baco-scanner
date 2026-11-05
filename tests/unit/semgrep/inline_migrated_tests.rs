@@ -250,7 +250,7 @@ fn test_parse_json_missing_extra_field_uses_defaults() {
     let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
 
     assert_eq!(findings.len(), 1);
-    assert_eq!(findings[0].severity, Severity::Info); // Default severity
+    assert_eq!(findings[0].severity, Severity::Medium); // Default severity
     assert!(findings[0].cwe_id.is_none());
     assert!(findings[0].description.contains("test.rule"));
 }
@@ -336,7 +336,7 @@ fn test_severity_mapping_low() {
 }
 
 #[test]
-fn test_severity_mapping_unknown_defaults_to_info() {
+fn test_severity_mapping_unknown_defaults_to_medium() {
     let mock_json = r#"{
         "results": [
             {"check_id": "unknown.category", "path": "test.py", "start": {"line": 1}, "extra": {"metadata": {}}}
@@ -346,7 +346,7 @@ fn test_severity_mapping_unknown_defaults_to_info() {
     let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
 
-    assert_eq!(findings[0].severity, Severity::Info);
+    assert_eq!(findings[0].severity, Severity::Medium);
 }
 
 #[test]

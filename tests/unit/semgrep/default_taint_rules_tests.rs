@@ -341,3 +341,152 @@ fn test_csharp_aliases() {
         "c# alias should produce C# rules"
     );
 }
+
+/// Extract the YAML section for a single rule by its ID.
+/// Returns the text from "- id: <rule_id>" up to the next rule or EOF.
+/// This lets tests assert patterns within a specific rule, not just
+/// anywhere in the file — preventing toothless cross-rule matches.
+fn rule_section(content: &str, rule_id: &str) -> String {
+    let marker = format!("- id: {}", rule_id);
+    let start = content
+        .find(&marker)
+        .unwrap_or_else(|| panic!("rule '{}' not found in content", rule_id));
+    let rest = &content[start..];
+    let end = rest[1..]
+        .find("\n  - id:")
+        .map(|i| start + 1 + i)
+        .unwrap_or(content.len());
+    content[start..end].to_string()
+}
+
+// --- BUG-022: Variadic sink patterns ---
+// Sinks like open($PATH) only match single-argument calls. Multi-argument
+// calls (open(p, "rb")) are missed. Each affected rule must also have a
+// variadic variant (open($PATH, ...)).
+
+#[test]
+fn test_bug_022_python_open_variadic_sink() {
+    let runner = SemgrepRunner::new(vec![], vec![]).with_languages(vec!["python".to_string()]);
+    let content = &runner.derive_default_custom_rules()[0];
+    let section = rule_section(content, "py-taint-path-traversal-high");
+    assert!(
+        section.contains("- pattern: open($PATH, ...)"),
+        "Python path-traversal must have variadic open sink (not os.open)"
+    );
+}
+
+#[test]
+fn test_bug_022_python_subprocess_variadic_sink() {
+    let runner = SemgrepRunner::new(vec![], vec![]).with_languages(vec!["python".to_string()]);
+    let content = &runner.derive_default_custom_rules()[0];
+    let section = rule_section(content, "py-taint-cmdi-high");
+    assert!(
+        section.contains("subprocess.call($CMD, ...)"),
+        "Python cmdi must have variadic subprocess.call sink"
+    );
+}
+
+#[test]
+fn test_bug_022_go_exec_command_variadic_sink() {
+    let runner = SemgrepRunner::new(vec![], vec![]).with_languages(vec!["go".to_string()]);
+    let content = &runner.derive_default_custom_rules()[0];
+    let section = rule_section(content, "go-taint-cmdi-high");
+    assert!(
+        section.contains("exec.Command($CMD, ...)"),
+        "Go cmdi must have variadic exec.Command sink"
+    );
+}
+
+#[test]
+fn test_bug_022_csharp_process_start_variadic_sink() {
+    let runner = SemgrepRunner::new(vec![], vec![]).with_languages(vec!["csharp".to_string()]);
+    let content = &runner.derive_default_custom_rules()[0];
+    let section = rule_section(content, "csharp-taint-cmdi-high");
+    assert!(
+        section.contains("- pattern: Process.Start($CMD, ...)"),
+        "C# cmdi must have variadic Process.Start sink (not qualified form)"
+    );
+}
+
+#[test]
+fn test_bug_022_java_runtime_exec_variadic_sink() {
+    let runner = SemgrepRunner::new(vec![], vec![]).with_languages(vec!["java".to_string()]);
+    let content = &runner.derive_default_custom_rules()[0];
+    let section = rule_section(content, "java-taint-cmdi-high");
+    assert!(
+        section.contains("Runtime.getRuntime().exec($CMD, ...)"),
+        "Java cmdi must have variadic Runtime.exec sink"
+    );
+}
+
+// --- BUG-023: Qualified name matching ---
+// C# Process.Start is also called as System.Diagnostics.Process.Start.
+// The rule must include the qualified form.
+
+#[test]
+fn test_bug_023_csharp_qualified_process_start() {
+    let runner = SemgrepRunner::new(vec![], vec![]).with_languages(vec!["csharp".to_string()]);
+    let content = &runner.derive_default_custom_rules()[0];
+    let section = rule_section(content, "csharp-taint-cmdi-high");
+    assert!(
+        section.contains("System.Diagnostics.Process.Start"),
+        "C# cmdi must match fully-qualified Process.Start calls"
+    );
+}
+
+// --- BUG-024: Go FormValue sources missing from cmdi and path-traversal ---
+// r.FormValue and r.PostFormValue are common Go HTTP input sources.
+// They were only in the SQLi rule, missing from cmdi and path-traversal.
+
+#[test]
+fn test_bug_024_go_formvalue_in_cmdi_sources() {
+    let runner = SemgrepRunner::new(vec![], vec![]).with_languages(vec!["go".to_string()]);
+    let content = &runner.derive_default_custom_rules()[0];
+    let section = rule_section(content, "go-taint-cmdi-high");
+    assert!(
+        section.contains("r.FormValue($KEY)"),
+        "Go cmdi must have r.FormValue as a source"
+    );
+}
+
+#[test]
+fn test_bug_024_go_formvalue_in_path_traversal_sources() {
+    let runner = SemgrepRunner::new(vec![], vec![]).with_languages(vec!["go".to_string()]);
+    let content = &runner.derive_default_custom_rules()[0];
+    let section = rule_section(content, "go-taint-path-traversal-high");
+    assert!(
+        section.contains("r.FormValue($KEY)"),
+        "Go path-traversal must have r.FormValue as a source"
+    );
+}
+
+// --- BUG-025: C# ASP.NET Core request sources ---
+// Request.Query[$KEY] and Request.Headers[$KEY] are the ASP.NET Core
+// equivalents of Request.QueryString[$KEY] and Request.Form[$KEY].
+// All C# taint rules must include them.
+
+#[test]
+fn test_bug_025_csharp_aspnet_core_sources_in_sqli() {
+    let runner = SemgrepRunner::new(vec![], vec![]).with_languages(vec!["csharp".to_string()]);
+    let content = &runner.derive_default_custom_rules()[0];
+    let section = rule_section(content, "csharp-taint-sqli-high");
+    assert!(
+        section.contains("Request.Query[$KEY]"),
+        "C# SQLi must have ASP.NET Core Request.Query source"
+    );
+    assert!(
+        section.contains("Request.Headers[$KEY]"),
+        "C# SQLi must have ASP.NET Core Request.Headers source"
+    );
+}
+
+#[test]
+fn test_bug_025_csharp_aspnet_core_sources_in_cmdi() {
+    let runner = SemgrepRunner::new(vec![], vec![]).with_languages(vec!["csharp".to_string()]);
+    let content = &runner.derive_default_custom_rules()[0];
+    let section = rule_section(content, "csharp-taint-cmdi-high");
+    assert!(
+        section.contains("Request.Query[$KEY]"),
+        "C# cmdi must have ASP.NET Core Request.Query source"
+    );
+}

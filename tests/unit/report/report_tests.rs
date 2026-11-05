@@ -231,10 +231,11 @@ fn test_resolve_cwe_conflict_selects_most_specific() {
     finding1.cwe_id = Some("CWE-79".to_string());
 
     let mut finding2 = make_finding("f2", Severity::High, "src/test.rs", Some(10));
-    finding2.cwe_id = Some("CWE-79-1".to_string());
+    finding2.cwe_id = Some("CWE-80".to_string());
 
     let findings = vec![&finding1, &finding2];
-    let conflict = ConflictResolver::resolve_cwe_conflict("src/test.rs:10", &findings);
+    let conflict = ConflictResolver::resolve_cwe_conflict("src/test.rs:10", &findings)
+        .expect("valid CWEs should resolve successfully");
 
     assert_eq!(conflict.conflict_type, ConflictType::CweMismatch);
     assert!(conflict.resolution_reason.contains("CWE-79"));
@@ -246,14 +247,37 @@ fn test_resolve_cwe_conflict_without_cwe() {
     let finding2 = make_finding("f2", Severity::High, "src/test.rs", Some(10));
 
     let findings = vec![&finding1, &finding2];
-    let conflict = ConflictResolver::resolve_cwe_conflict("src/test.rs:10", &findings);
+    let conflict = ConflictResolver::resolve_cwe_conflict("src/test.rs:10", &findings)
+        .expect("findings without CWEs should resolve (both sort as MAX)");
 
     assert_eq!(conflict.conflict_type, ConflictType::CweMismatch);
     // When both findings have no CWE, the resolution_reason uses "unknown" from the first finding
-    eprintln!("resolution_reason: {}", conflict.resolution_reason);
     assert!(
         conflict.resolution_reason.contains("unknown")
             || conflict.resolution_reason.contains("Selected")
+    );
+}
+
+#[test]
+fn test_resolve_cwe_conflict_rejects_unparseable_cwe() {
+    let mut finding1 = make_finding("f1", Severity::High, "src/test.rs", Some(10));
+    finding1.cwe_id = Some("CWE-79".to_string());
+
+    let mut finding2 = make_finding("f2", Severity::High, "src/test.rs", Some(10));
+    finding2.cwe_id = Some("INVALID-CWE-FORMAT".to_string()); // Unparseable
+
+    let findings = vec![&finding1, &finding2];
+    let result = ConflictResolver::resolve_cwe_conflict("src/test.rs:10", &findings);
+
+    assert!(
+        result.is_err(),
+        "Unparseable CWE should cause error, not silently sort last"
+    );
+    let err = result.unwrap_err();
+    assert!(
+        err.to_string().contains("unparseable") || err.to_string().contains("CWE"),
+        "Error should mention the CWE issue: {}",
+        err
     );
 }
 

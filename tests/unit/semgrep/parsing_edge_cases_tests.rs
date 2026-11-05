@@ -70,7 +70,7 @@ fn test_missing_extra_block() {
     // Should handle missing extra gracefully with defaults
     assert_eq!(findings.len(), 1);
     assert_eq!(findings[0].title, "test.rule");
-    assert_eq!(findings[0].severity, baco::findings::Severity::Info); // Default
+    assert_eq!(findings[0].severity, baco::findings::Severity::Medium); // Default
     assert!(findings[0].cwe_id.is_none());
     assert!(findings[0].description.contains("test.rule")); // Fallback description
 }

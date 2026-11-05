@@ -1,7 +1,12 @@
 use crate::findings::Severity;
 
-/// Default per-run semgrep timeout (client side) in seconds.
+/// Per-file semgrep timeout in seconds (passed to `--timeout` flag).
 pub const DEFAULT_SEMGREP_TIMEOUT_SECS: u64 = 300;
+
+/// Wall-clock timeout for the entire semgrep run in seconds.
+/// Separate from `DEFAULT_SEMGREP_TIMEOUT_SECS` to avoid aborting
+/// large projects that legitimately need more total time.
+pub const DEFAULT_SEMGREP_WALL_CLOCK_SECS: u64 = 1800;
 
 /// Bundled taint-mode rules for Python (derived from presets/oss-python.toml)
 const TAINT_PYTHON_RULES: &str = include_str!("rules/taint-python.yml");
@@ -31,8 +36,10 @@ const TAINT_CSHARP_RULES: &str = include_str!("rules/taint-csharp.yml");
 pub struct SemgrepRunner {
     pub rulesets: Vec<String>,
     pub exclude_rules: Vec<String>,
-    /// Per-run timeout: passed to semgrep `--timeout` and enforced client-side.
+    /// Per-file timeout: passed to semgrep `--timeout` flag.
     pub timeout_secs: u64,
+    /// Wall-clock timeout for the entire semgrep run (client-side).
+    pub wall_clock_timeout_secs: u64,
     /// Inline rule YAML documents (preset `custom_rules`), materialized to
     /// temp .yml files at scan time.
     pub custom_rules: Vec<String>,
@@ -52,6 +59,7 @@ impl SemgrepRunner {
             rulesets,
             exclude_rules,
             timeout_secs: DEFAULT_SEMGREP_TIMEOUT_SECS,
+            wall_clock_timeout_secs: DEFAULT_SEMGREP_WALL_CLOCK_SECS,
             custom_rules: Vec::new(),
             languages: Vec::new(),
             max_target_bytes: None,
@@ -65,9 +73,15 @@ impl SemgrepRunner {
         self
     }
 
-    /// Builder: set per-run timeout in seconds.
+    /// Builder: set per-file timeout in seconds.
     pub fn with_timeout(mut self, timeout_secs: u64) -> Self {
         self.timeout_secs = timeout_secs;
+        self
+    }
+
+    /// Builder: set wall-clock timeout for the entire semgrep run.
+    pub fn with_wall_clock_timeout(mut self, wall_clock_timeout_secs: u64) -> Self {
+        self.wall_clock_timeout_secs = wall_clock_timeout_secs;
         self
     }
 
@@ -196,22 +210,26 @@ pub struct RawFinding {
     pub message: Option<String>,
 }
 
-/// Map check_id to severity based on keyword matching
-pub fn parse_severity(check_id: &str) -> Severity {
-    // Keyword-based matching (substring), preserve raise-only semantics
+/// Map check_id to severity based on keyword matching.
+/// Returns `None` when no keyword matches, so the parser can distinguish
+/// a real keyword-derived severity (which may upgrade an explicit
+/// `extra.severity`) from an unknown fallback (which must not).
+pub fn parse_severity(check_id: &str) -> Option<Severity> {
     match check_id.to_lowercase().as_str() {
-        s if s.contains("critical") => Severity::Critical,
-        s if s.contains("high") => Severity::High,
-        s if s.contains("medium") => Severity::Medium,
-        s if s.contains("low") => Severity::Low,
-        _ => Severity::Info,
+        s if s.contains("critical") => Some(Severity::Critical),
+        s if s.contains("high") => Some(Severity::High),
+        s if s.contains("medium") => Some(Severity::Medium),
+        s if s.contains("low") => Some(Severity::Low),
+        s if s.contains("info") => Some(Severity::Info),
+        _ => None,
     }
 }
 
 /// Collect rule IDs from a list of YAML documents.
 /// Each document is expected to have a `rules` list with `id` fields.
-/// Returns a BTreeSet of all rule IDs found, or an error naming the document index
-/// and the serde error if any document is invalid YAML.
+/// Returns a BTreeSet of all rule IDs found. Malformed documents are
+/// skipped with a warning instead of aborting the entire collection,
+/// so a single bad rule does not suppress all taint rules.
 pub fn collect_rule_ids(docs: &[String]) -> Result<std::collections::BTreeSet<String>, String> {
     use serde::Deserialize;
 
@@ -228,12 +246,16 @@ pub fn collect_rule_ids(docs: &[String]) -> Result<std::collections::BTreeSet<St
     let mut ids = std::collections::BTreeSet::new();
 
     for (i, doc) in docs.iter().enumerate() {
-        let parsed: RulesDoc = serde_yaml::from_str(doc)
-            .map_err(|e| format!("Invalid YAML at document index {}: {}", i, e))?;
-
-        if let Some(rules) = parsed.rules {
-            for rule in rules {
-                ids.insert(rule.id);
+        match serde_yaml::from_str::<RulesDoc>(doc) {
+            Ok(parsed) => {
+                if let Some(rules) = parsed.rules {
+                    for rule in rules {
+                        ids.insert(rule.id);
+                    }
+                }
+            }
+            Err(e) => {
+                tracing::warn!("Skipping malformed custom rule at index {}: {}", i, e);
             }
         }
     }
@@ -242,9 +264,9 @@ pub fn collect_rule_ids(docs: &[String]) -> Result<std::collections::BTreeSet<St
 }
 
 /// Filter rules from a YAML document, excluding those whose IDs are in the exclude set.
-/// Returns Ok(None) if no rules remain after filtering, Ok(Some(string)) with the
-/// re-serialized document otherwise. On error, returns a string naming the problem.
-/// The exclude set is not silently ignored — it must be valid.
+/// Returns Ok(None) if no rules remain after filtering or the document is malformed,
+/// Ok(Some(string)) with the re-serialized document otherwise. Malformed documents
+/// are skipped with a warning instead of aborting the entire scan.
 pub fn filter_rules_excluding_ids(
     doc: &str,
     exclude: &std::collections::BTreeSet<String>,
@@ -265,8 +287,13 @@ pub fn filter_rules_excluding_ids(
         rest: std::collections::HashMap<String, serde_yaml::Value>,
     }
 
-    let parsed: RulesDoc =
-        serde_yaml::from_str(doc).map_err(|e| format!("Failed to parse YAML document: {}", e))?;
+    let parsed: RulesDoc = match serde_yaml::from_str(doc) {
+        Ok(p) => p,
+        Err(e) => {
+            tracing::warn!("Skipping malformed derived taint rule document: {}", e);
+            return Ok(None);
+        }
+    };
 
     let filtered: Vec<Rule> = parsed
         .rules

@@ -120,7 +120,7 @@ impl SemgrepRunner {
         }
 
         let output = match tokio::time::timeout(
-            std::time::Duration::from_secs(self.timeout_secs),
+            std::time::Duration::from_secs(self.wall_clock_timeout_secs),
             cmd.kill_on_drop(true).output(),
         )
         .await
@@ -132,7 +132,12 @@ impl SemgrepRunner {
                 }
                 return Err(format!("semgrep wait failed: {e}"));
             }
-            Err(_) => return Err(format!("semgrep timed out after {}s", self.timeout_secs)),
+            Err(_) => {
+                return Err(format!(
+                    "semgrep timed out after {}s (wall-clock)",
+                    self.wall_clock_timeout_secs
+                ));
+            }
         };
 
         // Extract stems from temp file paths for normalization
