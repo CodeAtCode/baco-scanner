@@ -195,46 +195,6 @@ fn test_load_with_empty_file_returns_error() {
 }
 
 // ============================================================================
-// FileHashStore::set_last_scan() and get_last_scan() Tests
-// ============================================================================
-
-#[test]
-fn test_last_scan_timestamp_initially_none() {
-    let store = FileHashStore::new();
-
-    assert!(store.get_last_scan().is_none());
-}
-
-#[test]
-fn test_set_last_scan_updates_timestamp() {
-    let mut store = FileHashStore::new();
-
-    store.set_last_scan(1234567890);
-
-    assert_eq!(store.get_last_scan(), Some(1234567890));
-}
-
-#[test]
-fn test_last_scan_can_be_updated() {
-    let mut store = FileHashStore::new();
-
-    store.set_last_scan(1000000000);
-    assert_eq!(store.get_last_scan(), Some(1000000000));
-
-    store.set_last_scan(2000000000);
-    assert_eq!(store.get_last_scan(), Some(2000000000));
-}
-
-#[test]
-fn test_last_scan_with_negative_timestamp() {
-    let mut store = FileHashStore::new();
-
-    store.set_last_scan(-1000);
-
-    assert_eq!(store.get_last_scan(), Some(-1000));
-}
-
-// ============================================================================
 // Edge Cases
 // ============================================================================
 
@@ -318,20 +278,18 @@ fn test_many_files_performance() {
 // ============================================================================
 
 #[test]
-fn test_full_save_load_cycle_with_timestamps() {
+fn test_full_save_load_cycle() {
     let temp_dir = TempDir::new().unwrap();
     let path = temp_dir.path().join("full_cycle.json");
 
     let mut store = FileHashStore::new();
     store.insert_hash(&PathBuf::from("file1.txt"), "hash1".to_string());
-    store.set_last_scan(1234567890);
 
     store.save(path.to_str().unwrap()).unwrap();
 
     let loaded = FileHashStore::load(path.to_str().unwrap()).unwrap();
 
     assert_eq!(loaded.len(), 1);
-    assert_eq!(loaded.get_last_scan(), Some(1234567890));
     assert_eq!(
         loaded.get_hash(&PathBuf::from("file1.txt")),
         Some(&"hash1".to_string())
@@ -366,4 +324,83 @@ fn test_multiple_save_load_cycles() {
         loaded2.get_hash(&PathBuf::from("file2.txt")),
         Some(&"hash2".to_string())
     );
+}
+
+// ============================================================================
+// Atomic Write Tests
+// ============================================================================
+
+#[test]
+fn test_atomic_save_no_temp_file_left_behind() {
+    let temp_dir = TempDir::new().unwrap();
+    let path = temp_dir.path().join("atomic_test.json");
+
+    let store = FileHashStore::new();
+    store.save(path.to_str().unwrap()).unwrap();
+
+    // Verify no .tmp file is left behind
+    let tmp_path = path.with_extension("json.tmp");
+    assert!(
+        !tmp_path.exists(),
+        "Temp file should be removed after successful rename"
+    );
+
+    // Verify the target file exists and can be loaded
+    assert!(path.exists());
+    let loaded = FileHashStore::load(path.to_str().unwrap()).unwrap();
+    assert!(loaded.is_empty());
+}
+
+#[test]
+fn test_atomic_save_preserves_existing_content_on_failure() {
+    let temp_dir = TempDir::new().unwrap();
+    let path = temp_dir.path().join("atomic_preserve.json");
+
+    // Pre-create the file with known content
+    let mut old_store = FileHashStore::new();
+    old_store.insert_hash(&PathBuf::from("old.txt"), "old_hash".to_string());
+    old_store.save(path.to_str().unwrap()).unwrap();
+
+    // Verify old content is there
+    let loaded_old = FileHashStore::load(path.to_str().unwrap()).unwrap();
+    assert_eq!(loaded_old.len(), 1);
+
+    // Save new content atomically
+    let mut new_store = FileHashStore::new();
+    new_store.insert_hash(&PathBuf::from("new.txt"), "new_hash".to_string());
+    new_store.save(path.to_str().unwrap()).unwrap();
+
+    // Verify new content is there (proving rename worked)
+    let loaded_new = FileHashStore::load(path.to_str().unwrap()).unwrap();
+    assert_eq!(loaded_new.len(), 1);
+    assert_eq!(
+        loaded_new.get_hash(&PathBuf::from("new.txt")),
+        Some(&"new_hash".to_string())
+    );
+
+    // Verify no temp file left behind
+    let tmp_path = path.with_extension("json.tmp");
+    assert!(!tmp_path.exists());
+}
+
+#[test]
+fn test_atomic_save_writes_valid_json() {
+    let temp_dir = TempDir::new().unwrap();
+    let path = temp_dir.path().join("valid_json.json");
+
+    let mut store = FileHashStore::new();
+    store.insert_hash(&PathBuf::from("test.txt"), "test_hash".to_string());
+    store.save(path.to_str().unwrap()).unwrap();
+
+    // Read the file content directly
+    let content = std::fs::read_to_string(&path).unwrap();
+
+    // Verify it's valid JSON by parsing with serde_json
+    let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
+
+    // Verify it's not empty
+    assert!(!content.is_empty());
+
+    // Verify it has the expected structure
+    assert!(parsed.is_object());
 }

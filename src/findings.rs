@@ -188,12 +188,13 @@ pub struct VulnerabilityFinding {
     pub diff_hunk: Option<String>,
     pub recommendation: Option<String>,
     pub code_location: Option<String>,
-    pub already_reported: bool,
     pub sources: Vec<String>,
     pub commit_reference: Option<String>,
     pub ticket_reference: Option<String>,
     pub priority_score: Option<f32>,
     pub cross_file_references: Option<Vec<String>>,
+    #[serde(default)]
+    pub related_finding_ids: Option<Vec<String>>,
     #[serde(default)]
     pub verification_status: Option<VerificationStatus>,
     #[serde(default)]

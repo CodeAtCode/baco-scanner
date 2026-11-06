@@ -1,5 +1,9 @@
 use std::collections::HashMap;
 use std::env;
+use std::sync::Mutex;
+
+/// Global lock for env var operations — serializes all set_var/remove_var calls
+static ENV_LOCK: Mutex<()> = Mutex::new(());
 
 fn load_env_api_keys() -> HashMap<String, Option<String>> {
     let mut overrides = HashMap::new();
@@ -107,27 +111,36 @@ fn apply_ticket_env_overrides(config: &mut crate::config::ScannerConfig) {
 /// Guard for environment variables that auto-cleans on drop
 pub struct EnvVarGuard {
     vars: HashMap<String, Option<String>>,
+    /// Holds the lock for the duration of the guard's lifetime
+    _lock: std::sync::MutexGuard<'static, ()>,
 }
 
 impl EnvVarGuard {
     pub fn set(vars: &[(&str, &str)]) -> Self {
+        // Acquire the lock before setting any vars
+        let lock = ENV_LOCK.lock().unwrap();
         let mut previous = HashMap::new();
         for &(key, value) in vars {
             let old_value = std::env::var(key).ok();
             unsafe { std::env::set_var(key, value) };
             previous.insert(key.to_string(), old_value);
         }
-        Self { vars: previous }
+        Self {
+            vars: previous,
+            _lock: lock,
+        }
     }
 }
 
 impl Drop for EnvVarGuard {
     fn drop(&mut self) {
+        // Lock is still held here, so restoration is serialized
         for (key, old_value) in &self.vars {
             match old_value {
                 Some(v) => unsafe { std::env::set_var(key, v) },
                 None => unsafe { std::env::remove_var(key) },
             }
         }
+        // Lock is released when _lock is dropped
     }
 }

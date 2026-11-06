@@ -8,6 +8,7 @@
 //! - Validation logic
 //! - LLM phase configurations
 
+use baco::config::env::EnvVarGuard as ProdEnvVarGuard;
 use baco::config::scanner::ScanPipelineProfile;
 use baco::config::{
     AgentConfig, ConfigError, LlmPhaseConfig, PerformanceSettings, ScannerConfig,
@@ -19,11 +20,11 @@ use std::collections::HashMap;
 use std::error::Error;
 
 /// Test helper for environment variable management
-struct EnvVarGuard {
+struct TestEnvVarGuard {
     vars: HashMap<String, Option<String>>,
 }
 
-impl EnvVarGuard {
+impl TestEnvVarGuard {
     fn new() -> Self {
         Self {
             vars: HashMap::new(),
@@ -43,7 +44,7 @@ impl EnvVarGuard {
     }
 }
 
-impl Drop for EnvVarGuard {
+impl Drop for TestEnvVarGuard {
     fn drop(&mut self) {
         for (key, value) in &self.vars {
             match value {
@@ -394,7 +395,7 @@ fn test_env_overrides() {
     ];
 
     for (name, env_vars, expected_discovery, expected_verification, expected_aggregation) in cases {
-        let mut guard = EnvVarGuard::new();
+        let mut guard = TestEnvVarGuard::new();
         for (key, value) in env_vars {
             guard.set(key, value);
         }
@@ -463,7 +464,7 @@ fn test_env_overrides() {
 #[test]
 #[serial]
 fn test_ticket_env_overrides_github() {
-    let mut guard = EnvVarGuard::new();
+    let mut guard = TestEnvVarGuard::new();
     guard.set("TICKET_GITHUB_KEY", "env-github-token");
 
     let toml_str = r#"
@@ -513,7 +514,7 @@ fn test_ticket_env_overrides_github() {
 #[test]
 #[serial]
 fn test_ticket_env_overrides_gitlab() {
-    let mut guard = EnvVarGuard::new();
+    let mut guard = TestEnvVarGuard::new();
     guard.set("TICKET_GITLAB_KEY", "env-gitlab-token");
 
     let toml_str = r#"
@@ -563,7 +564,7 @@ fn test_ticket_env_overrides_gitlab() {
 #[test]
 #[serial]
 fn test_ticket_env_overrides_explicit_takes_precedence() {
-    let mut guard = EnvVarGuard::new();
+    let mut guard = TestEnvVarGuard::new();
     guard.set("TICKET_GITHUB_KEY", "env-github-token");
 
     let toml_str = r#"
@@ -614,7 +615,7 @@ fn test_ticket_env_overrides_explicit_takes_precedence() {
 #[test]
 #[serial]
 fn test_ticket_env_overrides_no_env_var() {
-    let mut guard = EnvVarGuard::new();
+    let mut guard = TestEnvVarGuard::new();
     guard.clear("TICKET_GITHUB_KEY");
 
     let toml_str = r#"
@@ -661,7 +662,7 @@ fn test_ticket_env_overrides_no_env_var() {
 #[test]
 #[serial]
 fn test_ticket_env_overrides_unknown_system_type() {
-    let mut guard = EnvVarGuard::new();
+    let mut guard = TestEnvVarGuard::new();
     guard.set("TICKET_GITHUB_KEY", "env-github-token");
 
     let toml_str = r#"
@@ -709,7 +710,7 @@ fn test_ticket_env_overrides_unknown_system_type() {
 #[serial]
 fn test_ticket_env_overrides_multiple_systems() {
     // Test multiple ticket systems with different env vars
-    let mut guard = EnvVarGuard::new();
+    let mut guard = TestEnvVarGuard::new();
     guard.set("TICKET_GITHUB_KEY", "github-token");
     guard.set("TICKET_GITLAB_KEY", "gitlab-token");
 
@@ -769,7 +770,7 @@ fn test_ticket_env_overrides_multiple_systems() {
 #[serial]
 fn test_ticket_env_overrides_mixed_explicit_and_env() {
     // One system has explicit key, another relies on env
-    let mut guard = EnvVarGuard::new();
+    let mut guard = TestEnvVarGuard::new();
     guard.set("TICKET_GITLAB_KEY", "env-gitlab-token");
 
     let toml_str = r#"
@@ -831,7 +832,7 @@ fn test_ticket_env_overrides_mixed_explicit_and_env() {
 #[serial]
 fn test_ticket_env_overrides_invalid_system_type_ignored() {
     // Unknown system types should not get env var applied
-    let mut guard = EnvVarGuard::new();
+    let mut guard = TestEnvVarGuard::new();
     guard.set("TICKET_GITHUB_KEY", "github-token");
     guard.set("TICKET_GITLAB_KEY", "gitlab-token");
 
@@ -1060,6 +1061,94 @@ fn test_unknown_nested_key_is_rejected_with_its_name() {
     assert!(
         msg.contains("rulesets"),
         "the error must list the keys the section does accept, got: {msg}"
+    );
+}
+
+#[test]
+fn test_unknown_key_in_prior_runs_is_rejected() {
+    let toml_str = r#"
+        [project]
+        name = "x"
+        path = "/tmp"
+
+        [output]
+        dir = "./out"
+
+        [scanner]
+        max_file_size_kb = 100
+
+        [llm]
+        timeout_secs = 30
+        max_retries = 2
+        retry_backoff_ms = 1000
+
+        [llm.phases.discovery]
+        base_url = "http://test"
+        api_key = "k"
+        model = "test"
+
+        [llm.phases.verification]
+        base_url = "http://test"
+        model = "test"
+
+        [llm.phases.aggregation]
+        base_url = "http://test"
+        model = "test"
+
+        [prior_runs]
+        enabled = true
+        phantom_key = 42
+    "#;
+    let err = toml::from_str::<ScannerConfig>(toml_str)
+        .expect_err("an unknown key in [prior_runs] must be rejected");
+    let msg = format!("{err}");
+    assert!(
+        msg.contains("phantom_key"),
+        "the error must name the offending key, got: {msg}"
+    );
+}
+
+#[test]
+fn test_unknown_key_in_org_context_is_rejected() {
+    let toml_str = r#"
+        [project]
+        name = "x"
+        path = "/tmp"
+
+        [output]
+        dir = "./out"
+
+        [scanner]
+        max_file_size_kb = 100
+
+        [llm]
+        timeout_secs = 30
+        max_retries = 2
+        retry_backoff_ms = 1000
+
+        [llm.phases.discovery]
+        base_url = "http://test"
+        api_key = "k"
+        model = "test"
+
+        [llm.phases.verification]
+        base_url = "http://test"
+        model = "test"
+
+        [llm.phases.aggregation]
+        base_url = "http://test"
+        model = "test"
+
+        [org_context]
+        enabled = true
+        nonexistent_setting = "nope"
+    "#;
+    let err = toml::from_str::<ScannerConfig>(toml_str)
+        .expect_err("an unknown key in [org_context] must be rejected");
+    let msg = format!("{err}");
+    assert!(
+        msg.contains("nonexistent_setting"),
+        "the error must name the offending key, got: {msg}"
     );
 }
 
@@ -1698,7 +1787,7 @@ fn test_config_defaults() {
 #[test]
 #[serial]
 fn test_apply_env_overrides_explicit_wins() {
-    let mut guard = EnvVarGuard::new();
+    let mut guard = TestEnvVarGuard::new();
     guard.set("LLM_DISCOVERY_KEY", "env-discovery-key");
     guard.set("LLM_VERIFICATION_KEY", "env-verification-key");
     guard.set("LLM_AGGREGATION_KEY", "env-aggregation-key");
@@ -1776,7 +1865,7 @@ name = "test"
 path = "${TEST_PROJECT_PATH}"
 "#;
 
-    let mut guard = EnvVarGuard::new();
+    let mut guard = TestEnvVarGuard::new();
     guard.set("TEST_PROJECT_PATH", "/actual/path");
     let expanded = expand_env_vars(content);
 
@@ -1809,7 +1898,7 @@ name = "${PROJECT_NAME}"
 path = "${PROJECT_PATH}"
 "#;
 
-    let mut guard = EnvVarGuard::new();
+    let mut guard = TestEnvVarGuard::new();
     guard.set("PROJECT_NAME", "my-project");
     guard.set("PROJECT_PATH", "/my/path");
     let expanded = expand_env_vars(content);
@@ -1840,7 +1929,7 @@ max_file_size_kb = 1024
 
     fs::write(&config_path, config_content).unwrap();
 
-    let mut guard = EnvVarGuard::new();
+    let mut guard = TestEnvVarGuard::new();
     guard.set("TEST_CONFIG_PATH", tmpdir.path().to_str().unwrap());
 
     let config_result = ScannerConfig::from_file(config_path.to_str().unwrap());
@@ -1885,7 +1974,7 @@ max_file_size_kb = 1024
 #[test]
 #[serial]
 fn test_apply_env_overrides_scan_path() {
-    let mut guard = EnvVarGuard::new();
+    let mut guard = TestEnvVarGuard::new();
     guard.set("LLM_DISCOVERY_KEY", "test-api-key-123");
 
     let toml_str = r#"
@@ -1928,7 +2017,7 @@ fn test_apply_env_overrides_scan_path() {
 fn test_env_overrides_all_six_llm_phases() {
     // Test all six LLM phase keys: discovery, verification, aggregation,
     // static_analysis, security_agent_verification, threat_modeling
-    let mut guard = EnvVarGuard::new();
+    let mut guard = TestEnvVarGuard::new();
     guard.set("LLM_DISCOVERY_KEY", "env-discovery-key");
     guard.set("LLM_VERIFICATION_KEY", "env-verification-key");
     guard.set("LLM_AGGREGATION_KEY", "env-aggregation-key");
@@ -1984,7 +2073,7 @@ fn test_env_overrides_all_six_llm_phases() {
 #[serial]
 fn test_env_overrides_unset_phases_untouched() {
     // When env vars are not set, phases should remain None
-    let mut guard = EnvVarGuard::new();
+    let mut guard = TestEnvVarGuard::new();
     guard.clear("LLM_DISCOVERY_KEY");
     guard.clear("LLM_VERIFICATION_KEY");
     guard.clear("LLM_AGGREGATION_KEY");
@@ -2031,7 +2120,7 @@ fn test_env_overrides_unset_phases_untouched() {
 #[serial]
 fn test_env_overrides_explicit_toml_wins() {
     // When TOML has explicit value, env var should not override
-    let mut guard = EnvVarGuard::new();
+    let mut guard = TestEnvVarGuard::new();
     guard.set("LLM_DISCOVERY_KEY", "env-key");
     guard.set("LLM_VERIFICATION_KEY", "env-key");
     guard.set("LLM_AGGREGATION_KEY", "env-key");
@@ -2113,7 +2202,7 @@ fn test_env_overrides_explicit_toml_wins() {
 #[serial]
 fn test_env_overrides_partial_set() {
     // Only some env vars set - others should remain None
-    let mut guard = EnvVarGuard::new();
+    let mut guard = TestEnvVarGuard::new();
     guard.set("LLM_DISCOVERY_KEY", "env-discovery");
     guard.set("LLM_STATIC_ANALYSIS_KEY", "env-static");
     // Leave others unset
@@ -2146,7 +2235,7 @@ fn test_env_overrides_partial_set() {
 #[test]
 #[serial]
 fn test_env_overrides_new_phases() {
-    let mut guard = EnvVarGuard::new();
+    let mut guard = TestEnvVarGuard::new();
     guard.set("LLM_STATIC_ANALYSIS_KEY", "env-static-analysis-key");
     guard.set(
         "LLM_SECURITY_AGENT_VERIFICATION_KEY",
@@ -2223,7 +2312,7 @@ fn test_env_overrides_new_phases() {
 #[test]
 #[serial]
 fn test_new_phase_toml_takes_precedence() {
-    let mut guard = EnvVarGuard::new();
+    let mut guard = TestEnvVarGuard::new();
     guard.set("LLM_STATIC_ANALYSIS_KEY", "env-static-key");
     guard.set("LLM_SECURITY_AGENT_VERIFICATION_KEY", "env-security-key");
     guard.set("LLM_THREAT_MODELING_KEY", "env-threat-key");
@@ -2588,4 +2677,87 @@ fn test_deserialize_empty_scanner_performance() {
         config.scanner.performance.enable_hunt_prompts,
         "Deserializing empty [scanner.performance] should yield enable_hunt_prompts = true"
     );
+}
+
+// ============================================================================
+// EnvVarGuard Thread Safety Tests
+// ============================================================================
+
+/// Test that EnvVarGuard serializes access across threads.
+/// Two threads creating EnvVarGuard instances with the same key do not race —
+/// the second guard blocks until the first is dropped.
+#[test]
+fn test_env_var_guard_serialized() {
+    use std::sync::{Arc, Barrier};
+    use std::thread;
+
+    let key = "TEST_SERIALIZE_KEY";
+    let value1 = "value_thread_1";
+    let value2 = "value_thread_2";
+
+    // Set initial value
+    let mut test_guard = TestEnvVarGuard::new();
+    test_guard.set(key, "initial_value");
+
+    let barrier = Arc::new(Barrier::new(2));
+    let barrier_clone = barrier.clone();
+
+    // Shared result storage
+    let result1 = Arc::new(std::sync::Mutex::new(None::<String>));
+    let result2 = Arc::new(std::sync::Mutex::new(None::<String>));
+    let result1_clone = result1.clone();
+    let result2_clone = result2.clone();
+
+    // Thread 1: creates guard with value1
+    let handle1 = thread::spawn(move || {
+        let _guard1 = ProdEnvVarGuard::set(&[(key, value1)]);
+        // Wait at barrier to ensure thread 2 tries to acquire lock
+        barrier.wait();
+        // After barrier, thread 2 should have acquired and released its lock
+        let current_value = std::env::var(key).ok();
+        *result1_clone.lock().unwrap() = current_value;
+    });
+
+    // Thread 2: waits a bit, then creates guard with value2
+    thread::sleep(std::time::Duration::from_millis(10));
+    let handle2 = thread::spawn(move || {
+        barrier_clone.wait(); // Wait for thread 1 to be ready
+        let _guard2 = ProdEnvVarGuard::set(&[(key, value2)]);
+        let current_value = std::env::var(key).ok();
+        *result2_clone.lock().unwrap() = current_value;
+    });
+
+    handle1.join().unwrap();
+    handle2.join().unwrap();
+
+    // Both threads should see their own values while holding the guard
+    assert_eq!(*result1.lock().unwrap(), Some(value1.to_string()));
+    assert_eq!(*result2.lock().unwrap(), Some(value2.to_string()));
+
+    // After both guards are dropped, original value should be restored
+    let final_value = std::env::var(key).ok();
+    assert_eq!(final_value, Some("initial_value".to_string()));
+}
+
+/// Test that EnvVarGuard restores the original env var value on drop.
+#[test]
+fn test_env_var_guard_restores_on_drop() {
+    let key = "TEST_RESTORE_KEY";
+
+    // Set initial value
+    let mut test_guard = TestEnvVarGuard::new();
+    test_guard.set(key, "original_value");
+
+    // Create a new guard that changes the value
+    {
+        let _temp_guard = ProdEnvVarGuard::set(&[(key, "temp_value")]);
+        assert_eq!(std::env::var(key).ok(), Some("temp_value".to_string()));
+        // _temp_guard dropped here
+    }
+
+    // After guard is dropped, original value should be restored
+    assert_eq!(std::env::var(key).ok(), Some("original_value".to_string()));
+
+    // Clean up
+    test_guard.clear(key);
 }

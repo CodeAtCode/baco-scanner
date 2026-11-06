@@ -34,14 +34,38 @@ impl JoernEngine {
     }
 }
 
+/// Validate a project path before passing it to joern.
+///
+/// Canonicalizes the path (resolving symlinks and `..`), rejects the filesystem
+/// root (which would let joern scan the entire filesystem), and returns the
+/// canonical path for downstream use.
+pub fn validate_project_path(path: &Path) -> Result<PathBuf, CpgError> {
+    let canonical = path.canonicalize().map_err(|e| {
+        CpgError::BuildFailed(format!("Cannot resolve project path {:?}: {}", path, e))
+    })?;
+
+    // Reject the filesystem root — joern-parse on "/" would scan everything.
+    if canonical.parent().is_none() {
+        return Err(CpgError::BuildFailed(format!(
+            "Project path resolves to the filesystem root, which is not allowed: {:?}",
+            canonical
+        )));
+    }
+
+    Ok(canonical)
+}
+
 impl CpgEngine for JoernEngine {
     fn build(&self, project_path: &Path) -> Result<CpgHandle, CpgError> {
-        // Check if joern is available first
+        // Validate project path first (better UX than checking joern availability first)
+        let canonical_project_path = validate_project_path(project_path)?;
+
+        // Check if joern is available after path validation
         if !self.is_available() {
             return Err(CpgError::JoernNotInstalled);
         }
 
-        let workspace = project_path
+        let workspace = canonical_project_path
             .parent()
             .ok_or_else(|| CpgError::BuildFailed("Project path has no parent".to_string()))?
             .join(".cpg-workspace");
@@ -54,7 +78,7 @@ impl CpgEngine for JoernEngine {
         // Run joern-parse to build the CPG
         let parse_output = Command::new(self.find_joern()?)
             .arg("joern-parse")
-            .arg(project_path)
+            .arg(&canonical_project_path)
             .arg("--output")
             .arg(&cpg_path)
             .output()

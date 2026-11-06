@@ -14,14 +14,19 @@ pub const MAX_TOOL_OUTPUT_BYTES: usize = 8192;
 /// Truncate tool output to prevent context saturation.
 /// Output exceeding `MAX_TOOL_OUTPUT_BYTES` is cut and marked with an
 /// omission notice so the agent knows data was dropped.
+/// The cut point is adjusted to a valid UTF-8 character boundary.
 pub fn truncate_tool_output(output: &str) -> String {
     if output.len() <= MAX_TOOL_OUTPUT_BYTES {
         return output.to_string();
     }
-    let omitted = output.len() - MAX_TOOL_OUTPUT_BYTES;
+    // Find the nearest valid char boundary at or before MAX_TOOL_OUTPUT_BYTES
+    let cut_index = (0..=MAX_TOOL_OUTPUT_BYTES)
+        .rfind(|i| output.is_char_boundary(*i))
+        .expect("string must have at least one valid char boundary");
+    let omitted = output.len() - cut_index;
     format!(
         "{}\n\n[... truncated: {} bytes omitted ...]",
-        &output[..MAX_TOOL_OUTPUT_BYTES],
+        &output[..cut_index],
         omitted
     )
 }
@@ -49,12 +54,12 @@ pub fn create_empty_finding(
             diff_hunk: None,
             recommendation: None,
             code_location: None,
-            already_reported: false,
             sources: vec![],
             commit_reference: None,
             ticket_reference: None,
             priority_score: None,
             cross_file_references: None,
+            related_finding_ids: None,
             verification_status: None,
             verification_notes: None,
             verification_error: None,
@@ -101,12 +106,12 @@ pub fn create_audit_finding(
             diff_hunk: None,
             recommendation: None,
             code_location: None,
-            already_reported: false,
             sources: vec![],
             commit_reference: None,
             ticket_reference: None,
             priority_score: None,
             cross_file_references: None,
+            related_finding_ids: None,
             verification_status: None,
             verification_notes: None,
             verification_error: None,

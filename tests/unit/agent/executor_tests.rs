@@ -9,10 +9,12 @@
 //! - Path capture for test/compile artifacts
 //! - Message flow validation
 //! - Progress callback behavior
+//! - UTF-8 boundary handling in truncate_tool_output
 
 use baco::agent::ToolCall;
 use baco::agent::executor::{
-    ProgressCallback, create_audit_finding, create_empty_finding, execute_tool_calls,
+    MAX_TOOL_OUTPUT_BYTES, ProgressCallback, create_audit_finding, create_empty_finding,
+    execute_tool_calls, truncate_tool_output,
 };
 use baco::agent::sandbox::ToolSandbox;
 use baco::agent::tool_schema::ToolRegistry;
@@ -451,4 +453,54 @@ fn test_create_audit_finding_all_defaults() {
     assert_eq!(finding.finding.confidence_score, 0.7);
     assert_eq!(finding.agent_turns, 0);
     assert!(finding.finding.llm_model.is_none());
+}
+
+#[test]
+fn test_truncate_tool_output_utf8_boundary() {
+    // Create a string with 8191 ASCII bytes followed by a 4-byte emoji (🎉)
+    // Then more content. Byte 8192 would fall in the middle of the emoji.
+    let prefix = "x".repeat(MAX_TOOL_OUTPUT_BYTES - 1); // 8191 bytes
+    let emoji = "🎉"; // 4-byte UTF-8 character
+    let suffix = " more content after emoji";
+
+    let input = format!("{}{}{}", prefix, emoji, suffix);
+
+    // This should NOT panic even though byte 8192 is mid-emoji
+    let result = truncate_tool_output(&input);
+
+    // Verify the result does not panic and is valid UTF-8
+    assert!(!result.is_empty());
+
+    // Verify the result ends at a valid char boundary
+    // The truncated part should not include the emoji
+    assert!(!result.contains(emoji));
+
+    // Verify the truncation marker is present
+    assert!(result.contains("[... truncated:"));
+
+    // Verify the omitted count is correct (emoji + suffix bytes + any dropped prefix bytes)
+    assert!(result.contains(&format!(
+        "[... truncated: {} bytes omitted ...]",
+        emoji.len() + suffix.len()
+    )));
+
+    // Verify the result is valid UTF-8 by checking it can be processed
+    assert!(result.is_char_boundary(result.len()));
+}
+
+#[test]
+fn test_truncate_tool_output_exact_boundary() {
+    // String exactly at the limit should not be truncated
+    let input = "x".repeat(MAX_TOOL_OUTPUT_BYTES);
+    let result = truncate_tool_output(&input);
+    assert_eq!(result, input);
+    assert!(!result.contains("[... truncated"));
+}
+
+#[test]
+fn test_truncate_tool_output_under_limit() {
+    // String under the limit should not be truncated
+    let input = "hello world";
+    let result = truncate_tool_output(input);
+    assert_eq!(result, input);
 }

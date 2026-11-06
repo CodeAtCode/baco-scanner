@@ -1,9 +1,10 @@
 //! Unit tests for `baco::cli::scan` helper functions.
 
 use baco::checkpoint::ScanPhase;
-use baco::cli::scan::{format_phase, print_scan_summary, run_dry_run};
+use baco::cli::scan::{checkpoint_path_to_str, format_phase, print_scan_summary, run_dry_run};
 use baco::config::ScannerConfig;
 use baco::findings::{Severity, VulnerabilityFinding};
+use std::path::PathBuf;
 use tempfile::TempDir;
 
 /// Test `format_phase` with various ScanPhase variants.
@@ -124,4 +125,29 @@ fn test_run_dry_run() {
     let result = run_dry_run(&config, target_path, true);
 
     assert!(result.is_ok(), "run_dry_run should succeed");
+}
+
+/// Test `checkpoint_path_to_str` with valid UTF-8 path.
+#[test]
+fn test_checkpoint_path_to_str_valid() {
+    let path = PathBuf::from("/tmp/checkpoint.json");
+    let result = checkpoint_path_to_str(&path);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "/tmp/checkpoint.json");
+}
+
+/// Test `checkpoint_path_to_str` with non-UTF8 path (Unix only).
+#[test]
+#[cfg(unix)]
+fn test_checkpoint_path_to_str_invalid_utf8() {
+    use std::ffi::OsString;
+    use std::os::unix::ffi::OsStringExt;
+
+    // Create a non-UTF8 path using raw bytes
+    let non_utf8_path = PathBuf::from(OsString::from_vec(vec![0xFF, 0xFE]));
+    let result = checkpoint_path_to_str(&non_utf8_path);
+
+    assert!(result.is_err(), "Should return Err for non-UTF8 path");
+    let err_msg = result.unwrap_err();
+    assert!(err_msg.contains("checkpoint path is not valid UTF-8"));
 }

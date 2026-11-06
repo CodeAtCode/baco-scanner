@@ -33,12 +33,12 @@ fn make_finding(
         diff_hunk: None,
         recommendation: Some("Apply input validation and parameterized queries.".to_string()),
         code_location: None,
-        already_reported: false,
         sources: vec!["semgrep".to_string()],
         commit_reference: None,
         ticket_reference: None,
         priority_score: None,
         cross_file_references: None,
+        related_finding_ids: None,
         verification_status: None,
         verification_notes: None,
         verification_error: None,
@@ -560,17 +560,6 @@ fn test_sources_display() {
     let report = generate_markdown_report(&findings, "test");
 
     assert!(report.contains("**Sources:** semgrep, llm"));
-}
-
-#[test]
-fn test_already_reported_status() {
-    let mut finding = make_finding("1", "Test", "src/app.rs", Some(1), Severity::High);
-    finding.already_reported = true;
-
-    let findings = vec![finding];
-    let report = generate_markdown_report(&findings, "test");
-
-    assert!(report.contains("**Status:** Already reported in existing tracker"));
 }
 
 #[test]

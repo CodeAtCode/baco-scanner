@@ -8,9 +8,9 @@
 //! - AI aggregation deduplication
 //! - AI aggregation enrichment
 
-use baco::findings::{Severity, VulnerabilityFinding};
+use baco::findings::{Severity, VerificationStatus, VulnerabilityFinding};
 use baco::llm::LlmConfig;
-use baco::report::ai_aggregation::deduplication::DeduplicationService;
+use baco::report::ai_aggregation::deduplication::{DeduplicationService, dedup_merge_comparator};
 use baco::report::ai_aggregation::enrichment::EnrichmentService;
 use baco::report::ai_aggregation::models::*;
 use baco::report::ai_aggregation::{AiAggregationPhase, conflict_resolver::ConflictResolver};
@@ -209,7 +209,8 @@ fn test_resolve_severity_conflict_selects_highest() {
     let finding3 = make_finding("f3", Severity::High, "src/test.rs", Some(10));
 
     let findings = vec![&finding1, &finding2, &finding3];
-    let conflict = ConflictResolver::resolve_severity_conflict("src/test.rs:10", &findings);
+    let conflict = ConflictResolver::resolve_severity_conflict("src/test.rs:10", &findings)
+        .expect("non-empty findings should resolve successfully");
 
     assert_eq!(conflict.conflict_type, ConflictType::SeverityMismatch);
     assert_eq!(conflict.resolution, ConflictResolution::HighestSeverity);
@@ -217,12 +218,20 @@ fn test_resolve_severity_conflict_selects_highest() {
 }
 
 #[test]
-fn test_resolve_severity_conflict_empty() {
+fn test_resolve_severity_conflict_empty_returns_error() {
     let findings: Vec<&VulnerabilityFinding> = vec![];
-    let conflict = ConflictResolver::resolve_severity_conflict("src/test.rs:10", &findings);
+    let result = ConflictResolver::resolve_severity_conflict("src/test.rs:10", &findings);
 
-    assert_eq!(conflict.conflict_type, ConflictType::SeverityMismatch);
-    assert!(conflict.findings.is_empty());
+    assert!(
+        result.is_err(),
+        "Empty findings should return error, not panic"
+    );
+    let err = result.unwrap_err();
+    assert!(
+        err.to_string().contains("empty findings"),
+        "Error should mention empty findings: {}",
+        err
+    );
 }
 
 #[test]
@@ -295,6 +304,64 @@ fn test_resolve_confidence_conflict() {
     assert_eq!(conflict.conflict_type, ConflictType::ConfidenceConflict);
     assert_eq!(conflict.resolution, ConflictResolution::HighestConfidence);
     assert!(conflict.resolution_reason.contains("0.60"));
+}
+
+#[test]
+fn test_dedup_false_positive_never_beats_needs_review() {
+    // NeedsReview (rank 2, same as None) with Low severity vs FalsePositive (rank 1) with Critical severity
+    // The NeedsReview finding must win because FalsePositive has the lowest rank
+    let finding_needs_review = VulnerabilityFinding {
+        verification_status: Some(VerificationStatus::NeedsReview),
+        severity: Severity::Low,
+        confidence_score: 0.5,
+        ..make_finding("f1", Severity::Low, "src/test.rs", Some(10))
+    };
+
+    let finding_fp = VulnerabilityFinding {
+        verification_status: Some(VerificationStatus::FalsePositive),
+        severity: Severity::Critical,
+        confidence_score: 0.95,
+        ..make_finding("f2", Severity::Critical, "src/test.rs", Some(10))
+    };
+
+    // max_by returns Greater if first arg is the maximum
+    let result = dedup_merge_comparator(&finding_needs_review, &finding_fp);
+
+    // NeedsReview (rank 2) should win over FalsePositive (rank 1)
+    assert_eq!(
+        result,
+        std::cmp::Ordering::Greater,
+        "NeedsReview must beat FalsePositive regardless of severity"
+    );
+}
+
+#[test]
+fn test_dedup_false_positive_never_beats_none_status() {
+    // None status (rank 2) with Low severity vs FalsePositive (rank 1) with Critical severity
+    // The None-status finding must win because FalsePositive has the lowest rank
+    let finding_none_status = VulnerabilityFinding {
+        verification_status: None,
+        severity: Severity::Low,
+        confidence_score: 0.5,
+        ..make_finding("f1", Severity::Low, "src/test.rs", Some(10))
+    };
+
+    let finding_fp = VulnerabilityFinding {
+        verification_status: Some(VerificationStatus::FalsePositive),
+        severity: Severity::Critical,
+        confidence_score: 0.95,
+        ..make_finding("f2", Severity::Critical, "src/test.rs", Some(10))
+    };
+
+    // max_by returns Greater if first arg is the maximum
+    let result = dedup_merge_comparator(&finding_none_status, &finding_fp);
+
+    // None (rank 2) should win over FalsePositive (rank 1)
+    assert_eq!(
+        result,
+        std::cmp::Ordering::Greater,
+        "None-status must beat FalsePositive regardless of severity"
+    );
 }
 
 #[test]

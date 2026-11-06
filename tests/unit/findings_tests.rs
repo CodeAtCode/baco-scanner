@@ -71,12 +71,12 @@ fn test_json_roundtrip_inline_migrated() {
         diff_hunk: None,
         recommendation: Some("Sanitize input".to_string()),
         code_location: Some("test.c:42".to_string()),
-        already_reported: false,
         sources: vec!["semgrep".to_string()],
         commit_reference: None,
         ticket_reference: None,
         priority_score: Some(0.9),
         cross_file_references: None,
+        related_finding_ids: None,
         verification_status: None,
         verification_notes: None,
         verification_error: None,
@@ -762,12 +762,12 @@ fn test_vulnerability_finding_construction() {
         diff_hunk: None,
         recommendation: None,
         code_location: None,
-        already_reported: false,
         sources: vec![],
         commit_reference: None,
         ticket_reference: None,
         priority_score: None,
         cross_file_references: None,
+        related_finding_ids: None,
         verification_status: None,
         verification_notes: None,
         verification_error: None,
@@ -789,7 +789,6 @@ fn test_vulnerability_finding_construction() {
     assert!(finding.title.is_empty());
     assert!(finding.description.is_empty());
     assert!(finding.file_path.is_empty());
-    assert!(!finding.already_reported);
     assert!(finding.sources.is_empty());
 }
 
@@ -851,12 +850,12 @@ fn test_vulnerability_finding_serialize() {
         diff_hunk: None,
         recommendation: Some("Sanitize user input".to_string()),
         code_location: Some("src/handler.rs:42".to_string()),
-        already_reported: false,
         sources: vec!["semgrep".to_string(), "custom-rule".to_string()],
         commit_reference: None,
         ticket_reference: None,
         priority_score: Some(0.9),
         cross_file_references: None,
+        related_finding_ids: None,
         verification_status: None,
         verification_notes: None,
         verification_error: None,
@@ -896,7 +895,6 @@ fn test_vulnerability_finding_deserialize() {
         "diff_hunk": null,
         "recommendation": "Use prepared statements",
         "code_location": "src/db.rs:100",
-        "already_reported": true,
         "sources": ["sqlmap"],
         "commit_reference": null,
         "ticket_reference": null,
@@ -924,7 +922,6 @@ fn test_vulnerability_finding_deserialize() {
     assert_eq!(finding.cwe_id, Some("CWE-89".to_string()));
     assert_eq!(finding.file_path, "src/db.rs");
     assert_eq!(finding.line_number, Some(100));
-    assert!(finding.already_reported);
     assert_eq!(finding.sources, vec!["sqlmap".to_string()]);
 }
 
@@ -943,12 +940,12 @@ fn test_vulnerability_finding_roundtrip() {
         diff_hunk: Some("@@ -10 +10 @@\n-unsafe\n+safe".to_string()),
         recommendation: Some("Refactor to safe API".to_string()),
         code_location: Some("src/test.rs:10".to_string()),
-        already_reported: false,
         sources: vec!["test-scanner".to_string()],
         commit_reference: Some("abc123".to_string()),
         ticket_reference: Some("SEC-123".to_string()),
         priority_score: Some(0.6),
         cross_file_references: Some(vec!["ref1".to_string(), "ref2".to_string()]),
+        related_finding_ids: None,
         verification_status: Some(VerificationStatus::NeedsReview),
         verification_notes: Some("Needs manual review".to_string()),
         verification_error: None,
@@ -994,12 +991,12 @@ fn test_vulnerability_finding_field_access() {
         diff_hunk: None,
         recommendation: None,
         code_location: None,
-        already_reported: true,
         sources: vec![],
         commit_reference: None,
         ticket_reference: None,
         priority_score: None,
         cross_file_references: None,
+        related_finding_ids: None,
         verification_status: Some(VerificationStatus::Confirmed),
         verification_notes: None,
         verification_error: None,
@@ -1019,9 +1016,53 @@ fn test_vulnerability_finding_field_access() {
 
     assert_eq!(finding.id, "access-test");
     assert_eq!(finding.severity, Severity::Low);
-    assert!(finding.already_reported);
     assert_eq!(
         finding.verification_status,
         Some(VerificationStatus::Confirmed)
     );
+}
+
+#[test]
+fn test_vulnerability_finding_without_already_reported_field() {
+    // Regression test: verify that the already_reported field has been removed
+    // This test will fail if the field is reintroduced
+    let finding = VulnerabilityFinding {
+        id: "regression-test".to_string(),
+        title: "Test Finding".to_string(),
+        description: "Test description".to_string(),
+        severity: Severity::High,
+        confidence_score: 0.9,
+        cwe_id: Some("CWE-79".to_string()),
+        file_path: "src/test.rs".to_string(),
+        line_number: Some(42),
+        code_snippet: Some("unsafe_code()".to_string()),
+        diff_hunk: None,
+        recommendation: Some("Fix this".to_string()),
+        code_location: Some("src/test.rs:42".to_string()),
+        sources: vec!["test".to_string()],
+        commit_reference: None,
+        ticket_reference: None,
+        priority_score: None,
+        cross_file_references: None,
+        related_finding_ids: None,
+        verification_status: None,
+        verification_notes: None,
+        verification_error: None,
+        agent_evidence_path: None,
+        security_issue: None,
+        poc_code: None,
+        mitigation_code: None,
+        poc_format: None,
+        llm_model: None,
+        agent_mode: false,
+        statement_range: None,
+        triage_verdict: None,
+        evidence: vec![],
+        verification_tier: None,
+        verification_gate_answers: None,
+    };
+
+    assert_eq!(finding.id, "regression-test");
+    assert_eq!(finding.sources, vec!["test".to_string()]);
+    assert!(finding.code_location.is_some());
 }

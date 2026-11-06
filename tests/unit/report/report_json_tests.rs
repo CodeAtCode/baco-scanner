@@ -18,12 +18,12 @@ fn make_finding(severity: Severity, file: &str, line: Option<u32>) -> Vulnerabil
         diff_hunk: None,
         recommendation: None,
         code_location: None,
-        already_reported: false,
         sources: vec!["test".to_string()],
         commit_reference: None,
         ticket_reference: None,
         priority_score: None,
         cross_file_references: None,
+        related_finding_ids: None,
         verification_status: None,
         verification_notes: None,
         verification_error: None,
@@ -353,28 +353,6 @@ fn test_write_findings_json_with_recommendation() {
 
     let content = fs::read_to_string(output_path).unwrap();
     assert!(content.contains("Use parameterized queries"));
-
-    let _ = fs::remove_file(output_path);
-}
-
-#[test]
-fn test_write_findings_json_with_already_reported() {
-    let mut finding = make_finding(Severity::Low, "src/test.rs", Some(10));
-    finding.already_reported = true;
-    let findings = vec![finding];
-    let output_path = "/tmp/test_reported.json";
-
-    let _ = fs::remove_file(output_path);
-
-    let result = write_findings_json(&findings, &[], output_path, None, None, None, None);
-
-    assert!(result.is_ok());
-
-    let content = fs::read_to_string(output_path).unwrap();
-    let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
-    let findings_array = parsed.as_array().unwrap();
-
-    assert!(findings_array[0]["already_reported"].as_bool().unwrap());
 
     let _ = fs::remove_file(output_path);
 }

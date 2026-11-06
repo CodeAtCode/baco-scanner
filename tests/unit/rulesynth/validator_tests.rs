@@ -241,3 +241,115 @@ fn test_validate_rule_handles_many_rules_without_hanging() {
         );
     }
 }
+
+#[test]
+fn test_validate_rule_rejects_invalid_yaml() {
+    // YAML that is not parseable should return YamlError, not SemgrepError
+    // Use actual invalid YAML syntax (not just semantically invalid for semgrep)
+    let _invalid_yaml = r#"rules:
+  - id: test
+    patterns:
+      - pattern: $X
+  - id: broken
+    message: test
+    # Invalid: mixing tabs and spaces or incorrect indentation
+"#;
+    // This YAML is actually valid syntax, so it will pass pre-validation
+    // and fail at semgrep validation. Let's use truly invalid YAML:
+    let truly_invalid_yaml = "rules:\n  - id: test\n    patterns:\n      - pattern: $X\n  - id: broken\n    message: test\n    invalid: [unclosed";
+    let result = validate_rule(truly_invalid_yaml);
+    match result {
+        Err(RuleError::YamlError(msg)) => {
+            assert!(
+                msg.to_lowercase().contains("invalid") || msg.to_lowercase().contains("error"),
+                "YamlError should contain descriptive message, got: {}",
+                msg
+            );
+        }
+        other => panic!("Expected YamlError for invalid YAML, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_validate_rule_rejects_missing_rules_key() {
+    // YAML without a top-level 'rules' key should return YamlError
+    let no_rules_key = r#"id: test-rule
+pattern: $X
+message: Test
+languages:
+  - python
+severity: WARNING
+"#;
+    let result = validate_rule(no_rules_key);
+    match result {
+        Err(RuleError::YamlError(msg)) => {
+            assert!(
+                msg.contains("rules"),
+                "YamlError should mention missing 'rules' key, got: {}",
+                msg
+            );
+        }
+        other => panic!("Expected YamlError for missing rules key, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_validate_rule_accepts_valid_structure() {
+    // Minimal valid semgrep rule structure should pass pre-validation
+    // (it may still fail at semgrep if semgrep is not installed or rule is semantically invalid)
+    let valid_structure = r#"rules:
+  - id: test-rule
+    languages:
+      - python
+    message: Test message
+    severity: WARNING
+    patterns:
+      - pattern: print($X)
+"#;
+    let result = validate_rule(valid_structure);
+    match result {
+        Ok(()) => {
+            // Valid structure passed both pre-validation and semgrep
+        }
+        Err(RuleError::SemgrepNotFound) => {
+            // semgrep not installed - pre-validation passed
+        }
+        Err(RuleError::SemgrepError(_)) => {
+            // semgrep ran but rejected the rule - pre-validation passed
+        }
+        Err(RuleError::YamlError(msg)) => {
+            panic!(
+                "Valid structure should pass pre-validation, got YamlError: {}",
+                msg
+            );
+        }
+        Err(other) => panic!("Unexpected error for valid structure: {:?}", other),
+    }
+}
+
+#[test]
+fn test_validate_rule_rejects_type_tags() {
+    // YAML with explicit type tags (!! ) should be rejected for security
+    // Note: serde_yaml accepts !!str but creates a Tagged value which we catch
+    // Use a more dangerous tag that serde_yaml will parse as Tagged
+    let with_type_tag = r#"rules:
+  - id: test
+    message: !custom_tag "Test message"
+    languages:
+      - python
+    severity: WARNING
+    patterns:
+      - pattern: print($X)
+"#;
+    let result = validate_rule(with_type_tag);
+    match result {
+        Err(RuleError::YamlError(msg)) => {
+            assert!(
+                msg.to_lowercase().contains("tag") || msg.to_lowercase().contains("dangerous"),
+                "YamlError should mention type tag danger, got: {}",
+                msg
+            );
+        }
+        other => panic!("Expected YamlError for type tags, got {:?}", other),
+    }
+}

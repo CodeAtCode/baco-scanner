@@ -439,7 +439,7 @@ impl Default for CitationVerificationConfig {
 /// Prior-runs store: cross-run findings history used for skip directives
 /// and coverage gap targeting on subsequent scans.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct PriorRunsConfig {
     pub enabled: bool,
     #[serde(default = "default_prior_runs_max")]
@@ -492,7 +492,7 @@ pub fn default_max_file_size_kb() -> u64 {
 /// Org-context profile: prompt calibration from organizational policy.
 /// (Argus technique #5 + symlink containment #6 filesystem half)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct OrgContextConfig {
     pub enabled: bool,
     #[serde(default)]

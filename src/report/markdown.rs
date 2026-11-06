@@ -246,10 +246,5 @@ fn render_finding(finding: &VulnerabilityFinding) -> String {
         md.push_str(&format!("**Sources:** {}\n\n", finding.sources.join(", ")));
     }
 
-    // Already reported status
-    if finding.already_reported {
-        md.push_str("**Status:** Already reported in existing tracker\n\n");
-    }
-
     md
 }

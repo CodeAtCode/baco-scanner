@@ -553,7 +553,6 @@ fn test_file_hash_store_new() {
     let store = FileHashStore::new();
     assert!(store.is_empty());
     assert_eq!(store.len(), 0);
-    assert!(store.get_last_scan().is_none());
 }
 
 #[test]
@@ -588,17 +587,6 @@ fn test_file_hash_store_update_existing_hash() {
 }
 
 #[test]
-fn test_file_hash_store_set_and_get_last_scan() {
-    let mut store = FileHashStore::new();
-
-    assert!(store.get_last_scan().is_none());
-
-    store.set_last_scan(1234567890);
-
-    assert_eq!(store.get_last_scan(), Some(1234567890));
-}
-
-#[test]
 fn test_file_hash_store_save_and_load() {
     let temp_file = tempfile::NamedTempFile::new().unwrap();
     let temp_path = temp_file.path().to_str().unwrap();
@@ -606,7 +594,6 @@ fn test_file_hash_store_save_and_load() {
     let mut store = FileHashStore::new();
     store.insert_hash(&PathBuf::from("file1.rs"), "hash1".to_string());
     store.insert_hash(&PathBuf::from("file2.rs"), "hash2".to_string());
-    store.set_last_scan(9876543210);
 
     store.save(temp_path).unwrap();
 
@@ -621,7 +608,6 @@ fn test_file_hash_store_save_and_load() {
         loaded.get_hash(&PathBuf::from("file2.rs")),
         Some(&"hash2".to_string())
     );
-    assert_eq!(loaded.get_last_scan(), Some(9876543210));
 }
 
 #[test]

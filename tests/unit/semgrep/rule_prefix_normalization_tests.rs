@@ -183,7 +183,7 @@ fn test_parse_mixed_prefixed_and_unprefixed() {
 // ============================================================================
 
 #[test]
-fn test_aggregation_prefixed_ids_normalize() {
+fn test_prefixed_ids_normalize_per_location() {
     let mock_json = r#"{
         "results": [
             {
@@ -215,11 +215,22 @@ fn test_aggregation_prefixed_ids_normalize() {
     )
     .unwrap();
 
-    // Multiple findings with same check_id should aggregate
-    assert_eq!(findings.len(), 1);
-    // Title should be normalized
-    assert_eq!(findings[0].title, "cpp-buffer-overflow-high");
-    assert_eq!(findings[0].cwe_id, Some("CWE-119".to_string()));
+    // Three separate findings (not aggregated)
+    assert_eq!(findings.len(), 3);
+
+    // Sort by file_path for deterministic ordering
+    let mut sorted = findings.clone();
+    sorted.sort_by(|a, b| a.file_path.cmp(&b.file_path));
+
+    // All findings have normalized title
+    assert_eq!(sorted[0].title, "cpp-buffer-overflow-high");
+    assert_eq!(sorted[1].title, "cpp-buffer-overflow-high");
+    assert_eq!(sorted[2].title, "cpp-buffer-overflow-high");
+
+    // All findings have the same CWE
+    assert_eq!(sorted[0].cwe_id, Some("CWE-119".to_string()));
+    assert_eq!(sorted[1].cwe_id, Some("CWE-119".to_string()));
+    assert_eq!(sorted[2].cwe_id, Some("CWE-119".to_string()));
 }
 
 // ============================================================================

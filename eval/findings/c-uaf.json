@@ -12,7 +12,6 @@
     "diff_hunk": null,
     "recommendation": "Read the value before free and set the pointer to NULL immediately after",
     "code_location": null,
-    "already_reported": false,
     "sources": ["semgrep"],
     "commit_reference": null,
     "ticket_reference": null,

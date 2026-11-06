@@ -139,10 +139,6 @@ pub fn generate_html_report(
         .iter()
         .filter(|f| f.verification_status.is_some())
         .count();
-    let already_reported = filtered_findings
-        .iter()
-        .filter(|f| f.already_reported)
-        .count();
 
     let empty_state = if total_findings == 0 {
         build_empty_state_message()
@@ -337,7 +333,6 @@ pub fn generate_html_report(
                 models_html => models_html,
                 avg_confidence => format!("{:.1}", avg_confidence * 100.0),
                 verified => verified,
-                already_reported => already_reported,
                 unique_files => unique_files,
                 summary_cards_html => summary_cards_html,
                 empty_state => empty_state,

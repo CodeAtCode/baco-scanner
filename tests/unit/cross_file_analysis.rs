@@ -34,12 +34,12 @@ fn test_analyze_with_findings() {
         diff_hunk: None,
         recommendation: None,
         code_location: None,
-        already_reported: false,
         sources: vec!["semgrep".to_string()],
         commit_reference: None,
         ticket_reference: None,
         priority_score: None,
         cross_file_references: Some(vec!["src/utils.c".to_string()]),
+        related_finding_ids: None,
         verification_status: None,
         verification_notes: None,
         verification_error: None,
@@ -81,12 +81,12 @@ fn test_multi_file_findings_same_cwe() {
             diff_hunk: None,
             recommendation: None,
             code_location: None,
-            already_reported: false,
             sources: vec!["semgrep".to_string()],
             commit_reference: None,
             ticket_reference: None,
             priority_score: None,
             cross_file_references: None,
+            related_finding_ids: None,
             verification_status: None,
             verification_notes: None,
             verification_error: None,
@@ -116,12 +116,12 @@ fn test_multi_file_findings_same_cwe() {
             diff_hunk: None,
             recommendation: None,
             code_location: None,
-            already_reported: false,
             sources: vec!["semgrep".to_string()],
             commit_reference: None,
             ticket_reference: None,
             priority_score: None,
             cross_file_references: None,
+            related_finding_ids: None,
             verification_status: None,
             verification_notes: None,
             verification_error: None,
@@ -145,13 +145,13 @@ fn test_multi_file_findings_same_cwe() {
     assert_eq!(result.len(), 2);
 
     let auth_finding = result.iter().find(|f| f.id == "find1").unwrap();
-    assert!(auth_finding.cross_file_references.is_some());
-    let refs = auth_finding.cross_file_references.as_ref().unwrap();
+    assert!(auth_finding.related_finding_ids.is_some());
+    let refs = auth_finding.related_finding_ids.as_ref().unwrap();
     assert!(refs.contains(&"find2".to_string()));
 
     let query_finding = result.iter().find(|f| f.id == "find2").unwrap();
-    assert!(query_finding.cross_file_references.is_some());
-    let refs = query_finding.cross_file_references.as_ref().unwrap();
+    assert!(query_finding.related_finding_ids.is_some());
+    let refs = query_finding.related_finding_ids.as_ref().unwrap();
     assert!(refs.contains(&"find1".to_string()));
 }
 
@@ -175,12 +175,12 @@ fn test_cross_file_taint_tracking_same_severity_source() {
             diff_hunk: None,
             recommendation: None,
             code_location: None,
-            already_reported: false,
             sources: vec!["user_input".to_string(), "request_body".to_string()],
             commit_reference: None,
             ticket_reference: None,
             priority_score: None,
             cross_file_references: None,
+            related_finding_ids: None,
             verification_status: None,
             verification_notes: None,
             verification_error: None,
@@ -210,12 +210,12 @@ fn test_cross_file_taint_tracking_same_severity_source() {
             diff_hunk: None,
             recommendation: None,
             code_location: None,
-            already_reported: false,
             sources: vec!["user_input".to_string(), "db_write".to_string()],
             commit_reference: None,
             ticket_reference: None,
             priority_score: None,
             cross_file_references: None,
+            related_finding_ids: None,
             verification_status: None,
             verification_notes: None,
             verification_error: None,
@@ -239,13 +239,13 @@ fn test_cross_file_taint_tracking_same_severity_source() {
     assert_eq!(result.len(), 2);
 
     let source_finding = result.iter().find(|f| f.id == "source1").unwrap();
-    assert!(source_finding.cross_file_references.is_some());
-    let refs = source_finding.cross_file_references.as_ref().unwrap();
+    assert!(source_finding.related_finding_ids.is_some());
+    let refs = source_finding.related_finding_ids.as_ref().unwrap();
     assert!(refs.contains(&"sink1".to_string()));
 
     let sink_finding = result.iter().find(|f| f.id == "sink1").unwrap();
-    assert!(sink_finding.cross_file_references.is_some());
-    let refs = sink_finding.cross_file_references.as_ref().unwrap();
+    assert!(sink_finding.related_finding_ids.is_some());
+    let refs = sink_finding.related_finding_ids.as_ref().unwrap();
     assert!(refs.contains(&"source1".to_string()));
 }
 
@@ -282,12 +282,12 @@ fn test_single_file_no_cross_reference() {
             diff_hunk: None,
             recommendation: None,
             code_location: None,
-            already_reported: false,
             sources: vec!["semgrep".to_string()],
             commit_reference: None,
             ticket_reference: None,
             priority_score: None,
             cross_file_references: None,
+            related_finding_ids: None,
             verification_status: None,
             verification_notes: None,
             verification_error: None,
@@ -317,12 +317,12 @@ fn test_single_file_no_cross_reference() {
             diff_hunk: None,
             recommendation: None,
             code_location: None,
-            already_reported: false,
             sources: vec!["semgrep".to_string()],
             commit_reference: None,
             ticket_reference: None,
             priority_score: None,
             cross_file_references: None,
+            related_finding_ids: None,
             verification_status: None,
             verification_notes: None,
             verification_error: None,
@@ -347,8 +347,8 @@ fn test_single_file_no_cross_reference() {
 
     for finding in &result {
         assert!(
-            finding.cross_file_references.is_none(),
-            "Same-file findings should not have cross_file_references"
+            finding.related_finding_ids.is_none(),
+            "Same-file findings should not have related_finding_ids"
         );
     }
 }
@@ -373,12 +373,12 @@ fn test_mixed_same_and_different_cwe() {
             diff_hunk: None,
             recommendation: None,
             code_location: None,
-            already_reported: false,
             sources: vec!["semgrep".to_string()],
             commit_reference: None,
             ticket_reference: None,
             priority_score: None,
             cross_file_references: None,
+            related_finding_ids: None,
             verification_status: None,
             verification_notes: None,
             verification_error: None,
@@ -408,12 +408,12 @@ fn test_mixed_same_and_different_cwe() {
             diff_hunk: None,
             recommendation: None,
             code_location: None,
-            already_reported: false,
             sources: vec!["semgrep".to_string()],
             commit_reference: None,
             ticket_reference: None,
             priority_score: None,
             cross_file_references: None,
+            related_finding_ids: None,
             verification_status: None,
             verification_notes: None,
             verification_error: None,
@@ -443,12 +443,12 @@ fn test_mixed_same_and_different_cwe() {
             diff_hunk: None,
             recommendation: None,
             code_location: None,
-            already_reported: false,
             sources: vec!["semgrep".to_string()],
             commit_reference: None,
             ticket_reference: None,
             priority_score: None,
             cross_file_references: None,
+            related_finding_ids: None,
             verification_status: None,
             verification_notes: None,
             verification_error: None,
@@ -475,23 +475,143 @@ fn test_mixed_same_and_different_cwe() {
     let cwe1_b = result.iter().find(|f| f.id == "cwe1_b").unwrap();
     let cwe2 = result.iter().find(|f| f.id == "cwe2").unwrap();
 
-    assert!(cwe1_a.cross_file_references.is_some());
+    assert!(cwe1_a.related_finding_ids.is_some());
     assert!(
         cwe1_a
-            .cross_file_references
+            .related_finding_ids
             .as_ref()
             .unwrap()
             .contains(&"cwe1_b".to_string())
     );
 
-    assert!(cwe1_b.cross_file_references.is_some());
+    assert!(cwe1_b.related_finding_ids.is_some());
     assert!(
         cwe1_b
-            .cross_file_references
+            .related_finding_ids
             .as_ref()
             .unwrap()
             .contains(&"cwe1_a".to_string())
     );
 
-    assert!(cwe2.cross_file_references.is_none());
+    assert!(cwe2.related_finding_ids.is_none());
+}
+
+// ============================================================================
+// test_semgrep_locations_preserved_after_cross_file_analysis()
+// Regression test: cross_file_references (semgrep locations) must survive
+// cross-file analysis, which writes to related_finding_ids.
+// ============================================================================
+
+#[test]
+fn test_semgrep_locations_preserved_after_cross_file_analysis() {
+    let semgrep_locs_1 = vec!["src/auth.rs:42".to_string(), "src/db.rs:10".to_string()];
+    let semgrep_locs_2 = vec!["src/db.rs:10".to_string()];
+
+    let findings = vec![
+        VulnerabilityFinding {
+            id: "find1".to_string(),
+            title: "SQL Injection in auth".to_string(),
+            description: "SQL injection in authentication".to_string(),
+            severity: Severity::Critical,
+            confidence_score: 0.9,
+            cwe_id: Some("CWE-89".to_string()),
+            file_path: "src/auth.rs".to_string(),
+            line_number: Some(42),
+            code_snippet: None,
+            diff_hunk: None,
+            recommendation: None,
+            code_location: None,
+            sources: vec!["semgrep".to_string()],
+            commit_reference: None,
+            ticket_reference: None,
+            priority_score: None,
+            cross_file_references: Some(semgrep_locs_1.clone()),
+            related_finding_ids: None,
+            verification_status: None,
+            verification_notes: None,
+            verification_error: None,
+            agent_evidence_path: None,
+            security_issue: None,
+            poc_code: None,
+            mitigation_code: None,
+            poc_format: None,
+            llm_model: None,
+            agent_mode: false,
+            statement_range: None,
+            triage_verdict: None,
+            evidence: vec![],
+            verification_tier: None,
+            verification_gate_answers: None,
+        },
+        VulnerabilityFinding {
+            id: "find2".to_string(),
+            title: "SQL Injection in db".to_string(),
+            description: "SQL injection in database layer".to_string(),
+            severity: Severity::High,
+            confidence_score: 0.8,
+            cwe_id: Some("CWE-89".to_string()),
+            file_path: "src/db.rs".to_string(),
+            line_number: Some(10),
+            code_snippet: None,
+            diff_hunk: None,
+            recommendation: None,
+            code_location: None,
+            sources: vec!["semgrep".to_string()],
+            commit_reference: None,
+            ticket_reference: None,
+            priority_score: None,
+            cross_file_references: Some(semgrep_locs_2.clone()),
+            related_finding_ids: None,
+            verification_status: None,
+            verification_notes: None,
+            verification_error: None,
+            agent_evidence_path: None,
+            security_issue: None,
+            poc_code: None,
+            mitigation_code: None,
+            poc_format: None,
+            llm_model: None,
+            agent_mode: false,
+            statement_range: None,
+            triage_verdict: None,
+            evidence: vec![],
+            verification_tier: None,
+            verification_gate_answers: None,
+        },
+    ];
+
+    let result = CrossFileAnalyzer::analyze_cross_file_references(&findings);
+
+    assert_eq!(result.len(), 2);
+
+    let find1 = result.iter().find(|f| f.id == "find1").unwrap();
+    let find2 = result.iter().find(|f| f.id == "find2").unwrap();
+
+    // Semgrep locations must be preserved — not overwritten by the analyzer.
+    assert_eq!(
+        find1.cross_file_references.as_ref().unwrap(),
+        &semgrep_locs_1
+    );
+    assert_eq!(
+        find2.cross_file_references.as_ref().unwrap(),
+        &semgrep_locs_2
+    );
+
+    // The analyzer must have linked the two findings via related_finding_ids.
+    assert!(find1.related_finding_ids.is_some());
+    assert!(find2.related_finding_ids.is_some());
+    assert!(
+        find1
+            .related_finding_ids
+            .as_ref()
+            .unwrap()
+            .contains(&"find2".to_string())
+    );
+    assert!(
+        find2
+            .related_finding_ids
+            .as_ref()
+            .unwrap()
+            .contains(&"find1".to_string())
+    );
 }

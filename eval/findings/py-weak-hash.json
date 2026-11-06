@@ -12,7 +12,6 @@
     "diff_hunk": null,
     "recommendation": "Use a salted KDF such as PBKDF2-HMAC-SHA256, scrypt, or argon2",
     "code_location": null,
-    "already_reported": false,
     "sources": ["semgrep"],
     "commit_reference": null,
     "ticket_reference": null,

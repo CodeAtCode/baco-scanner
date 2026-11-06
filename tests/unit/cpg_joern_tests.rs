@@ -14,9 +14,13 @@ fn test_joern_engine_not_available_when_binary_missing() {
     // In CI, it should return false
     let available = engine.is_available();
 
-    // If joern is not available, we expect this
+    // If joern is not available, we expect JoernNotInstalled (path must exist so
+    // validate_project_path passes and the joern availability check runs)
     if !available {
-        let result = engine.build_cpg(Path::new("/tmp/test"));
+        let dir = std::env::temp_dir().join("baco-joern-test-avail");
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        let result = engine.build_cpg(&dir);
+        let _ = std::fs::remove_dir(&dir);
         assert!(matches!(result, Err(CpgError::JoernNotInstalled)));
     }
 }
@@ -26,7 +30,10 @@ fn test_build_returns_error_when_joern_unavailable() {
     let engine = JoernEngine::new(None);
 
     if !engine.is_available() {
-        let result = engine.build_cpg(Path::new("/tmp/test"));
+        let dir = std::env::temp_dir().join("baco-joern-test-build");
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        let result = engine.build_cpg(&dir);
+        let _ = std::fs::remove_dir(&dir);
         assert!(matches!(result, Err(CpgError::JoernNotInstalled)));
     }
 }
@@ -55,11 +62,10 @@ fn test_build_returns_error_when_path_has_no_parent() {
 
     // Guard: only test if joern is unavailable
     if !engine.is_available() {
-        // Use root path which has no parent
+        // Use root path which has no parent — validate_project_path rejects it
+        // with BuildFailed before the joern availability check runs
         let result = engine.build_cpg(Path::new("/"));
-        // When joern is unavailable, we get JoernNotInstalled first
-        // The BuildFailed error only occurs if joern is available
-        assert!(matches!(result, Err(CpgError::JoernNotInstalled)));
+        assert!(matches!(result, Err(CpgError::BuildFailed(_))));
     }
 }
 
@@ -72,4 +78,20 @@ fn test_joern_engine_new_with_some_path_preserves_path() {
     let result = engine.find_joern();
     // Since the path doesn't exist, it should return error
     assert!(matches!(result, Err(CpgError::JoernNotInstalled)));
+}
+
+#[test]
+fn test_validate_project_path_rejects_filesystem_root() {
+    // Test that the filesystem root is rejected
+    let result = baco::cpg::validate_project_path(Path::new("/"));
+    assert!(matches!(result, Err(CpgError::BuildFailed(_))));
+}
+
+#[test]
+fn test_validate_project_path_accepts_valid_path() {
+    // Test that a valid path is accepted and canonicalized
+    let result = baco::cpg::validate_project_path(Path::new("/tmp"));
+    assert!(result.is_ok());
+    let canonical = result.unwrap();
+    assert!(canonical.is_dir());
 }

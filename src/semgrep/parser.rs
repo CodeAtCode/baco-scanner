@@ -1,6 +1,7 @@
 use crate::findings::{Severity, VulnerabilityFinding};
 use hex;
 use sha2::{Digest, Sha256};
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
@@ -80,8 +81,19 @@ pub fn parse_json_output(
     let results: serde_json::Value =
         serde_json::from_slice(json).map_err(|e| format!("Failed to parse semgrep JSON: {}", e))?;
 
-    let mut grouped: std::collections::HashMap<String, Vec<RawFinding>> =
-        std::collections::HashMap::new();
+    if let Some(errors) = results.get("errors").and_then(|e| e.as_array()) {
+        for error in errors {
+            if let Some(error_msg) = error.get("message").and_then(|m| m.as_str()) {
+                tracing::warn!("Semgrep error: {}", error_msg);
+            }
+            // Also log error type if available
+            if let Some(error_type) = error.get("type").and_then(|t| t.as_str()) {
+                tracing::warn!("Semgrep error type: {}", error_type);
+            }
+        }
+    }
+
+    let mut grouped: HashMap<(String, String, u32), Vec<RawFinding>> = HashMap::new();
 
     for result in results
         .get("results")
@@ -91,7 +103,10 @@ pub fn parse_json_output(
     {
         let raw_check_id = match result.get("check_id").and_then(|v| v.as_str()) {
             Some(id) => id,
-            None => continue,
+            None => {
+                tracing::warn!("Dropping semgrep result: missing check_id: {:?}", result);
+                continue;
+            }
         };
 
         // Normalize check_id by stripping temp-file stem prefix
@@ -120,7 +135,10 @@ pub fn parse_json_output(
 
         let path = match result.get("path").and_then(|v| v.as_str()) {
             Some(p) => p,
-            None => continue,
+            None => {
+                tracing::warn!("Dropping semgrep result: missing path: {:?}", result);
+                continue;
+            }
         };
 
         let start = match result
@@ -129,7 +147,10 @@ pub fn parse_json_output(
             .and_then(|v| v.as_u64())
         {
             Some(s) => s,
-            None => continue,
+            None => {
+                tracing::warn!("Dropping semgrep result: missing start.line: {:?}", result);
+                continue;
+            }
         };
 
         let extra_severity = result
@@ -178,15 +199,15 @@ pub fn parse_json_output(
             message,
         };
 
-        grouped
-            .entry(check_id.to_string())
-            .or_default()
-            .push(raw_finding);
+        let key = (check_id.to_string(), path.to_string(), start as u32);
+        grouped.entry(key).or_default().push(raw_finding);
     }
 
     let mut findings = Vec::new();
 
-    for (check_id, raw_findings) in grouped {
+    for ((check_id, _path, _line), raw_findings) in grouped {
+        // Each group is keyed by (check_id, path, line) so it should rarely have >1 finding,
+        // but the aggregation logic is kept for safety.
         if raw_findings.len() == 1 {
             let rf = &raw_findings[0];
             // Generate description from Semgrep message or use title as fallback
@@ -214,12 +235,12 @@ pub fn parse_json_output(
                 diff_hunk: None,
                 recommendation: Some("Review and fix this issue".to_string()),
                 code_location: Some(format!("{}:{}", rf.path, rf.line)),
-                already_reported: false,
                 sources: vec!["semgrep".to_string()],
                 commit_reference: None,
                 ticket_reference: None,
                 priority_score: None,
                 cross_file_references: None,
+                related_finding_ids: None,
                 verification_status: None,
                 verification_notes: None,
                 verification_error: None,
@@ -295,12 +316,12 @@ pub fn parse_json_output(
                 diff_hunk: None,
                 recommendation: Some("Review and fix this issue".to_string()),
                 code_location: Some(format!("{}:{}", first.path, first.line)),
-                already_reported: false,
                 sources: vec!["semgrep".to_string()],
                 commit_reference: None,
                 ticket_reference: None,
                 priority_score: None,
                 cross_file_references: Some(locations.clone()),
+                related_finding_ids: None,
                 verification_status: None,
                 verification_notes: None,
                 verification_error: None,

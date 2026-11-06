@@ -20,31 +20,32 @@ fn test_parse_semgrep_multi_hit_uses_first_path() {
         baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
 
-    // Multiple findings with same check_id should be aggregated into one
-    assert_eq!(findings.len(), 1);
+    // Multiple findings with same check_id but different paths/lines are SEPARATE findings
+    assert_eq!(findings.len(), 2);
 
-    // Should use first finding's path, not sentinel
-    assert_eq!(findings[0].file_path, "file1.py");
-    assert_ne!(findings[0].file_path, "multiple_files");
+    // Sort by file_path for deterministic ordering
+    let mut sorted = findings.clone();
+    sorted.sort_by(|a, b| a.file_path.cmp(&b.file_path));
 
-    // Should have line_number from first finding
-    assert_eq!(findings[0].line_number, Some(10));
+    // Check first finding (file1.py:10)
+    assert_eq!(sorted[0].file_path, "file1.py");
+    assert_eq!(sorted[0].line_number, Some(10));
+    assert_eq!(sorted[0].code_location, Some("file1.py:10".to_string()));
+    assert_eq!(sorted[0].statement_range, Some((10, 12)));
 
-    // Should have code_location
-    assert_eq!(findings[0].code_location, Some("file1.py:10".to_string()));
+    // Check second finding (file2.py:20)
+    assert_eq!(sorted[1].file_path, "file2.py");
+    assert_eq!(sorted[1].line_number, Some(20));
+    assert_eq!(sorted[1].code_location, Some("file2.py:20".to_string()));
+    assert_eq!(sorted[1].statement_range, Some((20, 22)));
 
-    // Should have statement_range from first finding
-    assert_eq!(findings[0].statement_range, Some((10, 12)));
+    // Each finding has cross_file_references: None (single-location findings)
+    assert!(sorted[0].cross_file_references.is_none());
+    assert!(sorted[1].cross_file_references.is_none());
 
-    // Should have cross_file_references with ALL locations
-    let cross_refs = findings[0].cross_file_references.as_ref().unwrap();
-    assert_eq!(cross_refs.len(), 2);
-    assert!(cross_refs.contains(&"file1.py:10".to_string()));
-    assert!(cross_refs.contains(&"file2.py:20".to_string()));
-
-    // ID should be the aggregated hash (different from single-hit generate_id form)
-    assert!(findings[0].id.contains("aggregated") || findings[0].id.len() == 64);
-    // SHA256 hex
+    // Each finding has a regular generate_id (NOT "aggregated" hash)
+    assert!(!sorted[0].id.contains("aggregated"));
+    assert!(!sorted[1].id.contains("aggregated"));
 }
 
 #[test]
@@ -63,28 +64,35 @@ fn test_parse_semgrep_multi_hit_three_locations() {
         baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
 
-    assert_eq!(findings.len(), 1);
-    assert_eq!(findings[0].file_path, "a.rs");
-    assert_eq!(findings[0].line_number, Some(1));
-    assert_eq!(findings[0].statement_range, Some((1, 3)));
+    // Three separate findings (one per location)
+    assert_eq!(findings.len(), 3);
 
-    let cross_refs = findings[0].cross_file_references.as_ref().unwrap();
-    assert_eq!(cross_refs.len(), 3);
-    assert!(cross_refs.contains(&"a.rs:1".to_string()));
-    assert!(cross_refs.contains(&"b.rs:5".to_string()));
-    assert!(cross_refs.contains(&"c.rs:10".to_string()));
+    // Sort by file_path for deterministic ordering
+    let mut sorted = findings.clone();
+    sorted.sort_by(|a, b| a.file_path.cmp(&b.file_path));
 
-    // Code snippet should list all locations
-    let snippet = findings[0].code_snippet.as_ref().unwrap();
-    assert!(snippet.contains("3 files"));
-    assert!(snippet.contains("a.rs:1"));
-    assert!(snippet.contains("b.rs:5"));
-    assert!(snippet.contains("c.rs:10"));
+    // Check each finding has correct path and line
+    assert_eq!(sorted[0].file_path, "a.rs");
+    assert_eq!(sorted[0].line_number, Some(1));
+    assert_eq!(sorted[0].statement_range, Some((1, 3)));
+
+    assert_eq!(sorted[1].file_path, "b.rs");
+    assert_eq!(sorted[1].line_number, Some(5));
+    assert_eq!(sorted[1].statement_range, Some((5, 7)));
+
+    assert_eq!(sorted[2].file_path, "c.rs");
+    assert_eq!(sorted[2].line_number, Some(10));
+    assert_eq!(sorted[2].statement_range, Some((10, 12)));
+
+    // Each finding has its own code snippet from its own file
+    assert!(sorted[0].code_snippet.is_some());
+    assert!(sorted[1].code_snippet.is_some());
+    assert!(sorted[2].code_snippet.is_some());
 }
 
 #[test]
 fn test_parse_semgrep_multi_hit_id_consistency() {
-    // Verify that aggregated findings use the deterministic hash-based ID
+    // Verify that findings use deterministic IDs
     let mock_json = r#"{
         "results": [
             {"check_id": "stable.id.test", "path": "x.py", "start": {"line": 1}, "extra": {"message": "X", "metadata": {"cwe": ["CWE-1"]}}},
@@ -97,12 +105,20 @@ fn test_parse_semgrep_multi_hit_id_consistency() {
         baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
 
-    assert_eq!(findings.len(), 1);
-    // ID should be 64-char hex (SHA256)
-    assert_eq!(findings[0].id.len(), 64);
-    // ID should be deterministic - run again and compare
+    // Two separate findings
+    assert_eq!(findings.len(), 2);
+
+    // IDs should be deterministic - run again and compare
     let findings2 =
         baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
-    assert_eq!(findings[0].id, findings2[0].id);
+
+    // Sort both by file_path before comparing
+    let mut sorted1 = findings.clone();
+    sorted1.sort_by(|a, b| a.file_path.cmp(&b.file_path));
+    let mut sorted2 = findings2.clone();
+    sorted2.sort_by(|a, b| a.file_path.cmp(&b.file_path));
+
+    assert_eq!(sorted1[0].id, sorted2[0].id);
+    assert_eq!(sorted1[1].id, sorted2[1].id);
 }

@@ -9,17 +9,21 @@ pub struct ConflictResolver;
 
 impl ConflictResolver {
     /// Resolve severity conflict by keeping highest severity
+    ///
+    /// Returns an error if findings is empty, as this indicates a logic error
+    /// in the caller's conflict detection.
     pub fn resolve_severity_conflict(
         location: &str,
         findings: &[&VulnerabilityFinding],
-    ) -> FindingConflict {
+    ) -> Result<FindingConflict, ScanError> {
         if findings.is_empty() {
-            return FindingConflict {
-                findings: vec![],
-                conflict_type: ConflictType::SeverityMismatch,
-                resolution: ConflictResolution::HighestSeverity,
-                resolution_reason: "No findings to resolve".to_string(),
-            };
+            return Err(ScanError::Parse {
+                message: format!(
+                    "severity conflict resolution failed: empty findings slice at {}",
+                    location
+                ),
+                source: None,
+            });
         }
 
         let mut sorted: Vec<_> = findings.iter().collect();
@@ -34,11 +38,11 @@ impl ConflictResolver {
             severity_order(&b.severity).cmp(&severity_order(&a.severity))
         });
 
-        let highest = *sorted.first().unwrap();
+        let highest = sorted.first().expect("findings is non-empty");
         let conflict_type = ConflictType::SeverityMismatch;
         let resolution = ConflictResolution::HighestSeverity;
 
-        FindingConflict {
+        Ok(FindingConflict {
             findings: findings.iter().map(|f| (*f).clone()).collect(),
             conflict_type,
             resolution,
@@ -46,7 +50,7 @@ impl ConflictResolver {
                 "Selected highest severity '{}' for {}",
                 highest.severity, location
             ),
-        }
+        })
     }
 
     /// Resolve CWE conflict by keeping most specific (lowest CWE number)

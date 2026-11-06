@@ -434,7 +434,7 @@ fn test_aggregation_single_location_preserves_details() {
 }
 
 #[test]
-fn test_aggregation_multiple_same_rule_creates_single_finding() {
+fn test_multiple_same_rule_creates_separate_findings() {
     let mock_json = r#"{
         "results": [
             {"check_id": "multi.location", "path": "file1.py", "start": {"line": 1}, "extra": {"message": "Issue", "metadata": {}}},
@@ -446,18 +446,25 @@ fn test_aggregation_multiple_same_rule_creates_single_finding() {
     let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
 
-    // Multiple same check_id should aggregate to single finding
-    assert_eq!(findings.len(), 1);
-    // Should use first finding's path, not sentinel
-    assert_eq!(findings[0].file_path, "file1.py");
-    assert_eq!(findings[0].line_number, Some(1));
-    assert!(
-        findings[0]
-            .code_snippet
-            .as_ref()
-            .unwrap()
-            .contains("Found in")
-    );
+    // Multiple same check_id creates SEPARATE findings (not aggregated)
+    assert_eq!(findings.len(), 3);
+
+    // Sort by file_path for deterministic ordering
+    let mut sorted = findings.clone();
+    sorted.sort_by(|a, b| a.file_path.cmp(&b.file_path));
+
+    // Check each finding has correct path and line
+    assert_eq!(sorted[0].file_path, "file1.py");
+    assert_eq!(sorted[0].line_number, Some(1));
+    assert_eq!(sorted[1].file_path, "file2.py");
+    assert_eq!(sorted[1].line_number, Some(5));
+    assert_eq!(sorted[2].file_path, "file3.py");
+    assert_eq!(sorted[2].line_number, Some(10));
+
+    // Each finding has its own code snippet
+    assert!(sorted[0].code_snippet.is_some());
+    assert!(sorted[1].code_snippet.is_some());
+    assert!(sorted[2].code_snippet.is_some());
 }
 
 #[test]
@@ -533,7 +540,7 @@ fn test_findings_code_snippet_for_nonexistent_file() {
 }
 
 #[test]
-fn test_aggregated_findings_have_location_list_snippet() {
+fn test_multiple_findings_have_per_location_snippet() {
     let mock_json = r#"{
         "results": [
             {"check_id": "multi.issue", "path": "file1.py", "start": {"line": 1}, "extra": {"message": "Issue", "metadata": {}}},
@@ -545,11 +552,25 @@ fn test_aggregated_findings_have_location_list_snippet() {
     let runner = SemgrepRunner::new(vec![], vec![]);
     let findings = runner.parse_json_output(mock_json.as_bytes()).unwrap();
 
-    assert_eq!(findings.len(), 1);
-    // Aggregated findings should have a snippet listing all locations
-    assert!(findings[0].code_snippet.is_some());
-    let snippet = findings[0].code_snippet.as_ref().unwrap();
-    assert!(snippet.contains("3 locations") || snippet.contains("file1.py"));
+    // Three separate findings
+    assert_eq!(findings.len(), 3);
+
+    // Sort by file_path for deterministic ordering
+    let mut sorted = findings.clone();
+    sorted.sort_by(|a, b| a.file_path.cmp(&b.file_path));
+
+    // Each finding has its own snippet
+    assert!(sorted[0].code_snippet.is_some());
+    assert!(sorted[1].code_snippet.is_some());
+    assert!(sorted[2].code_snippet.is_some());
+
+    // Check each has correct path and line
+    assert_eq!(sorted[0].file_path, "file1.py");
+    assert_eq!(sorted[0].line_number, Some(1));
+    assert_eq!(sorted[1].file_path, "file2.py");
+    assert_eq!(sorted[1].line_number, Some(5));
+    assert_eq!(sorted[2].file_path, "file3.py");
+    assert_eq!(sorted[2].line_number, Some(10));
 }
 
 // ============================================================================

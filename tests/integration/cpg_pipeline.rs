@@ -90,12 +90,14 @@ fn build_fails_gracefully_without_joern() {
 
     if !engine.is_available() {
         let temp_dir = std::env::temp_dir().join("baco-test-no-joern");
+        std::fs::create_dir_all(&temp_dir).expect("Failed to create temp dir");
         let result = engine.build(&temp_dir);
+        let _ = std::fs::remove_dir(&temp_dir);
 
         assert!(
             matches!(result, Err(baco::cpg::CpgError::JoernNotInstalled)),
-            "Should return JoernNotInstalled error when Joern is not available"
+            "Should return JoernNotInstalled error when Joern is not available, got: {:?}",
+            result
         );
     }
-    // If Joern IS available, this test doesn't apply (but that's fine - Joern should be rare in CI)
 }

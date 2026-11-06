@@ -96,7 +96,10 @@ impl StagingArea {
         // Create worktree
         let output = Command::new("git")
             .current_dir(repo_path)
-            .args(["worktree", "add", worktree_path.to_str().unwrap(), "HEAD"])
+            .arg("worktree")
+            .arg("add")
+            .arg(&worktree_path)
+            .arg("HEAD")
             .output()
             .map_err(|e| StagingError::WorktreeCreate(e.to_string()))?;
 
@@ -226,12 +229,10 @@ impl StagingArea {
         // Attempt git worktree removal, but don't fail if it doesn't work
         let output = match Command::new("git")
             .current_dir(&self.original_repo_path)
-            .args([
-                "worktree",
-                "remove",
-                "--force",
-                self.worktree_path.to_str().unwrap(),
-            ])
+            .arg("worktree")
+            .arg("remove")
+            .arg("--force")
+            .arg(&self.worktree_path)
             .output()
         {
             Ok(o) => o,

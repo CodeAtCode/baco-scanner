@@ -473,7 +473,7 @@ fn test_cross_file_analyzer_single_finding_no_references() {
     let result = CrossFileAnalyzer::analyze_cross_file_references(&findings);
 
     assert_eq!(result.len(), 1);
-    assert!(result[0].cross_file_references.is_none());
+    assert!(result[0].related_finding_ids.is_none());
 }
 
 #[test]
@@ -486,8 +486,8 @@ fn test_cross_file_analyzer_same_cwe_different_file() {
 
     assert_eq!(result.len(), 2);
     // Both should have cross-file references
-    assert!(result[0].cross_file_references.is_some());
-    assert!(result[1].cross_file_references.is_some());
+    assert!(result[0].related_finding_ids.is_some());
+    assert!(result[1].related_finding_ids.is_some());
 }
 
 #[test]

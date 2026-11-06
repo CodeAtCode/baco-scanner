@@ -151,7 +151,6 @@ async fn test_ai_aggregation_generate_risk_assessment() {
 
     assert!(result.contains("Average Confidence Score: 0.73"));
     assert!(result.contains("Findings with Cross-file Reachability: 2"));
-    assert!(result.contains("Already Reported in Ticket System: 0"));
 }
 
 // ============================================================================
@@ -226,7 +225,8 @@ fn test_conflict_resolver_resolve_severity_conflict() {
     ];
     let finding_refs: Vec<&VulnerabilityFinding> = findings.iter().collect();
 
-    let conflict = ConflictResolver::resolve_severity_conflict("src/main.rs:42", &finding_refs);
+    let conflict = ConflictResolver::resolve_severity_conflict("src/main.rs:42", &finding_refs)
+        .expect("non-empty findings should resolve successfully");
 
     assert_eq!(
         conflict.conflict_type,
@@ -1163,14 +1163,19 @@ async fn test_aggregation_executive_summary_contains_recommendation() {
 }
 
 #[test]
-fn test_conflict_resolver_empty_findings() {
+fn test_conflict_resolver_empty_findings_returns_error() {
     let findings: Vec<&VulnerabilityFinding> = vec![];
 
-    let conflict = ConflictResolver::resolve_severity_conflict("empty:0", &findings);
+    let result = ConflictResolver::resolve_severity_conflict("empty:0", &findings);
 
-    // Should handle empty gracefully (may panic or return empty, depending on impl)
-    // This test documents the expected behavior
-    assert!(!conflict.resolution_reason.is_empty());
+    // Empty findings should return an error, not panic
+    assert!(result.is_err(), "Empty findings should return error");
+    let err = result.unwrap_err();
+    assert!(
+        err.to_string().contains("empty"),
+        "Error should mention empty findings: {}",
+        err
+    );
 }
 
 #[tokio::test]

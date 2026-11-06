@@ -42,12 +42,12 @@ fn make_test_finding(id: &str) -> VulnerabilityFinding {
         diff_hunk: None,
         recommendation: None,
         code_location: Some("test_module::test_func".to_string()),
-        already_reported: false,
         sources: vec!["test".to_string()],
         commit_reference: None,
         ticket_reference: None,
         priority_score: None,
         cross_file_references: None,
+        related_finding_ids: None,
         verification_status: Some(VerificationStatus::NeedsReview),
         verification_notes: None,
         verification_error: None,
@@ -89,9 +89,12 @@ fn test_cpg_phase_unavailable_skips_with_debug_log_path() {
     let engine = baco::cpg::JoernEngine::new(config.joern_path.clone());
 
     if !engine.is_available() {
-        // This is the "skip cheaply" path - no build() call, no phantom work
-        // The phase returns early after checking is_available()
-        let result = engine.build_cpg(&temp_cpg_path("cpg-slice-test"));
+        // Path must exist so validate_project_path passes and the joern
+        // availability check runs, returning JoernNotInstalled
+        let dir = temp_cpg_path("cpg-slice-test");
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        let result = engine.build_cpg(&dir);
+        let _ = std::fs::remove_dir(&dir);
         assert!(matches!(
             result,
             Err(baco::cpg::CpgError::JoernNotInstalled)

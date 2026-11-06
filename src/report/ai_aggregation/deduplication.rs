@@ -121,30 +121,31 @@ impl DeduplicationService {
 /// Merge comparator for selecting the best candidate when merging duplicate findings.
 ///
 /// Priority order:
-/// 1. Verification status: Confirmed beats FalsePositive regardless of severity/confidence
-/// 2. Severity: Higher severity wins
-/// 3. Confidence: Higher confidence wins as tiebreaker
+/// 1. FalsePositive always loses to any non-FalsePositive status, regardless of severity/confidence
+/// 2. Otherwise, fall through to severity-then-confidence ordering (original behavior)
 pub fn dedup_merge_comparator(
     a: &VulnerabilityFinding,
     b: &VulnerabilityFinding,
 ) -> std::cmp::Ordering {
-    // Verification status takes absolute priority: Confirmed beats FalsePositive
     let status_a = a.verification_status;
     let status_b = b.verification_status;
 
-    // If one is Confirmed and the other is FalsePositive, Confirmed wins
-    if status_a == Some(VerificationStatus::Confirmed)
-        && status_b == Some(VerificationStatus::FalsePositive)
-    {
-        return std::cmp::Ordering::Greater;
-    }
-    if status_b == Some(VerificationStatus::Confirmed)
-        && status_a == Some(VerificationStatus::FalsePositive)
+    // FalsePositive always loses to any non-FalsePositive
+    // If a is FalsePositive and b is not, b wins (Less)
+    if status_a == Some(VerificationStatus::FalsePositive)
+        && status_b != Some(VerificationStatus::FalsePositive)
     {
         return std::cmp::Ordering::Less;
     }
+    // If b is FalsePositive and a is not, a wins (Greater)
+    if status_b == Some(VerificationStatus::FalsePositive)
+        && status_a != Some(VerificationStatus::FalsePositive)
+    {
+        return std::cmp::Ordering::Greater;
+    }
 
-    // Otherwise, fall back to severity-then-confidence ordering
+    // Both are FalsePositive, or neither is FalsePositive
+    // Fall through to severity-then-confidence ordering (original behavior)
     let severity_cmp = match (a.severity, b.severity) {
         (Severity::Critical, Severity::Critical) => std::cmp::Ordering::Equal,
         (Severity::Critical, _) => std::cmp::Ordering::Greater,

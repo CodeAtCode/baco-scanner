@@ -64,14 +64,14 @@ impl AiAggregation {
             "RISK ASSESSMENT\n\
              ================\n\
              Average Confidence Score: {:.2}\n\
-             Findings with Cross-file Reachability: {}\n\
-             Already Reported in Ticket System: {}",
+             Findings with Cross-file Reachability: {}",
             avg_confidence,
             findings
                 .iter()
-                .filter(|f| f.cross_file_references.is_some())
-                .count(),
-            findings.iter().filter(|f| f.already_reported).count()
+                .filter(|f| {
+                    f.cross_file_references.is_some() || f.related_finding_ids.is_some()
+                })
+                .count()
         ))
     }
 }
@@ -206,10 +206,22 @@ impl AiAggregationPhase {
                 .len()
                 > 1
             {
-                let conflict = conflict_resolver::ConflictResolver::resolve_severity_conflict(
+                match conflict_resolver::ConflictResolver::resolve_severity_conflict(
                     location, findings,
-                );
-                conflicts.push(conflict);
+                ) {
+                    Ok(conflict) => {
+                        conflicts.push(conflict);
+                    }
+                    Err(e) => {
+                        // This should never happen in normal operation since we only
+                        // call resolve_severity_conflict when len > 1, but handle it gracefully
+                        tracing::warn!(
+                            "Severity conflict resolution failed at {}: {}",
+                            location,
+                            e
+                        );
+                    }
+                }
                 continue;
             }
 
@@ -387,7 +399,9 @@ impl AiAggregationPhase {
         };
 
         // Context analysis confidence
-        let context = if consensus.finding.cross_file_references.is_some() {
+        let context = if consensus.finding.cross_file_references.is_some()
+            || consensus.finding.related_finding_ids.is_some()
+        {
             positive_factors.push("Cross-file reachability confirmed".to_string());
             0.85
         } else {

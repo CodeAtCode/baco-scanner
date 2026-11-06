@@ -52,7 +52,13 @@ impl PocCompiler {
 
     /// Validate Rust code using rustc --edition 2021 --check
     pub fn validate_rust(code: &str) -> PoCCompileResult {
-        let temp_file = match tempfile::NamedTempFile::new() {
+        Self::validate_rust_in_dir(code, &std::env::temp_dir())
+    }
+
+    /// Validate Rust code, creating the temp file in `temp_dir`.
+    /// Exposed so tests can pass a non-UTF8 directory without polluting TMPDIR.
+    pub fn validate_rust_in_dir(code: &str, temp_dir: &std::path::Path) -> PoCCompileResult {
+        let temp_file = match tempfile::NamedTempFile::new_in(temp_dir) {
             Ok(f) => f,
             Err(e) => {
                 return PoCCompileResult::failure(
@@ -70,12 +76,10 @@ impl PocCompiler {
         }
 
         let output = Command::new("rustc")
-            .args([
-                "--edition",
-                "2021",
-                "--check",
-                temp_file.path().to_str().unwrap(),
-            ])
+            .arg("--edition")
+            .arg("2021")
+            .arg("--check")
+            .arg(temp_file.path())
             .output();
 
         match output {
@@ -102,12 +106,49 @@ impl PocCompiler {
         }
     }
 
-    /// Validate Python code using compile()
+    /// Validate Python code using py_compile module (no execution)
     pub fn validate_python(code: &str) -> PoCCompileResult {
-        match python_compile::compile_code(code) {
-            Ok(_) => PoCCompileResult::success("python"),
+        let temp_file = match tempfile::NamedTempFile::with_suffix(".py") {
+            Ok(f) => f,
             Err(e) => {
-                PoCCompileResult::failure("python", vec![format!("Python syntax error: {}", e)])
+                return PoCCompileResult::failure(
+                    "python",
+                    vec![format!("Failed to create temp file: {}", e)],
+                );
+            }
+        };
+
+        if let Err(e) = std::fs::write(temp_file.path(), code) {
+            return PoCCompileResult::failure(
+                "python",
+                vec![format!("Failed to write temp file: {}", e)],
+            );
+        }
+
+        let output = Command::new("python3")
+            .arg("-m")
+            .arg("py_compile")
+            .arg(temp_file.path())
+            .output();
+
+        match output {
+            Ok(result) => {
+                if result.status.success() {
+                    PoCCompileResult::success("python")
+                } else {
+                    let stderr = String::from_utf8_lossy(&result.stderr);
+                    PoCCompileResult::failure("python", vec![stderr.trim().to_string()])
+                }
+            }
+            Err(e) => {
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    PoCCompileResult::failure(
+                        "python",
+                        vec!["python3 not found - cannot validate Python code".to_string()],
+                    )
+                } else {
+                    PoCCompileResult::failure("python", vec![format!("Validation error: {}", e)])
+                }
             }
         }
     }
@@ -132,7 +173,8 @@ impl PocCompiler {
         }
 
         let output = Command::new("node")
-            .args(["--check", temp_file.path().to_str().unwrap()])
+            .arg("--check")
+            .arg(temp_file.path())
             .output();
 
         match output {
@@ -179,10 +221,9 @@ mod tempfile {
     }
 
     impl NamedTempFile {
-        pub fn new() -> io::Result<Self> {
-            let temp_dir = std::env::temp_dir();
+        pub fn new_in(dir: &std::path::Path) -> io::Result<Self> {
             let rand_id = super::rand_id();
-            let path = temp_dir.join(format!("baco_poc_{}.rs", rand_id));
+            let path = dir.join(format!("baco_poc_{}.rs", rand_id));
             std::fs::write(&path, "")?;
             Ok(Self { path })
         }
@@ -203,26 +244,6 @@ mod tempfile {
     impl Drop for NamedTempFile {
         fn drop(&mut self) {
             let _ = std::fs::remove_file(&self.path);
-        }
-    }
-}
-
-mod python_compile {
-    pub fn compile_code(code: &str) -> std::result::Result<(), String> {
-        let result = std::process::Command::new("python3")
-            .args(["-c", &format!("compile(r'''{}''', 'poc.py', 'exec')", code)])
-            .output();
-
-        match result {
-            Ok(output) if output.status.success() => Ok(()),
-            Ok(output) => Err(String::from_utf8_lossy(&output.stderr).to_string()),
-            Err(e) => {
-                if e.kind() == std::io::ErrorKind::NotFound {
-                    Err("python3 not found - cannot validate Python code".to_string())
-                } else {
-                    Err(format!("Validation error: {}", e))
-                }
-            }
         }
     }
 }

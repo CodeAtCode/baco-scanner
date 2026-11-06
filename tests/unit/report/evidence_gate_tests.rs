@@ -40,7 +40,6 @@ fn make_finding(id: &str, severity: Severity, tier: VerificationTier) -> Vulnera
         recommendation: "Fix this".to_string(),
         cwe_id: None,
         code_location: "src/test.rs:42".to_string(),
-        already_reported: false,
         sources: vec!["test".to_string()],
         priority_score: 0.5,
         verification_status: None,

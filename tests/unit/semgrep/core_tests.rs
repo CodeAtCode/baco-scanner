@@ -369,19 +369,20 @@ fn test_parse_semgrep_aggregated_multiple_locations() {
     let findings =
         baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
-    // Multiple findings with same check_id should be aggregated
-    assert_eq!(findings.len(), 1);
-    // Should use first finding's path, not sentinel
-    assert_eq!(findings[0].file_path, "file1.py");
-    assert_eq!(findings[0].line_number, Some(1));
-    // Code snippet shows "Found in 3 files:" format
-    assert!(
-        findings[0]
-            .code_snippet
-            .as_ref()
-            .unwrap()
-            .contains("3 files")
-    );
+    // Multiple findings with same check_id but different paths are SEPARATE
+    assert_eq!(findings.len(), 3);
+
+    // Sort by file_path for deterministic ordering
+    let mut sorted = findings.clone();
+    sorted.sort_by(|a, b| a.file_path.cmp(&b.file_path));
+
+    // Check each finding has correct path and line
+    assert_eq!(sorted[0].file_path, "file1.py");
+    assert_eq!(sorted[0].line_number, Some(1));
+    assert_eq!(sorted[1].file_path, "file2.py");
+    assert_eq!(sorted[1].line_number, Some(2));
+    assert_eq!(sorted[2].file_path, "file3.py");
+    assert_eq!(sorted[2].line_number, Some(3));
 }
 
 #[test]
@@ -486,9 +487,14 @@ fn test_parse_semgrep_aggregated_empty_message() {
     let findings =
         baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
-    assert_eq!(findings.len(), 1);
-    // When base_message is empty and other_count > 0, uses "detected in N locations"
-    assert!(findings[0].description.contains("detected in 2 locations"));
+    // Two separate findings
+    assert_eq!(findings.len(), 2);
+
+    // Each finding has description = "" (the empty message)
+    let mut sorted = findings.clone();
+    sorted.sort_by(|a, b| a.file_path.cmp(&b.file_path));
+    assert_eq!(sorted[0].description, "");
+    assert_eq!(sorted[1].description, "");
 }
 
 #[test]
@@ -593,10 +599,15 @@ fn test_parse_semgrep_aggregated_with_base_message_and_multiple() {
     let findings =
         baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
-    assert_eq!(findings.len(), 1);
-    // When base_message is not empty and other_count > 1: "Base issue found (and 2 other locations)"
-    assert!(findings[0].description.contains("Base issue found"));
-    assert!(findings[0].description.contains("2 other locations"));
+    // Three separate findings
+    assert_eq!(findings.len(), 3);
+
+    // Each finding has description = "Base issue found"
+    let mut sorted = findings.clone();
+    sorted.sort_by(|a, b| a.file_path.cmp(&b.file_path));
+    assert_eq!(sorted[0].description, "Base issue found");
+    assert_eq!(sorted[1].description, "Base issue found");
+    assert_eq!(sorted[2].description, "Base issue found");
 }
 
 #[test]
@@ -611,12 +622,14 @@ fn test_parse_semgrep_aggregated_with_base_message_single_other() {
     let findings =
         baco::semgrep::parser::parse_json_output(mock_json.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
-    assert_eq!(findings.len(), 1);
-    // When base_message is not empty and other_count == 1: "Found issue (and 1 other location)" - singular
-    assert!(findings[0].description.contains("Found issue"));
-    assert!(findings[0].description.contains("1 other location"));
-    // Should NOT have "locations" (plural)
-    assert!(!findings[0].description.contains("locations"));
+    // Two separate findings
+    assert_eq!(findings.len(), 2);
+
+    // Each finding has description = "Found issue"
+    let mut sorted = findings.clone();
+    sorted.sort_by(|a, b| a.file_path.cmp(&b.file_path));
+    assert_eq!(sorted[0].description, "Found issue");
+    assert_eq!(sorted[1].description, "Found issue");
 }
 
 #[test]
@@ -891,15 +904,20 @@ fn test_parse_json_output_aggregation_logic() {
     assert_eq!(findings.len(), 1);
     assert_eq!(findings[0].file_path, "f1.py");
 
-    // Multiple findings with same check_id - aggregation
+    // Multiple findings with same check_id - SEPARATE findings (not aggregated)
     let json_multi = r#"{"results": [{"check_id": "multi", "path": "f1.py", "start": {"line": 1}, "extra": {"message": "m"}}, {"check_id": "multi", "path": "f2.py", "start": {"line": 2}, "extra": {"message": "m"}}]}"#;
     let findings =
         baco::semgrep::parser::parse_json_output(json_multi.as_bytes(), &runner.exclude_rules, &[])
             .unwrap();
-    assert_eq!(findings.len(), 1);
-    // Should use first finding's path
-    assert_eq!(findings[0].file_path, "f1.py");
-    assert_eq!(findings[0].line_number, Some(1));
+    assert_eq!(findings.len(), 2);
+
+    // Sort by file_path for deterministic ordering
+    let mut sorted = findings.clone();
+    sorted.sort_by(|a, b| a.file_path.cmp(&b.file_path));
+    assert_eq!(sorted[0].file_path, "f1.py");
+    assert_eq!(sorted[0].line_number, Some(1));
+    assert_eq!(sorted[1].file_path, "f2.py");
+    assert_eq!(sorted[1].line_number, Some(2));
 }
 
 // ============================================================================

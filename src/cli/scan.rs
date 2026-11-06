@@ -2,6 +2,12 @@ use crate::config;
 use crate::validation;
 use std::path::{Path, PathBuf};
 
+/// Convert a checkpoint path to a &str, returning an error if the path is not valid UTF-8.
+pub fn checkpoint_path_to_str(path: &Path) -> Result<&str, String> {
+    path.to_str()
+        .ok_or_else(|| format!("checkpoint path is not valid UTF-8: {:?}", path))
+}
+
 #[allow(clippy::too_many_arguments)]
 pub async fn run_scan(
     config_path: &Path,
@@ -238,7 +244,8 @@ pub async fn run_resume(
     // Update checkpoint with new findings
     let mut final_checkpoint = checkpoint;
     final_checkpoint.findings_so_far = findings.clone();
-    final_checkpoint.save(checkpoint_path.to_str().unwrap())?;
+    let checkpoint_path_str = checkpoint_path_to_str(checkpoint_path)?;
+    final_checkpoint.save(checkpoint_path_str)?;
 
     if !quiet {
         tracing::info!("✅ Resume completed!");

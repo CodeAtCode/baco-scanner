@@ -11,8 +11,7 @@ impl CrossFileAnalyzer {
         for finding in &mut updated {
             let related = Self::find_related_findings(finding, findings);
             if !related.is_empty() {
-                finding.cross_file_references =
-                    Some(related.iter().map(|r| r.id.clone()).collect());
+                finding.related_finding_ids = Some(related.iter().map(|r| r.id.clone()).collect());
             }
         }
 

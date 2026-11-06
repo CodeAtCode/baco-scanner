@@ -168,7 +168,7 @@ impl ConfidenceRefinementPhase {
         }
 
         // Factor 3: Cross-file reachability
-        if finding.cross_file_references.is_some() {
+        if finding.cross_file_references.is_some() || finding.related_finding_ids.is_some() {
             refined_score = (refined_score + 0.08).min(1.0);
             factors.push(ConfidenceFactor::CrossFileReachability);
             explanations.push("Cross-file reachability confirmed".to_string());

@@ -178,6 +178,15 @@ pub fn build_metadata_rows(finding: &VulnerabilityFinding) -> MetadataRows {
         }
     }
 
+    if let Some(ref ids) = finding.related_finding_ids {
+        if !ids.is_empty() {
+            rows.push(format!(
+                r#"<strong>Related findings:</strong> {}"#,
+                html_escape::encode_text(&ids.join(", "))
+            ));
+        }
+    }
+
     if let Some(ref ticket) = finding.ticket_reference {
         rows.push(format!(
             r#"<strong>Ticket:</strong> {}"#,

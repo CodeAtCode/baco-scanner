@@ -6,7 +6,7 @@
 //! Based on: LLMxCPG (Usenix 2025) - arxiv:2507.16585
 
 pub mod joern;
-pub use joern::JoernEngine;
+pub use joern::{JoernEngine, validate_project_path};
 pub mod queries;
 pub mod slicer;
 pub use slicer::CpgSlicer;

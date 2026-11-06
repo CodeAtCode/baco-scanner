@@ -12,8 +12,6 @@ use std::path::Path;
 pub struct FileHashStore {
     /// Map of file path (as string) to its hash
     hashes: HashMap<String, String>,
-    /// Last scan timestamp (Unix epoch)
-    last_scan: Option<i64>,
 }
 
 impl FileHashStore {
@@ -21,7 +19,6 @@ impl FileHashStore {
     pub fn new() -> Self {
         Self {
             hashes: HashMap::new(),
-            last_scan: None,
         }
     }
 
@@ -46,22 +43,16 @@ impl FileHashStore {
     pub fn is_empty(&self) -> bool {
         self.hashes.is_empty()
     }
-
-    /// Set the last scan timestamp
-    pub fn set_last_scan(&mut self, timestamp: i64) {
-        self.last_scan = Some(timestamp);
-    }
-
-    /// Get the last scan timestamp
-    pub fn get_last_scan(&self) -> Option<i64> {
-        self.last_scan
-    }
 }
 
 impl FileHashStore {
     /// Save hash store to a file
+    ///
+    /// Uses atomic write-then-rename to avoid corruption on crash.
+    /// Writes to a temp file first, then renames it into place.
     pub fn save(&self, path: &str) -> Result<(), String> {
-        if let Some(parent) = std::path::Path::new(path).parent() {
+        let target = std::path::Path::new(path);
+        if let Some(parent) = target.parent() {
             std::fs::create_dir_all(parent)
                 .map_err(|e| format!("Failed to create directory: {}", e))?;
         }
@@ -69,9 +60,16 @@ impl FileHashStore {
         let json = serde_json::to_string_pretty(self)
             .map_err(|e| format!("Failed to serialize hash store: {}", e))?;
 
-        std::fs::write(path, json).map_err(|e| format!("Failed to write hash store: {}", e))?;
+        let tmp = target.with_extension("json.tmp");
+        std::fs::write(&tmp, &json).map_err(|e| format!("Failed to write temp file: {}", e))?;
 
-        Ok(())
+        match std::fs::rename(&tmp, target) {
+            Ok(()) => Ok(()),
+            Err(e) => {
+                let _ = std::fs::remove_file(&tmp);
+                Err(format!("Failed to rename temp file: {}", e))
+            }
+        }
     }
 
     /// Load hash store from a file

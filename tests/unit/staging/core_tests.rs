@@ -8,9 +8,12 @@
 //! - rollback behavior (not created, when created)
 //! - Drop implementation (auto-cleanup)
 //! - Field accessors
+//! - Non-UTF8 path handling (Unix only)
 
 use baco::staging::core::new_for_tests_with_created;
 use baco::staging::error::StagingError;
+use std::ffi::OsString;
+use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
 
 // ============================================================================
@@ -287,4 +290,51 @@ fn test_staging_area_original_repo_preserved() {
     let path = staging.original_repo_path();
     assert!(path.starts_with(std::env::temp_dir()));
     assert!(path.to_string_lossy().contains("test-repo-placeholder"));
+}
+
+// ============================================================================
+// Non-UTF8 Path Tests (Unix only)
+// ============================================================================
+
+#[cfg(unix)]
+#[test]
+fn test_non_utf8_path_arg_handling() {
+    use std::os::unix::ffi::OsStringExt;
+
+    // Construct a non-UTF8 OsString using invalid UTF-8 bytes
+    let non_utf8_bytes = vec![0x2F, 0x74, 0x65, 0x73, 0x74, 0xFF, 0x80]; // /test\xFF\x80
+    let os_string = OsString::from_vec(non_utf8_bytes);
+
+    // Verify it cannot be converted to a valid UTF-8 string
+    assert!(os_string.to_str().is_none());
+
+    // Convert to PathBuf
+    let path: PathBuf = os_string.into();
+
+    // Verify that to_str().unwrap() would panic on this path
+    // This demonstrates the bug that the fix addresses
+    assert!(
+        path.to_str().is_none(),
+        "to_str() should return None for non-UTF8 paths"
+    );
+
+    // Verify that Command::arg() accepts the PathBuf directly via AsRef<OsStr>
+    // This test verifies the fix: Command::arg() should not panic on non-UTF8 paths
+    // We test the AsRef<OsStr> conversion directly since we can't actually run git on this path
+    let os_str: &std::ffi::OsStr = path.as_ref();
+    assert_eq!(
+        os_str.as_bytes(),
+        &[0x2F, 0x74, 0x65, 0x73, 0x74, 0xFF, 0x80]
+    );
+
+    // The key assertion: this should NOT panic (the fix allows this)
+    // Before the fix, calling .to_str().unwrap() on this path would panic
+    // After the fix, we pass PathBuf directly to .arg() which uses AsRef<OsStr>
+    let _cmd = std::process::Command::new("echo").arg(&path).arg("test");
+
+    // Verify the path is correctly preserved through the conversion
+    assert_eq!(
+        path.as_os_str().as_bytes(),
+        &[0x2F, 0x74, 0x65, 0x73, 0x74, 0xFF, 0x80]
+    );
 }

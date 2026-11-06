@@ -20,7 +20,6 @@ fn create_findings_fixture() -> serde_json::Value {
             "diff_hunk": "@@ -40,7 +40,7 @@\n-    strcpy(buf, user_input);\n+    strncpy(buf, user_input, sizeof(buf) - 1);",
             "recommendation": "Use bounds-checked string functions like strncpy instead of strcpy",
             "code_location": "src/parser.rs:42",
-            "already_reported": false,
             "sources": ["semgrep", "llm-verification"],
             "priority_score": 0.98,
             "verification_status": "confirmed",
@@ -39,7 +38,6 @@ fn create_findings_fixture() -> serde_json::Value {
             "code_snippet": "let query = format!(\"SELECT * FROM users WHERE id = '{}'\", user_id);",
             "recommendation": "Use parameterized queries or prepared statements",
             "code_location": "src/database.rs:127",
-            "already_reported": false,
             "sources": ["llm-verification"],
             "priority_score": 0.85,
             "verification_status": "needs_review",
@@ -57,7 +55,6 @@ fn create_findings_fixture() -> serde_json::Value {
             "code_snippet": "const API_KEY: &str = \"sk-live-abc123xyz789\";",
             "recommendation": "Move sensitive credentials to environment variables or a secure vault",
             "code_location": "src/config.rs:15",
-            "already_reported": true,
             "sources": ["semgrep"],
             "priority_score": 0.65,
             "agent_mode": false
@@ -74,7 +71,6 @@ fn create_findings_fixture() -> serde_json::Value {
             "code_snippet": "let ptr = data.as_ptr();",
             "recommendation": "Review memory access patterns",
             "code_location": "src/memory.rs:88",
-            "already_reported": false,
             "sources": ["heuristic"],
             "priority_score": 0.25,
             "agent_mode": false

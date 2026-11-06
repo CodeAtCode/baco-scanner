@@ -97,12 +97,12 @@ fn unprotected_hook_finding(
             primitive_list, unprotected.handler
         )),
         code_location: Some(format!("{}:{}", path, line)),
-        already_reported: false,
         sources: vec!["hook_primitive_check".to_string()],
         commit_reference: None,
         ticket_reference: None,
         priority_score: None,
         cross_file_references: None,
+        related_finding_ids: None,
         verification_status: None,
         verification_notes: None,
         verification_error: None,
