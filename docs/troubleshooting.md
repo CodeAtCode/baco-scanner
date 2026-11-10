@@ -23,7 +23,7 @@ Common issues and solutions for the Baco SAST scanner.
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| Scan fails mid-way, can't resume | No checkpoint created | Resume with: `baco resume --checkpoint <path-to-checkpoint.json>` |
+| Scan fails mid-way, can't resume | No checkpoint created | Re-run the scan from scratch. To enable checkpointing for future runs, ensure the output directory is writable. |
 | checkpoint.json not found | Output directory cleared | Re-run full scan; checkpoint is written to output dir |
 | Report missing threat modeling section | Feature disabled | Set `enable_threat_modeling = true` in config.toml |
 
@@ -38,9 +38,8 @@ Common issues and solutions for the Baco SAST scanner.
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| Config parse errors at startup | Malformed TOML | Validate config.toml syntax; check for missing brackets or quotes. Serde silently ignores unknown keys. |
-| "missing [project] path" error | Required field absent | Add `project.path = "src/"` to config.toml |
 | Config parse errors at startup | Malformed TOML | Validate config.toml syntax; check for missing brackets or quotes |
+| Config parse errors at startup | Unknown configuration key | Remove the unknown key from the TOML file, or check for typos against docs/configuration.md |
 
 ## Common Error Messages
 
@@ -87,7 +86,8 @@ Resume with: baco resume --checkpoint <path>
 - Verify Joern is installed and in PATH
 - Ensure per-phase LLM API keys are set (`[llm.phases.discovery.api_key]` or env vars like `LLM_DISCOVERY_KEY`)
 - Review checkpoint.json for scan state
-- Clear output directory for fresh start
+- Clear output directory for fresh start — this removes checkpoints, incremental scan hashes, and the prior-runs store. Findings are regenerated from scratch.
+- Report issues at [GitHub Issues](https://github.com/CodeAtCode/baco-scanner/issues)
 
 ## Quick Reference
 

@@ -15,71 +15,71 @@ BACO uses a **data-driven PhaseGraph** (`src/scanner/pipeline/orchestrator.rs`) 
 
 > **Note:** Phase order is defined in `PhaseGraph::new()` (src/scanner/pipeline/orchestrator.rs:28-53). This table is manually maintained and should be updated when that code changes.
 
-| Phase # | Name | Config gate (default) |
-|---------|------|----------------------|
-| 1 | Indexing | Always-on |
-| 2 | Semgrep | Always-on |
-| 3 | CPG Slice | `cpg.enabled=false` |
-| 4 | LLM Static Analysis | `llm.phases.static_analysis` (API key present) |
-| 5 | CWE Routing | Always-on |
-| 6 | Rule Synthesis | `rulesynth.enabled=false` |
-| 7 | LLM Discovery | `llm.phases.discovery` (API key present) |
-| 8 | LLM Verification | `llm.phases.verification` (API key present) |
-| 9 | Validate | `validate.enabled=false` |
-| 10 | SecurityAgent Verification | `agent.enabled=false` |
-| 11 | Ticket Cross-Reference | `tickets.systems` non-empty |
-| 12 | Git Analysis | Target is a git repository |
-| 13 | Cross-File Analysis | Always-on |
-| 14 | Confidence Scoring | `scanner.performance.enable_confidence_refinement=false` |
-| 15 | AI Aggregation | `llm.phases.aggregation` (API key present) |
-| 16 | Threat Modeling | `scanner.performance.enable_threat_modeling=false` |
-| 17 | Root Cause Deduplication | `scanner.performance.enable_root_cause_dedup=true` |
-| 18 | Auto-Patching | `scanner.performance.enable_auto_patching=false` |
-| 19 | CVE Bootstrap | `scanner.performance.enable_cve_bootstrap=true` |
-| 20 | PoC Compilation | `scanner.performance.enable_poc_compilation=false` |
-| 21 | Exploit Synthesis | `exploit.enabled=false` |
-| 22 | Variant Search | `scanner.performance.enable_variant_search=true` |
-| 23 | Reporting | Always-on |
+| Phase # | Name | Config gate (default) | Description |
+|---------|------|----------------------|-------------|
+| 1 | Indexing | Always-on | Index project files |
+| 2 | Semgrep | Always-on | Run Semgrep static analysis |
+| 3 | CPG Slice | `cpg.enabled=false` | Code Property Graph slicing (Joern) |
+| 4 | LLM Static Analysis | `llm.phases.static_analysis` (API key present) | Analyze files with LLM |
+| 5 | CWE Routing | `router.enabled=true` | Route findings to specialized models (opt-in) |
+| 6 | Rule Synthesis | `rulesynth.enabled=false` | LLM-generated Semgrep rules (MoCQ) |
+| 7 | LLM Discovery | `llm.phases.discovery` (API key present) | Enrich findings with AI context |
+| 8 | LLM Verification | `llm.phases.verification` (API key present) | Verify findings with AI |
+| 9 | Validate | `validate.enabled=false` | LLM-as-judge rationale check (CORRECT paper) |
+| 10 | SecurityAgent Verification | `agent.enabled=false` | Tool-based verification |
+| 11 | Ticket Cross-Reference | `tickets.systems` non-empty | Cross-reference with ticket systems |
+| 12 | Git Analysis | Target is a git repository | Analyze Git history |
+| 13 | Cross-File Analysis | Always-on | Analyze cross-file dependencies |
+| 14 | Confidence Scoring | `scanner.performance.enable_confidence_refinement=false` | Refine confidence scores |
+| 15 | AI Aggregation | `llm.phases.aggregation` (API key present) | Aggregate findings with AI |
+| 16 | Threat Modeling | `scanner.performance.enable_threat_modeling=false` | Generate threat model (STRIDE) |
+| 17 | Root Cause Deduplication | `scanner.performance.enable_root_cause_dedup=true` | Deduplicate by root cause |
+| 18 | Auto-Patching | `scanner.performance.enable_auto_patching=false` | Generate patches automatically |
+| 19 | CVE Bootstrap | `scanner.performance.enable_cve_bootstrap=true` | Enrich with CVE data |
+| 20 | PoC Compilation | `scanner.performance.enable_poc_compilation=false` | Compile and validate PoCs |
+| 21 | Exploit Synthesis | `exploit.enabled=false` | Sandbox-verified exploit generation |
+| 22 | Variant Search | `scanner.performance.enable_variant_search=true` | Search for code variants |
+| 23 | Reporting | Always-on | Generate reports (JSON/HTML/SARIF) |
 
 ## Data Flow
 
 ```mermaid
 flowchart LR
-    subgraph Parallel["Parallel Detection"]
+    subgraph Parallel["Parallel Detection (1-4)"]
         direction TB
-        A1[Indexing] --> A2[Semgrep] --> A3[LLM Static]
+        A1[Indexing] --> A2[Semgrep] --> A3[CPG Slice] --> A4[LLM Static]
     end
 
-    subgraph Discovery["Sequential Discovery"]
+    subgraph Discovery["Sequential Discovery (5-8)"]
         direction TB
-        B1[CWE Routing] --> B2[LLM Discovery] --> B3[LLM Verification]
+        B1[CWE Routing] --> B2[Rule Synthesis] --> B3[LLM Discovery] --> B4[LLM Verification]
     end
 
-    subgraph Triage["Triage"]
+    subgraph Triage["Triage (9-13)"]
         direction TB
-        C1[SecurityAgent Verify] --> C2[Ticket Cross-Ref] --> C3[Git Analysis] --> C4[Cross-File] --> C5[Confidence]
+        C1[Validate] --> C2[SecurityAgent Verify] --> C3[Ticket Cross-Ref] --> C4[Git Analysis] --> C5[Cross-File]
     end
 
-    subgraph Aggregation["Aggregation"]
+    subgraph Aggregation["Aggregation (14-16)"]
         direction TB
-        D1[AI Aggregation] --> D2[Threat Modeling]
+        D1[Confidence] --> D2[AI Aggregation] --> D3[Threat Modeling]
     end
 
-    subgraph PostProcessing["Post-Processing"]
+    subgraph PostProcessing["Post-Processing (17-22)"]
         direction TB
-        E1[Root Cause Dedup] --> E2[Auto-Patch] --> E3[CVE Bootstrap] --> E4[PoC Compiler] --> E5[Variant Search]
+        E1[Root Cause Dedup] --> E2[Auto-Patch] --> E3[CVE Bootstrap] --> E4[PoC Compiler] --> E5[Exploit Synth] --> E6[Variant Search]
     end
 
-    subgraph Output["Output"]
+    subgraph Output["Output (23)"]
         direction TB
         F1[Reporting]
     end
 
-    A3 --> B1
-    B3 --> C1
+    A4 --> B1
+    B4 --> C1
     C5 --> D1
-    D2 --> E1
-    E5 --> F1
+    D3 --> E1
+    E6 --> F1
 
     classDef parallel fill:#e1f5fe
     classDef discovery fill:#fff3e0
@@ -87,7 +87,12 @@ flowchart LR
     classDef aggregation fill:#e8f5e9
     classDef postproc fill:#fce4ec
     classDef output fill:#eceff1
-    class Parallel,Discovery,Triage,Aggregation,PostProcessing,Output parallel
+    class Parallel parallel
+    class Discovery discovery
+    class Triage triage
+    class Aggregation aggregation
+    class PostProcessing postproc
+    class Output output
 ```
 
 **Checkpoint markers**: Checkpoints are saved after each major phase, enabling resume from any point in the pipeline.
@@ -118,7 +123,7 @@ Organizational policy profile injected into prompts for calibration. Fields incl
 - `risk_tolerance`: Risk posture
 - `severity_rules`: Per-rule severity overrides
 
-See technique #5 in [`docs/argus-analysis.md`](argus-analysis.md).
+The org-context profile is injected into discovery and verification prompts to reduce false positives tied to the organization's stack, infrastructure, and secret management.
 
 ### Domain-Routed Hunt Prompts (Discovery Phase)
 
@@ -134,3 +139,4 @@ When the Docker sandbox is unavailable, unverifiable findings are marked with `r
 
 Known-answer oracle scoring under `eval/` with labeled vulnerable/secure fixture pairs and oracle files. Recall/precision scoring via `src/eval.rs`; end-to-end runs use `BACO_EVAL_FLOOR` env var. See [`eval/README.md`](../eval/README.md).
 
+</content>

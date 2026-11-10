@@ -8,28 +8,28 @@ This document covers the papers already integrated into baco's architecture — 
 
 ## Integration Status Summary
 
-| Paper | Contribution | Status |
-|-------|--------------|--------|
-| Sifting the Noise (ISSTA 2026) | Triage filter to reduce false positives | Integrated |
-| AutoCVE | Multi-agent deduplication pipeline | Integrated |
-| Cloudflare Security-Audit-Skill | Six-phase parallel orchestration | Integrated |
-| Context-Enhanced Vulnerability Detection | Multi-level context injection | Integrated |
-| VulIn (BM25 RAG) | Specification RAG with BM25 retrieval | Integrated |
-| VulnTriage | Triple-path context augmentation | Integrated |
-| LLMxCPG (Usenix 2025) | CPG-guided code slicing | Integrated |
-| MoCQ | LLM-generated semgrep rules | Integrated |
-| QRS | LLM-to-CodeQL with adversarial validation | Integrated |
-| MoEVD (FSE 2025) | Per-CWE model routing | Integrated |
-| R2Vul + VULPO | Reasoning distillation + RL | Integrated |
-| SV-TrustEval-C | Structure-oriented regression suite | Integrated |
-| CORRECT | Rationale validation via LLM-as-judge | Opt-in |
-| SecVulEval | Statement-level localization benchmark | Integrated |
-| PrimeVul (ICSE 2025) | Chronological dataset hygiene | Integrated |
-| Closing the Gap (ICSE 2025) | Confidence calibration | Integrated |
-| AgentFlow | Multi-agent synthesis | Opt-in |
-| VulnLLM-R | Policy sampling + reasoning budget | Opt-in |
-| PacVD | Four-dimension context abstraction | Opt-in |
-| VulInInstruct | Specification-guided detection | Opt-in |
+| Paper | Contribution | Status | Config Flag |
+|-------|--------------|--------|-------------|
+| Sifting the Noise (ISSTA 2026) | Triage filter to reduce false positives | Integrated | Always on |
+| AutoCVE | Multi-agent deduplication pipeline | Integrated | Always on |
+| Cloudflare Security-Audit-Skill | Six-phase parallel orchestration | Integrated | Always on |
+| Context-Enhanced Vulnerability Detection | Multi-level context injection | Integrated | Always on |
+| VulIn (BM25 RAG) | Specification RAG with BM25 retrieval | Integrated | Always on |
+| VulTriage | Triple-path context augmentation | Integrated | `vultriage.enabled=true` |
+| LLMxCPG (Usenix 2025) | CPG-guided code slicing | Integrated | `cpg.enabled=true` |
+| MoCQ | LLM-generated semgrep rules | Integrated | `rulesynth.enabled=true` |
+| QRS | LLM-to-CodeQL with adversarial validation | Integrated | Always on |
+| MoEVD (FSE 2025) | Per-CWE model routing | Integrated | `router.enabled=true` |
+| R2Vul + VULPO | Reasoning distillation + RL | Surveyed | N/A |
+| SV-TrustEval-C | Structure-oriented regression suite | Integrated | Always on |
+| CORRECT | Rationale validation via LLM-as-judge | Opt-in | `validate.enabled=true` |
+| SecVulEval | Statement-level localization benchmark | Integrated | Always on |
+| PrimeVul (ICSE 2025) | Chronological dataset hygiene | Integrated | Always on |
+| Closing the Gap (ICSE 2025) | Confidence calibration | Integrated | Always on |
+| AgentFlow | Multi-agent synthesis | Opt-in | `agent.enabled=true` |
+| VulnLLM-R | Policy sampling + reasoning budget | Opt-in | `policy_sampling.enabled=true` |
+| PacVD | Four-dimension context abstraction | Opt-in | `pacvd.enabled=true` |
+| VulInInstruct | Specification-guided detection | Opt-in | `vuln_spec.enabled=true` |
 
 For the broader survey of 36 surveyed papers and the selection criteria for the P1–P5 integration tracks, see [Paper Survey](llm-vuln-detection-papers-survey.md).
 
@@ -87,7 +87,7 @@ For the broader survey of 36 surveyed papers and the selection criteria for the 
 
 **Baco Integration:** Baco uses CWE knowledge base RAG with BM25 retrieval for security specifications, avoiding vector stores while maintaining high-quality context.
 
-### VulnTriage (2605.09461)
+### VulTriage (2605.09461)
 
 **Problem:** Vulnerability analysis lacks proper data-flow grounding, causing LLMs to miss critical execution paths and control dependencies.
 
@@ -95,7 +95,7 @@ For the broader survey of 36 surveyed papers and the selection criteria for the 
 
 **Key Result:** Triple-path context extraction significantly improved analysis accuracy by grounding LLM reasoning in actual program structure rather than surface-level patterns.
 
-**Baco Integration:** Baco implements triple-path context extraction with program analysis grounding, using the control path to address data-flow grounding gaps.
+**Baco Integration:** Baco implements triple-path context augmentation (control flow, knowledge flow, semantic flow) in the context extraction phase. Control flow uses AST/CFG/DFG extraction; knowledge flow uses CWE knowledge base RAG; semantic flow uses function-level summaries. Enabled via `vultriage.enabled=true`.
 
 ### LLMxCPG (Usenix 2025) (2507.16585)
 
@@ -105,7 +105,7 @@ For the broader survey of 36 surveyed papers and the selection criteria for the 
 
 **Key Result:** CPG-guided slicing achieved the highest quality gain among context techniques, reducing code volume dramatically while maintaining analysis accuracy.
 
-**Baco Integration:** Baco integrates CPG-guided slicing using Joern CPG to reduce code volume for LLM analysis while preserving critical vulnerability paths.
+**Baco Integration:** Baco integrates CPG-guided slicing using Joern CPG to reduce code volume for LLM analysis while preserving critical vulnerability paths. Enabled via `cpg.enabled=true`.
 
 ## Rule Synthesis & Exploit Generation
 
@@ -117,7 +117,7 @@ For the broader survey of 36 surveyed papers and the selection criteria for the 
 
 **Key Result:** LLM-driven rule synthesis achieved rapid F-score improvement through automated pattern generation and validation, demonstrating the viability of synthetic rule creation.
 
-**Baco Integration:** Baco implements LLM-driven semgrep rule synthesis with validation, using the cargo-based build system for rapid rule iteration.
+**Baco Integration:** Baco implements LLM-driven semgrep rule synthesis with validation, using the cargo-based build system for rapid rule iteration. Enabled via `rulesynth.enabled=true`.
 
 ### QRS (2602.09774)
 
@@ -139,7 +139,7 @@ For the broader survey of 36 surveyed papers and the selection criteria for the 
 
 **Key Result:** Per-CWE routing significantly improved detection on long-tailed vulnerabilities while maintaining performance on common patterns.
 
-**Baco Integration:** Baco implements per-CWE and per-language routing with specialized prompts and models, using the MoEVD pattern for phase-based dispatch.
+**Baco Integration:** Baco implements per-CWE and per-language routing with specialized prompts and models, using the MoEVD pattern for phase-based dispatch. Enabled via `router.enabled=true`.
 
 ### R2Vul + VULPO (2504.04699, 2511.11896)
 
@@ -149,6 +149,7 @@ For the broader survey of 36 surveyed papers and the selection criteria for the 
 
 **Key Result:** Specialized reasoning models significantly improved explainability and root-cause analysis quality compared to general-purpose LLMs.
 
+**Baco Integration:** Surveyed for future integration; requires GPU infrastructure for model fine-tuning. No runtime implementation currently available.
 
 ## Quality & Evaluation
 
@@ -206,14 +207,10 @@ For the broader survey of 36 surveyed papers and the selection criteria for the 
 
 ## Surveyed but Not Integrated
 
-Papers assessed but deferred or skipped:
+Papers assessed but not wired into baco. The rationale preserves the decision trail for future reconsideration.
 
-| Paper | Integration Status | Rationale |
-|-------|-------------------|----------|
-| AgentFlow (2604.20801) | Opt-in | Multi-agent synthesis implemented but gated by `agent_flow.enabled=false` |
-| VulnLLM-R (2512.07533) | Opt-in | Policy sampling and max_reasoning_tokens implemented but gated by `policy_sampling.enabled=false` |
-| PacVD (P4.3/P4.4) | Opt-in | Four-dimension context abstraction implemented but gated by `pacvd.enabled=false` |
-| VulInInstruct (P1.2) | Opt-in | Specification-guided detection implemented but gated by `vuln_spec.enabled=false` |
+| Paper | Decision | Rationale |
+|-------|----------|-----------|
 | AgenticSCR (2601.19138) | Defer | Niche pre-commit case; wait for phase loop stabilization |
 | OpenAnt | Defer | Heavy UniFFI build; architectural impact too large |
 | DeepAudit | Skip | Full platform, diverges from baco's monolithic Rust design |
@@ -226,3 +223,5 @@ Papers assessed but deferred or skipped:
 
 All papers and projects surveyed from:
 - [Awesome-LLMs-for-Vulnerability-Detection](https://github.com/huhusmang/Awesome-LLMs-for-Vulnerability-Detection)
+
+</content>

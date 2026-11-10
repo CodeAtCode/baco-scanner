@@ -57,8 +57,7 @@ unchanged until an operator opts in.
   over CWE patterns, P1.3 Semantic Path summariser, P1.4 Config + docs,
   P1.5 Wire triple-path into prompt.
 - **Risk:** Low–medium. Reuses existing tree-sitter parsers and CPG slice
-  from `CpgSlice` phase. Knowledge Path needs an embedding endpoint
-  (open question Q1).
+  from `CpgSlice` phase. Knowledge Path needs an embedding endpoint.
 - **Why integrate:** Strong empirical false-positive reduction; minimal
   structural change to baco.
 
@@ -99,8 +98,8 @@ unchanged until an operator opts in.
   generation, P2.3 Call-graph path sampler, P2.4 Function-by-name
   retrieval tool, P2.5 Wire agent scaffold into SecurityAgentVerification.
 - **Risk:** Medium. Agent scaffold depends on call-graph quality and a
-  tool-calling interface in `LlmClient` (shared prerequisite PS1 in
-  Policy sampling is 5× LLM calls — must be opt-in.
+  tool-calling interface in `LlmClient`. Policy sampling is 5× LLM calls
+  — must be opt-in.
 - **Why integrate:** Inference-time techniques are portable to any
   reasoning-capable model already configured in baco; agent scaffold
   gives the existing `SecurityAgentVerification` phase a concrete
@@ -131,8 +130,8 @@ unchanged until an operator opts in.
 - **Sub-tasks:** P3.1 Pattern DSL, P3.2 Symbolic validator against trace
   corpus, P3.3 LLM proposer with feedback loop, P3.4 Emit accepted rules
   to disk, P3.5 Config + tests.
-- **Risk:** Medium. Needs a labelled trace corpus (open question Q2 in
-  start small (CWE-78, CWE-89).
+- **Risk:** Medium. Needs a labelled trace corpus; start small (CWE-78,
+  CWE-89).
 - **Why integrate:** Bridges symbolic + LLM without replacing existing
   flows; reduces rule-author fatigue. Emitted Semgrep rules are consumed
   by the existing `Semgrep` phase with no further wiring.
@@ -180,8 +179,7 @@ unchanged until an operator opts in.
 - **Sub-tasks:** P4.1 Primitive API catalogue, P4.2 Call-depth-3 callee
   walker, P4.3 Four-dimension extractor, P4.4 Level selector + prompt
   integration, P4.5 Model-aware level auto-selection.
-- **Risk:** Low–medium. Call-graph quality is the main dependency (shared
-  prerequisite PS3).
+- **Risk:** Low–medium. Call-graph quality is the main dependency.
 - **Why integrate:** Largest reported precision boost among the five
   papers; abstraction is a strict superset of P1's Control Path, so the
   two compose.
@@ -234,10 +232,9 @@ unchanged until an operator opts in.
 - **Sub-tasks:** P5.1 Harness DSL types, P5.2 Well-formedness checker,
   P5.3 Runtime executor, P5.4 Diagnoser, P5.5 Proposer (search loop).
 - **Risk:** High. Coverage/sanitizer feedback requires build
-  instrumentation that baco does not have today (shared prerequisite PS2
-  Recommend shipping P5.1-P5.4 (static harness execution)
-  first and deferring P5.5 (search loop) until instrumentation is
-  available (open question Q3).
+  instrumentation that baco does not have today. Recommend shipping P5.1-P5.4
+  (static harness execution) first and deferring P5.5 (search loop) until
+  instrumentation is available.
 - **Why integrate:** Most invasive but highest ceiling. Makes the
   existing `SecurityAgentVerification` phase a concrete, searchable
   harness space instead of a fixed pipeline; the typed DSL gives
@@ -300,3 +297,5 @@ unchanged until an operator opts in.
 | 34 | LAMD: Context-driven Android Malware Detection | 2025 | arXiv:2502.13055 | Domain-specific | Skip (mobile malware) | N/A |
 | 35 | LLMs in Software Security: Survey of Vuln Detection | 2025 | arXiv:2502.07049 | Survey | Skip | N/A |
 | 36 | One-for-All Does Not Work! MoE for Vuln Detection | 2025 | arXiv:2501.16454 | MoE | Skip (method overview) | N/A |
+
+</content>

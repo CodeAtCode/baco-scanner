@@ -1,5 +1,62 @@
 # Configuration
 
+## Table of Contents
+
+- [Quick Start](#quick-start)
+- [Unknown Keys Are Rejected](#unknown-keys-are-rejected)
+- [Project Settings](#project-settings)
+- [Scanner Settings](#scanner-settings)
+  - [Pipeline Profile](#pipeline-profile)
+  - [Performance Settings](#performance-settings)
+  - [Semgrep Configuration](#semgrep-configuration)
+  - [Phase Enable Flags](#phase-enable-flags)
+- [Router Configuration (MoE)](#router-configuration-moe)
+- [LLM Configuration](#llm-configuration)
+  - [Timeout Semantics](#timeout-semantics)
+- [Agent Mode](#agent-mode)
+  - [Discovery Agent](#discovery-agent)
+  - [SecurityAgent Verification](#securityagent-verification)
+- [Prompt Customization](#prompt-customization)
+  - [Template Variables](#template-variables)
+- [Ticket Systems](#ticket-systems)
+- [Output Configuration](#output-configuration)
+- [Environment Variables](#environment-variables)
+- [Output Formats](#output-formats)
+- [Scan Options](#scan-options)
+  - [Dry Run](#dry-run)
+- [Aggregation Configuration](#aggregation-configuration)
+- [Research Flags](#research-flags)
+  - [Validate (CORRECT paper)](#validate-correct-paper)
+  - [VulTriage (P1)](#vultriage-p1)
+  - [VulnLLM-R Policy Sampling (P2.2)](#vulnllm-r-policy-sampling-p22)
+  - [VulnLLM-R Agent Scaffold (P2.5)](#vulnllm-r-agent-scaffold-p25)
+  - [Truncated Generation (P2.1)](#truncated-generation-p21)
+  - [MoCQ Neuro-Symbolic Rule Synthesis (P3)](#mocq-neuro-symbolic-rule-synthesis-p3)
+  - [CPG-Guided Slicing (T3.1)](#cpg-guided-slicing-t31)
+  - [PacVD Primitive-API Abstraction (P4)](#pacvd-primitive-api-abstraction-p4)
+  - [Citation Verification Gate](#citation-verification-gate)
+  - [Prior-Runs Store](#prior-runs-store)
+  - [Org-Context Profile](#org-context-profile)
+  - [Domain-Routed Hunt Prompts](#domain-routed-hunt-prompts)
+  - [Taint Rules](#taint-rules)
+  - [Exploit Synthesis (T3.2)](#exploit-synthesis-t32)
+  - [Confidence Normalization](#confidence-normalization)
+- [Triage Configuration](#triage-configuration)
+- [Priority Configuration](#priority-configuration)
+- [Budget Configuration](#budget-configuration)
+- [Knowledge Configuration](#knowledge-configuration)
+- [VulnSpec Configuration](#vulnspec-configuration)
+- [Presets](#presets)
+  - [Built-in Presets](#built-in-presets)
+  - [Preset TOML Structure](#preset-toml-structure)
+  - [Custom Presets](#custom-presets)
+  - [Fields a Preset Can Override](#fields-a-preset-can-override)
+- [Eval Suite](#eval-suite)
+- [Agent Scaffold](#agent-scaffold)
+- [Citation Verification](#citation-verification)
+- [Prior Runs](#prior-runs)
+- [Policy Sampling](#policy-sampling)
+
 ## Quick Start
 
 Minimal working configuration — copy-paste this block and fill in your API key:
@@ -31,7 +88,7 @@ unknown field `enabled`, expected one of `rulesets`, `exclude_rules`, `custom_ru
 This applies to nested keys too. The alternative, which is what baco did before,
 is that an unknown key parses cleanly and is then dropped — leaving a config
 that looks applied and does nothing. That failure mode is silent and it hides
-settings that were renamed or removed, so the load fails instead.
+settings that were renamed or removed, so the load fail instead.
 
 If a config you carried over is rejected, the message names the key that is no
 longer recognised.
@@ -54,11 +111,11 @@ path = "/path/to/target"
 languages = ["c", "cpp", "python"]
 ```
 
-## Scanner Performance & Phase Flags
+## Scanner Settings
 
-The `[scanner.performance]` section controls incremental scanning and which optional analysis phases run. Each phase flag defaults to a safe value; side-effect-heavy phases (auto-patching, PoC compilation) are opt-in.
+The `[scanner]` and `[scanner.performance]` sections control scanning behavior, pipeline phases, and performance tuning.
 
-### Pipeline profile
+### Pipeline Profile
 
 `[scanner] profile` selects which phases the pipeline is allowed to run. It is a gate applied *before* the individual phase flags.
 
@@ -76,14 +133,73 @@ Setting a flag for one of these, for example `[agent] enabled = true` for `Secur
 profile = "all"
 ```
 
+### Performance Settings
+
 ```toml
 [scanner.performance]
 # Skip unchanged files based on SHA256 hash comparison (hashes persisted to output dir)
 # Maximum number of parallel tasks for scanning operations
 max_parallel_tasks = 4
+# Early termination: stop scanning when Medium-and-above finding count exceeds this value
+# Info findings are NOT counted toward the threshold (flood-resistant). Default: 1000.0
+# Set to 0.0 to disable early termination
+early_termination_threshold = 1000.0
 # Enable file filtering to reduce false positives
 
-# --- Semgrep configuration ---
+# --- Threat modeling ---
+enable_threat_modeling = false
+# Root-cause deduplication (collapses findings that share the same root cause)
+enable_root_cause_dedup = true
+# Auto-patching (generates and validates fix patches in a staging worktree)
+# Writes code files and runs git commands — opt-in for safety
+enable_auto_patching = false
+# PoC compilation (compiles proof-of-concept exploits to verify findings)
+# Spawns external compilers — opt-in for safety
+enable_poc_compilation = false
+# Confidence refinement (re-calibrates finding confidence based on multi-source/cross-file signals)
+enable_confidence_refinement = true
+# Never-submit pattern filter - heavily penalizes findings matching known false-positive patterns
+never_submit_enabled = true
+# Multiplier applied to confidence when never-submit pattern matches (default 0.1)
+never_submit_multiplier = 0.1
+# CVE bootstrap (enriches findings with CVE data from external sources)
+enable_cve_bootstrap = true
+# Variant search (searches for variant instances of the same vulnerability pattern)
+enable_variant_search = true
+# Class A: absence detection — flag functions handling sensitive state with no auth/nonce primitive
+enable_absence_detection = true
+# Class B: merge-order detection — flag merges where user-controlled input wins over trusted defaults
+enable_merge_order_detection = true
+# Domain-routed hunt prompts: select per-attack-class prompt modules from prompts/hunt/
+enable_hunt_prompts = true
+# Variant search patterns - code patterns to search for vulnerability variants
+variant_search_patterns = [
+    # { vulnerability_type = "command_injection", code_pattern = "system\\(", context_keywords = ["os", "exec"] }
+]
+```
+
+| Flag | Default | Side effects |
+| --- | --- | --- |
+| `early_termination_threshold` | `1000.0` | None |
+| `max_parallel_tasks` | `4` | None |
+| `enable_threat_modeling` | `false` | None (read-only analysis) |
+| `enable_root_cause_dedup` | `true` | None |
+| `enable_auto_patching` | `false` | Writes code files, runs git commands in a staging worktree |
+| `enable_poc_compilation` | `false` | Spawns external compilers |
+| `enable_confidence_refinement` | `true` | None |
+| `never_submit_enabled` | `true` | None |
+| `never_submit_multiplier` | `0.1` | None |
+| `enable_cve_bootstrap` | `true` | External network requests to NVD/CISA |
+| `enable_variant_search` | `true` | Additional LLM API calls |
+| `enable_absence_detection` | `true` | None |
+| `enable_merge_order_detection` | `true` | None |
+| `enable_hunt_prompts` | `true` | None |
+
+See [`docs/architecture.md`](architecture.md) for the full 23-phase pipeline description.
+
+### Semgrep Configuration
+
+```toml
 [scanner.semgrep]
 # Rulesets to use (array of strings). If empty, defaults are derived from project.languages:
 #   - python -> "p/python"
@@ -101,7 +217,7 @@ exclude_rules = ["html.security.plaintext-http-link"]
 # Max file size (in bytes) passed to semgrep via --max-target-bytes.
 # Files larger than this are skipped by semgrep without aborting the scan.
 # When unset, semgrep uses its own default (~1 MiB).
-# max_target_bytes = 1048576
+max_target_bytes = 1048576
 # Inline rule YAML documents (full `rules:` blocks) - materialized to temp files at scan time
 custom_rules = ['''
 rules:
@@ -111,57 +227,16 @@ rules:
     message: example rule
     pattern: eval($X)
 ''']
+# When true, pass `--no-git-ignore` to semgrep to scan files ignored by `.gitignore`
+force_scan = false
 ```
 
-### Semgrep severity mapping
+#### Semgrep Severity Mapping
 
 Semgrep findings have their severity determined by:
 1. **First**: `extra.severity` from semgrep output (ERROR→High, WARNING→Medium, INFO/INVENTORY→Low)
 2. **Fallback**: check_id keywords (e.g., "critical" in ID raises severity)
 3. **Important**: check_id keywords can only **raise** severity, never lower it
-
-```toml
-# --- Phase enable flags ---
-# Each flag controls whether a specific analysis phase runs during the scan.
-
-# Threat modeling using STRIDE analysis (adds LLM-based threat identification)
-enable_threat_modeling = false
-# Root-cause deduplication (collapses findings that share the same root cause)
-enable_root_cause_dedup = true
-# Auto-patching (generates and validates fix patches in a staging worktree)
-# Writes code files and runs git commands — opt-in for safety
-enable_auto_patching = false
-# PoC compilation (compiles proof-of-concept exploits to verify findings)
-# Spawns external compilers — opt-in for safety
-enable_poc_compilation = false
-# Confidence refinement (re-calibrates finding confidence based on multi-source/cross-file signals)
-enable_confidence_refinement = true
-# Never-submit pattern filter - heavily penalizes findings matching known false-positive patterns
-# When enabled, findings matching patterns like "missing.*header" or "content.security.policy"
-# have their confidence multiplied by never_submit_multiplier
-never_submit_enabled = true
-# Multiplier applied to confidence when never-submit pattern matches
-# A value of 0.1 reduces confidence to 10% of its original value
-never_submit_multiplier = 0.1
-# CVE bootstrap (enriches findings with CVE data from external sources)
-enable_cve_bootstrap = true
-# Variant search (searches for variant instances of the same vulnerability pattern)
-enable_variant_search = true
-```
-
-| Flag | Default | Side effects |
-| --- | --- | --- |
-| `enable_threat_modeling` | `false` | None (read-only analysis) |
-| `enable_root_cause_dedup` | `true` | None |
-| `enable_auto_patching` | `false` | Writes code files, runs git commands in a staging worktree |
-| `enable_poc_compilation` | `false` | Spawns external compilers |
-| `enable_confidence_refinement` | `true` | None |
-| `never_submit_enabled` | `true` | None |
-| `never_submit_multiplier` | `0.1` | None |
-| `enable_cve_bootstrap` | `true` | External network requests to NVD/CISA |
-| `enable_variant_search` | `true` | Additional LLM API calls |
-
-See [`docs/architecture.md`](architecture.md) for the full 23-phase pipeline description.
 
 ## Router Configuration (MoE)
 
@@ -195,6 +270,13 @@ BACO supports single or multiple models per phase. When multiple models are conf
 ```toml
 [llm]
 base_url = "https://api.mistral.ai/v1"
+timeout_secs = 60
+max_retries = 3
+retry_backoff_ms = 1000
+max_concurrent = 4
+temperature = 0.5
+enable_llm_cache = false
+cache_dir = null
 ```
 
 **Per-phase overrides:** Each phase supports optional `timeout_secs` and `temperature` overrides:
@@ -208,7 +290,7 @@ timeout_secs = 120      # Per-phase timeout override
 temperature = 0.3       # Per-phase temperature override
 ```
 
-### LLM Timeout Semantics
+### Timeout Semantics
 
 Timeout configuration operates at two levels:
 
@@ -267,7 +349,8 @@ models = ["gpt-4o", "gpt-4o-mini"]  # multiple models for distributed load
 
 BACO has **two distinct agent modes**:
 
-### 1. Discovery Agent (`agent.enabled = true`)
+### Discovery Agent
+
 When enabled, the LLM Discovery phase reads source files directly before analyzing findings:
 
 ```toml
@@ -282,7 +365,8 @@ tool_timeout_secs = 60   # Timeout for tool execution
 - Uses tools (file_read, pattern_search) for deeper analysis
 - Provides more accurate vulnerability descriptions with context
 
-### 2. SecurityAgent Verification (Phase 10)
+### SecurityAgent Verification (Phase 10)
+
 A **separate verification phase** that uses an embedded security agent with tools to **prove or disprove** findings:
 
 - **file_read**: Examine vulnerable code in context
@@ -304,7 +388,7 @@ BACO uses prompt templates for each phase loaded from markdown files at runtime.
 - `prompts/phases/llm_verification.md`
 - `prompts/phases/reporting.md`
 
-View the [full prompt templates on GitHub](prompts/phases/) to understand default behavior.
+View the [full prompt templates on GitHub](../prompts/phases/) to understand default behavior.
 
 **Inline override in config.toml**:
 ```toml
@@ -324,6 +408,8 @@ Current Description: %%CURRENT_DESCRIPTION%%
 Description: %%VULNERABILITY_DESCRIPTION%%
 """
 ```
+
+### Template Variables
 
 **Available template variables:**
 - `%%PROJECT_PATH%%` - Target project path
@@ -406,13 +492,13 @@ include_rejected = false
 
 ## Output Formats
 
-- **findings.json**: Complete vulnerability data, 32 fields per finding. Never filtered by the evidence gate; it carries a `verification_tier` so you can filter it yourself
+- **findings.json**: Complete vulnerability data with all fields. Never filtered by the evidence gate; it carries a `verification_tier` so you can filter it yourself
 - **report.html**: Visual report with severity colors, code snippets, AI summary
 - **report.sarif**: SARIF format for CI/CD integration, written by `baco report --format sarif` (a scan does not produce it)
 
 ## Scan Options
 
-### `--dry-run`
+### Dry Run
 
 The `--dry-run` flag performs indexing and prioritization without executing any LLM or semgrep phases. It prints an estimate of the resources a full scan would consume, then exits.
 
@@ -475,11 +561,11 @@ fp_store_path = "./fp-store.json"
 |-------|------|---------|-------------|
 | `fp_store_path` | str | `None` | Path to JSON file storing false positive patterns |
 
-## Paper-Integration Research Flags
+## Research Flags
 
 > **Experimental — disabled by default.** These sections enable research-backed analysis augmentations. Enable only after understanding the tradeoffs.
 
-### Validate (CORRECT paper arxiv:2504.13474)
+### Validate (CORRECT paper)
 
 LLM-as-judge rationale validation: evaluates the soundness of reasoning behind each finding and adjusts confidence accordingly (+0.10 sound, -0.20 flawed).
 
@@ -492,7 +578,7 @@ LLM-as-judge rationale validation: evaluates the soundness of reasoning behind e
 enabled = false
 ```
 
-### VulTriage (P1) — arXiv:2605.09461
+### VulTriage (P1)
 
 Triple-path context augmentation. Prepends control path (AST/CFG/DFG), knowledge
 path (CWE pattern RAG), and semantic path (function summary) to the LLM prompt
@@ -509,7 +595,7 @@ enabled = false
 semantic_path = true
 ```
 
-### VulnLLM-R Policy Sampling (P2.2) — arXiv:2605.09461
+### VulnLLM-R Policy Sampling (P2.2)
 
 Policy-based CWE generation. Queries the LLM N times to build a candidate set,
 then a final call picks one label. Increases LLM cost ~5x.
@@ -525,7 +611,7 @@ enabled = false
 samples = 4
 ```
 
-### VulnLLM-R Agent Scaffold (P2.5) — arXiv:2605.09461
+### VulnLLM-R Agent Scaffold (P2.5)
 
 Builds 3-path call-graph context + function-lookup tool per target for
 agent-assisted analysis.
@@ -543,7 +629,7 @@ max_rounds = 5
 paths_per_target = 3
 ```
 
-### Truncated Generation (P2.1) — arXiv:2605.09461
+### Truncated Generation (P2.1)
 
 Caps reasoning tokens before forcing the final answer. Configured in the `[llm]` section.
 
@@ -556,7 +642,7 @@ Caps reasoning tokens before forcing the final answer. Configured in the `[llm]`
 max_reasoning_tokens = 2048
 ```
 
-### MoCQ Neuro-Symbolic Rule Synthesis (P3) — arXiv:2605.13918
+### MoCQ Neuro-Symbolic Rule Synthesis (P3)
 
 RuleSynthesis 2.0: LLM proposes patterns in a DSL → symbolic validator gives
 feedback → iterative loop. Extends the `[scanner.rulesynth]` section.
@@ -592,7 +678,7 @@ joern_path = null
 slice_budget_lines = 200
 ```
 
-### PacVD Primitive-API Abstraction (P4) — arXiv:2605.07785
+### PacVD Primitive-API Abstraction (P4)
 
 Appends callee abstraction at one of four granularity levels to the LLM prompt.
 Level 1 = fuzzy branches only; Level 4 = concrete branches + key variables.
@@ -682,9 +768,9 @@ enable_hunt_prompts = true
 
 Available modules: `injection.md`, `auth.md`, `authz_absence.md`, `xss.md`, `path_traversal.md`, `crypto.md`, `resource.md`, `deserialization.md`, `memory_safety.md`.
 
-### Taint rules are derived from the project languages
+### Taint Rules
 
-Taint rules are always merged from the project languages (python, javascript/typescript, go, php, c/cpp, java, ruby, csharp). Explicit `custom_rules` no longer suppress them; when a rule id exists in both, the explicit one wins.
+Taint rules are always derived from the project languages (python, javascript/typescript, go, php, c/cpp, java, ruby, csharp). Explicit `custom_rules` no longer suppress them; when a rule id exists in both, the explicit one wins.
 
 CWE classes covered per language:
 - **SQLi**: CWE-89 (all languages)
@@ -727,6 +813,102 @@ normalization_tier = "None"
 project_baseline_path = null
 ```
 
+## Triage Configuration
+
+The `[triage]` section configures the triage cascade (T17). First pass: cheap model triage per file to filter out non-suspicious files. Second pass: deep analysis only on files that pass the suspicion threshold.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | bool | `false` | Enable triage cascade |
+| `model` | str | `"mistral-small"` | Model to use for triage pass |
+| `batch_size` | u8 | `8` | Batch size for triage requests |
+| `suspicion_threshold` | f32 | `0.35` | Suspicion threshold for deep analysis |
+
+```toml
+[triage]
+enabled = false
+model = "mistral-small"
+batch_size = 8
+suspicion_threshold = 0.35
+```
+
+## Priority Configuration
+
+The `[priority]` section configures file prioritization (T18). Scores files based on recency, entry-point status, and size to prioritize LLM budget.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | bool | `false` | Enable prioritization |
+| `git_recent_boost` | f32 | `2.0` | Boost factor for recently modified files (git or mtime < 7 days) |
+| `entry_point_boost` | f32 | `1.5` | Boost factor for entry-point files (main.*, index.*, app.*, server.*, __init__.*) |
+| `small_file_boost` | f32 | `1.2` | Boost factor for small files (< 10KB) |
+| `entry_point_patterns` | array | `[]` | Path/content patterns that mark a file as an entry point (empty = built-in defaults) |
+| `sink_patterns` | array | `[]` | Content substrings that mark a file as security-relevant; a match boosts priority |
+
+```toml
+[priority]
+enabled = false
+git_recent_boost = 2.0
+entry_point_boost = 1.5
+small_file_boost = 1.2
+entry_point_patterns = []
+sink_patterns = []
+```
+
+## Budget Configuration
+
+The `[budget]` section configures LLM budget enforcement (T18). Limits total LLM calls and reserves budget for high-risk files.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | bool | `false` | Enable budget enforcement |
+| `max_llm_calls` | usize | `200` | Maximum total LLM calls (triage + deep analysis) |
+| `reserve_percent_for_high_risk` | u8 | `20` | Percent of budget to reserve for high-risk files |
+
+```toml
+[budget]
+enabled = false
+max_llm_calls = 200
+reserve_percent_for_high_risk = 20
+```
+
+## Knowledge Configuration
+
+The `[knowledge]` section configures the knowledge base: per-CWE false-positive indicator patterns, required security primitives, and framework-specific hook registries.
+
+```toml
+[knowledge]
+# CWE id ("CWE-79") -> literal code substrings indicating a likely false positive
+fp_patterns = { "CWE-79" = ["esc_html(", "esc_attr(", "wp_kses_post("] }
+# Language-keyed primitives that must guard privileged actions; verification prompt references them.
+required_security_primitives = { "php" = ["wp_verify_nonce", "check_admin_referer", "current_user_can"] }
+# Per-language hook registry configuration for framework-specific entry point detection
+hook_registry = { "php" = { hook_label = "entry_point", registrations = ["(?si)add_action\\s*\\("] } }
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `fp_patterns` | map | `{}` | CWE ID → list of false-positive indicator strings |
+| `required_security_primitives` | map | `{}` | Language → list of required security primitives |
+| `hook_registry` | map | `{}` | Language → HookRegistryLanguageConfig with `hook_label`, `registrations` regexes, and optional `handler_patterns` override |
+
+## VulnSpec Configuration
+
+The `[vuln_spec]` section configures the VulInSpec security specification extraction and retrieval system (arXiv:2511.04014).
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | bool | `false` | Enable VulInSpec |
+| `db_path` | str | `"baco-output/vuln_spec_db.json"` | Path to the specification database (JSON file) |
+| `auto_extract_from_patches` | bool | `false` | Automatically extract specs from incoming patches |
+
+```toml
+[vuln_spec]
+enabled = false
+db_path = "baco-output/vuln_spec_db.json"
+auto_extract_from_patches = false
+```
+
 ## Presets
 
 Presets are bundled TOML overlays that pre-configure BACO for a target project
@@ -749,6 +931,7 @@ A key set in your `config.toml` wins over the same key in the preset, so a prese
 | `oss-python`       | Generic OSS Python project                      | python                |
 | `oss-monorepo`     | Polyglot OSS monorepo                           | python, rust          |
 
+```bash
 # List available presets (built-in + ~/.config/baco/presets/*.toml)
 baco preset list
 ```
@@ -806,7 +989,6 @@ suspicion_threshold = 0.35
 [priority]
 entry_point_patterns = ["wp-admin/admin-post.php", "xmlrpc.php"]
 sink_patterns = ["$wpdb->query", "unserialize(", "eval("]
-churn_weight = 0.3
 
 [budget]
 enabled = true
@@ -874,14 +1056,14 @@ check against.
 | `scanner`    | `max_file_size_kb`, `exclude_paths`, `semgrep.rulesets`, `semgrep.custom_rules`, `performance.*`  |
 | `llm`        | `timeout_secs`, `max_concurrent`, `temperature`, `phases.*`               |
 | `triage`     | `enabled`, `model`, `batch_size`, `suspicion_threshold`                   |
-| `priority`   | `enabled`, `git_recent_boost`, `entry_point_boost`, `small_file_boost`    |
+| `priority`   | `enabled`, `git_recent_boost`, `entry_point_boost`, `small_file_boost`, `entry_point_patterns`, `sink_patterns` |
 | `budget`     | `enabled`, `max_llm_calls`, `reserve_percent_for_high_risk`               |
 | `agent`      | `enabled`, `max_turns`, `tool_timeout_secs`               |
 | `knowledge`  | `fp_patterns` (map of CWE → list of false-positive indicator strings), `required_security_primitives` (map of language → list of required primitives), `hook_registry` (map of language → HookRegistryLanguageConfig with `hook_label`, `registrations` regexes with optional `(?P<hook>)` capture, `handler_patterns` override) |
 
 Unset fields keep the base `ScannerConfig` default; CLI flags still override the preset.
 
-## Eval suite
+## Eval Suite
 
 The `[eval]` section configures the detection-regression suite run by `baco eval`.
 
@@ -894,8 +1076,7 @@ The `[eval]` section configures the detection-regression suite run by `baco eval
 floor = 0.9
 ```
 
-
-## Agent scaffold
+## Agent Scaffold
 
 The `[agent_scaffold]` section configures the call-graph-guided agent scaffold used during security-agent verification.
 
@@ -910,7 +1091,7 @@ The `[agent_scaffold]` section configures the call-graph-guided agent scaffold u
 enabled = false
 ```
 
-## Citation verification
+## Citation Verification
 
 The `[citation_verification]` section controls verification that finding citations (file + line) actually resolve in the target source.
 
@@ -930,7 +1111,7 @@ Whether failed findings reach the report is decided by
 enabled = true
 ```
 
-## Prior runs
+## Prior Runs
 
 The `[prior_runs]` section configures the cross-run findings history used for skip directives and coverage-gap targeting on subsequent scans.
 
@@ -944,7 +1125,7 @@ The `[prior_runs]` section configures the cross-run findings history used for sk
 enabled = false
 ```
 
-## Policy sampling
+## Policy Sampling
 
 The `[policy_sampling]` section configures policy-based sampling rounds (VulnLLM-R style generation).
 
@@ -975,3 +1156,5 @@ Each entry in `systems` describes one ticket backend:
 system_type = "github"
 url = "https://github.com/org/repo"
 ```
+
+</content>

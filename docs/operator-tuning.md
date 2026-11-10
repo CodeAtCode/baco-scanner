@@ -4,6 +4,8 @@ Performance tuning for the Baco SAST scanner. Adjust settings based on scan spee
 
 ## Scenario Profiles
 
+> **Profile Note:** Flags under `[scanner.performance]` that are disabled by default (e.g., `enable_threat_modeling`) only take effect when `scanner.profile = "all"` is set. The default `core` profile excludes 9 experimental phases. See [Configuration](configuration.md#scanner-performance--phase-flags) for details.
+
 ### Fast CI Scans (Sub-10-Minute Turnaround)
 
 ```toml
@@ -101,17 +103,12 @@ Use to suppress known false positives. Document each exclusion.
 
 ### Early Termination Threshold
 
-Controls when the scan stops based on finding count. Set to `0.0` to disable.
-
-```toml
-### Early Termination Threshold
-
-Controls when the scan stops based on finding count. Only medium-and-above findings are counted (Info findings are excluded to prevent flooding). Set to `0.0` to disable.
-
 ```toml
 [scanner.performance]
 early_termination_threshold = 500.0
 ```
+
+Controls when the scan stops based on finding count. Only medium-and-above findings are counted (Info findings are excluded to prevent flooding). Set to `0.0` to disable.
 
 Scan stops after N medium+ findings. Useful for very large codebases. When triggered, an `early_termination` section is recorded in the JSON report.
 

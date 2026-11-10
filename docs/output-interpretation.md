@@ -19,8 +19,9 @@ Each finding in `findings.json` is a `VulnerabilityFinding` struct. Example:
   "code_snippet": "query = \"SELECT * FROM users WHERE id=\" + user_input",
   "diff_hunk": "@@ -40,4 +40,4 @@\n- query = \"SELECT...\" + user_input\n+ query = prepare(\"SELECT...\", user_input)",
   "recommendation": "Use parameterized queries",
-  "sources": ["phase3_pattern", "phase7_llm"],
+  "sources": ["semgrep_pattern", "llm_verification"],
   "verification_status": "needs_review",
+  "verification_tier": "supported",
   "triage_verdict": "pass"
 }
 ```
@@ -29,7 +30,7 @@ Each finding in `findings.json` is a `VulnerabilityFinding` struct. Example:
 
 | Field | Meaning |
 |-------|---------|
-| `id` | SHA256 hash of file+line+CWE (unique identifier) |
+| `id` | Stable hash uniquely identifying this finding (SHA256 of file path, line, CWE, rule ID, and code snippet) |
 | `severity` | Critical, High, Medium, Low, or Info |
 | `confidence_score` | 0.0–1.0 likelihood this is a real vulnerability |
 | `cwe_id` | Common Weakness Enumeration identifier |
@@ -47,8 +48,8 @@ The `confidence_score` reflects how likely the finding is a true positive.
 
 | Range | Interpretation | Action |
 |-------|----------------|--------|
-| 0.8+ | High confidence — likely real | Prioritize for fix |
-| 0.4–0.6 | Moderate confidence — needs review | Investigate manually |
+| ≥0.8 | High confidence — likely real | Prioritize for fix |
+| 0.4–0.79 | Moderate confidence — needs review | Investigate manually |
 | <0.4 | Low confidence — likely false positive | Review but deprioritize |
 
 ### How Confidence Gets Adjusted
@@ -80,7 +81,7 @@ The `verification_status` field shows human/LLM triage state:
 | `false_positive` | Verified as not a vulnerability | **Dismiss** — no action needed |
 | `failed` | Verification process encountered an error | **Retry verification** or manual review |
 
-Set `verification_status` manually in `findings.json` or via baco's triage interface.
+Set `verification_status` manually in `findings.json` or via the `baco verify` subcommand.
 
 ## Triage Verdicts
 
@@ -128,7 +129,7 @@ With the gate off (default), all outputs contain all findings unchanged.
 
 Combine severity and confidence to decide what to fix first:
 
-| | **High Confidence (0.8+)** | **Medium (0.4–0.6)** | **Low (<0.4)** |
+| | **High Confidence (≥0.8)** | **Medium (0.4–0.79)** | **Low (<0.4)** |
 |---|---|---|---|
 | **Critical** | 🔴 Fix now | 🟠 Verify, then fix | 🟡 Verify first |
 | **High** | 🔴 Fix now | 🟠 Investigate | 🟡 Review later |
