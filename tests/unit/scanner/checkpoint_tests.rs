@@ -53,33 +53,22 @@ async fn test_save_checkpoint_records_scan_target_and_config() {
 
 // Shared test data for phase transition tests (mirrors src/scanner/checkpoint.rs)
 const PHASE_TRANSITION_TEST_CASES: &[(ScanPhase, ScanPhase)] = &[
-    // Parallel phases (Indexing, Semgrep, CpgSlice, LlmStaticAnalysis run concurrently)
+    // Parallel phases (Indexing, Semgrep, LlmStaticAnalysis run concurrently)
     (ScanPhase::Indexing, ScanPhase::Semgrep),
-    (ScanPhase::Semgrep, ScanPhase::CpgSlice),
-    (ScanPhase::CpgSlice, ScanPhase::LlmStaticAnalysis),
+    (ScanPhase::Semgrep, ScanPhase::LlmStaticAnalysis),
     (ScanPhase::LlmStaticAnalysis, ScanPhase::CweRouting),
     // Sequential phases
-    (ScanPhase::CweRouting, ScanPhase::RuleSynthesis),
-    (ScanPhase::RuleSynthesis, ScanPhase::LlmDiscovery),
+    (ScanPhase::CweRouting, ScanPhase::LlmDiscovery),
     (ScanPhase::LlmDiscovery, ScanPhase::LlmVerification),
     (ScanPhase::LlmVerification, ScanPhase::Validate),
-    (ScanPhase::Validate, ScanPhase::SecurityAgentVerification),
-    (
-        ScanPhase::SecurityAgentVerification,
-        ScanPhase::TicketCrossRef,
-    ),
+    (ScanPhase::Validate, ScanPhase::TicketCrossRef),
     (ScanPhase::TicketCrossRef, ScanPhase::GitAnalysis),
     (ScanPhase::GitAnalysis, ScanPhase::CrossFileAnalysis),
     (ScanPhase::CrossFileAnalysis, ScanPhase::ConfidenceScoring),
     (ScanPhase::ConfidenceScoring, ScanPhase::AiAggregation),
-    (ScanPhase::AiAggregation, ScanPhase::ThreatModeling),
-    (ScanPhase::ThreatModeling, ScanPhase::RootCauseDedup),
-    (ScanPhase::RootCauseDedup, ScanPhase::AutoPatching),
-    (ScanPhase::AutoPatching, ScanPhase::CveBootstrap),
-    (ScanPhase::CveBootstrap, ScanPhase::PocCompiler),
-    (ScanPhase::PocCompiler, ScanPhase::ExploitSynth),
-    (ScanPhase::ExploitSynth, ScanPhase::VariantSearch),
-    (ScanPhase::VariantSearch, ScanPhase::Reporting),
+    (ScanPhase::AiAggregation, ScanPhase::RootCauseDedup),
+    (ScanPhase::RootCauseDedup, ScanPhase::CveBootstrap),
+    (ScanPhase::CveBootstrap, ScanPhase::Reporting),
     (ScanPhase::Reporting, ScanPhase::Complete),
     // Terminal states
     (ScanPhase::Complete, ScanPhase::Indexing),
@@ -380,7 +369,7 @@ fn test_checkpoint_resume_from_semgrep() {
     checkpoint.save(&temp_path).unwrap();
 
     let next_phase = Checkpoint::resume_from(&temp_path).unwrap();
-    assert_eq!(next_phase, ScanPhase::CpgSlice);
+    assert_eq!(next_phase, ScanPhase::LlmStaticAnalysis);
 
     let _ = fs::remove_file(&temp_path);
 }
@@ -549,17 +538,9 @@ fn test_scan_phase_all_variants_exist() {
         "ConfidenceScoring"
     );
     assert_eq!(format!("{:?}", ScanPhase::AiAggregation), "AiAggregation");
-    assert_eq!(format!("{:?}", ScanPhase::Reporting), "Reporting");
-    assert_eq!(format!("{:?}", ScanPhase::ThreatModeling), "ThreatModeling");
     assert_eq!(format!("{:?}", ScanPhase::RootCauseDedup), "RootCauseDedup");
-    assert_eq!(format!("{:?}", ScanPhase::AutoPatching), "AutoPatching");
     assert_eq!(format!("{:?}", ScanPhase::CveBootstrap), "CveBootstrap");
-    assert_eq!(format!("{:?}", ScanPhase::PocCompiler), "PocCompiler");
-    assert_eq!(format!("{:?}", ScanPhase::VariantSearch), "VariantSearch");
-    assert_eq!(
-        format!("{:?}", ScanPhase::SecurityAgentVerification),
-        "SecurityAgentVerification"
-    );
+    assert_eq!(format!("{:?}", ScanPhase::Reporting), "Reporting");
     assert_eq!(format!("{:?}", ScanPhase::Complete), "Complete");
     assert_eq!(format!("{:?}", ScanPhase::Error), "Error");
 }
@@ -692,26 +673,18 @@ fn test_resume_from_all_phases_inline_migrated() {
                 next_phase,
                 ScanPhase::Indexing
                     | ScanPhase::Semgrep
-                    | ScanPhase::CpgSlice
                     | ScanPhase::LlmStaticAnalysis
                     | ScanPhase::CweRouting
-                    | ScanPhase::RuleSynthesis
                     | ScanPhase::LlmDiscovery
                     | ScanPhase::LlmVerification
                     | ScanPhase::Validate
-                    | ScanPhase::SecurityAgentVerification
                     | ScanPhase::TicketCrossRef
                     | ScanPhase::GitAnalysis
                     | ScanPhase::CrossFileAnalysis
                     | ScanPhase::ConfidenceScoring
                     | ScanPhase::AiAggregation
-                    | ScanPhase::ThreatModeling
                     | ScanPhase::RootCauseDedup
-                    | ScanPhase::AutoPatching
                     | ScanPhase::CveBootstrap
-                    | ScanPhase::PocCompiler
-                    | ScanPhase::ExploitSynth
-                    | ScanPhase::VariantSearch
                     | ScanPhase::Reporting
                     | ScanPhase::Complete
             ),
@@ -970,7 +943,7 @@ fn test_resume_from_error_phase_inline_migrated() {
 fn test_resume_from_all_phase_transitions_inline_migrated() {
     let transitions = vec![
         (ScanPhase::Indexing, ScanPhase::Semgrep),
-        (ScanPhase::Semgrep, ScanPhase::CpgSlice),
+        (ScanPhase::Semgrep, ScanPhase::LlmStaticAnalysis),
     ];
 
     for (from, expected_next) in transitions {
@@ -1001,19 +974,14 @@ fn test_checkpoint_nonexistent_file_inline_migrated() {
 fn test_scan_phase_display_all_variants() {
     assert_eq!(format!("{}", ScanPhase::Indexing), "Indexing");
     assert_eq!(format!("{}", ScanPhase::Semgrep), "Semgrep");
-    assert_eq!(format!("{}", ScanPhase::CweRouting), "CweRouting");
-    assert_eq!(format!("{}", ScanPhase::CpgSlice), "CpgSlice");
     assert_eq!(
         format!("{}", ScanPhase::LlmStaticAnalysis),
         "LlmStaticAnalysis"
     );
+    assert_eq!(format!("{}", ScanPhase::CweRouting), "CweRouting");
     assert_eq!(format!("{}", ScanPhase::LlmDiscovery), "LlmDiscovery");
     assert_eq!(format!("{}", ScanPhase::LlmVerification), "LlmVerification");
     assert_eq!(format!("{}", ScanPhase::Validate), "Validate");
-    assert_eq!(
-        format!("{}", ScanPhase::SecurityAgentVerification),
-        "SecurityAgentVerification"
-    );
     assert_eq!(format!("{}", ScanPhase::TicketCrossRef), "TicketCrossRef");
     assert_eq!(format!("{}", ScanPhase::GitAnalysis), "GitAnalysis");
     assert_eq!(
@@ -1025,48 +993,31 @@ fn test_scan_phase_display_all_variants() {
         "ConfidenceScoring"
     );
     assert_eq!(format!("{}", ScanPhase::AiAggregation), "AiAggregation");
-    assert_eq!(format!("{}", ScanPhase::ThreatModeling), "ThreatModeling");
     assert_eq!(format!("{}", ScanPhase::RootCauseDedup), "RootCauseDedup");
-    assert_eq!(format!("{}", ScanPhase::AutoPatching), "AutoPatching");
     assert_eq!(format!("{}", ScanPhase::CveBootstrap), "CveBootstrap");
-    assert_eq!(format!("{}", ScanPhase::PocCompiler), "PocCompiler");
-    assert_eq!(format!("{}", ScanPhase::ExploitSynth), "ExploitSynth");
-    assert_eq!(format!("{}", ScanPhase::VariantSearch), "VariantSearch");
     assert_eq!(format!("{}", ScanPhase::Reporting), "Reporting");
-    assert_eq!(format!("{}", ScanPhase::RuleSynthesis), "RuleSynthesis");
     assert_eq!(format!("{}", ScanPhase::Complete), "Complete");
     assert_eq!(format!("{}", ScanPhase::Error), "Error");
 }
 
 #[test]
-fn test_checkpoint_resume_from_all_23_phases() {
-    // Test every phase in the 23-phase pipeline
+fn test_checkpoint_resume_from_all_15_phases() {
+    // Test every phase in the 15-phase pipeline
     let all_phases = vec![
         (ScanPhase::Indexing, ScanPhase::Semgrep),
-        (ScanPhase::Semgrep, ScanPhase::CpgSlice),
-        (ScanPhase::CpgSlice, ScanPhase::LlmStaticAnalysis),
+        (ScanPhase::Semgrep, ScanPhase::LlmStaticAnalysis),
         (ScanPhase::LlmStaticAnalysis, ScanPhase::CweRouting),
-        (ScanPhase::CweRouting, ScanPhase::RuleSynthesis),
-        (ScanPhase::RuleSynthesis, ScanPhase::LlmDiscovery),
+        (ScanPhase::CweRouting, ScanPhase::LlmDiscovery),
         (ScanPhase::LlmDiscovery, ScanPhase::LlmVerification),
         (ScanPhase::LlmVerification, ScanPhase::Validate),
-        (ScanPhase::Validate, ScanPhase::SecurityAgentVerification),
-        (
-            ScanPhase::SecurityAgentVerification,
-            ScanPhase::TicketCrossRef,
-        ),
+        (ScanPhase::Validate, ScanPhase::TicketCrossRef),
         (ScanPhase::TicketCrossRef, ScanPhase::GitAnalysis),
         (ScanPhase::GitAnalysis, ScanPhase::CrossFileAnalysis),
         (ScanPhase::CrossFileAnalysis, ScanPhase::ConfidenceScoring),
         (ScanPhase::ConfidenceScoring, ScanPhase::AiAggregation),
-        (ScanPhase::AiAggregation, ScanPhase::ThreatModeling),
-        (ScanPhase::ThreatModeling, ScanPhase::RootCauseDedup),
-        (ScanPhase::RootCauseDedup, ScanPhase::AutoPatching),
-        (ScanPhase::AutoPatching, ScanPhase::CveBootstrap),
-        (ScanPhase::CveBootstrap, ScanPhase::PocCompiler),
-        (ScanPhase::PocCompiler, ScanPhase::ExploitSynth),
-        (ScanPhase::ExploitSynth, ScanPhase::VariantSearch),
-        (ScanPhase::VariantSearch, ScanPhase::Reporting),
+        (ScanPhase::AiAggregation, ScanPhase::RootCauseDedup),
+        (ScanPhase::RootCauseDedup, ScanPhase::CveBootstrap),
+        (ScanPhase::CveBootstrap, ScanPhase::Reporting),
         (ScanPhase::Reporting, ScanPhase::Complete),
         (ScanPhase::Complete, ScanPhase::Indexing),
         (ScanPhase::Error, ScanPhase::Indexing),

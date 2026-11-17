@@ -7,7 +7,7 @@ use crate::pipeline_test_helpers::{
 #[test]
 fn test_all_active_phases_exist() {
     let phases = active_phases();
-    assert_eq!(phases.len(), 23, "Should have 23 active phases");
+    assert_eq!(phases.len(), 15, "Should have 15 active phases");
 }
 
 #[test]
@@ -55,7 +55,6 @@ fn test_parallel_phases_are_active() {
     let parallel = vec![
         ScanPhase::Indexing,
         ScanPhase::Semgrep,
-        ScanPhase::CpgSlice,
         ScanPhase::LlmStaticAnalysis,
     ];
     for phase in &parallel {
@@ -74,11 +73,11 @@ fn test_scan_phase_completeness() {
     all.extend(orphaned_phases());
     all.extend(terminal_phases());
 
-    // ScanPhase has 25 variants total
+    // ScanPhase has 17 variants total: 15 active + 2 terminal (Complete, Error)
     assert_eq!(
         all.len(),
-        25,
-        "All 25 ScanPhase variants must be categorized"
+        17,
+        "All 17 ScanPhase variants must be categorized (15 active + 2 terminal)"
     );
 }
 
@@ -99,12 +98,10 @@ fn test_new_phases_have_resume_from_routing() {
     // Verify the three newly-wired phases have proper resume_from transitions
     let tmp = tempfile::tempdir().unwrap();
     let transitions = vec![
-        (ScanPhase::Semgrep, ScanPhase::CpgSlice),
-        (ScanPhase::CpgSlice, ScanPhase::LlmStaticAnalysis),
-        (ScanPhase::CweRouting, ScanPhase::RuleSynthesis),
-        (ScanPhase::RuleSynthesis, ScanPhase::LlmDiscovery),
-        (ScanPhase::PocCompiler, ScanPhase::ExploitSynth),
-        (ScanPhase::ExploitSynth, ScanPhase::VariantSearch),
+        (ScanPhase::Semgrep, ScanPhase::LlmStaticAnalysis),
+        (ScanPhase::LlmStaticAnalysis, ScanPhase::CweRouting),
+        (ScanPhase::CweRouting, ScanPhase::LlmDiscovery),
+        (ScanPhase::LlmDiscovery, ScanPhase::LlmVerification),
     ];
 
     for (from, expected_next) in transitions {

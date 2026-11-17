@@ -1,10 +1,8 @@
-pub mod agent_verification;
 pub mod discovery;
 mod helpers;
 pub mod static_analysis;
 pub mod verification;
 
-pub use agent_verification::run_security_agent_verification;
 pub use discovery::{
     build_stable_discovery_prefix, build_volatile_discovery_tail, merge_agent_severity,
     partition_for_discovery, run_llm_discovery,

@@ -57,7 +57,7 @@ unchanged until an operator opts in.
   over CWE patterns, P1.3 Semantic Path summariser, P1.4 Config + docs,
   P1.5 Wire triple-path into prompt.
 - **Risk:** Low–medium. Reuses existing tree-sitter parsers and CPG slice
-  from `CpgSlice` phase. Knowledge Path needs an embedding endpoint.
+  from `LlmStaticAnalysis` phase. Knowledge Path needs an embedding endpoint.
 - **Why integrate:** Strong empirical false-positive reduction; minimal
   structural change to baco.
 
@@ -92,17 +92,17 @@ unchanged until an operator opts in.
 - **baco integration target:**
   - Reasoning adapter → `src/scanner/phases/llm_phases.rs::run_llm_static_analysis`
     and `run_llm_verification` (any LLM call site).
-  - Agent scaffold → extend `SecurityAgentVerification` phase in
-    `src/scanner/phases/other_phases.rs`.
+  - Agent scaffold → extend `LlmVerification` phase in
+    `src/scanner/phases/llm_phases.rs`.
 - **Sub-tasks:** P2.1 Truncated generation option, P2.2 Policy-based
   generation, P2.3 Call-graph path sampler, P2.4 Function-by-name
-  retrieval tool, P2.5 Wire agent scaffold into SecurityAgentVerification.
+  retrieval tool, P2.5 Wire agent scaffold into LlmVerification.
 - **Risk:** Medium. Agent scaffold depends on call-graph quality and a
   tool-calling interface in `LlmClient`. Policy sampling is 5× LLM calls
   — must be opt-in.
 - **Why integrate:** Inference-time techniques are portable to any
   reasoning-capable model already configured in baco; agent scaffold
-  gives the existing `SecurityAgentVerification` phase a concrete
+  gives the existing `LlmVerification` phase a concrete
   discovery procedure instead of a fixed multi-verifier pipeline.
 
 ### P3 — MoCQ: Neuro-symbolic Static Analysis with LLM Patterns (arXiv:2504.16057)
@@ -124,9 +124,9 @@ unchanged until an operator opts in.
   5. Accepted patterns are emitted as Semgrep rules (baco's existing
      rule format).
 
-- **baco integration target:** `src/scanner/phases/other_phases.rs::run_rule_synthesis`.
-  The current `RuleSynthesis` phase is the natural home — MoCQ is its
-  upgrade ("RuleSynthesis 2.0").
+- **baco integration target:** `src/scanner/phases/llm_phases.rs` — the
+  LLM discovery/verification pipeline. MoCQ's pattern synthesis is a
+  capability enhancement for that pipeline.
 - **Sub-tasks:** P3.1 Pattern DSL, P3.2 Symbolic validator against trace
   corpus, P3.3 LLM proposer with feedback loop, P3.4 Emit accepted rules
   to disk, P3.5 Config + tests.
@@ -172,7 +172,7 @@ unchanged until an operator opts in.
   | malloc/free                           | Memory Leak, UAF, Double Free          |
 
 - **baco integration target:** `src/scanner/phases/llm_phases.rs::run_llm_static_analysis`.
-  The CPG slice from `CpgSlice` phase (when Joern available) or tree-sitter
+  The CPG slice from `LlmStaticAnalysis` phase (when Joern available) or tree-sitter
   CFG fallback provides the call graph. This is a strict superset of P1's
   Control Path — P4 can be a more aggressive mode of the same
   prompt-augmentation hook.
@@ -224,7 +224,7 @@ unchanged until an operator opts in.
   vulnerable function; sanitizer distinguishes a benign crash from the
   target vuln).
 
-- **baco integration target:** `src/scanner/phases/other_phases.rs::run_security_agent_verification`.
+- **baco integration target:** `src/scanner/phases/llm_phases.rs::run_llm_verification`.
   Today this phase runs a fixed multi-verifier pipeline; AgentFlow would
   make the harness itself searchable. This is the most invasive
   integration — start with a static (non-search) harness encoded in the
@@ -236,7 +236,7 @@ unchanged until an operator opts in.
   (static harness execution) first and deferring P5.5 (search loop) until
   instrumentation is available.
 - **Why integrate:** Most invasive but highest ceiling. Makes the
-  existing `SecurityAgentVerification` phase a concrete, searchable
+  existing `LlmVerification` phase a concrete, searchable
   harness space instead of a fixed pipeline; the typed DSL gives
   compile-time guarantees on the harness structure.
 
@@ -253,7 +253,7 @@ unchanged until an operator opts in.
 
 ## 4. Long-Term Directions
 
-- **Neuro-symbolic hybrids (R2Vul, QRS, Neuro-symbolic Static Analysis)** suggest longer-term directions tied to `RuleSynthesis`, `AutoPatching`, and `RootCauseDedup`. Worth prototyping in a feature branch before merging.
+- **Neuro-symbolic hybrids (R2Vul, QRS, Neuro-symbolic Static Analysis)** suggest longer-term directions tied to the LLM discovery/verification pipeline and `RootCauseDedup`. Worth prototyping in a feature branch before merging.
 - **CPG + LLM** continues to dominate context-rich detection; **LLMxCPG** (arXiv:2507.16585) is the closest analogue to ongoing baco work. Safe to integrate CPG-guided prompting into `LlmStaticAnalysis` without adding a new phase.
 - **Agentic & MoE themes** appear in VulTriage, VulnLLM-R, MulVul. baco's macro config toggles allow integrating them as pluggable engines, keeping design consistent.
 
@@ -264,7 +264,7 @@ unchanged until an operator opts in.
 | 1 | Everything You Wanted to Know About LLM-based Vulnerability Detection | 2025 | arXiv:2504.13474 | Survey | Skip (CORRECT covers it) | Low |
 | 2 | VulnGym: Benchmarking Coding Agents for Repo-Level Vuln Detection | 2026 | arXiv:2608.02001 | Multi-agent | New phase: AgentBenchmarkEval | Medium |
 | 3 | VulTriage: Triple-Path Context Augmentation | 2026 | arXiv:2605.09461 | LLM static | Enhance LlmStaticAnalysis + ConfidenceScoring | Low |
-| 4 | Synthesizing Multi-Agent Harnesses for Vuln Discovery | 2026 | arXiv:2604.20801 | Multi-agent | Enhance SecurityAgentVerification | Medium |
+| 4 | Synthesizing Multi-Agent Harnesses for Vuln Discovery | 2026 | arXiv:2604.20801 | Multi-agent | Enhance LlmVerification | Medium |
 | 5 | QRS: Rule-Synthesizing Neuro-Symbolic Triad | 2026 | arXiv:2602.09774 | Neuro-symbolic | New phase: NeuroSymbolicSync | High |
 | 6 | Seclens: Role-specific LLM Eval | 2026 | arXiv:2604.01637 | Benchmark | Enhance CrossFileAnalysis | Low |
 | 7 | Do Fine-Tuned LLMs Understand Vulnerabilities? Semantic Trap | 2026 | arXiv:2601.22655 | Fine-tuning | Enhance LlmDiscovery prompts | Medium |
@@ -274,19 +274,19 @@ unchanged until an operator opts in.
 | 11 | MulVul: Retrieval-augmented Multi-Agent | 2026 | arXiv:2601.18847 | Multi-agent/RAG | Enhance MultiVerifier | Medium |
 | 12 | VulnLLM-R: Reasoning LLM + Agent Scaffold | 2025 | arXiv:2512.07533 | Reasoning | Enhance LlmStaticAnalysis | Low |
 | 13 | VULPO: Context-Aware On-Policy LLM Optimization | 2025 | arXiv:2511.11896 | On-policy | Enhance ConfidenceScoring; new AdaptiveFinetuneQueue | Medium |
-| 14 | VulInstruct: Root-Cause Reasoning via Security Specs | 2025 | arXiv:2511.04014 | Instruction tuning | Enhance LlmDiscovery + ThreatModeling | Low |
+| 14 | VulInstruct: Root-Cause Reasoning via Security Specs | 2025 | arXiv:2511.04014 | Instruction tuning | Enhance LlmDiscovery + — (phase removed) | Low |
 | 15 | From Large to Mammoth | 2025 | NDSS 2025 | Benchmark | Skip (parity only) | Low |
 | 16 | Benchmarking LLMs and LLM-based Agents | 2025 | ACL 2025 | Benchmark | Skip (benchmark) | Low |
 | 17 | Systematic Literature Review on LLMs for Vuln Detection | 2025 | arXiv:2507.22659 | Survey | Skip (summary) | Low |
-| 18 | LLMxCPG: CPG-Guided LLMs | 2025 | USENIX 2025 | CPG+LLM | Enhance CpgSlice → LlmStaticAnalysis | Medium |
+| 18 | LLMxCPG: CPG-Guided LLMs | 2025 | USENIX 2025 | CPG+LLM | Enhance LlmStaticAnalysis | Medium |
 | 19 | CLeVeR: Multi-modal Contrastive Learning | 2025 | ACL Findings 2025 | Multi-modal | New MultiModalVulnRepr phase | High |
 | 20 | Mono: Is Your "Clean" Vuln Dataset Really Solvable? | 2025 | arXiv:2506.03651 | Dataset critique | Skip | N/A |
-| 21 | Learning to Focus: Context Extraction for Efficient LLM Vuln Detection | 2025 | arXiv:2505.17460 | Context extraction | Enhance Indexing/CpgSlice | Low |
+| 21 | Learning to Focus: Context Extraction for Efficient LLM Vuln Detection | 2025 | arXiv:2505.17460 | Context extraction | Enhance Indexing | Low |
 | 22 | SV-TrustEval-C | 2025 | SP 2025 | Benchmark | Skip | Low |
 | 23 | SecVulEval | 2025 | arXiv:2505.19828 | Benchmark | Skip | Low |
 | 24 | CVE-Bench | 2025 | NAACL 2025 | Benchmark | Skip | Low |
-| 25 | R2Vul: RL + Structured Reasoning Distillation | 2025 | arXiv:2504.04699 | Neuro-symbolic/RL | Enhance AutoPatching + RootCauseDedup | High |
-| 26 | Neuro-symbolic Static Analysis with LLM Patterns | 2025 | arXiv:2504.16057 | Neuro-symbolic | Enhance RuleSynthesis → Semgrep/CpgSlice | Medium |
+| 25 | R2Vul: RL + Structured Reasoning Distillation | 2025 | arXiv:2504.04699 | Neuro-symbolic/RL | Enhance — (phase removed) + RootCauseDedup | High |
+| 26 | Neuro-symbolic Static Analysis with LLM Patterns | 2025 | arXiv:2504.16057 | Neuro-symbolic | Enhance the LLM discovery/verification pipeline → Semgrep | Medium |
 | 27 | Context-Enhanced Vuln Detection Based on LLM | 2025 | arXiv:2504.16877 | Context retrieval | Enhance LlmStaticAnalysis (RAG) | Low |
 | 28 | MOS: MoE for Smart Contract Vuln Detection | 2025 | arXiv:2504.12234 | MoE | Low overlap (smart contracts) | Medium |
 | 29 | Abundant Modalities: Multi-Modal Function-Level Vuln Detection | 2025 | TOSEM 2025 | Multi-modal | New MultiModalFusion phase | High |

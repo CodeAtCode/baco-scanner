@@ -197,7 +197,7 @@ fn test_env_var_count_matches_docs() {
     let llm_env_vars = extract_llm_env_vars_from_code();
     let config_docs = include_str!("../../docs/configuration.md");
 
-    // Count LLM_*_KEY entries in docs table
+    // Count LLM_*_KEY entries in docs table (slot-specific keys + LLM_API_KEY fallback)
     let mut doc_llm_key_count = 0;
     for line in config_docs.lines() {
         if line.contains("LLM_") && line.contains("_KEY") {
@@ -205,13 +205,18 @@ fn test_env_var_count_matches_docs() {
         }
     }
 
+    // Code reads 4 slot-specific keys (discovery, verification, aggregation, static_analysis)
+    // plus LLM_API_KEY as global fallback = 5 total env vars
     assert_eq!(
-        doc_llm_key_count,
+        doc_llm_key_count, 5,
+        "docs/configuration.md should document 5 LLM_*_KEY env vars (4 slots + LLM_API_KEY fallback), found {}",
+        doc_llm_key_count
+    );
+    assert_eq!(
         llm_env_vars.len(),
-        "docs/configuration.md documents {} LLM_*_KEY env vars but src/config/env.rs reads {} (missing: {:?})",
-        doc_llm_key_count,
-        llm_env_vars.len(),
-        llm_env_vars
+        5,
+        "src/config/env.rs should read 5 LLM_*_KEY env vars (4 slots + LLM_API_KEY fallback), found {}",
+        llm_env_vars.len()
     );
 }
 

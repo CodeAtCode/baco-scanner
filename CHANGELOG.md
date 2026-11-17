@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Semgrep runner no longer aborts the entire scan on a non-zero exit code; partial JSON findings from stdout are preserved
 - Verification gate downgrades to `NeedsReview` instead of `FalsePositive` when a single check fails, preserving incremental evidence
 
+### Removed
+- Experimental pipeline tier: the `CpgSlice`, `RuleSynthesis`, `SecurityAgentVerification`, `ThreatModeling`, `AutoPatching`, `PocCompiler`, `ExploitSynth`, and `VariantSearch` phases, along with the `[scanner] profile` option and their configuration and LLM-phase slots. The pipeline is now a fixed 15-phase core (3 parallel + 12 sequential); `Validate` is a core phase.
+
 ### Fixed
 - Finding ID collisions: `generate_id` now includes `rule_id` and a snippet discriminator byte in the hash, preventing distinct vulnerabilities on the same file/line/CWE from sharing an ID
 - `generate_id` distinguishes `None` from `Some("")` snippets via a discriminator byte

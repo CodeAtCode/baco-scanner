@@ -6,69 +6,9 @@ use std::path::PathBuf;
 #[serde(deny_unknown_fields)]
 pub struct AggregationConfig {}
 
-/// Rule synthesis configuration (MoCQ: LLM→semgrep rule generation)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct RuleSynthConfig {
-    /// Whether rules synthesis is enabled
-    #[serde(default)]
-    pub enabled: bool,
-    /// Output directory for generated rules
-    #[serde(default = "crate::config::default_rulesynth_output_dir")]
-    pub output_dir: PathBuf,
-    /// Maximum rules to generate per CWE
-    #[serde(default = "crate::config::default_max_rules_per_cwe")]
-    pub max_rules_per_cwe: usize,
-    /// Use MoCQ proposer loop with symbolic validation (vs old RuleSynthesizer)
-    #[serde(default)]
-    pub mocq_mode: bool,
-    /// Max iterations for the proposer loop
-    #[serde(default = "crate::config::default_mocq_max_iterations")]
-    pub max_iterations: u8,
-    /// Path to labelled trace corpus for symbolic validation
-    #[serde(default)]
-    pub corpus_path: Option<PathBuf>,
-}
-
-impl Default for RuleSynthConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            output_dir: crate::config::default_rulesynth_output_dir(),
-            max_rules_per_cwe: crate::config::default_max_rules_per_cwe(),
-            mocq_mode: false,
-            max_iterations: crate::config::default_mocq_max_iterations(),
-            corpus_path: None,
-        }
-    }
-}
-pub const DEFAULT_RULESYNTH_OUTPUT_DIR: &str = "./output/generated_rules";
-pub fn default_rulesynth_output_dir() -> PathBuf {
-    PathBuf::from(DEFAULT_RULESYNTH_OUTPUT_DIR)
-}
-pub const DEFAULT_MAX_RULES_PER_CWE: usize = 5;
-pub fn default_max_rules_per_cwe() -> usize {
-    DEFAULT_MAX_RULES_PER_CWE
-}
-pub const DEFAULT_MOCQ_MAX_ITERATIONS: u8 = 5;
-pub fn default_mocq_max_iterations() -> u8 {
-    DEFAULT_MOCQ_MAX_ITERATIONS
-}
-pub const DEFAULT_ENABLE_THREAT_MODELING: bool = false;
-pub fn default_enable_threat_modeling() -> bool {
-    DEFAULT_ENABLE_THREAT_MODELING
-}
 pub const DEFAULT_ENABLE_ROOT_CAUSE_DEDUP: bool = true;
 pub fn default_enable_root_cause_dedup() -> bool {
     DEFAULT_ENABLE_ROOT_CAUSE_DEDUP
-}
-pub const DEFAULT_ENABLE_AUTO_PATCHING: bool = false;
-pub fn default_enable_auto_patching() -> bool {
-    DEFAULT_ENABLE_AUTO_PATCHING
-}
-pub const DEFAULT_ENABLE_POC_COMPILATION: bool = false;
-pub fn default_enable_poc_compilation() -> bool {
-    DEFAULT_ENABLE_POC_COMPILATION
 }
 pub const DEFAULT_ENABLE_CONFIDENCE_REFINEMENT: bool = true;
 pub fn default_enable_confidence_refinement() -> bool {
@@ -77,10 +17,6 @@ pub fn default_enable_confidence_refinement() -> bool {
 pub const DEFAULT_ENABLE_CVE_BOOTSTRAP: bool = true;
 pub fn default_enable_cve_bootstrap() -> bool {
     DEFAULT_ENABLE_CVE_BOOTSTRAP
-}
-pub const DEFAULT_ENABLE_VARIANT_SEARCH: bool = true;
-pub fn default_enable_variant_search() -> bool {
-    DEFAULT_ENABLE_VARIANT_SEARCH
 }
 pub const DEFAULT_ENABLE_ABSENCE_DETECTION: bool = true;
 pub fn default_enable_absence_detection() -> bool {
@@ -128,56 +64,12 @@ impl Default for NormalizationConfig {
     }
 }
 
-/// Configuration for CPG-guided slicing (T3.1)
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
-#[serde(default)]
-pub struct CpgConfig {
-    /// Whether CPG slicing is enabled
-    pub enabled: bool,
-    /// Path to Joern binary (None = search PATH)
-    pub joern_path: Option<PathBuf>,
-    /// Maximum lines to include in a slice
-    pub slice_budget_lines: usize,
-}
-
-impl Default for CpgConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            joern_path: None,
-            slice_budget_lines: 200,
-        }
-    }
-}
-
-/// Configuration for exploit synthesis (T3.2)
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
-#[serde(default)]
-pub struct ExploitConfig {
-    /// Whether exploit synthesis is enabled
-    pub enabled: bool,
-    /// Docker image for sandboxed exploit execution
-    pub sandbox_image: String,
-    /// Timeout for exploit execution in seconds
-    pub timeout_secs: u64,
-}
-
-impl Default for ExploitConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            sandbox_image: "python:3.11-slim".to_string(),
-            timeout_secs: 30,
-        }
-    }
-}
-
 /// Configuration for the Validate phase (CORRECT paper arxiv:2504.13474)
 ///
 /// LLM-as-judge rationale validation: evaluates the soundness of reasoning
 /// behind each finding and adjusts confidence accordingly (+0.10 sound, -0.20 flawed).
 #[derive(Debug, Clone, Default, serde::Deserialize, serde::Serialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct ValidateConfig {
     /// Whether the Validate phase is enabled
     pub enabled: bool,
@@ -315,32 +207,6 @@ impl Default for PolicySamplingConfig {
     }
 }
 
-/// Configuration for the VulnLLM-R agent scaffold (P2.5).
-/// Builds 3-path call-graph context + function-lookup tool per target.
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct AgentScaffoldConfig {
-    /// Whether the agent scaffold is enabled
-    #[serde(default)]
-    pub enabled: bool,
-    /// Maximum interaction rounds per target function
-    #[serde(default = "crate::config::default_agent_max_rounds")]
-    pub max_rounds: u8,
-    /// Number of call-graph paths to sample per target function
-    #[serde(default = "crate::config::default_agent_paths_per_target")]
-    pub paths_per_target: u8,
-}
-
-impl Default for AgentScaffoldConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            max_rounds: crate::config::default_agent_max_rounds(),
-            paths_per_target: crate::config::default_agent_paths_per_target(),
-        }
-    }
-}
-
 /// Configuration for PacVD primitive-API abstraction.
 /// Appends callee abstraction at one of four granularity levels to the
 /// LLM prompt. With `auto_level = true`, the level is chosen based on
@@ -372,14 +238,6 @@ impl Default for PacvdConfig {
 pub const DEFAULT_POLICY_SAMPLES: u8 = 4;
 pub fn default_policy_samples() -> u8 {
     DEFAULT_POLICY_SAMPLES
-}
-pub const DEFAULT_AGENT_MAX_ROUNDS: u8 = 5;
-pub fn default_agent_max_rounds() -> u8 {
-    DEFAULT_AGENT_MAX_ROUNDS
-}
-pub const DEFAULT_AGENT_PATHS_PER_TARGET: u8 = 3;
-pub fn default_agent_paths_per_target() -> u8 {
-    DEFAULT_AGENT_PATHS_PER_TARGET
 }
 pub const DEFAULT_PACVD_LEVEL: u8 = 2;
 pub fn default_pacvd_level() -> u8 {

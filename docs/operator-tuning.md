@@ -4,17 +4,13 @@ Performance tuning for the Baco SAST scanner. Adjust settings based on scan spee
 
 ## Scenario Profiles
 
-> **Profile Note:** Flags under `[scanner.performance]` that are disabled by default (e.g., `enable_threat_modeling`) only take effect when `scanner.profile = "all"` is set. The default `core` profile excludes 9 experimental phases. See [Configuration](configuration.md#scanner-performance--phase-flags) for details.
-
 ### Fast CI Scans (Sub-10-Minute Turnaround)
 
 ```toml
 [scanner.performance]
 max_parallel_tasks = 2
-enable_threat_modeling = false
 enable_confidence_refinement = false
 enable_cve_bootstrap = false
-enable_variant_search = false
 
 [llm]
 enable_llm_cache = true
@@ -30,11 +26,9 @@ exclude_paths = ["tests/", "docs/", "target/", "vendor/"]
 ```toml
 [scanner.performance]
 max_parallel_tasks = 8
-enable_threat_modeling = true
 enable_root_cause_dedup = true
 enable_confidence_refinement = true
 enable_cve_bootstrap = true
-enable_variant_search = true
 
 [llm]
 enable_llm_cache = true
@@ -50,7 +44,6 @@ timeout_secs = 120
 [scanner.performance]
 max_parallel_tasks = 2
 enable_confidence_refinement = false
-enable_variant_search = false
 
 [llm]
 enable_llm_cache = true
@@ -64,13 +57,9 @@ max_concurrent = 2
 | Flag | Type | Default | Effect |
 |------|------|---------|--------|
 | `max_parallel_tasks` | int | 4 | Max concurrent scan tasks |
-| `enable_threat_modeling` | bool | false | STRIDE-based threat analysis |
 | `enable_root_cause_dedup` | bool | true | Collapses findings with same root cause |
-| `enable_auto_patching` | bool | false | Generates fix patches — opt-in |
-| `enable_poc_compilation` | bool | false | Compiles PoC exploits — opt-in |
 | `enable_confidence_refinement` | bool | true | Re-calibrates confidence scores |
 | `enable_cve_bootstrap` | bool | true | Enriches findings with CVE data |
-| `enable_variant_search` | bool | true | Searches for variant vulnerability instances |
 | `early_termination_threshold` | float | 1000.0 | Stops scan after N medium+ findings (0.0 disables; Info findings excluded) |
 | `never_submit_enabled` | bool | true | Enables never-submit pattern filter |
 | `never_submit_multiplier` | float | 0.1 | Confidence multiplier when never-submit pattern matches |
@@ -86,7 +75,7 @@ max_concurrent = 2
 
 ### LLM Cost vs. Recall
 
-Disabling `enable_confidence_refinement` and `enable_variant_search` cuts LLM calls by ~40%. Expect 15-25% reduction in true positives.
+Disabling `enable_confidence_refinement` cuts LLM calls by ~20%. Expect 10-15% reduction in true positives.
 
 ### Incremental Scan Caveats
 

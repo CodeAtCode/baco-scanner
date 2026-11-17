@@ -1235,8 +1235,6 @@ fn get_phase_config(
         "verification" => phases.verification.clone(),
         "aggregation" => phases.aggregation.clone(),
         "static_analysis" => phases.static_analysis.clone(),
-        "security_agent_verification" => phases.security_agent_verification.clone(),
-        "threat_modeling" => phases.threat_modeling.clone(),
         _ => crate::config::LlmPhaseConfig::default(),
     }
 }

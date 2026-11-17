@@ -99,9 +99,6 @@ fn test_generate_config_content() {
     assert!(content.contains("[llm.phases.verification]"));
     assert!(content.contains("[llm.phases.aggregation]"));
     assert!(content.contains("[llm.phases.static_analysis]"));
-    assert!(content.contains("[llm.phases.security_agent_verification]"));
-    assert!(content.contains("[llm.phases.threat_modeling]"));
-    assert!(content.contains("profile = \"core\""));
     assert!(content.contains("Suggested preset: cpp"));
 }
 

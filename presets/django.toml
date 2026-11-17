@@ -86,7 +86,6 @@ rules:
 ''']
 
 [scanner.performance]
-enable_variant_search = true
 enable_cve_bootstrap = true
 
 [llm]

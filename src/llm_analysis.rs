@@ -10,6 +10,17 @@ use std::path::Path;
 /// Strip content between two markers (inclusive of markers).
 ///
 /// Used to conditionally remove prompt sections based on config toggles.
+/// Largest byte offset not exceeding `i` that lies on a UTF-8 char boundary.
+///
+/// Slicing a `&str` at an arbitrary byte panics when that byte falls inside a
+/// multi-byte character, so every byte-budget truncation must snap first.
+pub fn prev_char_boundary(s: &str, mut i: usize) -> usize {
+    while i > 0 && !s.is_char_boundary(i) {
+        i -= 1;
+    }
+    i
+}
+
 pub fn strip_between_markers(content: &str, start_marker: &str, end_marker: &str) -> String {
     let pattern = format!(
         r"{}[\s\S]*?{}",
@@ -1193,12 +1204,6 @@ impl LlmAnalyzer {
         if code.len() <= max_bytes {
             return code.to_string();
         }
-        fn prev_char_boundary(s: &str, mut i: usize) -> usize {
-            while i > 0 && !s.is_char_boundary(i) {
-                i -= 1;
-            }
-            i
-        }
         let mut boundary = prev_char_boundary(code, max_bytes);
         loop {
             let notice = format!(
@@ -1288,7 +1293,17 @@ impl LlmAnalyzer {
 
                 while !remaining.is_empty() {
                     let take = max_bytes.saturating_sub(marker.len());
-                    let end = std::cmp::min(take, remaining.len());
+                    let mut end =
+                        prev_char_boundary(remaining, std::cmp::min(take, remaining.len()));
+                    if end == 0 {
+                        // The budget is smaller than one character, or the head
+                        // character is wider than it: take exactly one character
+                        // so the loop always advances.
+                        end = remaining
+                            .char_indices()
+                            .nth(1)
+                            .map_or(remaining.len(), |(i, _)| i);
+                    }
 
                     let chunk_text = if chunk_num == 1 {
                         format!("{}{}{}", preamble, marker, &remaining[..end])

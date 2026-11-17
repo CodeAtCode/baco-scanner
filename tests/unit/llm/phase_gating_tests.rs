@@ -39,7 +39,6 @@ fn create_test_config_with_static_analysis() -> baco::config::ScannerConfig {
         },
         scanner: ScannerSettings {
             max_file_size_kb: 1024,
-            profile: Default::default(),
             exclude_paths: vec![],
             semgrep: baco::config::SemgrepSettings::default(),
             performance: baco::config::PerformanceSettings::default(),
@@ -58,16 +57,6 @@ fn create_test_config_with_static_analysis() -> baco::config::ScannerConfig {
                     model: "test-model".to_string(),
                     models: vec![],
                     timeout_secs: Some(30),
-                    agent_flow: Default::default(),
-                    temperature: None,
-                },
-                security_agent_verification: LlmPhaseConfig {
-                    base_url: "http://localhost:8080".to_string(),
-                    api_key: Some("test-key".to_string()),
-                    model: "test-model".to_string(),
-                    models: vec![],
-                    timeout_secs: Some(30),
-                    agent_flow: Default::default(),
                     temperature: None,
                 },
                 ..Default::default()
@@ -80,14 +69,10 @@ fn create_test_config_with_static_analysis() -> baco::config::ScannerConfig {
         agent: AgentConfig::default(),
         router: baco::config::RouterConfig::default(),
         aggregation: baco::config::AggregationConfig::default(),
-        rulesynth: baco::config::RuleSynthConfig::default(),
         normalization: baco::config::NormalizationConfig::default(),
-        cpg: baco::config::CpgConfig::default(),
-        exploit: baco::config::ExploitConfig::default(),
         validate: Default::default(),
         vultriage: Default::default(),
         policy_sampling: Default::default(),
-        agent_scaffold: Default::default(),
         pacvd: Default::default(),
         vuln_spec: Default::default(),
         citation_verification: Default::default(),
@@ -216,92 +201,6 @@ async fn test_llm_static_analysis_skips_without_models() {
 
     let phase_config = PhaseConfig {
         phase: &ScanPhase::LlmStaticAnalysis,
-        findings: findings.clone(),
-        pb: &pb,
-        analyzed_files: &analyzed_files,
-        metrics_tracker: &metrics_tracker,
-        target_path: &target_path,
-        config: &scanner.config,
-        project_stack: &project_stack,
-    };
-
-    let result = run_phase(&scanner, phase_config).await;
-    assert!(result.is_ok(), "Phase should complete without error");
-    let (updated_findings, _, _) = result.unwrap();
-    assert_eq!(
-        updated_findings.len(),
-        findings.len(),
-        "Findings should be preserved when phase skips"
-    );
-}
-
-// ============================================================================
-// LLM Phase Gating Tests - security_agent_verification
-// ============================================================================
-
-#[tokio::test]
-async fn test_security_agent_verification_skips_when_agent_disabled() {
-    let config = create_test_config_with_static_analysis();
-    let scanner = create_test_scanner_with_config(config);
-
-    let pb = ProgressBar::hidden();
-    let metrics_tracker = LlmMetricsTracker::new();
-    let analyzed_files: Vec<String> = vec![];
-    let target_path = PathBuf::from(".");
-    let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
-    let findings = vec![make_finding_report_agg(
-        "test-1",
-        "Test Vulnerability",
-        "/tmp/test/test.py",
-        Some(42),
-        Some("CWE-89"),
-        Severity::High,
-    )];
-
-    let phase_config = PhaseConfig {
-        phase: &ScanPhase::SecurityAgentVerification,
-        findings: findings.clone(),
-        pb: &pb,
-        analyzed_files: &analyzed_files,
-        metrics_tracker: &metrics_tracker,
-        target_path: &target_path,
-        config: &scanner.config,
-        project_stack: &project_stack,
-    };
-
-    let result = run_phase(&scanner, phase_config).await;
-    assert!(result.is_ok(), "Phase should complete without error");
-    let (updated_findings, _, _) = result.unwrap();
-    assert_eq!(
-        updated_findings.len(),
-        findings.len(),
-        "Findings should be preserved when phase skips"
-    );
-}
-
-#[tokio::test]
-async fn test_security_agent_verification_skips_without_api_key() {
-    let mut config = create_test_config_with_static_analysis();
-    config.agent.enabled = true;
-    config.llm.phases.security_agent_verification.api_key = None;
-
-    let scanner = create_test_scanner_with_config(config);
-    let pb = ProgressBar::hidden();
-    let metrics_tracker = LlmMetricsTracker::new();
-    let analyzed_files: Vec<String> = vec![];
-    let target_path = PathBuf::from(".");
-    let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
-    let findings = vec![make_finding_report_agg(
-        "test-1",
-        "Test Vulnerability",
-        "/tmp/test/test.py",
-        Some(42),
-        Some("CWE-89"),
-        Severity::High,
-    )];
-
-    let phase_config = PhaseConfig {
-        phase: &ScanPhase::SecurityAgentVerification,
         findings: findings.clone(),
         pb: &pb,
         analyzed_files: &analyzed_files,

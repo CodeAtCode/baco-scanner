@@ -726,10 +726,6 @@ mod tests {
             (ScanPhase::CweRouting, "CWE routing"),
             (ScanPhase::LlmDiscovery, "LLM discovery"),
             (ScanPhase::LlmVerification, "LLM verification"),
-            (
-                ScanPhase::SecurityAgentVerification,
-                "SecurityAgent verification",
-            ),
             (ScanPhase::TicketCrossRef, "Searching ticket systems"),
             (ScanPhase::GitAnalysis, "Analyzing Git history"),
             (ScanPhase::CrossFileAnalysis, "Cross-file dependency"),
@@ -738,12 +734,8 @@ mod tests {
                 "Calculating confidence scores",
             ),
             (ScanPhase::AiAggregation, "AI aggregation"),
-            (ScanPhase::ThreatModeling, "Threat modeling"),
             (ScanPhase::RootCauseDedup, "Root cause deduplication"),
-            (ScanPhase::AutoPatching, "Auto-patching"),
             (ScanPhase::CveBootstrap, "CVE bootstrap"),
-            (ScanPhase::PocCompiler, "PoC compilation"),
-            (ScanPhase::VariantSearch, "Variant search"),
             (ScanPhase::Reporting, "Generating reports"),
         ];
 
@@ -752,20 +744,13 @@ mod tests {
                 ScanPhase::CweRouting => "CWE routing (routing findings to specialized models)...",
                 ScanPhase::LlmDiscovery => "LLM discovery (enriching findings with context)...",
                 ScanPhase::LlmVerification => "LLM verification (validating findings)...",
-                ScanPhase::SecurityAgentVerification => {
-                    "SecurityAgent verification (tool-based validation)..."
-                }
                 ScanPhase::TicketCrossRef => "Searching ticket systems for references...",
                 ScanPhase::GitAnalysis => "Analyzing Git history for related commits...",
                 ScanPhase::CrossFileAnalysis => "Cross-file dependency analysis...",
                 ScanPhase::ConfidenceScoring => "Calculating confidence scores...",
                 ScanPhase::AiAggregation => "AI aggregation (generating executive summary)...",
-                ScanPhase::ThreatModeling => "Threat modeling (STRIDE analysis)...",
                 ScanPhase::RootCauseDedup => "Root cause deduplication...",
-                ScanPhase::AutoPatching => "Auto-patching with staging validation...",
                 ScanPhase::CveBootstrap => "CVE bootstrap...",
-                ScanPhase::PocCompiler => "PoC compilation check...",
-                ScanPhase::VariantSearch => "Variant search...",
                 ScanPhase::Reporting => "Generating reports (JSON/HTML/SARIF)...",
                 _ => "unknown",
             };

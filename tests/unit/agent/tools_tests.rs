@@ -502,3 +502,78 @@ fn test_pattern_search_pattern_starting_with_dash_is_literal() {
         "output should contain the line matching literal '-e'"
     );
 }
+
+#[test]
+fn test_pattern_search_has_timeout() {
+    // A2 regression test: PatternSearchTool must use sandbox.run_with_timeout
+    // to prevent hanging on catastrophic regex or huge directory trees.
+    // This test verifies the tool completes within the timeout by using
+    // a pattern that would hang if grep ran without timeout.
+    let tmpdir = tempfile::tempdir().unwrap();
+    let path = tmpdir.path().join("search.txt");
+    std::fs::write(&path, "normal line\n").unwrap();
+
+    let tool = PatternSearchTool;
+    let args = serde_json::json!({
+        "pattern": "normal",
+        "path": tmpdir.path().to_string_lossy().to_string()
+    });
+    let sandbox = Box::new(ToolSandbox::new(tmpdir.path().to_path_buf(), 5));
+
+    // Should complete quickly with timeout applied
+    let result = tool.execute(args, &*sandbox);
+    assert!(
+        result.is_ok(),
+        "pattern_search should complete with timeout"
+    );
+}
+
+#[test]
+fn test_test_run_rejects_negative_timeout() {
+    // A3 regression test: TestRunTool must not panic on negative timeout values.
+    // LLM tool calls with "timeout_secs": -1 should clamp to default, not unwrap().
+    let tmpdir = tempfile::tempdir().unwrap();
+    let path = tmpdir.path().join("test.py");
+    std::fs::write(&path, "print('hello')").unwrap();
+
+    let tool = TestRunTool;
+    let args = serde_json::json!({
+        "executable_path": "test.py",
+        "timeout_secs": -1
+    });
+    let sandbox = Box::new(ToolSandbox::new(tmpdir.path().to_path_buf(), 30));
+
+    // Should not panic; should use default timeout
+    let result = tool.execute(args, &*sandbox);
+    assert!(
+        result.is_ok(),
+        "negative timeout should clamp to default, not panic"
+    );
+}
+
+#[test]
+fn test_test_run_compiles_and_runs_rust() {
+    // A17 regression test: TestRunTool must compile .rs files, then run the binary.
+    // The old code passed "&&" and output path as filenames to rustc.
+    let tmpdir = tempfile::tempdir().unwrap();
+    let path = tmpdir.path().join("hello.rs");
+    std::fs::write(&path, "fn main() { println!(\"hello from rust\"); }").unwrap();
+
+    let tool = TestRunTool;
+    let args = serde_json::json!({
+        "executable_path": "hello.rs",
+        "timeout_secs": 30
+    });
+    let sandbox = Box::new(ToolSandbox::new(tmpdir.path().to_path_buf(), 30));
+
+    let result = tool.execute(args, &*sandbox);
+    assert!(
+        result.is_ok(),
+        "rust compilation and execution should succeed"
+    );
+    let output = result.unwrap().output;
+    assert!(
+        output.contains("hello from rust"),
+        "output should contain program output"
+    );
+}

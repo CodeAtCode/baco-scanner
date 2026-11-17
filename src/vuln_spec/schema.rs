@@ -57,6 +57,7 @@ pub struct SpecificationSource {
 
 /// Configuration for the VulInSpec module
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct VulnSpecConfig {
     /// Whether VulInSpec is enabled (default: false)
     #[serde(default = "default_false")]

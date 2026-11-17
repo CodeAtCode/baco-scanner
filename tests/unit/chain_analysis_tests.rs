@@ -10,8 +10,7 @@ use baco::findings::{Severity, TriageVerdict, VulnerabilityFinding};
 use baco::root_cause_dedup::{GlobalFpStore, RootCauseDeduplicator};
 use baco::scanner_types::cve::RootCauseGroup;
 use baco::scanner_types::severity::V3Severity;
-use baco::variant_search::{SearchPattern, VariantHit, VariantSearcher};
-use std::fs;
+
 use tempfile::TempDir;
 
 use crate::fixtures::{make_finding_report_agg, make_finding_snippet};
@@ -349,111 +348,6 @@ fn test_fp_store_save_and_load() {
     let store = GlobalFpStore::load(&path);
     assert!(store.is_false_positive("fp-1"));
     assert!(store.is_false_positive("fp-2"));
-}
-
-// ============================================================================
-// VARIANT SEARCH TESTS
-// ============================================================================
-
-#[test]
-fn test_variant_searcher_new_creates_with_default_threshold() {
-    let temp = TempDir::new().unwrap();
-    let searcher = VariantSearcher::new(temp.path().to_string_lossy().to_string());
-
-    // Search with no patterns should return empty
-    let hits = searcher.search_variants().unwrap();
-    assert!(hits.is_empty());
-}
-
-#[test]
-fn test_search_patterns_added_correctly() {
-    let temp = TempDir::new().unwrap();
-    let pattern = SearchPattern::new(
-        "command_injection",
-        r"Command::new\(",
-        vec!["user_input".to_string()],
-    );
-
-    let searcher = VariantSearcher::new(temp.path().to_string_lossy().to_string())
-        .with_patterns(vec![pattern]);
-
-    let hits = searcher.search_variants().unwrap();
-    assert!(hits.is_empty()); // No matching files
-}
-
-#[test]
-fn test_search_with_vulnerable_file() {
-    let temp = TempDir::new().unwrap();
-    let test_file = temp.path().join("vuln.rs");
-    fs::write(&test_file, "Command::new(user_input).spawn();").unwrap();
-
-    let pattern = SearchPattern::new(
-        "command_injection",
-        r"Command::new\(.*\).*spawn\(\)",
-        vec!["user_input".to_string()],
-    );
-
-    let searcher = VariantSearcher::new(temp.path().to_string_lossy().to_string())
-        .with_patterns(vec![pattern])
-        .with_threshold(0.3);
-
-    let hits = searcher.search_variants().unwrap();
-    assert!(!hits.is_empty());
-    assert!(hits[0].file_path.contains("vuln.rs"));
-}
-
-#[test]
-fn test_threshold_filters_low_score_hits() {
-    let temp = TempDir::new().unwrap();
-    let test_file = temp.path().join("test.rs");
-    fs::write(&test_file, "Command::new(\"ls\");").unwrap();
-
-    let pattern = SearchPattern::new("test", r"Command::new\(", vec![]);
-
-    let searcher = VariantSearcher::new(temp.path().to_string_lossy().to_string())
-        .with_patterns(vec![pattern])
-        .with_threshold(0.9);
-
-    let hits = searcher.search_variants().unwrap();
-    // High threshold should filter out low-score matches
-    for hit in &hits {
-        assert!(hit.similarity_score >= 0.9);
-    }
-}
-
-#[test]
-fn test_extract_pattern_escapes_special_chars() {
-    let pattern = VariantSearcher::extract_pattern("user.name");
-    assert!(pattern.contains("\\."));
-
-    let pattern2 = VariantSearcher::extract_pattern("func(arg)");
-    assert!(pattern2.contains("\\("));
-    assert!(pattern2.contains("\\)"));
-}
-
-#[test]
-fn test_match_pattern_valid_regex() {
-    assert!(VariantSearcher::match_pattern("let x = foo();", r"foo\(\)"));
-    assert!(!VariantSearcher::match_pattern(
-        "let x = bar();",
-        r"foo\(\)"
-    ));
-}
-
-#[test]
-fn test_match_pattern_invalid_regex_returns_false() {
-    let result = VariantSearcher::match_pattern("test", "[invalid(");
-    assert!(!result);
-}
-
-#[test]
-fn test_variant_hit_creation() {
-    let hit = VariantHit::new("src/main.rs", 42, 0.85, "code snippet");
-
-    assert_eq!(hit.file_path, "src/main.rs");
-    assert_eq!(hit.line_number, 42);
-    assert_eq!(hit.similarity_score, 0.85);
-    assert_eq!(hit.snippet, "code snippet");
 }
 
 // ============================================================================

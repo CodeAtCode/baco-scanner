@@ -66,18 +66,15 @@ impl Tool for PatternSearchTool {
             .get("context_lines")
             .and_then(|v| v.as_i64())
             .unwrap_or(2) as usize;
-        let output = std::process::Command::new("grep")
-            .arg("-rn")
-            .arg(format!("-C{}", ctx))
-            .arg("--")
-            .arg(pattern)
-            .arg(path)
-            .output()
-            .map_err(|e| format!("grep failed: {}", e))?;
+        let result = sandbox.run_with_timeout(
+            "grep",
+            &["-rn", &format!("-C{}", ctx), "--", pattern, path],
+            Some(30),
+        )?;
         Ok(ToolResult {
             tool_call_id: "pattern_search".to_string(),
-            success: output.status.success(),
-            output: String::from_utf8_lossy(&output.stdout).to_string(),
+            success: result.success,
+            output: result.output,
         })
     }
 }
@@ -159,37 +156,59 @@ impl Tool for TestRunTool {
         let path = args["executable_path"]
             .as_str()
             .ok_or("Missing 'executable_path' argument")?;
-        let timeout: u64 = args
+        let timeout_raw: i64 = args
             .get("timeout_secs")
             .and_then(|v| v.as_i64())
-            .unwrap_or(30)
-            .try_into()
-            .unwrap();
+            .unwrap_or(30);
+        let timeout: u64 = if timeout_raw > 0 {
+            timeout_raw.try_into().unwrap_or(30)
+        } else {
+            30
+        };
         let full = sandbox
             .resolve_safe_path(path)
             .map_err(|e| format!("Path error: {}", e))?;
 
         // Determine interpreter based on file extension
         let full_str = full.to_string_lossy().to_string();
-        let (cmd, cmd_args) = if path.ends_with(".py") {
-            ("python3", vec![full_str.as_str()])
+        if path.ends_with(".py") {
+            let result =
+                sandbox.run_with_timeout("python3", &[full_str.as_str()], Some(timeout))?;
+            Ok(ToolResult {
+                tool_call_id: "test_run".to_string(),
+                success: true,
+                output: result.output,
+            })
         } else if path.ends_with(".rs") {
-            (
-                "rustc",
-                vec!["-o", "tmp_out", full_str.as_str(), "&&", "tmp_out"],
-            )
+            // Compile first
+            let out_path = full
+                .parent()
+                .map(|p| p.join("tmp_out").to_string_lossy().to_string())
+                .unwrap_or_else(|| "tmp_out".to_string());
+            let compile_result =
+                sandbox.run_with_timeout("rustc", &["-o", &out_path, &full_str], Some(timeout))?;
+            if !compile_result.success {
+                return Ok(ToolResult {
+                    tool_call_id: "test_run".to_string(),
+                    success: true,
+                    output: compile_result.output,
+                });
+            }
+            // Then run
+            let run_result = sandbox.run_with_timeout(&out_path, &[], Some(timeout))?;
+            Ok(ToolResult {
+                tool_call_id: "test_run".to_string(),
+                success: true,
+                output: run_result.output,
+            })
         } else {
             // Try to execute directly
-            (full_str.as_str(), vec![])
-        };
-
-        let result = sandbox.run_with_timeout(cmd, &cmd_args.to_vec(), Some(timeout))?;
-        // Always return Ok() for test_run, even when test fails (non-zero exit)
-        // The success field indicates if the process ran, not if it passed
-        Ok(ToolResult {
-            tool_call_id: "test_run".to_string(),
-            success: true,
-            output: result.output,
-        })
+            let result = sandbox.run_with_timeout(&full_str, &[], Some(timeout))?;
+            Ok(ToolResult {
+                tool_call_id: "test_run".to_string(),
+                success: true,
+                output: result.output,
+            })
+        }
     }
 }

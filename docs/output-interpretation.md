@@ -108,7 +108,7 @@ The `verification_tier` field classifies how strongly a finding is supported by 
 | `supported` | ≥2 evidence items of any kind, or a single source with confidence > 0.8 | Plausible but not independently reproduced |
 | `unverified` | Everything else | Single-source or no evidence |
 
-Evidence sources are grouped into kinds: static analysis (`semgrep`, `cpg_slice`), LLM analysis (`llm_analysis`, `rule_synthesis`), verifiers (`independent_verifier`, `security_agent_verification`), and specifications (`cwe_spec`). Two entries from the same kind do not count as independent reproduction.
+Evidence sources are grouped into kinds: static analysis (`semgrep`), LLM analysis (`llm_analysis`), verifiers (`independent_verifier`), and specifications (`cwe_spec`). Two entries from the same kind do not count as independent reproduction.
 
 ### Evidence Gating
 

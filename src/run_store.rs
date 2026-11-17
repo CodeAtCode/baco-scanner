@@ -223,8 +223,8 @@ pub fn save_run(output_dir: &Path, findings: &[VulnerabilityFinding]) {
         }
     };
 
-    // Write to file
-    if let Err(e) = fs::write(&findings_path, json) {
+    // Write to file atomically
+    if let Err(e) = crate::hook_registry::atomic_write(&findings_path, json.as_bytes()) {
         tracing::warn!("Failed to write findings to {:?}: {}", findings_path, e);
     } else {
         tracing::debug!("Saved {} findings to {:?}", findings.len(), findings_path);

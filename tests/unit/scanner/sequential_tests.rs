@@ -30,14 +30,6 @@ fn test_scan_phase_llm_verification() {
 }
 
 #[test]
-fn test_scan_phase_security_agent_verification() {
-    assert_eq!(
-        format!("{:?}", ScanPhase::SecurityAgentVerification),
-        "SecurityAgentVerification"
-    );
-}
-
-#[test]
 fn test_scan_phase_ticket_cross_ref() {
     assert_eq!(format!("{:?}", ScanPhase::TicketCrossRef), "TicketCrossRef");
 }
@@ -74,33 +66,13 @@ fn test_scan_phase_reporting() {
 }
 
 #[test]
-fn test_scan_phase_threat_modeling() {
-    assert_eq!(format!("{:?}", ScanPhase::ThreatModeling), "ThreatModeling");
-}
-
-#[test]
 fn test_scan_phase_root_cause_dedup() {
     assert_eq!(format!("{:?}", ScanPhase::RootCauseDedup), "RootCauseDedup");
 }
 
 #[test]
-fn test_scan_phase_auto_patching() {
-    assert_eq!(format!("{:?}", ScanPhase::AutoPatching), "AutoPatching");
-}
-
-#[test]
 fn test_scan_phase_cve_bootstrap() {
     assert_eq!(format!("{:?}", ScanPhase::CveBootstrap), "CveBootstrap");
-}
-
-#[test]
-fn test_scan_phase_poc_compiler() {
-    assert_eq!(format!("{:?}", ScanPhase::PocCompiler), "PocCompiler");
-}
-
-#[test]
-fn test_scan_phase_variant_search() {
-    assert_eq!(format!("{:?}", ScanPhase::VariantSearch), "VariantSearch");
 }
 
 #[test]
@@ -344,7 +316,6 @@ fn test_finding_with_all_phases() {
         ScanPhase::LlmDiscovery,
         ScanPhase::LlmVerification,
         ScanPhase::Reporting,
-        ScanPhase::ThreatModeling,
     ];
 
     for phase in phases {
@@ -398,27 +369,21 @@ fn test_finding_with_all_phases() {
 
 #[test]
 fn test_sequential_phases_count() {
-    assert_eq!(PhaseSpec::sequential().len(), 19);
+    assert_eq!(PhaseSpec::sequential().len(), 12);
 }
 
 #[test]
 fn test_sequential_phases_order() {
     let seq = PhaseSpec::sequential();
     assert_eq!(seq[0], ScanPhase::CweRouting);
-    assert_eq!(seq[1], ScanPhase::RuleSynthesis);
-    assert_eq!(seq[18], ScanPhase::Reporting);
+    assert_eq!(seq[11], ScanPhase::Reporting);
 }
 
 #[test]
 fn test_sequential_phases_contains_all_v3_features() {
     let seq = PhaseSpec::sequential();
-    assert!(seq.contains(&ScanPhase::ThreatModeling));
     assert!(seq.contains(&ScanPhase::RootCauseDedup));
-    assert!(seq.contains(&ScanPhase::AutoPatching));
-    assert!(seq.contains(&ScanPhase::AutoPatching));
     assert!(seq.contains(&ScanPhase::CveBootstrap));
-    assert!(seq.contains(&ScanPhase::PocCompiler));
-    assert!(seq.contains(&ScanPhase::VariantSearch));
 }
 
 #[test]

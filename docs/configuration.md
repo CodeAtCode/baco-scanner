@@ -93,15 +93,6 @@ settings that were renamed or removed, so the load fail instead.
 If a config you carried over is rejected, the message names the key that is no
 longer recognised.
 
-**Experimental sections** (disabled by default):
-- `[cpg]` — CPG-guided slicing (requires Joern binary)
-- `[validate]` — LLM-as-judge rationale validation
-- `[vuln_spec]` — VulTriage triple-path, policy sampling, agent scaffold
-- `[agent_scaffold]` — Agent-assisted analysis
-- `[threat_modeling]` — STRIDE threat modeling (now under `[scanner.performance]`)
-
-Enable only after reviewing the detailed sections below.
-
 ## Project Settings
 
 ```toml
@@ -114,24 +105,6 @@ languages = ["c", "cpp", "python"]
 ## Scanner Settings
 
 The `[scanner]` and `[scanner.performance]` sections control scanning behavior, pipeline phases, and performance tuning.
-
-### Pipeline Profile
-
-`[scanner] profile` selects which phases the pipeline is allowed to run. It is a gate applied *before* the individual phase flags.
-
-| Value | Phases run | Notes |
-|-------|-----------|-------|
-| `core` (default) | 14 of 23 | The essential phases |
-| `all` | 23 of 23 | Includes the experimental phases, each still subject to its own flag |
-
-The 9 phases excluded by the `core` profile are `CpgSlice`, `RuleSynthesis`, `Validate`, `SecurityAgentVerification`, `ThreatModeling`, `AutoPatching`, `PocCompiler`, `ExploitSynth` and `VariantSearch`.
-
-Setting a flag for one of these, for example `[agent] enabled = true` for `SecurityAgentVerification`, has no effect while the profile is `core`. Use `profile = "all"` to reach them.
-
-```toml
-[scanner]
-profile = "all"
-```
 
 ### Performance Settings
 
@@ -146,16 +119,8 @@ max_parallel_tasks = 4
 early_termination_threshold = 1000.0
 # Enable file filtering to reduce false positives
 
-# --- Threat modeling ---
-enable_threat_modeling = false
 # Root-cause deduplication (collapses findings that share the same root cause)
 enable_root_cause_dedup = true
-# Auto-patching (generates and validates fix patches in a staging worktree)
-# Writes code files and runs git commands — opt-in for safety
-enable_auto_patching = false
-# PoC compilation (compiles proof-of-concept exploits to verify findings)
-# Spawns external compilers — opt-in for safety
-enable_poc_compilation = false
 # Confidence refinement (re-calibrates finding confidence based on multi-source/cross-file signals)
 enable_confidence_refinement = true
 # Never-submit pattern filter - heavily penalizes findings matching known false-positive patterns
@@ -164,38 +129,22 @@ never_submit_enabled = true
 never_submit_multiplier = 0.1
 # CVE bootstrap (enriches findings with CVE data from external sources)
 enable_cve_bootstrap = true
-# Variant search (searches for variant instances of the same vulnerability pattern)
-enable_variant_search = true
-# Class A: absence detection — flag functions handling sensitive state with no auth/nonce primitive
-enable_absence_detection = true
-# Class B: merge-order detection — flag merges where user-controlled input wins over trusted defaults
-enable_merge_order_detection = true
 # Domain-routed hunt prompts: select per-attack-class prompt modules from prompts/hunt/
 enable_hunt_prompts = true
-# Variant search patterns - code patterns to search for vulnerability variants
-variant_search_patterns = [
-    # { vulnerability_type = "command_injection", code_pattern = "system\\(", context_keywords = ["os", "exec"] }
-]
 ```
 
 | Flag | Default | Side effects |
 | --- | --- | --- |
 | `early_termination_threshold` | `1000.0` | None |
 | `max_parallel_tasks` | `4` | None |
-| `enable_threat_modeling` | `false` | None (read-only analysis) |
 | `enable_root_cause_dedup` | `true` | None |
-| `enable_auto_patching` | `false` | Writes code files, runs git commands in a staging worktree |
-| `enable_poc_compilation` | `false` | Spawns external compilers |
 | `enable_confidence_refinement` | `true` | None |
 | `never_submit_enabled` | `true` | None |
 | `never_submit_multiplier` | `0.1` | None |
 | `enable_cve_bootstrap` | `true` | External network requests to NVD/CISA |
-| `enable_variant_search` | `true` | Additional LLM API calls |
-| `enable_absence_detection` | `true` | None |
-| `enable_merge_order_detection` | `true` | None |
 | `enable_hunt_prompts` | `true` | None |
 
-See [`docs/architecture.md`](architecture.md) for the full 23-phase pipeline description.
+See [`docs/architecture.md`](architecture.md) for the full 15-phase pipeline description.
 
 ### Semgrep Configuration
 
@@ -483,8 +432,6 @@ include_rejected = false
 | `LLM_VERIFICATION_KEY` | Overrides `llm.phases.verification.api_key` |
 | `LLM_AGGREGATION_KEY` | Overrides `llm.phases.aggregation.api_key` |
 | `LLM_STATIC_ANALYSIS_KEY` | Overrides `llm.phases.static_analysis.api_key` |
-| `LLM_SECURITY_AGENT_VERIFICATION_KEY` | Overrides `llm.phases.security_agent_verification.api_key` |
-| `LLM_THREAT_MODELING_KEY` | Overrides `llm.phases.threat_modeling.api_key` |
 | `LLM_CONFIG_PATH` | Overrides config path for `baco verify` (source: `src/cli/verify.rs:24`) |
 | `NO_COLOR` | Disables colored output (source: `src/ui.rs:46`) |
 | `TICKET_GITHUB_KEY` | Overrides `[[tickets.systems]]` api_key for GitHub |
@@ -561,10 +508,6 @@ fp_store_path = "./fp-store.json"
 |-------|------|---------|-------------|
 | `fp_store_path` | str | `None` | Path to JSON file storing false positive patterns |
 
-## Research Flags
-
-> **Experimental — disabled by default.** These sections enable research-backed analysis augmentations. Enable only after understanding the tradeoffs.
-
 ### Validate (CORRECT paper)
 
 LLM-as-judge rationale validation: evaluates the soundness of reasoning behind each finding and adjusts confidence accordingly (+0.10 sound, -0.20 flawed).
@@ -640,42 +583,6 @@ Caps reasoning tokens before forcing the final answer. Configured in the `[llm]`
 ```toml
 [llm]
 max_reasoning_tokens = 2048
-```
-
-### MoCQ Neuro-Symbolic Rule Synthesis (P3)
-
-RuleSynthesis 2.0: LLM proposes patterns in a DSL → symbolic validator gives
-feedback → iterative loop. Extends the `[scanner.rulesynth]` section.
-
-| Field           | Type | Default | Description                    |
-|-----------------|------|---------|--------------------------------|
-| `mocq_mode`     | bool | false   | Enable MoCQ neuro-symbolic mode|
-| `max_iterations`| int  | 5       | Max synthesis iterations       |
-| `corpus_path`   | str  | None    | Path to pattern corpus         |
-
-```toml
-[scanner.rulesynth]
-enabled = false
-mocq_mode = false
-max_iterations = 5
-corpus_path = "tests/fixtures/"
-```
-
-### CPG-Guided Slicing (T3.1)
-
-CPG (Code Property Graph) slicing using Joern. Requires Joern binary in PATH or specify path.
-
-| Field         | Type | Default | Description                    |
-|---------------|------|---------|--------------------------------|
-| `enabled`     | bool | false   | Enable CPG slicing             |
-| `joern_path`  | str  | None    | Path to Joern binary           |
-| `slice_budget_lines`| int | 200  | Maximum lines per slice      |
-
-```toml
-[cpg]
-enabled = false
-joern_path = null
-slice_budget_lines = 200
 ```
 
 ### PacVD Primitive-API Abstraction (P4)
@@ -778,23 +685,6 @@ CWE classes covered per language:
 - **Path traversal**: CWE-22 (all languages)
 - **Deserialization**: CWE-502 (php, java, csharp)
 - **Code injection**: CWE-94 (ruby)
-
-### Exploit Synthesis (T3.2)
-
-Automated exploit generation to verify findings. Runs in sandboxed Docker containers.
-
-| Field                        | Type | Default | Description                    |
-|------------------------------|------|---------|--------------------------------|
-| `enabled`                    | bool | false   | Enable exploit synthesis       |
-| `sandbox_image`              | str  | "python:3.11-slim" | Docker image for sandbox |
-| `timeout_secs`               | int  | 30      | Timeout for exploit execution  |
-
-```toml
-[exploit]
-enabled = false
-sandbox_image = "python:3.11-slim"
-timeout_secs = 30
-```
 
 ### Confidence Normalization
 
@@ -967,7 +857,6 @@ rules:
 
 [scanner.performance]
 enable_root_cause_dedup = true
-enable_variant_search = true
 
 [llm]
 timeout_secs = 90

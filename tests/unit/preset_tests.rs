@@ -195,39 +195,6 @@ fn test_preset_budget_config() {
     assert_eq!(config.budget.max_llm_calls, 600);
 }
 
-#[test]
-fn test_preset_agent_flow_staging_only() {
-    // All OSS presets should have agent_flow disabled or staging-only
-    let presets = [
-        "wordpress-core",
-        "wordpress-plugin",
-        "litellm",
-        "oss-python",
-        "oss-monorepo",
-    ];
-    for name in &presets {
-        let preset = preset::load_preset(name).unwrap();
-        let mut config = ScannerConfig::default();
-        preset.merge_into(&mut config);
-
-        // Agent flow should be disabled for untrusted OSS targets. This must
-        // assert the gate the scanner actually reads, per phase -- the
-        // top-level [agent_flow] section it used to check was never read by
-        // anything, so a preset could have enabled the harness and this test
-        // would still have passed.
-        assert!(
-            !config
-                .llm
-                .phases
-                .security_agent_verification
-                .agent_flow
-                .enabled,
-            "Preset {} should have agent_flow disabled for security_agent_verification",
-            name
-        );
-    }
-}
-
 // Regression tests for preset TOML structure (T39-T42)
 
 #[test]

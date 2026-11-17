@@ -160,13 +160,7 @@ impl GlobalFpStore {
     /// Save the FP store to disk as JSON
     pub fn save(&self) -> Result<(), std::io::Error> {
         let json = serde_json::to_string_pretty(&self.fp_ids).map_err(std::io::Error::other)?;
-
-        // Ensure parent directory exists
-        if let Some(parent) = self.path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-
-        fs::write(&self.path, json)
+        crate::hook_registry::atomic_write(&self.path, json.as_bytes())
     }
 
     /// Mark a root cause ID as a false positive

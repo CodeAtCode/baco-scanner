@@ -8,9 +8,9 @@ use baco::scanner::progress::progress_position;
 #[test]
 fn test_phase_spec_counts() {
     // Guard against the hardcoded-24 regression
-    assert_eq!(PhaseSpec::total(), 23);
-    assert_eq!(PhaseSpec::parallel().len(), 4);
-    assert_eq!(PhaseSpec::sequential().len(), 19);
+    assert_eq!(PhaseSpec::total(), 15);
+    assert_eq!(PhaseSpec::parallel().len(), 3);
+    assert_eq!(PhaseSpec::sequential().len(), 12);
 }
 
 #[test]
@@ -51,10 +51,10 @@ fn test_progress_bar_loop_math() {
 
 #[test]
 fn test_bar_total_consistency() {
-    // Verify that the bar total (23 * 100 = 2300) is sufficient for all phases
-    // parallel block = 4 * 100 = 400
-    // sequential block = 19 phases, last pre-phase set = 400 + 18*100 = 2200
-    // final phase ends at 2300 = bar total
+    // Verify that the bar total (15 * 100 = 1500) is sufficient for all phases
+    // parallel block = 3 * 100 = 300
+    // sequential block = 12 phases, last pre-phase set = 300 + 11*100 = 1400
+    // final phase ends at 1500 = bar total
 
     let total_units = PhaseSpec::total() as u64 * 100;
     let parallel_units = PhaseSpec::parallel().len() as u64 * 100;
@@ -72,9 +72,9 @@ fn test_bar_total_consistency() {
     );
 
     // Specific values
-    assert_eq!(total_units, 2300);
-    assert_eq!(parallel_units, 400);
-    assert_eq!(sequential_units, 19);
+    assert_eq!(total_units, 1500);
+    assert_eq!(parallel_units, 300);
+    assert_eq!(sequential_units, 12);
 }
 
 #[test]

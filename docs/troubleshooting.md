@@ -6,17 +6,14 @@ Common issues and solutions for the Baco SAST scanner.
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| `No API key configured - skipping ...` | Missing API key | Add `api_key` inside each `[llm.phases.<slot>]` (discovery, verification, aggregation, static_analysis, security_agent_verification, threat_modeling) or set per-slot env vars (`LLM_DISCOVERY_KEY`, `LLM_VERIFICATION_KEY`, `LLM_AGGREGATION_KEY`, etc.) |
+| `No API key configured - skipping ...` | Missing API key | Add `api_key` inside each `[llm.phases.<slot>]` (discovery, verification, aggregation, static_analysis) or set per-slot env vars (`LLM_DISCOVERY_KEY`, `LLM_VERIFICATION_KEY`, `LLM_AGGREGATION_KEY`, etc.) |
 | Phases show "No API key configured - skipping" | LLM API key not set | Set per-phase API keys via `[llm.phases.discovery.api_key]` or env vars (`LLM_DISCOVERY_KEY`, `LLM_VERIFICATION_KEY`, etc.) |
 | Duplicate LLM API calls during scan | Cache disabled by default | Set `enable_llm_cache = true` in `[llm]` section of config.toml |
-| Threat modeling output is static STRIDE template | Feature disabled by default | Set `enable_threat_modeling = true` in config.toml (documentation-only output) |
 
 ## Scan Hangs/Slow
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| Scan hangs during CPG slicing | Joern binary not installed | Install Joern: `curl -L https://github.com/joernio/joern/releases/latest/download/joern-cli-linux-x64.zip -o joern.zip && unzip joern.zip && sudo mv joern-cli /usr/local/bin/` |
-| CPG slicing phase shows "skipped" | Joern dependency missing | Install Joern binary (see above) or skip CPG analysis |
 | Scan takes unusually long | Large codebase, no caching | Enable `enable_llm_cache = true` to avoid duplicate API calls |
 
 ## Report/Output Issues
@@ -25,16 +22,12 @@ Common issues and solutions for the Baco SAST scanner.
 |---------|-------|-----|
 | Scan fails mid-way, can't resume | No checkpoint created | Re-run the scan from scratch. To enable checkpointing for future runs, ensure the output directory is writable. |
 | checkpoint.json not found | Output directory cleared | Re-run full scan; checkpoint is written to output dir |
-| Report missing threat modeling section | Feature disabled | Set `enable_threat_modeling = true` in config.toml |
+| Report missing threat modeling section | Feature disabled | Remove this row - threat modeling is a core phase that always runs |
 
 ## External Tool Dependencies
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| CPG slicing phase skipped | Joern binary not in PATH | Install Joern (see "Scan Hangs/Slow" section) |
-| CPG errors about missing binary | Joern not executable | Ensure Joern has execute permissions: `chmod +x /usr/local/bin/joern-cli` |
-
-## Configuration Errors
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
@@ -78,7 +71,7 @@ Resume with: baco resume --checkpoint <path>
 
 3. **Use incremental scans:** After initial full scan, subsequent runs only process changed files.
 
-4. **Disable unused phases:** If you don't need threat modeling, keep `enable_threat_modeling = false` to reduce scan time.
+4. **Disable unused phases:** Keep `enable_confidence_refinement = false` to reduce LLM calls.
 
 ## Getting Help
 

@@ -1,9 +1,6 @@
-use crate::checkpoint::ScanPhase;
-use crate::cpg::CpgEngine as _;
 use crate::error::ScanResult;
 use crate::findings::VulnerabilityFinding;
 use crate::scanner::phases::PhaseConfig;
-use crate::scanner::progress::progress_position;
 
 /// Run CWE routing phase (phase 5 of 23).
 pub async fn run_cwe_routing(
@@ -48,114 +45,5 @@ pub async fn run_cwe_routing(
         findings.len()
     );
 
-    Ok((findings, analyzed_files.to_vec()))
-}
-
-/// Run CPG slice phase (phase 3 of 23).
-///
-/// Uses Joern to build a Code Property Graph and extract code slices around
-/// suspected vulnerabilities, reducing LLM context size (LLMxCPG, Usenix 2025).
-/// No-op when `config.cpg.enabled` is false or Joern is unavailable.
-pub async fn run_cpg_slice(
-    _scanner: &crate::scanner::Scanner,
-    cfg: PhaseConfig<'_>,
-) -> ScanResult<(Vec<VulnerabilityFinding>, Vec<String>)> {
-    let PhaseConfig {
-        phase: _,
-        mut findings,
-        pb,
-        analyzed_files,
-        metrics_tracker: _,
-        target_path,
-        config,
-        project_stack: _,
-    } = cfg;
-
-    if !config.cpg.enabled {
-        tracing::info!("CPG slice phase disabled (config.cpg.enabled=false); skipping");
-        pb.set_position(pb.position() + 100);
-        return Ok((findings, analyzed_files.to_vec()));
-    }
-
-    let engine = crate::cpg::JoernEngine::new(config.cpg.joern_path.clone());
-    if !engine.is_available() {
-        tracing::debug!(
-            "CPG slice phase enabled but Joern unavailable; skipping (no engine invocation)"
-        );
-        pb.set_position(pb.position() + 100);
-        return Ok((findings, analyzed_files.to_vec()));
-    }
-
-    tracing::info!(
-        "Running CPG slice phase on {} findings (budget={} lines)",
-        findings.len(),
-        config.cpg.slice_budget_lines
-    );
-    let phase_num = crate::scanner::pipeline::orchestrator::phase_index(&ScanPhase::CpgSlice);
-    let total = crate::scanner::pipeline::orchestrator::total_phases();
-    pb.set_message(format!(
-        "Phase {}/{}: CPG slice (building graph and slicing)...",
-        phase_num, total
-    ));
-
-    let cpg = match engine.build(target_path) {
-        Ok(cpg) => cpg,
-        Err(e) => {
-            tracing::warn!(
-                "CPG build failed for {:?}: {}; skipping phase",
-                target_path,
-                e
-            );
-            pb.set_position(pb.position() + 100);
-            return Ok((findings, analyzed_files.to_vec()));
-        }
-    };
-
-    let slicer = crate::cpg::slicer::CpgSlicer::new(&engine);
-    let total = findings.len();
-    let base = pb.position();
-    for (i, finding) in findings.iter_mut().enumerate() {
-        // Without a CWE there is no query to run. Defaulting to CWE-79 made
-        // every uncategorised finding look like XSS, and get_query_for_cwe
-        // turned that guess into the query the CPG was sliced with -- evidence
-        // gathered for a vulnerability class the finding never claimed.
-        let Some(cwe_hint) = finding.cwe_id.as_deref() else {
-            pb.set_position(progress_position(base, i, total));
-            continue;
-        };
-        // The CPG query is written against a function name. code_location holds
-        // "path:line", so splitting on a Rust path separator never yielded one
-        // and the fallback below was unreachable.
-        let Some(entry_point) = finding.title.split(['(', ' ']).find_map(|token| {
-            let name = token.trim();
-            (!name.is_empty() && name != "&").then_some(name)
-        }) else {
-            pb.set_position(progress_position(base, i, total));
-            continue;
-        };
-        if let Ok(slice) = slicer.slice(&cpg, cwe_hint, entry_point) {
-            if !slice.is_empty() {
-                tracing::debug!(
-                    "CPG slice for finding {} ({}): {} bytes, {} function(s)",
-                    finding.id,
-                    cwe_hint,
-                    slice.source.len(),
-                    slice.related_functions.len()
-                );
-                // Write evidence directly to the real finding (not a clone)
-                finding.add_evidence(
-                    crate::evidence::EvidenceSource::CpgSlice("cpg_slice".into()),
-                    0.6,
-                    format!(
-                        "CPG slice isolated {} relevant statements",
-                        slice.source.lines().count()
-                    ),
-                );
-            }
-        }
-        pb.set_position(progress_position(base, i, total));
-    }
-
-    pb.set_position(base + 100);
     Ok((findings, analyzed_files.to_vec()))
 }

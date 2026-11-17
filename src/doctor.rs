@@ -4,7 +4,6 @@
 
 use serde::Serialize;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 /// Result of a single health check
 #[derive(Debug, Clone, Serialize)]
@@ -150,8 +149,6 @@ fn check_llm_reachability(config_path: Option<&Path>) -> CheckResult {
         &config.llm.phases.verification,
         &config.llm.phases.aggregation,
         &config.llm.phases.static_analysis,
-        &config.llm.phases.security_agent_verification,
-        &config.llm.phases.threat_modeling,
     ] {
         if !phase.base_url.is_empty() {
             urls.insert(phase.base_url.clone());
@@ -472,19 +469,6 @@ fn check_llm_phases(config_path: Option<&Path>) -> CheckResult {
         &mut missing_config,
         &mut keyless,
     );
-    check_phase_config(
-        "security_agent_verification",
-        &phases.security_agent_verification,
-        &mut missing_config,
-        &mut keyless,
-    );
-    check_phase_config(
-        "threat_modeling",
-        &phases.threat_modeling,
-        &mut missing_config,
-        &mut keyless,
-    );
-
     if missing_config.is_empty() && keyless.is_empty() {
         CheckResult {
             name: "llm_phases".to_string(),
@@ -538,14 +522,15 @@ fn check_phase_config(
     }
 }
 
+/// Bound for the external version probes run by `baco doctor`.
+const CHECK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+
 /// Check if semgrep is on PATH
 pub fn check_semgrep() -> CheckResult {
     match which::which("semgrep") {
         Ok(path) => {
             // Get version
-            let version = Command::new(&path)
-                .arg("--version")
-                .output()
+            let version = crate::subprocess::run_with_timeout(&path, ["--version"], CHECK_TIMEOUT)
                 .ok()
                 .and_then(|o| String::from_utf8(o.stdout).ok())
                 .map(|v| v.trim().to_string())
@@ -569,9 +554,7 @@ pub fn check_semgrep() -> CheckResult {
 pub fn check_python3() -> CheckResult {
     match which::which("python3") {
         Ok(path) => {
-            let version = Command::new(&path)
-                .arg("--version")
-                .output()
+            let version = crate::subprocess::run_with_timeout(&path, ["--version"], CHECK_TIMEOUT)
                 .ok()
                 .and_then(|o| String::from_utf8(o.stdout).ok())
                 .map(|v| v.trim().to_string())
@@ -592,31 +575,8 @@ pub fn check_python3() -> CheckResult {
     }
 }
 
-/// Check if Joern is available (only if CPG is enabled in config)
-fn check_joern(config_path: Option<&Path>) -> CheckResult {
-    // First check if CPG is enabled in config
-    let cpg_enabled = match config_path {
-        Some(p) => match crate::config::ScannerConfig::from_file(p.to_str().unwrap_or("")) {
-            Ok(c) => c.cpg.enabled,
-            Err(e) => {
-                return CheckResult {
-                    name: "joern".to_string(),
-                    status: CheckStatus::Fail,
-                    detail: format!("Config parse error (cannot determine CPG status): {}", e),
-                };
-            }
-        },
-        None => false,
-    };
-
-    if !cpg_enabled {
-        return CheckResult {
-            name: "joern".to_string(),
-            status: CheckStatus::Ok,
-            detail: "Joern check skipped (CPG not enabled in config)".to_string(),
-        };
-    }
-
+/// Check if Joern is available
+fn check_joern(_config_path: Option<&Path>) -> CheckResult {
     // CPG is enabled, check for Joern
     match which::which("joern") {
         Ok(path) => CheckResult {
@@ -714,7 +674,11 @@ pub fn check_disk_space(output_dir: Option<&Path>) -> CheckResult {
     // For now, we'll do a simple check using df on Unix
     #[cfg(unix)]
     {
-        match Command::new("df").arg("-k").arg(&path).output() {
+        match crate::subprocess::run_with_timeout(
+            "df",
+            [std::ffi::OsStr::new("-k"), path.as_os_str()],
+            CHECK_TIMEOUT,
+        ) {
             Ok(output) if output.status.success() => {
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 let lines: Vec<&str> = stdout.lines().collect();

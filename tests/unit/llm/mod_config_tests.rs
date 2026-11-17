@@ -141,23 +141,6 @@ fn test_model_name_with_nonempty_model_field() {
 // ============================================================================
 
 #[test]
-fn test_phase_llm_config_threat_modeling_arm() {
-    // Line 1326: "threat_modeling" arm - use a ScannerConfig with valid base_url + model
-    let mut scanner_config = ScannerConfig::default();
-    scanner_config.llm.base_url = "https://api.test.com/v1".to_string();
-    scanner_config.llm.phases.threat_modeling.base_url =
-        "https://threat-model.api.com/v1".to_string();
-    scanner_config.llm.phases.threat_modeling.model = "threat-model".to_string();
-
-    let result = phase_llm_config(&scanner_config, "threat_modeling", None);
-
-    assert!(result.is_ok());
-    let cfg = result.unwrap();
-    assert_eq!(cfg.base_url, "https://threat-model.api.com/v1");
-    assert_eq!(cfg.model, "threat-model");
-}
-
-#[test]
 fn test_phase_llm_config_bogus_phase_default_arm() {
     // Line 1327: default `_` arm - bogus_phase returns LlmPhaseConfig::default()
     // then phase_llm_config errors (empty base_url in default → Err)
@@ -218,23 +201,6 @@ fn test_phase_llm_config_static_analysis_arm() {
     scanner_config.llm.phases.static_analysis.model = "static-model".to_string();
 
     let result = phase_llm_config(&scanner_config, "static_analysis", None);
-
-    assert!(result.is_ok());
-}
-
-#[test]
-fn test_phase_llm_config_security_agent_verification_arm() {
-    // Test security_agent_verification phase arm
-    let mut scanner_config = ScannerConfig::default();
-    scanner_config.llm.base_url = "https://api.test.com/v1".to_string();
-    scanner_config
-        .llm
-        .phases
-        .security_agent_verification
-        .base_url = "https://security.api.com/v1".to_string();
-    scanner_config.llm.phases.security_agent_verification.model = "security-model".to_string();
-
-    let result = phase_llm_config(&scanner_config, "security_agent_verification", None);
 
     assert!(result.is_ok());
 }

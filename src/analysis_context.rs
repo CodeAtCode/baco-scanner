@@ -3,7 +3,6 @@
 //! Serializes/deserializes `AnalysisContext` to `context.json` in the output dir
 //! so phases can share state without passing through LLM calls.
 
-use crate::project_type::ProjectType;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
@@ -11,9 +10,6 @@ use std::path::Path;
 /// Persisted analysis state shared across phases.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AnalysisContext {
-    pub project_type: ProjectType,
-    pub architecture_summary: String,
-    pub threat_model: Option<String>,
     pub invariants: Vec<String>,
     pub findings_so_far: Vec<String>,
 }

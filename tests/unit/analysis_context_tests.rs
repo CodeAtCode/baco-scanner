@@ -4,7 +4,6 @@
 //! save, load, and edge cases.
 
 use baco::analysis_context::AnalysisContext;
-use baco::project_type::ProjectType;
 
 // ============================================================================
 // save tests
@@ -38,9 +37,6 @@ fn test_save_with_data() {
     let tmp_dir = tempfile::tempdir().unwrap();
 
     let ctx = AnalysisContext {
-        project_type: ProjectType::Web,
-        architecture_summary: "Test architecture".to_string(),
-        threat_model: Some("Attacker model".to_string()),
         invariants: vec!["Invariant 1".to_string(), "Invariant 2".to_string()],
         findings_so_far: vec!["Finding 1".to_string()],
     };
@@ -52,7 +48,6 @@ fn test_save_with_data() {
     let context_path = tmp_dir.path().join("context.json");
     let content = std::fs::read_to_string(&context_path).unwrap();
     assert!(!content.is_empty());
-    assert!(content.contains("Test architecture"));
 }
 
 // ============================================================================
@@ -65,9 +60,6 @@ fn test_load_returns_default_when_file_missing() {
 
     let ctx = AnalysisContext::load(tmp_dir.path()).unwrap();
 
-    assert_eq!(ctx.project_type, ProjectType::Unknown);
-    assert!(ctx.architecture_summary.is_empty());
-    assert!(ctx.threat_model.is_none());
     assert!(ctx.invariants.is_empty());
     assert!(ctx.findings_so_far.is_empty());
 }
@@ -78,8 +70,7 @@ fn test_load_returns_default_when_directory_empty() {
 
     let ctx = AnalysisContext::load(tmp_dir.path()).unwrap();
 
-    assert_eq!(ctx.project_type, ProjectType::Unknown);
-    assert!(ctx.architecture_summary.is_empty());
+    assert!(ctx.invariants.is_empty());
 }
 
 #[test]
@@ -87,9 +78,6 @@ fn test_load_restores_saved_context() {
     let tmp_dir = tempfile::tempdir().unwrap();
 
     let original = AnalysisContext {
-        project_type: ProjectType::CLI,
-        architecture_summary: "CLI architecture".to_string(),
-        threat_model: Some("Network attacker".to_string()),
         invariants: vec!["No unauthenticated access".to_string()],
         findings_so_far: vec!["CWE-79: XSS".to_string(), "CWE-89: SQLi".to_string()],
     };
@@ -97,30 +85,8 @@ fn test_load_restores_saved_context() {
     original.save(tmp_dir.path()).unwrap();
     let loaded = AnalysisContext::load(tmp_dir.path()).unwrap();
 
-    assert_eq!(loaded.project_type, original.project_type);
-    assert_eq!(loaded.architecture_summary, original.architecture_summary);
-    assert_eq!(loaded.threat_model, original.threat_model);
     assert_eq!(loaded.invariants, original.invariants);
     assert_eq!(loaded.findings_so_far, original.findings_so_far);
-}
-
-#[test]
-fn test_load_with_empty_threat_model() {
-    let tmp_dir = tempfile::tempdir().unwrap();
-
-    let ctx = AnalysisContext {
-        project_type: ProjectType::Library,
-        architecture_summary: "Library".to_string(),
-        threat_model: None,
-        invariants: vec![],
-        findings_so_far: vec![],
-    };
-
-    ctx.save(tmp_dir.path()).unwrap();
-    let loaded = AnalysisContext::load(tmp_dir.path()).unwrap();
-
-    assert_eq!(loaded.project_type, ProjectType::Library);
-    assert!(loaded.threat_model.is_none());
 }
 
 #[test]
@@ -128,9 +94,6 @@ fn test_load_with_empty_invariants() {
     let tmp_dir = tempfile::tempdir().unwrap();
 
     let ctx = AnalysisContext {
-        project_type: ProjectType::Game,
-        architecture_summary: "Game engine".to_string(),
-        threat_model: Some("Player attacker".to_string()),
         invariants: vec![],
         findings_so_far: vec![],
     };
@@ -138,7 +101,6 @@ fn test_load_with_empty_invariants() {
     ctx.save(tmp_dir.path()).unwrap();
     let loaded = AnalysisContext::load(tmp_dir.path()).unwrap();
 
-    assert_eq!(loaded.project_type, ProjectType::Game);
     assert!(loaded.invariants.is_empty());
 }
 
@@ -147,9 +109,6 @@ fn test_load_with_multiple_findings() {
     let tmp_dir = tempfile::tempdir().unwrap();
 
     let ctx = AnalysisContext {
-        project_type: ProjectType::Desktop,
-        architecture_summary: "Desktop app".to_string(),
-        threat_model: None,
         invariants: vec![],
         findings_so_far: vec![
             "CWE-79: XSS in header".to_string(),
@@ -172,65 +131,6 @@ fn test_load_with_multiple_findings() {
 // ============================================================================
 // save/load roundtrip tests
 // ============================================================================
-
-#[test]
-fn test_roundtrip_all_project_types() {
-    let project_types = vec![
-        ProjectType::Unknown,
-        ProjectType::CLI,
-        ProjectType::Web,
-        ProjectType::Library,
-        ProjectType::Embedded,
-        ProjectType::Firmware,
-        ProjectType::Desktop,
-        ProjectType::Game,
-    ];
-
-    for project_type in project_types {
-        let tmp_dir = tempfile::tempdir().unwrap();
-        let ctx = AnalysisContext {
-            project_type: project_type.clone(),
-            architecture_summary: "Test".to_string(),
-            threat_model: None,
-            invariants: vec![],
-            findings_so_far: vec![],
-        };
-
-        ctx.save(tmp_dir.path()).unwrap();
-        let loaded = AnalysisContext::load(tmp_dir.path()).unwrap();
-
-        assert_eq!(loaded.project_type, project_type);
-    }
-}
-
-#[test]
-fn test_roundtrip_preserves_string_content() {
-    let tmp_dir = tempfile::tempdir().unwrap();
-
-    let ctx = AnalysisContext {
-        project_type: ProjectType::Web,
-        architecture_summary: r#"
-            Complex architecture with
-            multiple lines and special
-            characters: <>&"'
-        "#
-        .to_string(),
-        threat_model: Some("Attacker with network access".to_string()),
-        invariants: vec![
-            "All inputs must be sanitized".to_string(),
-            "No direct SQL concatenation".to_string(),
-        ],
-        findings_so_far: vec!["Critical finding".to_string()],
-    };
-
-    ctx.save(tmp_dir.path()).unwrap();
-    let loaded = AnalysisContext::load(tmp_dir.path()).unwrap();
-
-    assert_eq!(loaded.architecture_summary, ctx.architecture_summary);
-    assert_eq!(loaded.threat_model, ctx.threat_model);
-    assert_eq!(loaded.invariants, ctx.invariants);
-    assert_eq!(loaded.findings_so_far, ctx.findings_so_far);
-}
 
 // ============================================================================
 // Error handling tests
@@ -288,9 +188,6 @@ fn test_load_error_for_malformed_json() {
 fn test_default_context_is_empty() {
     let ctx = AnalysisContext::default();
 
-    assert_eq!(ctx.project_type, ProjectType::Unknown);
-    assert!(ctx.architecture_summary.is_empty());
-    assert!(ctx.threat_model.is_none());
     assert!(ctx.invariants.is_empty());
     assert!(ctx.findings_so_far.is_empty());
 }
@@ -303,8 +200,7 @@ fn test_default_can_be_saved_and_loaded() {
     ctx.save(tmp_dir.path()).unwrap();
 
     let loaded = AnalysisContext::load(tmp_dir.path()).unwrap();
-    assert_eq!(loaded.project_type, ProjectType::Unknown);
-    assert!(loaded.architecture_summary.is_empty());
+    assert!(loaded.invariants.is_empty());
 }
 
 // ============================================================================
@@ -317,9 +213,6 @@ fn test_save_load_with_very_long_strings() {
 
     let long_string = "x".repeat(10000);
     let ctx = AnalysisContext {
-        project_type: ProjectType::Web,
-        architecture_summary: long_string.clone(),
-        threat_model: Some(long_string.clone()),
         invariants: vec![long_string.clone()],
         findings_so_far: vec![long_string.clone()],
     };
@@ -327,8 +220,6 @@ fn test_save_load_with_very_long_strings() {
     ctx.save(tmp_dir.path()).unwrap();
     let loaded = AnalysisContext::load(tmp_dir.path()).unwrap();
 
-    assert_eq!(loaded.architecture_summary.len(), 10000);
-    assert_eq!(loaded.threat_model.unwrap().len(), 10000);
     assert_eq!(loaded.invariants[0].len(), 10000);
     assert_eq!(loaded.findings_so_far[0].len(), 10000);
 }
@@ -338,9 +229,6 @@ fn test_save_load_with_unicode_content() {
     let tmp_dir = tempfile::tempdir().unwrap();
 
     let ctx = AnalysisContext {
-        project_type: ProjectType::Web,
-        architecture_summary: "Unicode: 你好世界 🌍 émojis".to_string(),
-        threat_model: Some("Attacker: 攻击者".to_string()),
         invariants: vec!["Invariant: 不变量".to_string()],
         findings_so_far: vec!["Finding: 发现".to_string()],
     };
@@ -348,8 +236,6 @@ fn test_save_load_with_unicode_content() {
     ctx.save(tmp_dir.path()).unwrap();
     let loaded = AnalysisContext::load(tmp_dir.path()).unwrap();
 
-    assert_eq!(loaded.architecture_summary, ctx.architecture_summary);
-    assert_eq!(loaded.threat_model, ctx.threat_model);
     assert_eq!(loaded.invariants, ctx.invariants);
     assert_eq!(loaded.findings_so_far, ctx.findings_so_far);
 }
@@ -360,9 +246,6 @@ fn test_save_overwrites_existing_file() {
 
     // Save first context
     let ctx1 = AnalysisContext {
-        project_type: ProjectType::CLI,
-        architecture_summary: "First".to_string(),
-        threat_model: None,
         invariants: vec![],
         findings_so_far: vec![],
     };
@@ -370,9 +253,6 @@ fn test_save_overwrites_existing_file() {
 
     // Save second context
     let ctx2 = AnalysisContext {
-        project_type: ProjectType::Web,
-        architecture_summary: "Second".to_string(),
-        threat_model: None,
         invariants: vec![],
         findings_so_far: vec![],
     };
@@ -380,8 +260,7 @@ fn test_save_overwrites_existing_file() {
 
     // Load and verify second context overwrote first
     let loaded = AnalysisContext::load(tmp_dir.path()).unwrap();
-    assert_eq!(loaded.project_type, ProjectType::Web);
-    assert_eq!(loaded.architecture_summary, "Second");
+    assert!(loaded.invariants.is_empty());
 }
 // ============================================================================
 // Additional AnalysisContext Tests
@@ -391,9 +270,6 @@ fn test_save_overwrites_existing_file() {
 fn test_context_save_load() {
     let tmp = tempfile::tempdir().unwrap();
     let ctx = AnalysisContext {
-        project_type: ProjectType::CLI,
-        architecture_summary: "Test summary".to_string(),
-        threat_model: Some("Attacker: anonymous".to_string()),
         invariants: vec!["No unauthenticated access".to_string()],
         findings_so_far: vec!["CWE-79: XSS in header".to_string()],
     };
@@ -401,9 +277,6 @@ fn test_context_save_load() {
     ctx.save(tmp.path()).unwrap();
 
     let loaded = AnalysisContext::load(tmp.path()).unwrap();
-    assert_eq!(loaded.project_type, ctx.project_type);
-    assert_eq!(loaded.architecture_summary, ctx.architecture_summary);
-    assert_eq!(loaded.threat_model, ctx.threat_model);
     assert_eq!(loaded.invariants, ctx.invariants);
     assert_eq!(loaded.findings_so_far, ctx.findings_so_far);
 }
@@ -412,8 +285,6 @@ fn test_context_save_load() {
 fn test_context_missing_file() {
     let tmp = tempfile::tempdir().unwrap();
     let ctx = AnalysisContext::load(tmp.path()).unwrap();
-    assert!(ctx.architecture_summary.is_empty());
     assert!(ctx.invariants.is_empty());
     assert!(ctx.findings_so_far.is_empty());
-    assert_eq!(ctx.threat_model, None);
 }

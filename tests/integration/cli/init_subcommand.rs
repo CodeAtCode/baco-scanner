@@ -361,13 +361,11 @@ fn test_init_generated_config_has_all_phases() {
     let config_path = temp_dir.path().join("baco.toml");
     let content = std::fs::read_to_string(&config_path).unwrap();
 
-    // Verify all six phase slots are present
+    // Verify all four phase slots are present
     assert!(content.contains("[llm.phases.discovery]"));
     assert!(content.contains("[llm.phases.verification]"));
     assert!(content.contains("[llm.phases.aggregation]"));
     assert!(content.contains("[llm.phases.static_analysis]"));
-    assert!(content.contains("[llm.phases.security_agent_verification]"));
-    assert!(content.contains("[llm.phases.threat_modeling]"));
 
     // Verify each phase has commented base_url/models/api_key lines
     assert!(content.contains("base_url"));

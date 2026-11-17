@@ -5,12 +5,9 @@ pub mod cli;
 pub mod common;
 mod context;
 pub mod corpus_tests;
-mod exploit;
 pub mod hook_registry_tests;
 mod prompt;
 mod report;
-mod rulesynth;
-mod threat_model;
 // Error taxonomy tests (T27)
 // Include centralized fixtures
 pub use fixtures::*;
@@ -52,7 +49,7 @@ pub use fixtures::*;
 // Additional coverage: agent sandbox/session/tools, cve+misc, chain analysis, core utilities
 // Additional coverage: agent sandbox/session/tools, cve+misc, chain analysis, core utilities
 // Additional coverage: report aggregation, rulesynth
-// Additional coverage: worktree staging, cve_client, scanner/sequential
+// Additional coverage: cve_client, scanner/sequential
 // Additional coverage: enrichment, exploit harness
 // CVE client network tests using mockito
 // Deep rulesynth tests - comprehensive coverage for rulesynth module
@@ -109,18 +106,12 @@ mod confidence_normalization;
 mod confidence_normalization_update_tests;
 mod confidence_refinement;
 mod config;
-mod cost_estimate_tests;
 mod coverage_eval_helpers_tests;
 mod coverage_llm_phase_pure_tests;
-mod coverage_rulesynth_agentflow_tests;
+
 mod coverage_small_modules_tests;
 mod coverage_static_orchestrator_tests;
-mod cpg_joern_tests;
-mod cpg_queries_tests;
-mod cpg_slice_phase_tests;
-mod cpg_slicer;
-mod cpg_slicer_tests;
-mod cpg_tests;
+
 mod cross_file_analysis;
 mod cve_bootstrap_mutants;
 mod cve_bootstrap_php_tests;
@@ -194,7 +185,6 @@ mod semgrep;
 mod semgrep_ruleset_cpe_tests;
 mod severity_order_tests;
 mod specifications_config_tests;
-mod staging;
 mod statement_range;
 mod static_analysis_prompt_tests;
 mod structural_dedup_tests;
@@ -208,8 +198,7 @@ mod truncate_code_tests;
 mod ui_tests;
 mod validation_success_path_tests;
 mod validation_tests;
-mod variant_search_edge_tests;
-mod variant_search_tests;
+
 mod verification;
 mod verification_batch_index_tests;
 mod verification_blind_cap_tests;
@@ -224,6 +213,7 @@ mod wp_primitive_prompt_tests;
 mod prompt_absent_value_tests;
 
 mod severity_label_tests;
+mod skipped_phase_names_tests;
 
 mod path_match_tests;
 
@@ -237,4 +227,7 @@ mod upgrade_absence_read_error_tests;
 mod verification_tools_test;
 
 // max_file_size_kb range validation regression tests
+mod atomic_write_tests;
 mod max_file_size_validation_tests;
+mod subprocess_tests;
+mod utf8_boundary_tests;

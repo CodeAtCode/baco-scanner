@@ -62,28 +62,21 @@ fn temp_checkpoint_path(test_name: &str) -> String {
 // ============================================================================
 
 #[test]
-fn test_sequential_phase_19_phase_table() {
+fn test_sequential_phase_12_phase_table() {
     // Test that resume_from(phase) equals the next phase in sequential_phases order
     // This pins the exact mapping verified in audit
     let sequential_phases = [
         ScanPhase::CweRouting,
-        ScanPhase::RuleSynthesis,
         ScanPhase::LlmDiscovery,
         ScanPhase::LlmVerification,
         ScanPhase::Validate,
-        ScanPhase::SecurityAgentVerification,
         ScanPhase::TicketCrossRef,
         ScanPhase::GitAnalysis,
         ScanPhase::CrossFileAnalysis,
         ScanPhase::ConfidenceScoring,
         ScanPhase::AiAggregation,
-        ScanPhase::ThreatModeling,
         ScanPhase::RootCauseDedup,
-        ScanPhase::AutoPatching,
         ScanPhase::CveBootstrap,
-        ScanPhase::PocCompiler,
-        ScanPhase::ExploitSynth,
-        ScanPhase::VariantSearch,
         ScanPhase::Reporting,
     ];
 
@@ -114,11 +107,10 @@ fn test_sequential_phase_19_phase_table() {
 
 #[test]
 fn test_parallel_chain_indexing_to_cwe_routing() {
-    // Parallel chain: Indexing -> Semgrep -> CpgSlice -> LlmStaticAnalysis -> CweRouting
+    // Parallel chain: Indexing -> Semgrep -> LlmStaticAnalysis -> CweRouting
     let parallel_chain = [
         (ScanPhase::Indexing, ScanPhase::Semgrep),
-        (ScanPhase::Semgrep, ScanPhase::CpgSlice),
-        (ScanPhase::CpgSlice, ScanPhase::LlmStaticAnalysis),
+        (ScanPhase::Semgrep, ScanPhase::LlmStaticAnalysis),
         (ScanPhase::LlmStaticAnalysis, ScanPhase::CweRouting),
     ];
 

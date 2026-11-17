@@ -64,10 +64,25 @@ fn test_run_doctor_checks_minimal_valid_config() {
     let config_path = temp_dir.path().join("baco.toml");
 
     let config_content = r#"
+[project]
+name = "test"
+path = "."
+
+[output]
+dir = "./output"
+
 [scanner]
-profile = "core"
+
+[scanner.semgrep]
+
+[scanner.performance]
+max_parallel_tasks = 4
 
 [llm]
+timeout_secs = 60
+max_retries = 3
+retry_backoff_ms = 2000
+
 [llm.phases]
 [llm.phases.discovery]
 api_key = "test-key"
@@ -88,19 +103,6 @@ model = "test-model"
 api_key = "test-key"
 base_url = "https://test.api/v1"
 model = "test-model"
-
-[llm.phases.security_agent_verification]
-api_key = "test-key"
-base_url = "https://test.api/v1"
-model = "test-model"
-
-[llm.phases.threat_modeling]
-api_key = "test-key"
-base_url = "https://test.api/v1"
-model = "test-model"
-
-[cpg]
-enabled = false
 "#;
 
     std::fs::write(&config_path, config_content).unwrap();
@@ -108,9 +110,6 @@ enabled = false
     let output_dir = temp_dir.path().join("output");
     let results =
         baco::doctor::run_doctor_checks(Some(config_path.as_path()), Some(output_dir.as_path()));
-
-    // Verify we got check results
-    assert!(!results.checks.is_empty());
 
     // Config parse should succeed
     let config_check = results.checks.iter().find(|c| c.name == "config_parse");
@@ -125,10 +124,25 @@ fn test_run_doctor_checks_missing_api_key() {
     let config_path = temp_dir.path().join("baco.toml");
 
     let config_content = r#"
+[project]
+name = "test"
+path = "."
+
+[output]
+dir = "./output"
+
 [scanner]
-profile = "core"
+
+[scanner.semgrep]
+
+[scanner.performance]
+max_parallel_tasks = 4
 
 [llm]
+timeout_secs = 60
+max_retries = 3
+retry_backoff_ms = 2000
+
 [llm.phases]
 [llm.phases.discovery]
 # Missing api_key intentionally
@@ -149,19 +163,6 @@ model = "test-model"
 api_key = "test-key"
 base_url = "https://test.api/v1"
 model = "test-model"
-
-[llm.phases.security_agent_verification]
-api_key = "test-key"
-base_url = "https://test.api/v1"
-model = "test-model"
-
-[llm.phases.threat_modeling]
-api_key = "test-key"
-base_url = "https://test.api/v1"
-model = "test-model"
-
-[cpg]
-enabled = false
 "#;
 
     std::fs::write(&config_path, config_content).unwrap();
@@ -170,7 +171,7 @@ enabled = false
     let results =
         baco::doctor::run_doctor_checks(Some(config_path.as_path()), Some(output_dir.as_path()));
 
-    // LLM phases check should warn about missing config
+    // LLM phases check should warn about missing api_key
     let llm_check = results.checks.iter().find(|c| c.name == "llm_phases");
     assert!(llm_check.is_some());
     let llm_result = llm_check.unwrap();
@@ -249,18 +250,11 @@ api_key = "test-key"
 base_url = "https://test.api/v1"
 model = "test-model"
 
-[llm.phases.security_agent_verification]
-api_key = "test-key"
-base_url = "https://test.api/v1"
-model = "test-model"
-
-[llm.phases.threat_modeling]
-api_key = "test-key"
-base_url = "https://test.api/v1"
-model = "test-model"
-
 [cpg]
 enabled = false
+
+[project]
+path = "."
 "#;
 
     std::fs::write(&config_path, config_content).unwrap();
@@ -307,18 +301,11 @@ api_key = "test-key"
 base_url = "https://test.api/v1"
 model = "test-model"
 
-[llm.phases.security_agent_verification]
-api_key = "test-key"
-base_url = "https://test.api/v1"
-model = "test-model"
-
-[llm.phases.threat_modeling]
-api_key = "test-key"
-base_url = "https://test.api/v1"
-model = "test-model"
-
 [cpg]
 enabled = false
+
+[project]
+path = "."
 "#;
 
     std::fs::write(&config_path, config_content).unwrap();
@@ -602,18 +589,11 @@ api_key = "test-key"
 base_url = "https://test.api/v1"
 model = "test-model"
 
-[llm.phases.security_agent_verification]
-api_key = "test-key"
-base_url = "https://test.api/v1"
-model = "test-model"
-
-[llm.phases.threat_modeling]
-api_key = "test-key"
-base_url = "https://test.api/v1"
-model = "test-model"
-
 [cpg]
 enabled = false
+
+[project]
+path = "."
 "#;
 
     std::fs::write(&config_path, config_content).unwrap();
@@ -640,12 +620,37 @@ fn test_check_llm_phases_missing_base_url_and_model() {
     let config_path = temp_dir.path().join("baco.toml");
 
     let config_content = r#"
+[project]
+name = "test"
+path = "."
+
+[output]
+dir = "./output"
+
 [scanner]
-profile = "core"
+
+[scanner.semgrep]
+
+[scanner.performance]
+max_parallel_tasks = 4
 
 [llm]
+timeout_secs = 60
+max_retries = 3
+retry_backoff_ms = 2000
+
 [llm.phases]
 [llm.phases.discovery]
+api_key = "x"
+base_url = "http://x"
+
+[llm.phases.verification]
+api_key = "x"
+
+[llm.phases.aggregation]
+api_key = "x"
+
+[llm.phases.static_analysis]
 api_key = "x"
 "#;
 
@@ -670,12 +675,39 @@ fn test_check_llm_phases_missing_model_only() {
     let config_path = temp_dir.path().join("baco.toml");
 
     let config_content = r#"
+[project]
+name = "test"
+path = "."
+
+[output]
+dir = "./output"
+
 [scanner]
-profile = "core"
+
+[scanner.semgrep]
+
+[scanner.performance]
+max_parallel_tasks = 4
 
 [llm]
+timeout_secs = 60
+max_retries = 3
+retry_backoff_ms = 2000
+
 [llm.phases]
 [llm.phases.discovery]
+api_key = "x"
+base_url = "http://x"
+
+[llm.phases.verification]
+api_key = "x"
+base_url = "http://x"
+
+[llm.phases.aggregation]
+api_key = "x"
+base_url = "http://x"
+
+[llm.phases.static_analysis]
 api_key = "x"
 base_url = "http://x"
 "#;
@@ -692,69 +724,6 @@ base_url = "http://x"
 
     assert_eq!(llm_check.status, CheckStatus::Warn);
     assert!(llm_check.detail.contains("model"));
-}
-
-// ============================================================================
-// Target 6: check_joern cpg-disabled
-// ============================================================================
-
-#[test]
-fn test_check_joern_cpg_disabled_skipped() {
-    let temp_dir = TempDir::new().unwrap();
-    let config_path = temp_dir.path().join("baco.toml");
-
-    let config_content = r#"
-[scanner]
-profile = "core"
-
-[llm]
-[llm.phases]
-[llm.phases.discovery]
-api_key = "test-key"
-base_url = "https://test.api/v1"
-model = "test-model"
-
-[llm.phases.verification]
-api_key = "test-key"
-base_url = "https://test.api/v1"
-model = "test-model"
-
-[llm.phases.aggregation]
-api_key = "test-key"
-base_url = "https://test.api/v1"
-model = "test-model"
-
-[llm.phases.static_analysis]
-api_key = "test-key"
-base_url = "https://test.api/v1"
-model = "test-model"
-
-[llm.phases.security_agent_verification]
-api_key = "test-key"
-base_url = "https://test.api/v1"
-model = "test-model"
-
-[llm.phases.threat_modeling]
-api_key = "test-key"
-base_url = "https://test.api/v1"
-model = "test-model"
-
-[cpg]
-enabled = false
-"#;
-
-    std::fs::write(&config_path, config_content).unwrap();
-
-    let results = baco::doctor::run_doctor_checks(Some(config_path.as_path()), None);
-
-    let joern_check = results
-        .checks
-        .iter()
-        .find(|c| c.name == "joern")
-        .expect("joern check must run");
-
-    assert_eq!(joern_check.status, CheckStatus::Ok);
-    assert!(joern_check.detail.contains("skipped"));
 }
 
 #[test]
@@ -774,16 +743,31 @@ fn doctor_checks_missing_config_file_skip_ok() {
 #[test]
 fn test_config_parsing_validates_business_rules() {
     // Create a config that parses but fails business validation
-    // (e.g., has an invalid preset reference)
+    // (e.g., invalid max_file_size_kb = 0)
     let temp_dir = TempDir::new().unwrap();
     let config_path = temp_dir.path().join("baco.toml");
 
     let config_content = r#"
+[project]
+name = "test"
+path = "."
+
+[output]
+dir = "./output"
+
 [scanner]
-profile = "core"
-preset = "nonexistent-preset-xyz-123"
+max_file_size_kb = 0
+
+[scanner.semgrep]
+
+[scanner.performance]
+max_parallel_tasks = 4
 
 [llm]
+timeout_secs = 60
+max_retries = 3
+retry_backoff_ms = 2000
+
 [llm.phases]
 [llm.phases.discovery]
 api_key = "test-key"
@@ -804,34 +788,30 @@ model = "test-model"
 api_key = "test-key"
 base_url = "https://test.api/v1"
 model = "test-model"
-
-[llm.phases.security_agent_verification]
-api_key = "test-key"
-base_url = "https://test.api/v1"
-model = "test-model"
-
-[llm.phases.threat_modeling]
-api_key = "test-key"
-base_url = "https://test.api/v1"
-model = "test-model"
-
-[cpg]
-enabled = false
 "#;
 
     std::fs::write(&config_path, config_content).unwrap();
 
     let results = baco::doctor::run_doctor_checks(Some(config_path.as_path()), None);
 
-    // Config parse should FAIL because business validation fails (invalid preset)
-    let config_check = results
+    // config_parse should succeed (TOML parses fine)
+    let config_parse_check = results
         .checks
         .iter()
         .find(|c| c.name == "config_parse")
         .expect("config_parse check must run");
 
-    assert_eq!(config_check.status, CheckStatus::Fail);
-    assert!(config_check.detail.contains("validation") || config_check.detail.contains("preset"));
+    assert_eq!(config_parse_check.status, CheckStatus::Ok);
+
+    // config_validation should FAIL because max_file_size_kb = 0 is invalid
+    let config_validation_check = results
+        .checks
+        .iter()
+        .find(|c| c.name == "config_validation")
+        .expect("config_validation check must run");
+
+    assert_eq!(config_validation_check.status, CheckStatus::Fail);
+    assert!(config_validation_check.detail.contains("max_file_size_kb"));
 }
 
 // ============================================================================
@@ -888,30 +868,4 @@ profile = "core"  # Missing closing bracket - invalid TOML
 
     assert_eq!(llm_check.status, CheckStatus::Fail);
     assert!(llm_check.detail.contains("Config parse error"));
-}
-
-#[test]
-fn test_joern_fails_on_config_parse_error() {
-    // Create an invalid config file (malformed TOML)
-    let temp_dir = TempDir::new().unwrap();
-    let config_path = temp_dir.path().join("baco.toml");
-
-    let config_content = r#"
-[scanner
-profile = "core"  # Missing closing bracket - invalid TOML
-"#;
-
-    std::fs::write(&config_path, config_content).unwrap();
-
-    let results = baco::doctor::run_doctor_checks(Some(config_path.as_path()), None);
-
-    // Joern check should FAIL with config parse error
-    let joern_check = results
-        .checks
-        .iter()
-        .find(|c| c.name == "joern")
-        .expect("joern check must run");
-
-    assert_eq!(joern_check.status, CheckStatus::Fail);
-    assert!(joern_check.detail.contains("Config parse error"));
 }

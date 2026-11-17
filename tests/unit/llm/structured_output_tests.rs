@@ -129,7 +129,6 @@ fn test_phase_llm_config_applies_phase_overrides() {
                     models: vec![],
                     timeout_secs: Some(120),
                     temperature: Some(0.9),
-                    agent_flow: Default::default(),
                 },
                 ..Default::default()
             },
@@ -230,7 +229,6 @@ fn test_phase_llm_config_static_analysis_uses_own_slot() {
                     models: vec![],
                     timeout_secs: Some(60),
                     temperature: Some(0.8),
-                    agent_flow: Default::default(),
                 },
                 static_analysis: LlmPhaseConfig {
                     base_url: "https://static-analysis.api.com".to_string(),
@@ -239,7 +237,6 @@ fn test_phase_llm_config_static_analysis_uses_own_slot() {
                     models: vec![],
                     timeout_secs: Some(90),
                     temperature: Some(0.6),
-                    agent_flow: Default::default(),
                 },
                 ..Default::default()
             },
@@ -445,7 +442,7 @@ fn test_create_llm_client_with_metrics_returns_none_on_missing_base_url() {
     let config = baco::config::ScannerConfig {
         llm: baco::config::LlmConfig {
             phases: LlmPhasesConfig {
-                security_agent_verification: LlmPhaseConfig {
+                static_analysis: LlmPhaseConfig {
                     api_key: Some("test-key".to_string()),
                     base_url: "".to_string(), // Empty base_url - should cause graceful skip
                     model: "test-model".to_string(),
@@ -461,7 +458,7 @@ fn test_create_llm_client_with_metrics_returns_none_on_missing_base_url() {
     let temp_dir = tempfile::tempdir().unwrap();
     let scanner = baco::scanner::Scanner::new(config, temp_dir.path().to_path_buf(), false);
 
-    let result = baco::llm::create_llm_client_with_metrics(&scanner, "security_agent_verification");
+    let result = baco::llm::create_llm_client_with_metrics(&scanner, "static_analysis");
 
     assert!(
         result.is_none(),

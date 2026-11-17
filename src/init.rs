@@ -172,10 +172,6 @@ dir = "baco-output"
 evidence_gate = false
 
 [scanner]
-# Scan profile: "core" (default, essential phases) or "all" (all phases)
-profile = "core"
-# To enable all phases: profile = "all"
-
 # Maximum file size to analyze (in KB)
 max_file_size_kb = 512
 
@@ -209,16 +205,6 @@ temperature = 0.5
 # models = ["mistral-small"]
 
 [llm.phases.static_analysis]
-# base_url = "https://api.mistral.ai/v1"
-# api_key = "${{MISTRAL_API_KEY}}"
-# models = ["mistral-small"]
-
-[llm.phases.security_agent_verification]
-# base_url = "https://api.mistral.ai/v1"
-# api_key = "${{MISTRAL_API_KEY}}"
-# models = ["mistral-small"]
-
-[llm.phases.threat_modeling]
 # base_url = "https://api.mistral.ai/v1"
 # api_key = "${{MISTRAL_API_KEY}}"
 # models = ["mistral-small"]

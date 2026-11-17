@@ -4,24 +4,24 @@ use baco::scanner::Scanner;
 
 #[test]
 fn test_parallel_phase_count() {
-    // Parallel phases: Indexing, Semgrep, CpgSlice, LlmStaticAnalysis = 4
+    // Parallel phases: Indexing, Semgrep, LlmStaticAnalysis = 3
     let parallel_count = Scanner::scheduled_parallel_phases();
-    assert_eq!(parallel_count, 4, "Expected 4 parallel phases");
+    assert_eq!(parallel_count, 3, "Expected 3 parallel phases");
 }
 
 #[test]
 fn test_sequential_phase_count() {
-    // Sequential phases: 20 (including Validate)
+    // Sequential phases: 12 (CweRouting through Reporting)
     let sequential_count = Scanner::scheduled_sequential_phases();
-    assert_eq!(sequential_count, 19, "Expected 19 sequential phases");
+    assert_eq!(sequential_count, 12, "Expected 12 sequential phases");
 }
 
 #[test]
 fn test_total_phase_count() {
-    // Total: 4 parallel + 19 sequential = 23
+    // Total: 3 parallel + 12 sequential = 15
     let (parallel, sequential) = Scanner::scheduled_phase_counts();
     let total = parallel + sequential;
-    assert_eq!(total, 23, "Expected 23 total phases");
+    assert_eq!(total, 15, "Expected 15 total phases");
 }
 
 #[test]
@@ -45,23 +45,30 @@ fn test_phase_graph_matches_schedule() {
 }
 
 #[test]
-fn test_cpg_slice_is_parallel_phase() {
-    // CpgSlice should be in parallel phases (phase 3)
+fn test_llm_static_analysis_is_parallel_phase() {
+    // LlmStaticAnalysis should be in parallel phases (phase 3)
     let phase_graph = PhaseGraph::new();
     let phases = phase_graph.phases();
 
-    let cpg_slice_idx = phases.iter().position(|p| *p == ScanPhase::CpgSlice);
-    assert!(cpg_slice_idx.is_some(), "CpgSlice should be in PhaseGraph");
+    let llm_static_idx = phases
+        .iter()
+        .position(|p| *p == ScanPhase::LlmStaticAnalysis);
+    assert!(
+        llm_static_idx.is_some(),
+        "LlmStaticAnalysis should be in PhaseGraph"
+    );
     assert_eq!(
-        cpg_slice_idx.unwrap(),
+        llm_static_idx.unwrap(),
         2,
-        "CpgSlice should be at index 2 (3rd phase)"
+        "LlmStaticAnalysis should be at index 2 (3rd phase)"
     );
 }
 
 #[test]
 fn test_validate_is_sequential_phase() {
-    // Validate should be in sequential phases (phase 9)
+    // Validate should be in sequential phases (phase 7)
+    // Order: Indexing(0), Semgrep(1), LlmStaticAnalysis(2), CweRouting(3),
+    //        LlmDiscovery(4), LlmVerification(5), Validate(6)
     let phase_graph = PhaseGraph::new();
     let phases = phase_graph.phases();
 
@@ -69,7 +76,7 @@ fn test_validate_is_sequential_phase() {
     assert!(validate_idx.is_some(), "Validate should be in PhaseGraph");
     assert_eq!(
         validate_idx.unwrap(),
-        8,
-        "Validate should be at index 8 (9th phase)"
+        6,
+        "Validate should be at index 6 (7th phase)"
     );
 }

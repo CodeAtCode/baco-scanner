@@ -2,32 +2,6 @@ use crate::config::{default_four, default_max_file_size_kb};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// Pipeline profile selection: which phases run by default
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
-#[serde(rename_all = "lowercase")]
-pub enum ScanPipelineProfile {
-    /// Core profile: runs the essential phases that constitute a sensible default scan
-    #[default]
-    Core,
-    /// All profile: runs all phases including experimental ones (still individually flag-gated)
-    All,
-}
-
-/// Pattern configuration for variant search
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields)]
-pub struct VariantSearchPattern {
-    /// Type of vulnerability (e.g., "command_injection", "sql_injection")
-    #[serde(default)]
-    pub vulnerability_type: String,
-    /// Regex pattern to match in code
-    #[serde(default)]
-    pub code_pattern: String,
-    /// Context keywords that increase similarity score
-    #[serde(default)]
-    pub context_keywords: Vec<String>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ScannerSettings {
@@ -35,9 +9,6 @@ pub struct ScannerSettings {
     pub max_file_size_kb: u64,
     #[serde(default)]
     pub exclude_paths: Vec<String>,
-    /// Pipeline profile: "core" (default) or "all"
-    #[serde(default)]
-    pub profile: ScanPipelineProfile,
     #[serde(default)]
     pub semgrep: SemgrepSettings,
     #[serde(default)]
@@ -49,7 +20,6 @@ impl Default for ScannerSettings {
         Self {
             max_file_size_kb: default_max_file_size_kb(),
             exclude_paths: Vec::new(),
-            profile: ScanPipelineProfile::default(),
             semgrep: SemgrepSettings::default(),
             performance: PerformanceSettings::default(),
         }
@@ -89,21 +59,13 @@ pub struct PerformanceSettings {
     pub early_termination_threshold: f32,
     #[serde(default = "default_four")]
     pub max_parallel_tasks: usize,
-    // v3 feature flags
-    #[serde(default = "crate::config::default_enable_threat_modeling")]
-    pub enable_threat_modeling: bool,
+    // feature flags
     #[serde(default = "crate::config::default_enable_root_cause_dedup")]
     pub enable_root_cause_dedup: bool,
-    #[serde(default = "crate::config::default_enable_auto_patching")]
-    pub enable_auto_patching: bool,
-    #[serde(default = "crate::config::default_enable_poc_compilation")]
-    pub enable_poc_compilation: bool,
     #[serde(default = "crate::config::default_enable_confidence_refinement")]
     pub enable_confidence_refinement: bool,
     #[serde(default = "crate::config::default_enable_cve_bootstrap")]
     pub enable_cve_bootstrap: bool,
-    #[serde(default = "crate::config::default_enable_variant_search")]
-    pub enable_variant_search: bool,
     /// Class A: absence detection — flag functions handling sensitive state with no auth/nonce primitive.
     #[serde(default = "crate::config::default_enable_absence_detection")]
     pub enable_absence_detection: bool,
@@ -120,9 +82,6 @@ pub struct PerformanceSettings {
     /// Multiplier applied to confidence when never-submit pattern matches (default 0.1)
     #[serde(default = "crate::config::default_never_submit_multiplier")]
     pub never_submit_multiplier: f32,
-    /// Variant search patterns - code patterns to search for vulnerability variants
-    #[serde(default)]
-    pub variant_search_patterns: Vec<VariantSearchPattern>,
 }
 
 pub const DEFAULT_NEVER_SUBMIT_ENABLED: bool = true;
@@ -140,19 +99,14 @@ impl Default for PerformanceSettings {
         Self {
             early_termination_threshold: 1000.0,
             max_parallel_tasks: default_four(),
-            enable_threat_modeling: crate::config::default_enable_threat_modeling(),
             enable_root_cause_dedup: crate::config::default_enable_root_cause_dedup(),
-            enable_auto_patching: crate::config::default_enable_auto_patching(),
-            enable_poc_compilation: crate::config::default_enable_poc_compilation(),
             enable_confidence_refinement: crate::config::default_enable_confidence_refinement(),
             enable_cve_bootstrap: crate::config::default_enable_cve_bootstrap(),
-            enable_variant_search: crate::config::default_enable_variant_search(),
             enable_absence_detection: crate::config::default_enable_absence_detection(),
             enable_merge_order_detection: crate::config::default_enable_merge_order_detection(),
             enable_hunt_prompts: crate::config::default_enable_hunt_prompts(),
             never_submit_enabled: crate::config::default_never_submit_enabled(),
             never_submit_multiplier: crate::config::default_never_submit_multiplier(),
-            variant_search_patterns: Vec::new(),
         }
     }
 }

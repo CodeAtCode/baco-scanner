@@ -4,8 +4,13 @@
 //! Supports Rust, Python, and JavaScript via compile/check only.
 
 use crate::scanner_types::poc::PoCCompileResult;
-use std::process::Command;
+use crate::subprocess::run_with_timeout;
+use std::ffi::OsStr;
+use std::time::Duration;
 use thiserror::Error;
+
+/// Cap for the external compile checks. A wedged compiler must not hang the scan.
+const VALIDATE_TIMEOUT: Duration = Duration::from_secs(30);
 
 #[derive(Error, Debug)]
 pub enum CompileError {
@@ -75,12 +80,16 @@ impl PocCompiler {
             );
         }
 
-        let output = Command::new("rustc")
-            .arg("--edition")
-            .arg("2021")
-            .arg("--check")
-            .arg(temp_file.path())
-            .output();
+        let output = run_with_timeout(
+            "rustc",
+            [
+                OsStr::new("--edition"),
+                OsStr::new("2021"),
+                OsStr::new("--check"),
+                temp_file.path().as_os_str(),
+            ],
+            VALIDATE_TIMEOUT,
+        );
 
         match output {
             Ok(result) => {
@@ -93,16 +102,14 @@ impl PocCompiler {
                     PoCCompileResult::failure("rust", vec![errors.trim().to_string()])
                 }
             }
-            Err(e) => {
-                if e.kind() == std::io::ErrorKind::NotFound {
-                    PoCCompileResult::failure(
-                        "rust",
-                        vec!["rustc not found - cannot validate Rust code".to_string()],
-                    )
-                } else {
-                    PoCCompileResult::failure("rust", vec![format!("Validation error: {}", e)])
-                }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => PoCCompileResult::failure(
+                "rust",
+                vec!["rustc not found - cannot validate Rust code".to_string()],
+            ),
+            Err(e) if e.kind() == std::io::ErrorKind::TimedOut => {
+                PoCCompileResult::failure("rust", vec![e.to_string()])
             }
+            Err(e) => PoCCompileResult::failure("rust", vec![format!("Validation error: {}", e)]),
         }
     }
 
@@ -125,11 +132,15 @@ impl PocCompiler {
             );
         }
 
-        let output = Command::new("python3")
-            .arg("-m")
-            .arg("py_compile")
-            .arg(temp_file.path())
-            .output();
+        let output = run_with_timeout(
+            "python3",
+            [
+                OsStr::new("-m"),
+                OsStr::new("py_compile"),
+                temp_file.path().as_os_str(),
+            ],
+            VALIDATE_TIMEOUT,
+        );
 
         match output {
             Ok(result) => {
@@ -140,16 +151,14 @@ impl PocCompiler {
                     PoCCompileResult::failure("python", vec![stderr.trim().to_string()])
                 }
             }
-            Err(e) => {
-                if e.kind() == std::io::ErrorKind::NotFound {
-                    PoCCompileResult::failure(
-                        "python",
-                        vec!["python3 not found - cannot validate Python code".to_string()],
-                    )
-                } else {
-                    PoCCompileResult::failure("python", vec![format!("Validation error: {}", e)])
-                }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => PoCCompileResult::failure(
+                "python",
+                vec!["python3 not found - cannot validate Python code".to_string()],
+            ),
+            Err(e) if e.kind() == std::io::ErrorKind::TimedOut => {
+                PoCCompileResult::failure("python", vec![e.to_string()])
             }
+            Err(e) => PoCCompileResult::failure("python", vec![format!("Validation error: {}", e)]),
         }
     }
 
@@ -172,10 +181,11 @@ impl PocCompiler {
             );
         }
 
-        let output = Command::new("node")
-            .arg("--check")
-            .arg(temp_file.path())
-            .output();
+        let output = run_with_timeout(
+            "node",
+            [OsStr::new("--check"), temp_file.path().as_os_str()],
+            VALIDATE_TIMEOUT,
+        );
 
         match output {
             Ok(result) => {
@@ -186,18 +196,15 @@ impl PocCompiler {
                     PoCCompileResult::failure("javascript", vec![stderr.trim().to_string()])
                 }
             }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => PoCCompileResult::failure(
+                "javascript",
+                vec!["node not found - cannot validate JavaScript code".to_string()],
+            ),
+            Err(e) if e.kind() == std::io::ErrorKind::TimedOut => {
+                PoCCompileResult::failure("javascript", vec![e.to_string()])
+            }
             Err(e) => {
-                if e.kind() == std::io::ErrorKind::NotFound {
-                    PoCCompileResult::failure(
-                        "javascript",
-                        vec!["node not found - cannot validate JavaScript code".to_string()],
-                    )
-                } else {
-                    PoCCompileResult::failure(
-                        "javascript",
-                        vec![format!("Validation error: {}", e)],
-                    )
-                }
+                PoCCompileResult::failure("javascript", vec![format!("Validation error: {}", e)])
             }
         }
     }

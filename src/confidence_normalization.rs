@@ -6,7 +6,6 @@
 
 use crate::config::{NormalizationConfig, NormalizationTier};
 use std::fs;
-use std::path::PathBuf;
 
 /// Project baseline for confidence normalization.
 ///
@@ -41,7 +40,7 @@ impl ProjectBaseline {
     /// Load baseline from a file path.
     ///
     /// Returns empty baseline if file doesn't exist or is invalid.
-    pub fn load(path: &PathBuf) -> Self {
+    pub fn load(path: &std::path::Path) -> Self {
         if !path.exists() {
             return Self::empty();
         }
@@ -62,15 +61,9 @@ impl ProjectBaseline {
     }
 
     /// Save baseline to a file path.
-    pub fn save(&self, path: &PathBuf) -> std::io::Result<()> {
+    pub fn save(&self, path: &std::path::Path) -> std::io::Result<()> {
         let json = serde_json::to_string_pretty(self).map_err(std::io::Error::other)?;
-
-        // Ensure parent directory exists
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-
-        fs::write(path, json)
+        crate::hook_registry::atomic_write(path, json.as_bytes())
     }
 
     /// Get false positive rate.

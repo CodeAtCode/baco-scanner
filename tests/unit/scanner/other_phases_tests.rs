@@ -144,18 +144,9 @@ async fn test_phases_skip_when_disabled() {
         ValidateDisabled,
         ValidateNoApiKey,
         ConfidenceScoringDisabled,
-        ThreatModelingDisabled,
         RootCauseDedupDisabled,
-        AutoPatchingDisabled,
         CveBootstrapDisabled,
-        PocCompilerDisabled,
-        VariantSearchDisabled,
         CweRoutingDisabled,
-        RuleSynthesisDisabled,
-        RuleSynthesisNoApiKey,
-        ExploitSynthDisabled,
-        ExploitSynthNoApiKey,
-        CpgSliceDisabled,
     }
 
     fn apply_modifier(config: &mut config::ScannerConfig, modifier: ConfigModifier) {
@@ -170,43 +161,14 @@ async fn test_phases_skip_when_disabled() {
             ConfigModifier::ConfidenceScoringDisabled => {
                 config.scanner.performance.enable_confidence_refinement = false;
             }
-            ConfigModifier::ThreatModelingDisabled => {
-                config.scanner.performance.enable_threat_modeling = false;
-            }
             ConfigModifier::RootCauseDedupDisabled => {
                 config.scanner.performance.enable_root_cause_dedup = false;
-            }
-            ConfigModifier::AutoPatchingDisabled => {
-                config.scanner.performance.enable_auto_patching = false;
             }
             ConfigModifier::CveBootstrapDisabled => {
                 config.scanner.performance.enable_cve_bootstrap = false;
             }
-            ConfigModifier::PocCompilerDisabled => {
-                config.scanner.performance.enable_poc_compilation = false;
-            }
-            ConfigModifier::VariantSearchDisabled => {
-                config.scanner.performance.enable_variant_search = false;
-            }
             ConfigModifier::CweRoutingDisabled => {
                 config.router.enabled = false;
-            }
-            ConfigModifier::RuleSynthesisDisabled => {
-                config.rulesynth.enabled = false;
-            }
-            ConfigModifier::RuleSynthesisNoApiKey => {
-                config.rulesynth.enabled = true;
-                config.llm.phases.discovery.api_key = None;
-            }
-            ConfigModifier::ExploitSynthDisabled => {
-                config.exploit.enabled = false;
-            }
-            ConfigModifier::ExploitSynthNoApiKey => {
-                config.exploit.enabled = true;
-                config.llm.phases.discovery.api_key = None;
-            }
-            ConfigModifier::CpgSliceDisabled => {
-                config.cpg.enabled = false;
             }
         }
     }
@@ -229,19 +191,9 @@ async fn test_phases_skip_when_disabled() {
             "confidence_scoring_disabled",
         ),
         (
-            ScanPhase::ThreatModeling,
-            ConfigModifier::ThreatModelingDisabled,
-            "threat_modeling_disabled",
-        ),
-        (
             ScanPhase::RootCauseDedup,
             ConfigModifier::RootCauseDedupDisabled,
             "root_cause_dedup_disabled",
-        ),
-        (
-            ScanPhase::AutoPatching,
-            ConfigModifier::AutoPatchingDisabled,
-            "auto_patching_disabled",
         ),
         (
             ScanPhase::CveBootstrap,
@@ -249,44 +201,9 @@ async fn test_phases_skip_when_disabled() {
             "cve_bootstrap_disabled",
         ),
         (
-            ScanPhase::PocCompiler,
-            ConfigModifier::PocCompilerDisabled,
-            "poc_compiler_disabled",
-        ),
-        (
-            ScanPhase::VariantSearch,
-            ConfigModifier::VariantSearchDisabled,
-            "variant_search_disabled",
-        ),
-        (
             ScanPhase::CweRouting,
             ConfigModifier::CweRoutingDisabled,
             "cwe_routing_disabled",
-        ),
-        (
-            ScanPhase::RuleSynthesis,
-            ConfigModifier::RuleSynthesisDisabled,
-            "rule_synthesis_disabled",
-        ),
-        (
-            ScanPhase::RuleSynthesis,
-            ConfigModifier::RuleSynthesisNoApiKey,
-            "rule_synthesis_no_api_key",
-        ),
-        (
-            ScanPhase::ExploitSynth,
-            ConfigModifier::ExploitSynthDisabled,
-            "exploit_synth_disabled",
-        ),
-        (
-            ScanPhase::ExploitSynth,
-            ConfigModifier::ExploitSynthNoApiKey,
-            "exploit_synth_no_api_key",
-        ),
-        (
-            ScanPhase::CpgSlice,
-            ConfigModifier::CpgSliceDisabled,
-            "cpg_slice_disabled",
         ),
     ];
 
@@ -692,13 +609,9 @@ async fn test_all_phases_complete_without_error() {
         ScanPhase::CrossFileAnalysis,
         ScanPhase::ConfidenceScoring,
         ScanPhase::AiAggregation,
-        ScanPhase::Reporting,
-        ScanPhase::ThreatModeling,
         ScanPhase::RootCauseDedup,
-        ScanPhase::AutoPatching,
         ScanPhase::CveBootstrap,
-        ScanPhase::PocCompiler,
-        ScanPhase::VariantSearch,
+        ScanPhase::Reporting,
         ScanPhase::CweRouting,
     ];
     let mut current_findings = findings.clone();
@@ -825,61 +738,6 @@ async fn test_llm_verification_skips_without_api_key() {
         c.llm.phases.verification.api_key = None;
     })
     .await;
-}
-
-#[tokio::test]
-async fn test_security_agent_skips_when_disabled() {
-    let scanner = create_test_scanner();
-    let mut config = create_test_config();
-    config.agent.enabled = false;
-    let pb = ProgressBar::hidden();
-    let metrics_tracker = LlmMetricsTracker::new();
-    let analyzed_files: Vec<String> = vec![];
-    let target_path = PathBuf::from(".");
-    let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
-    let findings = vec![create_test_finding("test-1", Severity::High)];
-    let phase_config = PhaseConfig {
-        phase: &ScanPhase::SecurityAgentVerification,
-        findings: findings.clone(),
-        pb: &pb,
-        analyzed_files: &analyzed_files,
-        metrics_tracker: &metrics_tracker,
-        target_path: &target_path,
-        config: &config,
-        project_stack: &project_stack,
-    };
-    let result = run_phase(&scanner, phase_config).await;
-    assert!(result.is_ok());
-    let (updated, _, _) = result.unwrap();
-    assert_eq!(updated.len(), findings.len());
-}
-
-#[tokio::test]
-async fn test_threat_modeling_phase_basic() {
-    let scanner = create_test_scanner();
-    let mut config = create_test_config();
-    // Disable threat modeling to test the phase logic without LLM calls
-    config.scanner.performance.enable_threat_modeling = false;
-    let pb = ProgressBar::hidden();
-    let metrics_tracker = LlmMetricsTracker::new();
-    let analyzed_files: Vec<String> = vec![];
-    let target_path = PathBuf::from(".");
-    let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
-    let findings = vec![create_test_finding("threat-1", Severity::High)];
-    let phase_config = PhaseConfig {
-        phase: &ScanPhase::ThreatModeling,
-        findings: findings.clone(),
-        pb: &pb,
-        analyzed_files: &analyzed_files,
-        metrics_tracker: &metrics_tracker,
-        target_path: &target_path,
-        config: &config,
-        project_stack: &project_stack,
-    };
-    let result = run_phase(&scanner, phase_config).await;
-    assert!(result.is_ok());
-    let (updated, _, _) = result.unwrap();
-    assert_eq!(updated.len(), findings.len());
 }
 
 #[tokio::test]
@@ -1103,34 +961,6 @@ async fn test_llm_verification_without_api_key() {
 }
 
 #[tokio::test]
-async fn test_security_agent_verification_disabled() {
-    let scanner = create_test_scanner();
-    let mut config = create_test_config();
-    config.agent.enabled = false;
-    let pb = ProgressBar::hidden();
-    let metrics_tracker = LlmMetricsTracker::new();
-    let analyzed_files: Vec<String> = vec![];
-    let target_path = PathBuf::from(".");
-    let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
-    let findings = vec![create_test_finding("agent-1", Severity::High)];
-
-    let phase_config = PhaseConfig {
-        phase: &ScanPhase::SecurityAgentVerification,
-        findings,
-        pb: &pb,
-        analyzed_files: &analyzed_files,
-        metrics_tracker: &metrics_tracker,
-        target_path: &target_path,
-        config: &config,
-        project_stack: &project_stack,
-    };
-
-    let result = run_phase(&scanner, phase_config).await.unwrap();
-    // Should return findings unchanged when agent is disabled
-    assert_eq!(result.0.len(), 1);
-}
-
-#[tokio::test]
 async fn test_ticket_crossref_with_empty_systems() {
     let scanner = create_test_scanner();
     let config = create_test_config();
@@ -1214,34 +1044,6 @@ async fn test_root_cause_dedup_disabled() {
 }
 
 #[tokio::test]
-async fn test_auto_patching_disabled() {
-    let scanner = create_test_scanner();
-    let mut config = create_test_config();
-    config.scanner.performance.enable_auto_patching = false;
-    let pb = ProgressBar::hidden();
-    let metrics_tracker = LlmMetricsTracker::new();
-    let analyzed_files: Vec<String> = vec![];
-    let target_path = PathBuf::from(".");
-    let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
-    let findings = vec![create_test_finding("patch-1", Severity::High)];
-
-    let phase_config = PhaseConfig {
-        phase: &ScanPhase::AutoPatching,
-        findings,
-        pb: &pb,
-        analyzed_files: &analyzed_files,
-        metrics_tracker: &metrics_tracker,
-        target_path: &target_path,
-        config: &config,
-        project_stack: &project_stack,
-    };
-
-    let result = run_phase(&scanner, phase_config).await.unwrap();
-    // Should return findings unchanged when auto-patching is disabled
-    assert_eq!(result.0.len(), 1);
-}
-
-#[tokio::test]
 async fn test_cve_bootstrap_disabled() {
     let scanner = create_test_scanner();
     let mut config = create_test_config();
@@ -1266,90 +1068,6 @@ async fn test_cve_bootstrap_disabled() {
 
     let result = run_phase(&scanner, phase_config).await.unwrap();
     // Should return findings unchanged when CVE bootstrap is disabled
-    assert_eq!(result.0.len(), 1);
-}
-
-#[tokio::test]
-async fn test_poc_compiler_disabled() {
-    let scanner = create_test_scanner();
-    let mut config = create_test_config();
-    config.scanner.performance.enable_poc_compilation = false;
-    let pb = ProgressBar::hidden();
-    let metrics_tracker = LlmMetricsTracker::new();
-    let analyzed_files: Vec<String> = vec![];
-    let target_path = PathBuf::from(".");
-    let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
-    let findings = vec![create_test_finding("poc-1", Severity::High)];
-
-    let phase_config = PhaseConfig {
-        phase: &ScanPhase::PocCompiler,
-        findings,
-        pb: &pb,
-        analyzed_files: &analyzed_files,
-        metrics_tracker: &metrics_tracker,
-        target_path: &target_path,
-        config: &config,
-        project_stack: &project_stack,
-    };
-
-    let result = run_phase(&scanner, phase_config).await.unwrap();
-    // Should return findings unchanged when PoC compilation is disabled
-    assert_eq!(result.0.len(), 1);
-}
-
-#[tokio::test]
-async fn test_variant_search_disabled() {
-    let scanner = create_test_scanner();
-    let mut config = create_test_config();
-    config.scanner.performance.enable_variant_search = false;
-    let pb = ProgressBar::hidden();
-    let metrics_tracker = LlmMetricsTracker::new();
-    let analyzed_files: Vec<String> = vec![];
-    let target_path = PathBuf::from(".");
-    let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
-    let findings = vec![create_test_finding("variant-1", Severity::High)];
-
-    let phase_config = PhaseConfig {
-        phase: &ScanPhase::VariantSearch,
-        findings,
-        pb: &pb,
-        analyzed_files: &analyzed_files,
-        metrics_tracker: &metrics_tracker,
-        target_path: &target_path,
-        config: &config,
-        project_stack: &project_stack,
-    };
-
-    let result = run_phase(&scanner, phase_config).await.unwrap();
-    // Should return findings unchanged when variant search is disabled
-    assert_eq!(result.0.len(), 1);
-}
-
-#[tokio::test]
-async fn test_threat_modeling_disabled() {
-    let scanner = create_test_scanner();
-    let mut config = create_test_config();
-    config.scanner.performance.enable_threat_modeling = false;
-    let pb = ProgressBar::hidden();
-    let metrics_tracker = LlmMetricsTracker::new();
-    let analyzed_files: Vec<String> = vec![];
-    let target_path = PathBuf::from(".");
-    let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
-    let findings = vec![create_test_finding("threat-1", Severity::High)];
-
-    let phase_config = PhaseConfig {
-        phase: &ScanPhase::ThreatModeling,
-        findings,
-        pb: &pb,
-        analyzed_files: &analyzed_files,
-        metrics_tracker: &metrics_tracker,
-        target_path: &target_path,
-        config: &config,
-        project_stack: &project_stack,
-    };
-
-    let result = run_phase(&scanner, phase_config).await.unwrap();
-    // Should return findings unchanged when threat modeling is disabled
     assert_eq!(result.0.len(), 1);
 }
 
@@ -1517,67 +1235,6 @@ async fn test_indexing_phase_with_temp_files() {
     let result = run_phase(&scanner, phase_config).await;
     assert!(result.is_ok());
     tmp_dir.close().unwrap();
-}
-
-// ============================================================================
-// Security Agent Verification Phase Tests - None Branch
-// ============================================================================
-
-#[tokio::test]
-async fn test_security_agent_verification_llm_client_unavailable() {
-    // Test the None branch of create_llm_client_with_metrics
-    // Triggered when: agent.enabled == true AND api_key is Some() BUT
-    // create_llm_client_with_metrics returns None (incomplete LLM config - no base_url)
-    let scanner = create_test_scanner();
-    let mut config = create_test_config();
-
-    // Enable agent and set API key
-    config.agent.enabled = true;
-    config.llm.phases.security_agent_verification.api_key = Some("test-key".to_string());
-
-    // Leave base_url empty in both global and phase config to trigger phase_llm_config error
-    // This causes create_llm_client_with_metrics to return None
-    config.llm.base_url = String::new();
-    config.llm.phases.security_agent_verification.base_url = String::new();
-
-    let pb = ProgressBar::hidden();
-    let metrics_tracker = LlmMetricsTracker::new();
-    let analyzed_files: Vec<String> = vec![];
-    let target_path = PathBuf::from(".");
-    let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
-
-    let mut finding = create_test_finding("agent-llm-unavailable", Severity::High);
-    finding.title = "Test SQL Injection".to_string();
-    let findings = vec![finding];
-
-    let phase_config = PhaseConfig {
-        phase: &ScanPhase::SecurityAgentVerification,
-        findings: findings.clone(),
-        pb: &pb,
-        analyzed_files: &analyzed_files,
-        metrics_tracker: &metrics_tracker,
-        target_path: &target_path,
-        config: &config,
-        project_stack: &project_stack,
-    };
-
-    let result = run_phase(&scanner, phase_config).await;
-    assert!(
-        result.is_ok(),
-        "Phase should complete successfully even when LLM client is unavailable"
-    );
-
-    let (updated, _, _) = result.unwrap();
-
-    // The None branch returns findings unchanged
-    assert_eq!(
-        updated.len(),
-        findings.len(),
-        "Findings should be returned unchanged when LLM client is unavailable"
-    );
-
-    // Verify the finding is unchanged
-    assert_eq!(updated[0].id, findings[0].id);
 }
 
 // ConfidenceScoring with actual findings
@@ -1769,26 +1426,6 @@ async fn test_llm_verification_with_findings() {
     assert!(result.is_ok());
     let (updated, _, _) = result.unwrap();
     assert_eq!(updated.len(), findings.len());
-}
-
-// ExploitSynth with disabled config
-#[test]
-fn test_exploit_synth_disabled() {
-    use baco::config::ExploitConfig;
-
-    let mut config = ExploitConfig::default();
-    config.enabled = false;
-    assert!(!config.enabled);
-}
-
-// RuleSynthesis with disabled config
-#[test]
-fn test_rule_synthesis_disabled() {
-    use baco::config::RuleSynthConfig;
-
-    let mut config = RuleSynthConfig::default();
-    config.enabled = false;
-    assert!(!config.enabled);
 }
 
 // Test ScanPhase unknown variant handling
@@ -2261,246 +1898,9 @@ async fn test_validate_phase_with_mockito() {
 }
 
 #[tokio::test]
-async fn test_rule_synthesis_phase_with_mockito() {
-    let mut server = mockito::Server::new_async().await;
-    let _mock = server
-        .mock("POST", "/v1/chat/completions")
-        .with_status(200)
-        .with_header("content-type", "application/json")
-        .with_body(
-            r#"{"choices": [{"message": {"content": "rules:\n  - id: cwe-89-test\n    pattern: execute($X)\n    message: test\n    languages: [python]\n    severity: ERROR"}}]}"#,
-        )
-        .create();
-
-    let temp = TempDir::new().unwrap();
-    let mut config = create_test_config();
-    config.rulesynth.enabled = true;
-    config.rulesynth.mocq_mode = false;
-    config.rulesynth.output_dir = temp.path().to_path_buf();
-    config.llm.phases.discovery.base_url = server.url();
-    config.llm.phases.discovery.api_key = Some("k".to_string());
-    config.llm.phases.discovery.models = vec!["mock-model".to_string()];
-    config.project.languages = vec!["python".to_string()];
-
-    let scanner = Scanner::new(config.clone(), temp.path().to_path_buf(), false);
-    let pb = ProgressBar::hidden();
-    let metrics_tracker = LlmMetricsTracker::new();
-    let analyzed_files: Vec<String> = vec![];
-    let target_path = temp.path().to_path_buf();
-    let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
-    let finding = create_test_finding("test-1", Severity::High);
-    let phase = ScanPhase::RuleSynthesis;
-    let phase_config = PhaseConfig {
-        phase: &phase,
-        findings: vec![finding],
-        pb: &pb,
-        analyzed_files: &analyzed_files,
-        metrics_tracker: &metrics_tracker,
-        target_path: &target_path,
-        config: &config,
-        project_stack: &project_stack,
-    };
-    let result = run_phase(&scanner, phase_config).await;
-    assert!(result.is_ok());
-    let (updated, _, _) = result.unwrap();
-    assert_eq!(updated.len(), 1, "findings returned unchanged");
-}
-
-#[tokio::test]
-async fn test_exploit_synth_phase_sandbox_unavailable() {
-    let server = mockito::Server::new_async().await;
-    let mut config = create_test_config();
-    config.exploit.enabled = true;
-    config.llm.phases.discovery.base_url = server.url();
-    config.llm.phases.discovery.api_key = Some("k".to_string());
-    config.llm.phases.discovery.models = vec!["mock-model".to_string()];
-
-    let scanner = Scanner::new(config.clone(), PathBuf::from("."), false);
-    let pb = ProgressBar::hidden();
-    let metrics_tracker = LlmMetricsTracker::new();
-    let analyzed_files: Vec<String> = vec![];
-    let target_path = PathBuf::from(".");
-    let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
-    let finding = create_test_finding("test-1", Severity::High);
-    let phase = ScanPhase::ExploitSynth;
-    let phase_config = PhaseConfig {
-        phase: &phase,
-        findings: vec![finding],
-        pb: &pb,
-        analyzed_files: &analyzed_files,
-        metrics_tracker: &metrics_tracker,
-        target_path: &target_path,
-        config: &config,
-        project_stack: &project_stack,
-    };
-    let result = run_phase(&scanner, phase_config).await;
-    assert!(result.is_ok());
-    let (updated, _, _) = result.unwrap();
-    assert_eq!(
-        updated.len(),
-        1,
-        "findings returned unchanged when sandbox unavailable"
-    );
-}
-// ============================================================================
-// Security Agent Verification Skip Tests
-// ============================================================================
-
-#[tokio::test]
-async fn test_security_agent_verification_skips_when_agent_disabled() {
-    run_phase_skip_test(ScanPhase::SecurityAgentVerification, |cfg| {
-        cfg.agent.enabled = false;
-    })
-    .await;
-}
-
-#[tokio::test]
-async fn test_security_agent_verification_skips_when_no_api_key() {
-    run_phase_skip_test(ScanPhase::SecurityAgentVerification, |cfg| {
-        cfg.agent.enabled = true;
-        cfg.llm.phases.security_agent_verification.api_key = None;
-    })
-    .await;
-}
-
-#[tokio::test]
 async fn test_llm_static_analysis_skips_when_no_api_key() {
     run_phase_skip_test(ScanPhase::LlmStaticAnalysis, |cfg| {
         cfg.llm.phases.static_analysis.api_key = None;
     })
     .await;
-}
-
-// ============================================================================
-// PoC Compiler Phase Tests - Enabled Path Coverage
-// ============================================================================
-
-#[tokio::test]
-async fn test_poc_compiler_phase_with_poc_code_unsupported_language() {
-    // Covers run_poc_compiler lines 112-135: enabled path with poc_code set
-    // Uses unsupported language "ruby" to trigger the else branch (Failed + notes)
-    let scanner = create_test_scanner();
-    let mut config = create_test_config();
-    config.scanner.performance.enable_poc_compilation = true;
-
-    let pb = ProgressBar::hidden();
-    let metrics_tracker = LlmMetricsTracker::new();
-    let analyzed_files: Vec<String> = vec![];
-    let target_path = PathBuf::from(".");
-    let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
-
-    // Create a finding with poc_code and unsupported language
-    let mut finding = create_test_finding("poc-test-1", Severity::High);
-    finding.poc_code = Some("puts 'hello'".to_string());
-    finding.poc_format = Some("ruby".to_string());
-    let findings = vec![finding];
-
-    let phase_config = PhaseConfig {
-        phase: &ScanPhase::PocCompiler,
-        findings: findings.clone(),
-        pb: &pb,
-        analyzed_files: &analyzed_files,
-        metrics_tracker: &metrics_tracker,
-        target_path: &target_path,
-        config: &config,
-        project_stack: &project_stack,
-    };
-
-    let result = run_phase(&scanner, phase_config).await;
-    assert!(result.is_ok());
-    let (updated, _, _) = result.unwrap();
-    assert_eq!(updated.len(), findings.len());
-
-    // Verify the finding was updated with Failed status and notes
-    assert_eq!(
-        updated[0].verification_status,
-        Some(VerificationStatus::Failed)
-    );
-    assert!(updated[0].verification_notes.is_some());
-    assert!(
-        updated[0]
-            .verification_notes
-            .as_ref()
-            .unwrap()
-            .contains("PoC compilation failed")
-    );
-}
-
-#[tokio::test]
-async fn test_poc_compiler_phase_without_poc_code() {
-    // Covers run_poc_compiler: finding without poc_code (no-op path)
-    let scanner = create_test_scanner();
-    let mut config = create_test_config();
-    config.scanner.performance.enable_poc_compilation = true;
-
-    let pb = ProgressBar::hidden();
-    let metrics_tracker = LlmMetricsTracker::new();
-    let analyzed_files: Vec<String> = vec![];
-    let target_path = PathBuf::from(".");
-    let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
-
-    // Create a finding without poc_code
-    let findings = vec![create_test_finding("poc-test-2", Severity::High)];
-
-    let phase_config = PhaseConfig {
-        phase: &ScanPhase::PocCompiler,
-        findings: findings.clone(),
-        pb: &pb,
-        analyzed_files: &analyzed_files,
-        metrics_tracker: &metrics_tracker,
-        target_path: &target_path,
-        config: &config,
-        project_stack: &project_stack,
-    };
-
-    let result = run_phase(&scanner, phase_config).await;
-    assert!(result.is_ok());
-    let (updated, _, _) = result.unwrap();
-    assert_eq!(updated.len(), findings.len());
-
-    // Verify the finding was unchanged (no poc_code means no verification)
-    // Note: create_test_finding sets verification_status to Confirmed by default
-    assert_eq!(
-        updated[0].verification_status,
-        Some(VerificationStatus::Confirmed)
-    );
-}
-
-// ============================================================================
-// Variant Search Phase Tests - No-Patterns Branch Coverage
-// ============================================================================
-
-#[tokio::test]
-async fn test_variant_search_phase_no_patterns_configured() {
-    // Covers run_variant_search lines 162-173: enabled but no patterns
-    let scanner = create_test_scanner();
-    let mut config = create_test_config();
-    config.scanner.performance.enable_variant_search = true;
-    // variant_search_patterns is empty by default
-
-    let pb = ProgressBar::hidden();
-    let metrics_tracker = LlmMetricsTracker::new();
-    let analyzed_files: Vec<String> = vec![];
-    let target_path = PathBuf::from(".");
-    let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
-    let findings = vec![create_test_finding("variant-test-1", Severity::High)];
-
-    let phase_config = PhaseConfig {
-        phase: &ScanPhase::VariantSearch,
-        findings: findings.clone(),
-        pb: &pb,
-        analyzed_files: &analyzed_files,
-        metrics_tracker: &metrics_tracker,
-        target_path: &target_path,
-        config: &config,
-        project_stack: &project_stack,
-    };
-
-    let result = run_phase(&scanner, phase_config).await;
-    assert!(result.is_ok());
-    let (updated, _, _) = result.unwrap();
-    assert_eq!(updated.len(), findings.len());
-
-    // Verify finding count unchanged (early return with warning)
-    assert_eq!(updated[0].id, findings[0].id);
 }

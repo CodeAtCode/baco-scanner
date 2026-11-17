@@ -49,7 +49,7 @@ pub fn create_test_config() -> ScannerConfig {
         scanner: ScannerSettings {
             max_file_size_kb: 1024,
             exclude_paths: vec![],
-            profile: baco::config::scanner::ScanPipelineProfile::Core,
+
             semgrep: SemgrepSettings {
                 ..Default::default()
             },
@@ -74,7 +74,6 @@ pub fn create_test_config() -> ScannerConfig {
                     models: vec![],
                     timeout_secs: Some(30),
                     temperature: None,
-                    agent_flow: Default::default(),
                 },
                 verification: LlmPhaseConfig {
                     base_url: "http://localhost:11434".to_string(),
@@ -83,7 +82,6 @@ pub fn create_test_config() -> ScannerConfig {
                     models: vec![],
                     timeout_secs: Some(30),
                     temperature: None,
-                    agent_flow: Default::default(),
                 },
                 aggregation: LlmPhaseConfig {
                     base_url: "http://localhost:11434".to_string(),
@@ -92,7 +90,6 @@ pub fn create_test_config() -> ScannerConfig {
                     models: vec![],
                     timeout_secs: Some(30),
                     temperature: None,
-                    agent_flow: Default::default(),
                 },
                 static_analysis: LlmPhaseConfig {
                     base_url: "http://localhost:11434".to_string(),
@@ -101,25 +98,6 @@ pub fn create_test_config() -> ScannerConfig {
                     models: vec![],
                     timeout_secs: Some(30),
                     temperature: None,
-                    agent_flow: Default::default(),
-                },
-                security_agent_verification: LlmPhaseConfig {
-                    base_url: "http://localhost:11434".to_string(),
-                    api_key: None,
-                    model: "llama3.1".to_string(),
-                    models: vec![],
-                    timeout_secs: Some(30),
-                    temperature: None,
-                    agent_flow: Default::default(),
-                },
-                threat_modeling: LlmPhaseConfig {
-                    base_url: "http://localhost:11434".to_string(),
-                    api_key: None,
-                    model: "llama3.1".to_string(),
-                    models: vec![],
-                    timeout_secs: Some(30),
-                    temperature: None,
-                    agent_flow: Default::default(),
                 },
                 prompt_overrides: Default::default(),
             },
@@ -131,17 +109,13 @@ pub fn create_test_config() -> ScannerConfig {
         tickets: Default::default(),
         router: Default::default(),
         aggregation: Default::default(),
-        rulesynth: Default::default(),
         normalization: Default::default(),
-        cpg: Default::default(),
-        exploit: Default::default(),
         validate: Default::default(),
         vultriage: Default::default(),
         triage: Default::default(),
         priority: Default::default(),
         budget: Default::default(),
         policy_sampling: Default::default(),
-        agent_scaffold: Default::default(),
         pacvd: Default::default(),
         vuln_spec: Default::default(),
         citation_verification: Default::default(),

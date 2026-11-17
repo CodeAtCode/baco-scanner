@@ -6,7 +6,7 @@ pub mod env;
 pub mod helpers;
 pub mod orchestrator;
 
-pub use orchestrator::structural_dedup;
+pub use orchestrator::{skipped_sequential_phase_names, structural_dedup};
 pub mod parallel;
 pub mod phase_spec;
 pub mod phases;
@@ -86,12 +86,12 @@ impl Scanner {
 
     /// Return the number of parallel phases (for testing)
     pub fn scheduled_parallel_phases() -> usize {
-        4 // Indexing, Semgrep, CpgSlice, LlmStaticAnalysis
+        3 // Indexing, Semgrep, LlmStaticAnalysis
     }
 
     /// Return the number of sequential phases (for testing)
     pub fn scheduled_sequential_phases() -> usize {
-        19 // All sequential phases
+        12 // All sequential phases
     }
 
     /// Return parallel and sequential phase counts (for testing)

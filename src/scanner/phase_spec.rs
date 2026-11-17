@@ -1,12 +1,11 @@
-//! Single source of truth for the BACO 23-phase pipeline definition.
+//! Single source of truth for the BACO 15-phase pipeline definition.
 //!
-//! This module defines the canonical pipeline structure: 4 parallel phases
-//! followed by 19 sequential phases. All phase-related queries (order,
-//! grouping, profile filtering, resume transitions, progress messages)
-//! derive from this table — no redundant definitions elsewhere.
+//! This module defines the canonical pipeline structure: 3 parallel phases
+//! followed by 12 sequential phases. All phase-related queries (order,
+//! grouping, resume transitions, progress messages) derive from this table —
+//! no redundant definitions elsewhere.
 
 use crate::checkpoint::ScanPhase;
-use crate::config::scanner::ScanPipelineProfile;
 
 /// Phase execution mode: parallel (concurrent) or sequential (ordered).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -23,52 +22,40 @@ pub struct PhaseSlot {
     pub phase: ScanPhase,
     /// Parallel or sequential execution mode.
     pub kind: PhaseKind,
-    /// True if this phase is part of the core profile.
-    pub core: bool,
-    /// Optional config gate key for feature-flag gating (unused this stage).
-    pub config_gate_key: Option<&'static str>,
-    /// Executor key for dispatch (unused this stage).
+    /// Executor key for dispatch.
     pub executor_key: &'static str,
 }
 
-/// The canonical 23-phase pipeline table.
+/// The canonical 15-phase pipeline table.
 ///
-/// Order: 4 parallel phases (Indexing, Semgrep, CpgSlice, LlmStaticAnalysis)
-/// followed by 19 sequential phases (CweRouting through Reporting).
+/// Order: 3 parallel phases (Indexing, Semgrep, LlmStaticAnalysis) followed
+/// by 12 sequential phases (CweRouting through Reporting).
 pub struct PhaseSpec;
 
 impl PhaseSpec {
-    /// Returns the full 23-phase slot table.
-    ///
-    /// Order is byte-identical to the historical definition:
-    /// - Parallel: Indexing, Semgrep, CpgSlice, LlmStaticAnalysis
-    /// - Sequential: CweRouting, RuleSynthesis, LlmDiscovery, LlmVerification,
-    ///   Validate, SecurityAgentVerification, TicketCrossRef, GitAnalysis,
-    ///   CrossFileAnalysis, ConfidenceScoring, AiAggregation, ThreatModeling,
-    ///   RootCauseDedup, AutoPatching, CveBootstrap, PocCompiler,
-    ///   ExploitSynth, VariantSearch, Reporting
-    pub const fn slots() -> &'static [PhaseSlot; 23] {
+    /// Returns the full 15-phase slot table.
+    pub const fn slots() -> &'static [PhaseSlot; 15] {
         &SLOTS
     }
 
-    /// Return all phases in execution order (23 total).
-    pub fn all() -> &'static [ScanPhase; 23] {
+    /// Return all phases in execution order (15 total).
+    pub fn all() -> &'static [ScanPhase; 15] {
         &ALL_PHASES
     }
 
-    /// Return only the sequential phases (19 total).
-    pub fn sequential() -> &'static [ScanPhase; 19] {
+    /// Return only the sequential phases (12 total).
+    pub fn sequential() -> &'static [ScanPhase; 12] {
         &SEQUENTIAL_PHASES
     }
 
-    /// Return only the parallel phases (4 total).
-    pub fn parallel() -> &'static [ScanPhase; 4] {
+    /// Return only the parallel phases (3 total).
+    pub fn parallel() -> &'static [ScanPhase; 3] {
         &PARALLEL_PHASES
     }
 
-    /// Total phase count (23).
+    /// Total phase count (15).
     pub const fn total() -> usize {
-        23
+        15
     }
 
     /// Look up the slot for a given phase.
@@ -76,92 +63,49 @@ impl PhaseSpec {
         SLOTS.iter().find(|s| &s.phase == phase)
     }
 
-    /// Return core phases only (14 total).
-    pub fn core_phases() -> &'static [ScanPhase; 14] {
-        &CORE_PHASES
-    }
-
-    /// Return experimental phases only (9 total).
-    pub fn experimental_phases() -> &'static [ScanPhase; 9] {
-        &EXPERIMENTAL_PHASES
-    }
-
-    /// Compute the effective phase set for a given profile.
-    ///
-    /// - Core: 14 phases (excludes experimental)
-    /// - All: 23 phases (all enabled)
-    pub fn effective(profile: &ScanPipelineProfile) -> Vec<ScanPhase> {
-        match profile {
-            ScanPipelineProfile::Core => CORE_PHASES.to_vec(),
-            ScanPipelineProfile::All => ALL_PHASES.to_vec(),
-        }
-    }
-
     /// Compute the next phase to resume from, given a completed phase.
     ///
     /// Byte-identical semantics to checkpoint::Checkpoint::resume_from.
     pub fn resume_from(phase: &ScanPhase) -> ScanPhase {
         match phase {
-            // Parallel phases (run concurrently: Indexing, Semgrep, CpgSlice, LlmStaticAnalysis)
+            // Parallel phases (run concurrently: Indexing, Semgrep, LlmStaticAnalysis)
             ScanPhase::Indexing => ScanPhase::Semgrep,
-            ScanPhase::Semgrep => ScanPhase::CpgSlice,
-            ScanPhase::CpgSlice => ScanPhase::LlmStaticAnalysis,
+            ScanPhase::Semgrep => ScanPhase::LlmStaticAnalysis,
             ScanPhase::LlmStaticAnalysis => ScanPhase::CweRouting,
             // Sequential phases
-            ScanPhase::CweRouting => ScanPhase::RuleSynthesis,
-            ScanPhase::RuleSynthesis => ScanPhase::LlmDiscovery,
+            ScanPhase::CweRouting => ScanPhase::LlmDiscovery,
             ScanPhase::LlmDiscovery => ScanPhase::LlmVerification,
             ScanPhase::LlmVerification => ScanPhase::Validate,
-            ScanPhase::Validate => ScanPhase::SecurityAgentVerification,
-            ScanPhase::SecurityAgentVerification => ScanPhase::TicketCrossRef,
+            ScanPhase::Validate => ScanPhase::TicketCrossRef,
             ScanPhase::TicketCrossRef => ScanPhase::GitAnalysis,
             ScanPhase::GitAnalysis => ScanPhase::CrossFileAnalysis,
             ScanPhase::CrossFileAnalysis => ScanPhase::ConfidenceScoring,
             ScanPhase::ConfidenceScoring => ScanPhase::AiAggregation,
-            ScanPhase::AiAggregation => ScanPhase::ThreatModeling,
-            ScanPhase::ThreatModeling => ScanPhase::RootCauseDedup,
-            ScanPhase::RootCauseDedup => ScanPhase::AutoPatching,
-            ScanPhase::AutoPatching => ScanPhase::CveBootstrap,
-            ScanPhase::CveBootstrap => ScanPhase::PocCompiler,
-            ScanPhase::PocCompiler => ScanPhase::ExploitSynth,
-            ScanPhase::ExploitSynth => ScanPhase::VariantSearch,
-            ScanPhase::VariantSearch => ScanPhase::Reporting,
+            ScanPhase::AiAggregation => ScanPhase::RootCauseDedup,
+            ScanPhase::RootCauseDedup => ScanPhase::CveBootstrap,
+            ScanPhase::CveBootstrap => ScanPhase::Reporting,
             ScanPhase::Reporting => ScanPhase::Complete,
             ScanPhase::Complete | ScanPhase::Error => ScanPhase::Indexing,
         }
     }
 
     /// Return the progress message for a given phase.
-    ///
-    /// Byte-identical to the historical get_phase_message implementation.
     pub fn progress_message(phase: &ScanPhase) -> &'static str {
         match phase {
             ScanPhase::CweRouting => "CWE routing (routing findings to specialized models)...",
-            ScanPhase::RuleSynthesis => {
-                "Rule synthesis (generating semgrep rules from LLM analysis)..."
-            }
             ScanPhase::LlmDiscovery => "LLM discovery (enriching findings with context)...",
             ScanPhase::LlmVerification => "LLM verification (validating findings)...",
             ScanPhase::Validate => "Validate (LLM-as-judge rationale validation)...",
-            ScanPhase::SecurityAgentVerification => {
-                "SecurityAgent verification (tool-based validation)..."
-            }
             ScanPhase::TicketCrossRef => "Searching ticket systems for references...",
             ScanPhase::GitAnalysis => "Analyzing Git history for related commits...",
             ScanPhase::CrossFileAnalysis => "Cross-file dependency analysis...",
             ScanPhase::ConfidenceScoring => "Calculating confidence scores...",
             ScanPhase::AiAggregation => "AI aggregation (generating executive summary)...",
-            ScanPhase::ThreatModeling => "Threat modeling (STRIDE analysis)...",
             ScanPhase::RootCauseDedup => "Root cause deduplication...",
-            ScanPhase::AutoPatching => "Auto-patching with staging validation...",
             ScanPhase::CveBootstrap => "CVE bootstrap...",
-            ScanPhase::PocCompiler => "PoC compilation check...",
-            ScanPhase::ExploitSynth => "Exploit synthesis with sandbox...",
-            ScanPhase::VariantSearch => "Variant search...",
             ScanPhase::Reporting => "Generating reports (JSON/HTML/SARIF)...",
             ScanPhase::Indexing => "Indexing project files...",
             ScanPhase::Semgrep => "Running Semgrep...",
-            ScanPhase::CpgSlice => "CPG-guided slicing...",
             ScanPhase::LlmStaticAnalysis => "LLM static analysis...",
             ScanPhase::Complete => "Scan complete!",
             ScanPhase::Error => "Error occurred...",
@@ -170,239 +114,99 @@ impl PhaseSpec {
 }
 
 // ============================================================================
-// Static data: the canonical 23-phase table
+// Static data: the canonical 15-phase table
 // ============================================================================
 
-const SLOTS: [PhaseSlot; 23] = [
-    // Parallel phases (4)
+const SLOTS: [PhaseSlot; 15] = [
+    // Parallel phases (3)
     PhaseSlot {
         phase: ScanPhase::Indexing,
         kind: PhaseKind::Parallel,
-        core: true,
-        config_gate_key: None,
         executor_key: "indexing",
     },
     PhaseSlot {
         phase: ScanPhase::Semgrep,
         kind: PhaseKind::Parallel,
-        core: true,
-        config_gate_key: None,
         executor_key: "semgrep",
-    },
-    PhaseSlot {
-        phase: ScanPhase::CpgSlice,
-        kind: PhaseKind::Parallel,
-        core: false, // experimental
-        config_gate_key: None,
-        executor_key: "cpg_slice",
     },
     PhaseSlot {
         phase: ScanPhase::LlmStaticAnalysis,
         kind: PhaseKind::Parallel,
-        core: true,
-        config_gate_key: None,
         executor_key: "llm_static",
     },
-    // Sequential phases (20)
+    // Sequential phases (12)
     PhaseSlot {
         phase: ScanPhase::CweRouting,
         kind: PhaseKind::Sequential,
-        core: true,
-        config_gate_key: None,
         executor_key: "cwe_routing",
-    },
-    PhaseSlot {
-        phase: ScanPhase::RuleSynthesis,
-        kind: PhaseKind::Sequential,
-        core: false, // experimental
-        config_gate_key: None,
-        executor_key: "rule_synthesis",
     },
     PhaseSlot {
         phase: ScanPhase::LlmDiscovery,
         kind: PhaseKind::Sequential,
-        core: true,
-        config_gate_key: None,
         executor_key: "llm_discovery",
     },
     PhaseSlot {
         phase: ScanPhase::LlmVerification,
         kind: PhaseKind::Sequential,
-        core: true,
-        config_gate_key: None,
         executor_key: "llm_verification",
     },
     PhaseSlot {
         phase: ScanPhase::Validate,
         kind: PhaseKind::Sequential,
-        core: false, // experimental
-        config_gate_key: None,
         executor_key: "validate",
-    },
-    PhaseSlot {
-        phase: ScanPhase::SecurityAgentVerification,
-        kind: PhaseKind::Sequential,
-        core: false, // experimental
-        config_gate_key: None,
-        executor_key: "security_agent_verification",
     },
     PhaseSlot {
         phase: ScanPhase::TicketCrossRef,
         kind: PhaseKind::Sequential,
-        core: true,
-        config_gate_key: None,
         executor_key: "ticket_cross_ref",
     },
     PhaseSlot {
         phase: ScanPhase::GitAnalysis,
         kind: PhaseKind::Sequential,
-        core: true,
-        config_gate_key: None,
         executor_key: "git_analysis",
     },
     PhaseSlot {
         phase: ScanPhase::CrossFileAnalysis,
         kind: PhaseKind::Sequential,
-        core: true,
-        config_gate_key: None,
         executor_key: "cross_file_analysis",
     },
     PhaseSlot {
         phase: ScanPhase::ConfidenceScoring,
         kind: PhaseKind::Sequential,
-        core: true,
-        config_gate_key: None,
         executor_key: "confidence_scoring",
     },
     PhaseSlot {
         phase: ScanPhase::AiAggregation,
         kind: PhaseKind::Sequential,
-        core: true,
-        config_gate_key: None,
         executor_key: "ai_aggregation",
-    },
-    PhaseSlot {
-        phase: ScanPhase::ThreatModeling,
-        kind: PhaseKind::Sequential,
-        core: false, // experimental (v3 feature)
-        config_gate_key: None,
-        executor_key: "threat_modeling",
     },
     PhaseSlot {
         phase: ScanPhase::RootCauseDedup,
         kind: PhaseKind::Sequential,
-        core: true,
-        config_gate_key: None,
         executor_key: "root_cause_dedup",
-    },
-    PhaseSlot {
-        phase: ScanPhase::AutoPatching,
-        kind: PhaseKind::Sequential,
-        core: false, // experimental (v3 feature)
-        config_gate_key: None,
-        executor_key: "auto_patching",
     },
     PhaseSlot {
         phase: ScanPhase::CveBootstrap,
         kind: PhaseKind::Sequential,
-        core: true,
-        config_gate_key: None,
         executor_key: "cve_bootstrap",
-    },
-    PhaseSlot {
-        phase: ScanPhase::PocCompiler,
-        kind: PhaseKind::Sequential,
-        core: false, // experimental (v3 feature)
-        config_gate_key: None,
-        executor_key: "poc_compiler",
-    },
-    PhaseSlot {
-        phase: ScanPhase::ExploitSynth,
-        kind: PhaseKind::Sequential,
-        core: false, // experimental (T3.2)
-        config_gate_key: None,
-        executor_key: "exploit_synth",
-    },
-    PhaseSlot {
-        phase: ScanPhase::VariantSearch,
-        kind: PhaseKind::Sequential,
-        core: false, // experimental (v3 feature)
-        config_gate_key: None,
-        executor_key: "variant_search",
     },
     PhaseSlot {
         phase: ScanPhase::Reporting,
         kind: PhaseKind::Sequential,
-        core: true,
-        config_gate_key: None,
         executor_key: "reporting",
     },
 ];
 
 // Derived static arrays for efficient queries
 
-const ALL_PHASES: [ScanPhase; 23] = [
+const ALL_PHASES: [ScanPhase; 15] = [
     ScanPhase::Indexing,
     ScanPhase::Semgrep,
-    ScanPhase::CpgSlice,
     ScanPhase::LlmStaticAnalysis,
     ScanPhase::CweRouting,
-    ScanPhase::RuleSynthesis,
     ScanPhase::LlmDiscovery,
     ScanPhase::LlmVerification,
     ScanPhase::Validate,
-    ScanPhase::SecurityAgentVerification,
-    ScanPhase::TicketCrossRef,
-    ScanPhase::GitAnalysis,
-    ScanPhase::CrossFileAnalysis,
-    ScanPhase::ConfidenceScoring,
-    ScanPhase::AiAggregation,
-    ScanPhase::ThreatModeling,
-    ScanPhase::RootCauseDedup,
-    ScanPhase::AutoPatching,
-    ScanPhase::CveBootstrap,
-    ScanPhase::PocCompiler,
-    ScanPhase::ExploitSynth,
-    ScanPhase::VariantSearch,
-    ScanPhase::Reporting,
-];
-
-const PARALLEL_PHASES: [ScanPhase; 4] = [
-    ScanPhase::Indexing,
-    ScanPhase::Semgrep,
-    ScanPhase::CpgSlice,
-    ScanPhase::LlmStaticAnalysis,
-];
-
-const SEQUENTIAL_PHASES: [ScanPhase; 19] = [
-    ScanPhase::CweRouting,
-    ScanPhase::RuleSynthesis,
-    ScanPhase::LlmDiscovery,
-    ScanPhase::LlmVerification,
-    ScanPhase::Validate,
-    ScanPhase::SecurityAgentVerification,
-    ScanPhase::TicketCrossRef,
-    ScanPhase::GitAnalysis,
-    ScanPhase::CrossFileAnalysis,
-    ScanPhase::ConfidenceScoring,
-    ScanPhase::AiAggregation,
-    ScanPhase::ThreatModeling,
-    ScanPhase::RootCauseDedup,
-    ScanPhase::AutoPatching,
-    ScanPhase::CveBootstrap,
-    ScanPhase::PocCompiler,
-    ScanPhase::ExploitSynth,
-    ScanPhase::VariantSearch,
-    ScanPhase::Reporting,
-];
-
-const CORE_PHASES: [ScanPhase; 14] = [
-    ScanPhase::Indexing,
-    ScanPhase::Semgrep,
-    ScanPhase::CweRouting,
-    ScanPhase::LlmStaticAnalysis,
-    ScanPhase::LlmDiscovery,
-    ScanPhase::LlmVerification,
     ScanPhase::TicketCrossRef,
     ScanPhase::GitAnalysis,
     ScanPhase::CrossFileAnalysis,
@@ -413,14 +217,23 @@ const CORE_PHASES: [ScanPhase; 14] = [
     ScanPhase::Reporting,
 ];
 
-const EXPERIMENTAL_PHASES: [ScanPhase; 9] = [
-    ScanPhase::CpgSlice,
-    ScanPhase::RuleSynthesis,
+const PARALLEL_PHASES: [ScanPhase; 3] = [
+    ScanPhase::Indexing,
+    ScanPhase::Semgrep,
+    ScanPhase::LlmStaticAnalysis,
+];
+
+const SEQUENTIAL_PHASES: [ScanPhase; 12] = [
+    ScanPhase::CweRouting,
+    ScanPhase::LlmDiscovery,
+    ScanPhase::LlmVerification,
     ScanPhase::Validate,
-    ScanPhase::SecurityAgentVerification,
-    ScanPhase::ThreatModeling,
-    ScanPhase::AutoPatching,
-    ScanPhase::PocCompiler,
-    ScanPhase::ExploitSynth,
-    ScanPhase::VariantSearch,
+    ScanPhase::TicketCrossRef,
+    ScanPhase::GitAnalysis,
+    ScanPhase::CrossFileAnalysis,
+    ScanPhase::ConfidenceScoring,
+    ScanPhase::AiAggregation,
+    ScanPhase::RootCauseDedup,
+    ScanPhase::CveBootstrap,
+    ScanPhase::Reporting,
 ];

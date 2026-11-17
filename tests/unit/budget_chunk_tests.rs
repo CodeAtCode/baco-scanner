@@ -407,4 +407,42 @@ fn function_two() {
         assert_eq!(chunks.len(), 1);
         assert!(chunks[0].contains("some code here"));
     }
+
+    /// A function larger than the cap whose content is full of multi-byte
+    /// characters used to panic: the hard split cut the slice at a byte offset
+    /// that could fall inside a character.
+    #[test]
+    fn test_chunking_splits_a_multibyte_function_without_panicking() {
+        let client = LlmClient::new(baco::llm::LlmConfig {
+            base_url: "https://test.example.com".to_string(),
+            api_key: "test-key".to_string(),
+            model: "test-model".to_string(),
+            models: vec![],
+            timeout: 30,
+            max_retries: 3,
+            retry_backoff_ms: 1000,
+            temperature: 0.5,
+            max_reasoning_tokens: None,
+            enable_llm_cache: false,
+            cache_dir: None,
+            max_concurrent: 3,
+        });
+        let analyzer = baco::llm_analysis::LlmAnalyzer::new(
+            client,
+            vec!["rust".to_string()],
+            1024,
+            &Default::default(),
+        );
+
+        // "☃" is three bytes wide, so the 8000-byte cut cannot land on a boundary
+        // for every offset the splitter might choose.
+        let mut code = String::from("fn big() {\n    let s = \"");
+        for _ in 0..3000 {
+            code.push('☃');
+        }
+        code.push_str("\";\n}\n");
+
+        let chunks = analyzer.chunk_code_tree_sitter(&code, "rust", 8000);
+        assert!(chunks.len() > 1, "a function over the cap must be split");
+    }
 }

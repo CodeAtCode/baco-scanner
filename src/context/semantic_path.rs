@@ -40,7 +40,7 @@ pub async fn summarize(
     }
 
     let truncated = if source.len() > 2000 {
-        &source[..2000]
+        &source[..crate::llm_analysis::prev_char_boundary(source, 2000)]
     } else {
         source
     };

@@ -62,13 +62,7 @@ pub struct ScannerConfig {
     #[serde(default)]
     pub aggregation: AggregationConfig,
     #[serde(default)]
-    pub rulesynth: RuleSynthConfig,
-    #[serde(default)]
     pub normalization: NormalizationConfig,
-    #[serde(default)]
-    pub cpg: CpgConfig,
-    #[serde(default)]
-    pub exploit: ExploitConfig,
     #[serde(default)]
     pub validate: ValidateConfig,
     #[serde(default)]
@@ -81,8 +75,6 @@ pub struct ScannerConfig {
     pub budget: BudgetConfig,
     #[serde(default)]
     pub policy_sampling: PolicySamplingConfig,
-    #[serde(default)]
-    pub agent_scaffold: AgentScaffoldConfig,
     #[serde(default)]
     pub pacvd: PacvdConfig,
     #[serde(default)]

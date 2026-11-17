@@ -19,12 +19,6 @@ fn load_env_api_keys() -> HashMap<String, Option<String>> {
     if let Ok(key) = env::var("LLM_STATIC_ANALYSIS_KEY") {
         overrides.insert("static_analysis".to_string(), Some(key));
     }
-    if let Ok(key) = env::var("LLM_SECURITY_AGENT_VERIFICATION_KEY") {
-        overrides.insert("security_agent_verification".to_string(), Some(key));
-    }
-    if let Ok(key) = env::var("LLM_THREAT_MODELING_KEY") {
-        overrides.insert("threat_modeling".to_string(), Some(key));
-    }
     // Global fallback: LLM_API_KEY fills phases without a slot-specific key.
     if let Ok(fallback) = env::var("LLM_API_KEY") {
         for phase in [
@@ -32,8 +26,6 @@ fn load_env_api_keys() -> HashMap<String, Option<String>> {
             "verification",
             "aggregation",
             "static_analysis",
-            "security_agent_verification",
-            "threat_modeling",
         ] {
             overrides
                 .entry(phase.to_string())
@@ -66,22 +58,6 @@ pub fn apply_env_overrides(config: &mut crate::config::ScannerConfig) {
                 "static_analysis" => {
                     if config.llm.phases.static_analysis.api_key.is_none() {
                         config.llm.phases.static_analysis.api_key = Some(api_key);
-                    }
-                }
-                "security_agent_verification" => {
-                    if config
-                        .llm
-                        .phases
-                        .security_agent_verification
-                        .api_key
-                        .is_none()
-                    {
-                        config.llm.phases.security_agent_verification.api_key = Some(api_key);
-                    }
-                }
-                "threat_modeling" => {
-                    if config.llm.phases.threat_modeling.api_key.is_none() {
-                        config.llm.phases.threat_modeling.api_key = Some(api_key);
                     }
                 }
                 _ => {
@@ -118,7 +94,7 @@ pub struct EnvVarGuard {
 impl EnvVarGuard {
     pub fn set(vars: &[(&str, &str)]) -> Self {
         // Acquire the lock before setting any vars
-        let lock = ENV_LOCK.lock().unwrap();
+        let lock = ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
         let mut previous = HashMap::new();
         for &(key, value) in vars {
             let old_value = std::env::var(key).ok();

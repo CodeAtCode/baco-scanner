@@ -217,7 +217,6 @@ impl ScanHealth {
             ScanPhase::LlmStaticAnalysis,
             ScanPhase::LlmDiscovery,
             ScanPhase::LlmVerification,
-            ScanPhase::SecurityAgentVerification,
         ];
         llm_phases.iter().all(|p| {
             self.phase_status.iter().any(|ps| {
@@ -247,11 +246,6 @@ impl ScanHealth {
                 "verification",
                 "llm.phases.verification",
             ),
-            (
-                ScanPhase::SecurityAgentVerification,
-                "security_agent_verification",
-                "llm.phases.security_agent_verification",
-            ),
         ];
 
         for (phase, config_key, config_path) in llm_phase_checks {
@@ -265,7 +259,6 @@ impl ScanHealth {
                 "static_analysis" => &llm_phases_config.static_analysis,
                 "discovery" => &llm_phases_config.discovery,
                 "verification" => &llm_phases_config.verification,
-                "security_agent_verification" => &llm_phases_config.security_agent_verification,
                 _ => continue,
             };
 
@@ -371,26 +364,18 @@ pub fn phase_name(phase: &ScanPhase) -> String {
         ScanPhase::Indexing => "Indexing".to_string(),
         ScanPhase::Semgrep => "Semgrep".to_string(),
         ScanPhase::CweRouting => "CweRouting".to_string(),
-        ScanPhase::CpgSlice => "CpgSlice".to_string(),
         ScanPhase::LlmStaticAnalysis => "LlmStaticAnalysis".to_string(),
         ScanPhase::LlmDiscovery => "LlmDiscovery".to_string(),
         ScanPhase::LlmVerification => "LlmVerification".to_string(),
+        ScanPhase::Validate => "Validate".to_string(),
         ScanPhase::TicketCrossRef => "TicketCrossRef".to_string(),
         ScanPhase::GitAnalysis => "GitAnalysis".to_string(),
         ScanPhase::CrossFileAnalysis => "CrossFileAnalysis".to_string(),
         ScanPhase::ConfidenceScoring => "ConfidenceScoring".to_string(),
         ScanPhase::AiAggregation => "AiAggregation".to_string(),
         ScanPhase::Reporting => "Reporting".to_string(),
-        ScanPhase::ThreatModeling => "ThreatModeling".to_string(),
         ScanPhase::RootCauseDedup => "RootCauseDedup".to_string(),
-        ScanPhase::AutoPatching => "AutoPatching".to_string(),
         ScanPhase::CveBootstrap => "CveBootstrap".to_string(),
-        ScanPhase::PocCompiler => "PocCompiler".to_string(),
-        ScanPhase::VariantSearch => "VariantSearch".to_string(),
-        ScanPhase::SecurityAgentVerification => "SecurityAgentVerification".to_string(),
-        ScanPhase::RuleSynthesis => "RuleSynthesis".to_string(),
-        ScanPhase::Validate => "Validate".to_string(),
-        ScanPhase::ExploitSynth => "ExploitSynth".to_string(),
         ScanPhase::Complete => "Complete".to_string(),
         ScanPhase::Error => "Error".to_string(),
     }

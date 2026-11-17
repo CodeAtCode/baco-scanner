@@ -72,9 +72,8 @@ fn test_summary_omits_failed_when_nothing_failed() {
     // Keeps the pre-existing summary format stable for healthy scans.
     let mut health = ScanHealth::new();
     health.record_phase_run(&ScanPhase::Indexing);
-    health.record_phase_skipped(&ScanPhase::CpgSlice, "profile=core");
     let summary = health.summary();
-    assert!(summary.contains("phases: 1 run, 1 skipped"));
+    assert!(summary.contains("phases: 1 run, 0 skipped"));
     assert!(!summary.contains("FAILED"));
 }
 
@@ -140,7 +139,6 @@ fn test_all_llm_phases_skipped() {
     health.record_phase_skipped(&ScanPhase::LlmStaticAnalysis, "no API key");
     health.record_phase_skipped(&ScanPhase::LlmDiscovery, "no API key");
     health.record_phase_skipped(&ScanPhase::LlmVerification, "no API key");
-    health.record_phase_skipped(&ScanPhase::SecurityAgentVerification, "no API key");
 
     assert!(health.all_llm_phases_skipped());
 }
@@ -152,7 +150,6 @@ fn test_blind_marker_when_all_llm_skipped() {
     health.record_phase_skipped(&ScanPhase::LlmStaticAnalysis, "no API key");
     health.record_phase_skipped(&ScanPhase::LlmDiscovery, "no API key");
     health.record_phase_skipped(&ScanPhase::LlmVerification, "no API key");
-    health.record_phase_skipped(&ScanPhase::SecurityAgentVerification, "no API key");
     health.set_llm_counts(0, 0);
 
     assert_eq!(
@@ -241,33 +238,6 @@ fn test_json_report_contains_scan_health_section() {
 }
 
 #[test]
-fn test_profile_skip_entries_in_health() {
-    // Test that profile-skipped phases are recorded when profile=core
-    use baco::scan_health::PhaseStatusKind;
-
-    let mut health = ScanHealth::new();
-    health.record_phase_run(&ScanPhase::Indexing);
-    health.record_phase_skipped(
-        &ScanPhase::CpgSlice,
-        "profile=core excludes experimental phase",
-    );
-    health.record_phase_run(&ScanPhase::Semgrep);
-
-    assert_eq!(health.phase_status.len(), 3);
-
-    let cpg_entry = health
-        .phase_status
-        .iter()
-        .find(|ps| ps.phase == "CpgSlice")
-        .unwrap();
-    assert!(matches!(cpg_entry.status, PhaseStatusKind::Skipped));
-    assert_eq!(
-        cpg_entry.reason,
-        Some("profile=core excludes experimental phase".to_string())
-    );
-}
-
-#[test]
 fn test_llm_config_skip_entry_contains_phase_slot() {
     // Test that LLM-skip entries mention the phase's config slot
     use baco::scan_health::PhaseStatusKind;
@@ -313,10 +283,6 @@ fn test_json_serialization_includes_phase_status_entries() {
     let mut health = ScanHealth::new();
     health.record_phase_run(&ScanPhase::Indexing);
     health.record_phase_skipped(
-        &ScanPhase::CpgSlice,
-        "profile=core excludes experimental phase",
-    );
-    health.record_phase_skipped(
         &ScanPhase::LlmDiscovery,
         "no API key configured (set llm.phases.discovery.api_key)",
     );
@@ -326,14 +292,12 @@ fn test_json_serialization_includes_phase_status_entries() {
 
     // Verify phase_status is included
     assert!(json.contains("phase_status"));
-    assert!(json.contains("CpgSlice"));
     assert!(json.contains("LlmDiscovery"));
-    assert!(json.contains("profile=core excludes experimental phase"));
     assert!(json.contains("llm.phases.discovery"));
 
     // Verify deserialization works
     let parsed: ScanHealth = serde_json::from_str(&json).unwrap();
-    assert_eq!(parsed.phase_status.len(), 3);
+    assert_eq!(parsed.phase_status.len(), 2);
     assert_eq!(parsed.files.indexed, 50);
 }
 
@@ -348,8 +312,6 @@ fn test_detect_llm_config_skips() {
     config.verification.api_key = Some("test-key".to_string());
     // static_analysis has no API key
     config.static_analysis.api_key = None;
-    // security_agent_verification has API key
-    config.security_agent_verification.api_key = Some("test-key".to_string());
 
     // Phases that already ran
     let ran_phases = vec!["Indexing".to_string(), "Semgrep".to_string()];
@@ -493,7 +455,6 @@ fn test_migrated_all_llm_phases_skipped() {
     health.record_phase_skipped(&ScanPhase::LlmStaticAnalysis, "no API key");
     health.record_phase_skipped(&ScanPhase::LlmDiscovery, "no API key");
     health.record_phase_skipped(&ScanPhase::LlmVerification, "no API key");
-    health.record_phase_skipped(&ScanPhase::SecurityAgentVerification, "no API key");
 
     assert!(health.all_llm_phases_skipped());
 }
@@ -507,7 +468,6 @@ fn test_migrated_blind_marker() {
     health.record_phase_skipped(&ScanPhase::LlmStaticAnalysis, "no API key");
     health.record_phase_skipped(&ScanPhase::LlmDiscovery, "no API key");
     health.record_phase_skipped(&ScanPhase::LlmVerification, "no API key");
-    health.record_phase_skipped(&ScanPhase::SecurityAgentVerification, "no API key");
     health.set_llm_counts(0, 0);
 
     assert_eq!(
@@ -574,10 +534,6 @@ fn test_phase_name_llm_phases() {
     );
     assert_eq!(phase_name(&ScanPhase::LlmDiscovery), "LlmDiscovery");
     assert_eq!(phase_name(&ScanPhase::LlmVerification), "LlmVerification");
-    assert_eq!(
-        phase_name(&ScanPhase::SecurityAgentVerification),
-        "SecurityAgentVerification"
-    );
 }
 
 // ============================================================================
@@ -591,7 +547,6 @@ fn test_blind_marker_partial_skip_llm_ok_gt_zero() {
     health.record_phase_skipped(&ScanPhase::LlmStaticAnalysis, "no API key");
     health.record_phase_run(&ScanPhase::LlmDiscovery);
     health.record_phase_skipped(&ScanPhase::LlmVerification, "no API key");
-    health.record_phase_skipped(&ScanPhase::SecurityAgentVerification, "no API key");
     health.set_llm_counts(5, 0);
 
     assert!(health.blind_marker().is_none());

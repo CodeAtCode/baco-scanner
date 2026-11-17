@@ -93,29 +93,11 @@ impl PresetOverlay {
                 base.scanner.performance.max_parallel_tasks =
                     scanner.performance.max_parallel_tasks;
             }
-            if scanner.performance.enable_threat_modeling
-                != crate::config::scanner::PerformanceSettings::default().enable_threat_modeling
-            {
-                base.scanner.performance.enable_threat_modeling =
-                    scanner.performance.enable_threat_modeling;
-            }
             if scanner.performance.enable_root_cause_dedup
                 != crate::config::scanner::PerformanceSettings::default().enable_root_cause_dedup
             {
                 base.scanner.performance.enable_root_cause_dedup =
                     scanner.performance.enable_root_cause_dedup;
-            }
-            if scanner.performance.enable_auto_patching
-                != crate::config::scanner::PerformanceSettings::default().enable_auto_patching
-            {
-                base.scanner.performance.enable_auto_patching =
-                    scanner.performance.enable_auto_patching;
-            }
-            if scanner.performance.enable_poc_compilation
-                != crate::config::scanner::PerformanceSettings::default().enable_poc_compilation
-            {
-                base.scanner.performance.enable_poc_compilation =
-                    scanner.performance.enable_poc_compilation;
             }
             if scanner.performance.enable_confidence_refinement
                 != crate::config::scanner::PerformanceSettings::default()
@@ -129,12 +111,6 @@ impl PresetOverlay {
             {
                 base.scanner.performance.enable_cve_bootstrap =
                     scanner.performance.enable_cve_bootstrap;
-            }
-            if scanner.performance.enable_variant_search
-                != crate::config::scanner::PerformanceSettings::default().enable_variant_search
-            {
-                base.scanner.performance.enable_variant_search =
-                    scanner.performance.enable_variant_search;
             }
             if scanner.performance.enable_hunt_prompts
                 != crate::config::scanner::PerformanceSettings::default().enable_hunt_prompts
@@ -153,10 +129,6 @@ impl PresetOverlay {
             {
                 base.scanner.performance.never_submit_multiplier =
                     scanner.performance.never_submit_multiplier;
-            }
-            if !scanner.performance.variant_search_patterns.is_empty() {
-                base.scanner.performance.variant_search_patterns =
-                    scanner.performance.variant_search_patterns.clone();
             }
         }
 

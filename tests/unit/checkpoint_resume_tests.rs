@@ -115,7 +115,7 @@ fn test_resume_from_semgrep() {
     let tmp = tempfile::tempdir().unwrap();
     let path = make_checkpoint_path(&tmp, ScanPhase::Semgrep);
     let next = Checkpoint::resume_from(path.to_str().unwrap()).unwrap();
-    assert_eq!(next, ScanPhase::CpgSlice);
+    assert_eq!(next, ScanPhase::LlmStaticAnalysis);
 }
 
 #[test]
@@ -131,7 +131,7 @@ fn test_resume_from_cwe_routing() {
     let tmp = tempfile::tempdir().unwrap();
     let path = make_checkpoint_path(&tmp, ScanPhase::CweRouting);
     let next = Checkpoint::resume_from(path.to_str().unwrap()).unwrap();
-    assert_eq!(next, ScanPhase::RuleSynthesis);
+    assert_eq!(next, ScanPhase::LlmDiscovery);
 }
 
 #[test]
@@ -159,48 +159,21 @@ fn test_resume_from_error_restarts() {
 }
 
 #[test]
-fn test_resume_from_cpgslice() {
-    let tmp = tempfile::tempdir().unwrap();
-    let path = make_checkpoint_path(&tmp, ScanPhase::CpgSlice);
-    let next = Checkpoint::resume_from(path.to_str().unwrap()).unwrap();
-    assert_eq!(next, ScanPhase::LlmStaticAnalysis);
-}
-
-#[test]
-fn test_resume_from_exploitsynth() {
-    let tmp = tempfile::tempdir().unwrap();
-    let path = make_checkpoint_path(&tmp, ScanPhase::ExploitSynth);
-    let next = Checkpoint::resume_from(path.to_str().unwrap()).unwrap();
-    assert_eq!(next, ScanPhase::VariantSearch);
-}
-
-#[test]
 fn test_resume_full_sequential_chain() {
     let phases = vec![
-        (ScanPhase::Semgrep, ScanPhase::CpgSlice),
-        (ScanPhase::CpgSlice, ScanPhase::LlmStaticAnalysis),
+        (ScanPhase::Semgrep, ScanPhase::LlmStaticAnalysis),
         (ScanPhase::LlmStaticAnalysis, ScanPhase::CweRouting),
-        (ScanPhase::CweRouting, ScanPhase::RuleSynthesis),
-        (ScanPhase::RuleSynthesis, ScanPhase::LlmDiscovery),
+        (ScanPhase::CweRouting, ScanPhase::LlmDiscovery),
         (ScanPhase::LlmDiscovery, ScanPhase::LlmVerification),
         (ScanPhase::LlmVerification, ScanPhase::Validate),
-        (ScanPhase::Validate, ScanPhase::SecurityAgentVerification),
-        (
-            ScanPhase::SecurityAgentVerification,
-            ScanPhase::TicketCrossRef,
-        ),
+        (ScanPhase::Validate, ScanPhase::TicketCrossRef),
         (ScanPhase::TicketCrossRef, ScanPhase::GitAnalysis),
         (ScanPhase::GitAnalysis, ScanPhase::CrossFileAnalysis),
         (ScanPhase::CrossFileAnalysis, ScanPhase::ConfidenceScoring),
         (ScanPhase::ConfidenceScoring, ScanPhase::AiAggregation),
-        (ScanPhase::AiAggregation, ScanPhase::ThreatModeling),
-        (ScanPhase::ThreatModeling, ScanPhase::RootCauseDedup),
-        (ScanPhase::RootCauseDedup, ScanPhase::AutoPatching),
-        (ScanPhase::AutoPatching, ScanPhase::CveBootstrap),
-        (ScanPhase::CveBootstrap, ScanPhase::PocCompiler),
-        (ScanPhase::PocCompiler, ScanPhase::ExploitSynth),
-        (ScanPhase::ExploitSynth, ScanPhase::VariantSearch),
-        (ScanPhase::VariantSearch, ScanPhase::Reporting),
+        (ScanPhase::AiAggregation, ScanPhase::RootCauseDedup),
+        (ScanPhase::RootCauseDedup, ScanPhase::CveBootstrap),
+        (ScanPhase::CveBootstrap, ScanPhase::Reporting),
         (ScanPhase::Reporting, ScanPhase::Complete),
     ];
 

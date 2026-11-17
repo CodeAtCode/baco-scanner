@@ -15,9 +15,8 @@ fn test_scan_phase_all_variants_exist() {
     let phases = vec![
         ScanPhase::Indexing,
         ScanPhase::Semgrep,
-        ScanPhase::CweRouting,
-        ScanPhase::CpgSlice,
         ScanPhase::LlmStaticAnalysis,
+        ScanPhase::CweRouting,
         ScanPhase::LlmDiscovery,
         ScanPhase::LlmVerification,
         ScanPhase::Validate,
@@ -26,21 +25,14 @@ fn test_scan_phase_all_variants_exist() {
         ScanPhase::CrossFileAnalysis,
         ScanPhase::ConfidenceScoring,
         ScanPhase::AiAggregation,
-        ScanPhase::Reporting,
-        ScanPhase::ThreatModeling,
         ScanPhase::RootCauseDedup,
-        ScanPhase::AutoPatching,
         ScanPhase::CveBootstrap,
-        ScanPhase::PocCompiler,
-        ScanPhase::VariantSearch,
-        ScanPhase::SecurityAgentVerification,
-        ScanPhase::RuleSynthesis,
-        ScanPhase::ExploitSynth,
+        ScanPhase::Reporting,
         ScanPhase::Complete,
         ScanPhase::Error,
     ];
 
-    assert_eq!(phases.len(), 25);
+    assert_eq!(phases.len(), 17);
 }
 
 #[test]

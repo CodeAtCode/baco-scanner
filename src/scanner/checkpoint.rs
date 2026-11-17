@@ -10,31 +10,19 @@ pub enum ScanPhase {
     Indexing,
     Semgrep,
     CweRouting,
-    // T3.1: CPG-guided slicing
-    CpgSlice,
     LlmStaticAnalysis,
     LlmDiscovery,
     LlmVerification,
+    // CORRECT paper (arxiv:2504.13474) — LLM-as-judge rationale validation
+    Validate,
     TicketCrossRef,
     GitAnalysis,
     CrossFileAnalysis,
     ConfidenceScoring,
     AiAggregation,
-    Reporting,
-    // v3 features
-    ThreatModeling,
     RootCauseDedup,
-    AutoPatching,
     CveBootstrap,
-    PocCompiler,
-    VariantSearch,
-    SecurityAgentVerification,
-    // T2.3: MoCQ LLM→semgrep rule synthesis phase
-    RuleSynthesis,
-    // CORRECT paper (arxiv:2504.13474) — LLM-as-judge rationale validation
-    Validate,
-    // T3.2: Exploit synthesis with sandbox
-    ExploitSynth,
+    Reporting,
     Complete,
     Error,
 }
@@ -45,26 +33,18 @@ impl fmt::Display for ScanPhase {
             ScanPhase::Indexing => write!(f, "Indexing"),
             ScanPhase::Semgrep => write!(f, "Semgrep"),
             ScanPhase::CweRouting => write!(f, "CweRouting"),
-            ScanPhase::CpgSlice => write!(f, "CpgSlice"),
             ScanPhase::LlmStaticAnalysis => write!(f, "LlmStaticAnalysis"),
             ScanPhase::LlmDiscovery => write!(f, "LlmDiscovery"),
             ScanPhase::LlmVerification => write!(f, "LlmVerification"),
+            ScanPhase::Validate => write!(f, "Validate"),
             ScanPhase::TicketCrossRef => write!(f, "TicketCrossRef"),
             ScanPhase::GitAnalysis => write!(f, "GitAnalysis"),
             ScanPhase::CrossFileAnalysis => write!(f, "CrossFileAnalysis"),
             ScanPhase::ConfidenceScoring => write!(f, "ConfidenceScoring"),
             ScanPhase::AiAggregation => write!(f, "AiAggregation"),
-            ScanPhase::Reporting => write!(f, "Reporting"),
-            ScanPhase::ThreatModeling => write!(f, "ThreatModeling"),
             ScanPhase::RootCauseDedup => write!(f, "RootCauseDedup"),
-            ScanPhase::AutoPatching => write!(f, "AutoPatching"),
             ScanPhase::CveBootstrap => write!(f, "CveBootstrap"),
-            ScanPhase::PocCompiler => write!(f, "PocCompiler"),
-            ScanPhase::VariantSearch => write!(f, "VariantSearch"),
-            ScanPhase::SecurityAgentVerification => write!(f, "SecurityAgentVerification"),
-            ScanPhase::RuleSynthesis => write!(f, "RuleSynthesis"),
-            ScanPhase::Validate => write!(f, "Validate"),
-            ScanPhase::ExploitSynth => write!(f, "ExploitSynth"),
+            ScanPhase::Reporting => write!(f, "Reporting"),
             ScanPhase::Complete => write!(f, "Complete"),
             ScanPhase::Error => write!(f, "Error"),
         }
@@ -118,12 +98,8 @@ impl Checkpoint {
     }
 
     pub fn save(&self, path: &str) -> Result<(), std::io::Error> {
-        if let Some(parent) = Path::new(path).parent() {
-            fs::create_dir_all(parent)?;
-        }
         let json = serde_json::to_string_pretty(self)?;
-        fs::write(path, json)?;
-        Ok(())
+        crate::hook_registry::atomic_write(Path::new(path), json.as_bytes())
     }
 
     pub fn load(path: &str) -> Result<Self, String> {
@@ -213,33 +189,9 @@ pub async fn save_checkpoint(
         checkpoint.early_termination = Some(info);
     }
 
-    // Get completed phases (all phases up to and including current)
-    // Must match the pipeline order: 4 parallel + 19 sequential, Reporting last
-    let all_phases = [
-        ScanPhase::Indexing,
-        ScanPhase::Semgrep,
-        ScanPhase::CpgSlice,
-        ScanPhase::LlmStaticAnalysis,
-        ScanPhase::CweRouting,
-        ScanPhase::RuleSynthesis,
-        ScanPhase::LlmDiscovery,
-        ScanPhase::LlmVerification,
-        ScanPhase::Validate,
-        ScanPhase::SecurityAgentVerification,
-        ScanPhase::TicketCrossRef,
-        ScanPhase::GitAnalysis,
-        ScanPhase::CrossFileAnalysis,
-        ScanPhase::ConfidenceScoring,
-        ScanPhase::AiAggregation,
-        ScanPhase::ThreatModeling,
-        ScanPhase::RootCauseDedup,
-        ScanPhase::AutoPatching,
-        ScanPhase::CveBootstrap,
-        ScanPhase::PocCompiler,
-        ScanPhase::ExploitSynth,
-        ScanPhase::VariantSearch,
-        ScanPhase::Reporting,
-    ];
+    // Get completed phases (all phases up to and including current), derived
+    // from the single source of truth.
+    let all_phases = crate::scanner::phase_spec::PhaseSpec::all().to_vec();
 
     if let Some(pos) = all_phases.iter().position(|p| p == phase) {
         checkpoint.completed_phases = all_phases[..=pos].to_vec();

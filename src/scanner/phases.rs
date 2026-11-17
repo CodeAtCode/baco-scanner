@@ -44,14 +44,10 @@ pub async fn run_phase(
     match cfg.phase {
         Indexing => dispatch_phase!(scanner, other_phases::run_indexing, cfg),
         Semgrep => dispatch_phase!(scanner, other_phases::run_semgrep, cfg),
-        CpgSlice => dispatch_phase!(scanner, other_phases::run_cpg_slice, cfg),
         LlmStaticAnalysis => dispatch_phase!(scanner, llm_phases::run_llm_static_analysis, cfg),
         LlmDiscovery => dispatch_phase!(scanner, llm_phases::run_llm_discovery, cfg),
         LlmVerification => llm_phases::run_llm_verification(scanner, cfg).await,
         Validate => dispatch_phase!(scanner, other_phases::run_validate, cfg),
-        SecurityAgentVerification => {
-            dispatch_phase!(scanner, llm_phases::run_security_agent_verification, cfg)
-        }
         TicketCrossRef => dispatch_phase!(scanner, other_phases::run_ticket_cross_ref, cfg),
         GitAnalysis => dispatch_phase!(scanner, other_phases::run_git_analysis, cfg),
         CrossFileAnalysis => dispatch_phase!(scanner, other_phases::run_cross_file_analysis, cfg),
@@ -61,15 +57,9 @@ pub async fn run_phase(
             let (findings, files, _rejected) = other_phases::run_reporting(scanner, cfg).await?;
             Ok((findings, files, Vec::new()))
         }
-        ThreatModeling => dispatch_phase!(scanner, other_phases::run_threat_modeling, cfg),
         RootCauseDedup => dispatch_phase!(scanner, other_phases::run_root_cause_dedup, cfg),
-        AutoPatching => dispatch_phase!(scanner, other_phases::run_auto_patching, cfg),
         CveBootstrap => dispatch_phase!(scanner, other_phases::run_cve_bootstrap, cfg),
-        PocCompiler => dispatch_phase!(scanner, other_phases::run_poc_compiler, cfg),
-        VariantSearch => dispatch_phase!(scanner, other_phases::run_variant_search, cfg),
         CweRouting => dispatch_phase!(scanner, other_phases::run_cwe_routing, cfg),
-        RuleSynthesis => dispatch_phase!(scanner, other_phases::run_rule_synthesis, cfg),
-        ExploitSynth => dispatch_phase!(scanner, other_phases::run_exploit_synth, cfg),
         Complete | Error => {
             let (findings, files) = other_phases::run_default(cfg).await?;
             Ok((findings, files, Vec::new()))

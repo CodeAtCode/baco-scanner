@@ -38,7 +38,11 @@ fn test_phase_graph_has_expected_phase_count() {
     let graph = PhaseGraph::new();
     let phases = graph.phases();
 
-    assert!(phases.len() >= 19, "Expected at least 19 phases");
+    assert_eq!(
+        phases.len(),
+        15,
+        "Expected exactly 15 phases (3 parallel + 12 sequential)"
+    );
 }
 
 // ============================================================================
@@ -122,12 +126,12 @@ fn test_next_phase_chain_from_indexing() {
 }
 
 #[test]
-fn test_previous_phase_chain_from_variant_search() {
+fn test_previous_phase_chain_from_reporting() {
     let graph = PhaseGraph::new();
 
-    let exploit_synth = graph.previous_phase(&ScanPhase::VariantSearch);
-    assert!(exploit_synth.is_some());
-    assert_eq!(exploit_synth.unwrap(), &ScanPhase::ExploitSynth);
+    let cve_bootstrap = graph.previous_phase(&ScanPhase::Reporting);
+    assert!(cve_bootstrap.is_some());
+    assert_eq!(cve_bootstrap.unwrap(), &ScanPhase::CveBootstrap);
 }
 
 // ============================================================================

@@ -84,6 +84,16 @@ impl ConflictResolver {
             }
         }
 
+        if findings.is_empty() {
+            return Err(ScanError::Parse {
+                message: format!(
+                    "CWE conflict resolution failed: empty findings slice at {}",
+                    location
+                ),
+                source: None,
+            });
+        }
+
         let mut sorted: Vec<_> = findings.iter().collect();
         sorted.sort_by(|a, b| {
             let cwe_num = |cwe: &Option<String>| {
@@ -94,7 +104,7 @@ impl ConflictResolver {
             cwe_num(&a.cwe_id).cmp(&cwe_num(&b.cwe_id))
         });
 
-        let most_specific = *sorted.first().unwrap();
+        let most_specific = *sorted.first().expect("findings is non-empty");
         let conflict_type = ConflictType::CweMismatch;
         let resolution = ConflictResolution::KeptOne;
 

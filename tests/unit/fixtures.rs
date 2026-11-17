@@ -50,7 +50,7 @@ pub use centralized_fixtures::mock_llm;
 use baco::analysis_context::AnalysisContext;
 use baco::config::{
     AgentConfig, LlmConfig, LlmPhaseConfig, OutputConfig, PerformanceSettings, ProjectConfig,
-    RuleSynthConfig, ScannerConfig, ScannerSettings, SemgrepSettings, TicketConfig,
+    ScannerConfig, ScannerSettings, SemgrepSettings, TicketConfig,
 };
 use baco::findings::{Severity, VerificationStatus, VulnerabilityFinding};
 pub use baco::phase::helpers::{create_finding_with_params, create_test_finding_simple};
@@ -226,7 +226,6 @@ pub fn create_test_config() -> ScannerConfig {
         scanner: ScannerSettings {
             max_file_size_kb: 1024,
             exclude_paths: vec![],
-            profile: baco::config::scanner::ScanPipelineProfile::Core,
             semgrep: SemgrepSettings {
                 ..Default::default()
             },
@@ -250,7 +249,6 @@ pub fn create_test_config() -> ScannerConfig {
                     models: vec![],
                     temperature: None,
                     timeout_secs: Some(30),
-                    agent_flow: Default::default(),
                 },
                 verification: LlmPhaseConfig {
                     base_url: "http://localhost:11434".to_string(),
@@ -259,7 +257,6 @@ pub fn create_test_config() -> ScannerConfig {
                     models: vec![],
                     temperature: None,
                     timeout_secs: Some(30),
-                    agent_flow: Default::default(),
                 },
                 aggregation: LlmPhaseConfig {
                     base_url: "http://localhost:11434".to_string(),
@@ -268,7 +265,6 @@ pub fn create_test_config() -> ScannerConfig {
                     models: vec![],
                     temperature: None,
                     timeout_secs: Some(30),
-                    agent_flow: Default::default(),
                 },
                 static_analysis: LlmPhaseConfig {
                     base_url: "http://localhost:11434".to_string(),
@@ -277,25 +273,6 @@ pub fn create_test_config() -> ScannerConfig {
                     models: vec![],
                     temperature: None,
                     timeout_secs: Some(30),
-                    agent_flow: Default::default(),
-                },
-                security_agent_verification: LlmPhaseConfig {
-                    base_url: "http://localhost:11434".to_string(),
-                    api_key: None,
-                    model: "llama3.1".to_string(),
-                    models: vec![],
-                    temperature: None,
-                    timeout_secs: Some(30),
-                    agent_flow: Default::default(),
-                },
-                threat_modeling: LlmPhaseConfig {
-                    base_url: "http://localhost:11434".to_string(),
-                    api_key: None,
-                    model: "llama3.1".to_string(),
-                    models: vec![],
-                    temperature: None,
-                    timeout_secs: Some(30),
-                    agent_flow: Default::default(),
                 },
                 prompt_overrides: Default::default(),
             },
@@ -311,14 +288,10 @@ pub fn create_test_config() -> ScannerConfig {
         },
         router: Default::default(),
         aggregation: Default::default(),
-        rulesynth: Default::default(),
         normalization: Default::default(),
-        cpg: Default::default(),
-        exploit: Default::default(),
         validate: Default::default(),
         vultriage: Default::default(),
         policy_sampling: Default::default(),
-        agent_scaffold: Default::default(),
         pacvd: Default::default(),
         vuln_spec: Default::default(),
         citation_verification: Default::default(),
@@ -352,7 +325,6 @@ pub fn create_minimal_config() -> ScannerConfig {
         scanner: ScannerSettings {
             max_file_size_kb: 1024,
             exclude_paths: vec![],
-            profile: baco::config::scanner::ScanPipelineProfile::Core,
             semgrep: SemgrepSettings::default(),
             performance: PerformanceSettings::default(),
         },
@@ -371,14 +343,10 @@ pub fn create_minimal_config() -> ScannerConfig {
         tickets: TicketConfig::default(),
         router: Default::default(),
         aggregation: Default::default(),
-        rulesynth: Default::default(),
         normalization: Default::default(),
-        cpg: Default::default(),
-        exploit: Default::default(),
         validate: Default::default(),
         vultriage: Default::default(),
         policy_sampling: Default::default(),
-        agent_scaffold: Default::default(),
         pacvd: Default::default(),
         vuln_spec: Default::default(),
         citation_verification: Default::default(),
@@ -403,12 +371,8 @@ pub fn create_test_config_with_discovery_key() -> ScannerConfig {
 pub fn create_test_config_all_features() -> ScannerConfig {
     let mut config = create_minimal_config();
     config.scanner.performance.enable_confidence_refinement = true;
-    config.scanner.performance.enable_threat_modeling = true;
     config.scanner.performance.enable_root_cause_dedup = true;
-    config.scanner.performance.enable_auto_patching = true;
     config.scanner.performance.enable_cve_bootstrap = true;
-    config.scanner.performance.enable_poc_compilation = true;
-    config.scanner.performance.enable_variant_search = true;
     config
 }
 
@@ -730,20 +694,6 @@ pub fn make_threat_model_test_context() -> AnalysisContext {
 }
 
 // ============================================================================
-// RuleSynth Test Helpers
-// ============================================================================
-
-/// Create a test RuleSynthConfig.
-pub fn make_rulesynth_config() -> RuleSynthConfig {
-    RuleSynthConfig {
-        enabled: true,
-        output_dir: temp_fixture_path("rules-fixtures"),
-        max_rules_per_cwe: 3,
-        mocq_mode: false,
-        max_iterations: 5,
-        corpus_path: None,
-    }
-}
 
 // ============================================================================
 // Report AI Aggregation Test Helpers

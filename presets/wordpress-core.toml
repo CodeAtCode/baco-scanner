@@ -105,9 +105,7 @@ rules:
 
 [scanner.performance]
 enable_root_cause_dedup = true
-enable_variant_search = true
 enable_cve_bootstrap = true
-enable_threat_modeling = false
 
 [llm]
 timeout_secs = 90

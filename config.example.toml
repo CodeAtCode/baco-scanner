@@ -8,8 +8,6 @@
 # - LLM_VERIFICATION_KEY           -> overrides llm.phases.verification.api_key
 # - LLM_AGGREGATION_KEY            -> overrides llm.phases.aggregation.api_key
 # - LLM_STATIC_ANALYSIS_KEY        -> overrides llm.phases.static_analysis.api_key
-# - LLM_SECURITY_AGENT_VERIFICATION_KEY -> overrides llm.phases.security_agent_verification.api_key
-# - LLM_THREAT_MODELING_KEY        -> overrides llm.phases.threat_modeling.api_key
 
 # Project configuration
 [project]
@@ -63,20 +61,9 @@ max_parallel_tasks = 4
 # Each flag controls whether a specific analysis phase runs during the scan.
 # Phases marked "enabled" run by default; set to false to skip them.
 
-# Threat modeling using STRIDE analysis (adds LLM-based threat identification)
-# Default: false
-enable_threat_modeling = false
 # Root-cause deduplication (collapses findings that share the same root cause)
 # Default: true
 enable_root_cause_dedup = true
-# Auto-patching (generates and validates fix patches in a staging worktree)
-# Writes code files and runs git commands — opt-in for safety
-# Default: false
-enable_auto_patching = false
-# PoC compilation (compiles proof-of-concept exploits to verify findings)
-# Spawns external compilers — opt-in for safety
-# Default: false
-enable_poc_compilation = false
 # Confidence refinement (re-calibrates finding confidence based on multi-source/cross-file signals)
 # Default: true
 enable_confidence_refinement = true
@@ -97,9 +84,6 @@ enable_cve_bootstrap = true
 # A CVE whose CPE references the hinted vendor/product is considered relevant
 # regardless of package-name matching
 # cpe_hint = "cpe:2.3:a:microsoft:internet_explorer:11.0:*:*:*:*:*:*:*"
-# Variant search (searches for variant instances of the same vulnerability pattern)
-# Default: true
-enable_variant_search = true
 # Domain-routed hunt prompts: select per-attack-class prompt modules from
 # prompts/hunt/ based on the target's languages during LLM discovery
 # Default: true
@@ -156,18 +140,6 @@ base_url = "https://api.mistral.ai/v1"
 api_key = "your-static-analysis-api-key"  # or set env: LLM_STATIC_ANALYSIS_KEY
 model = "mistral-small"
 
-# Security agent verification phase: agent-based finding verification
-[llm.phases.security_agent_verification]
-base_url = "https://api.mistral.ai/v1"
-api_key = "your-security-agent-verification-api-key"  # or set env: LLM_SECURITY_AGENT_VERIFICATION_KEY
-model = "qwen35"
-
-# Threat modeling phase: STRIDE-based threat analysis
-[llm.phases.threat_modeling]
-base_url = "https://api.mistral.ai/v1"
-api_key = "your-threat-modeling-api-key"  # or set env: LLM_THREAT_MODELING_KEY
-model = "mistral-medium"
-
 # Ticket system configuration (search for existing reports)
 [tickets]
 # Add multiple ticket systems by adding multiple [[tickets.systems]] blocks
@@ -184,24 +156,6 @@ url = "https://github.com/GNOME/libxml2"
 #[agent]
 # enabled = false       # Set to true to enable the agent
 # max_turns = 10        # Maximum agent conversation turns per issue
-
-# CPG-guided slicing
-[cpg]
-# Whether CPG slicing is enabled
-# enabled = false
-# Path to Joern binary (None = search PATH)
-# joern_path = ""
-# Maximum lines to include in a slice
-# slice_budget_lines = 200
-
-# Exploit synthesis
-[exploit]
-# Whether exploit synthesis is enabled
-# enabled = false
-# Docker image for sandboxed exploit execution
-# sandbox_image = "python:3.11-slim"
-# Timeout for exploit execution in seconds
-# timeout_secs = 30
 
 # Soundness validation (CORRECT paper)
 [validate]
