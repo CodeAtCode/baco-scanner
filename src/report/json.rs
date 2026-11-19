@@ -5,7 +5,6 @@ use crate::llm::metrics::LlmMetrics;
 use crate::scan_health::ScanHealth;
 use crate::scanner::checkpoint::EarlyTerminationInfo;
 use serde::Serialize;
-use std::fs;
 
 #[derive(Serialize)]
 pub struct ReportSummary {
@@ -179,7 +178,8 @@ pub fn write_findings_json(
         std::fs::create_dir_all(parent).map_err(ScanError::IoError)?;
     }
 
-    fs::write(output_path, json).map_err(ScanError::IoError)?;
+    crate::hook_registry::atomic_write(std::path::Path::new(output_path), json.as_bytes())
+        .map_err(ScanError::IoError)?;
 
     Ok(())
 }

@@ -118,3 +118,29 @@ fn absence_detection_disabled_leaves_status_unchanged() {
         "with absence detection off the status must not change"
     );
 }
+
+#[test]
+fn an_unconfigured_language_leaves_a_needs_review_finding_alone() {
+    // The primitives map is empty, so no body was searched. Absence was not
+    // established, and the finding must not be confirmed on the strength of a
+    // check that never ran.
+    let finding = sensitive_finding("src/app.php");
+
+    let (status, notes) = upgrade_for_absent_primitive(
+        &finding,
+        VerificationStatus::NeedsReview,
+        "",
+        &std::collections::HashMap::new(),
+        true, // enable_absence_detection
+    );
+
+    assert_eq!(
+        status,
+        VerificationStatus::NeedsReview,
+        "a check that never ran must not confirm a finding, notes: {notes}"
+    );
+    assert!(
+        notes.contains("not checked"),
+        "the reason must say the check did not run, got: {notes}"
+    );
+}

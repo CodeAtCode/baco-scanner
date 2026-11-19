@@ -10,6 +10,8 @@ use baco::llm::LlmConfig;
 use baco::llm_analysis::LlmAnalyzer;
 use tempfile::TempDir;
 
+use crate::log_capture::capture_logs;
+
 // ============================================================================
 // Test fixtures
 // ============================================================================
@@ -44,8 +46,8 @@ fn create_analyzer() -> LlmAnalyzer {
 // Target 1: analyze_file oversized file early return (lines 532, 534–535, 537)
 // ============================================================================
 
-#[tokio::test]
-async fn test_analyze_file_oversized_file_returns_empty() {
+#[test]
+fn test_analyze_file_oversized_file_returns_empty() {
     let analyzer = create_analyzer();
     let temp_dir = TempDir::new().unwrap();
 
@@ -54,10 +56,48 @@ async fn test_analyze_file_oversized_file_returns_empty() {
     let content = "fn main() {}\n".repeat(1_000_000); // ~15 MB
     std::fs::write(&large_file, &content).unwrap();
 
-    let result = analyzer.analyze_file(&large_file).await;
+    let logs = capture_logs(|| {
+        let result = futures::executor::block_on(analyzer.analyze_file(&large_file));
+        assert!(
+            result.expect("a skip is not an error").is_empty(),
+            "an oversized file is skipped, so nothing is analysed"
+        );
+    });
 
-    assert!(result.is_ok());
-    assert!(result.unwrap().is_empty());
+    assert!(
+        logs.contains("exceeds the hard read cap"),
+        "the skip must say why, got {:?}",
+        logs.messages()
+    );
+    assert!(
+        logs.contains("large.rs"),
+        "the skip must name the file, got {:?}",
+        logs.messages()
+    );
+}
+
+#[test]
+fn an_unreadable_file_is_skipped_with_a_warning() {
+    // This is the case that used to pass in silence: the same empty result as a
+    // file with nothing in it, and no record either way.
+    let analyzer = create_analyzer();
+    let missing = std::path::PathBuf::from("/nonexistent/baco-skip-test/handler.php");
+
+    let logs = capture_logs(|| {
+        let result = futures::executor::block_on(analyzer.analyze_file(&missing));
+        assert!(result.expect("a skip is not an error").is_empty());
+    });
+
+    assert!(
+        logs.contains("Skipping /nonexistent/baco-skip-test/handler.php"),
+        "an unreadable file must be recorded, got {:?}",
+        logs.messages()
+    );
+    assert!(
+        logs.contains("unreadable"),
+        "the record must say why, got {:?}",
+        logs.messages()
+    );
 }
 
 // ============================================================================

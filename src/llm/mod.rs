@@ -284,6 +284,22 @@ pub fn parse_chat_content(result: &serde_json::Value) -> Result<String, &'static
     Ok(content.to_string())
 }
 
+/// Normalise a tool call's `arguments` field to a JSON object.
+///
+/// Providers disagree on the shape: some send an object, OpenAI-compatible ones
+/// send the same JSON as a string. Accepting only the object shape silently
+/// dropped every parameter, so each tool call arrived as if it had been made
+/// with no arguments at all.
+fn parse_tool_arguments(raw: &serde_json::Value) -> Option<serde_json::Value> {
+    match raw {
+        serde_json::Value::Object(_) => Some(raw.clone()),
+        serde_json::Value::String(text) => serde_json::from_str(text)
+            .ok()
+            .filter(serde_json::Value::is_object),
+        _ => None,
+    }
+}
+
 /// Extract tool calls from a chat message value (empty vec when absent).
 pub fn parse_tool_calls(message: &serde_json::Value) -> Vec<ToolCall> {
     message
@@ -302,8 +318,7 @@ pub fn parse_tool_calls(message: &serde_json::Value) -> Vec<ToolCall> {
                             arguments: tc
                                 .get("function")
                                 .and_then(|f| f.get("arguments"))
-                                .and_then(|a| a.as_object())
-                                .map(|o| serde_json::to_value(o).unwrap_or_default())
+                                .and_then(parse_tool_arguments)
                                 .unwrap_or_default(),
                         })
                 })
@@ -1219,7 +1234,18 @@ pub fn phase_llm_config(
         temperature,
         max_reasoning_tokens: global_llm.max_reasoning_tokens,
         enable_llm_cache: global_llm.enable_llm_cache,
-        cache_dir: global_llm.cache_dir.clone(),
+        // Root the cache under the configured output directory. Left unset, the
+        // accessor falls back to a literal that resolves against the CWD, so a
+        // scan pointed at another output directory would still write its cache
+        // into the repository. An explicit [llm].cache_dir still wins.
+        cache_dir: global_llm.cache_dir.clone().or_else(|| {
+            let out = scanner_config.output.dir.trim();
+            if out.is_empty() {
+                None
+            } else {
+                Some(format!("{}/llm-cache", out.trim_end_matches('/')))
+            }
+        }),
         max_concurrent: global_llm.max_concurrent,
     })
 }

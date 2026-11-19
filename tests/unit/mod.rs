@@ -188,6 +188,7 @@ mod specifications_config_tests;
 mod statement_range;
 mod static_analysis_prompt_tests;
 mod structural_dedup_tests;
+mod ticket_auth_tests;
 mod ticket_git_cross_tests;
 mod tickets;
 mod tickets_coverage;
@@ -231,3 +232,18 @@ mod atomic_write_tests;
 mod max_file_size_validation_tests;
 mod subprocess_tests;
 mod utf8_boundary_tests;
+
+// Configuration and test-hygiene guard rails
+mod log_capture;
+mod output_dir_isolation_tests;
+mod shipped_config_tests;
+mod test_hygiene_tests;
+
+// Bug verification tests for checkpoint resume state persistence
+mod checkpoint_resume_state_bug_tests;
+// Bug verification tests for run_store timestamp resolution
+mod run_store_timestamp_bug_tests;
+// Verification test for file hash store persistence (VERIFY-ONLY)
+mod file_hash_store_persistence_verification_tests;
+// Verification test for scan health phase recording (VERIFY-ONLY)
+mod scan_health_phase_recording_verification_tests;

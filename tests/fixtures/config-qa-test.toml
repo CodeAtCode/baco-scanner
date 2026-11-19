@@ -5,7 +5,8 @@ languages = ["c", "python"]
 
 [output]
 dir = "./tests/output"
-format = ["json"]
+evidence_gate = true
+include_rejected = false
 
 [scanner]
 max_file_size_kb = 100
@@ -37,7 +38,7 @@ model = "test-model"
 [[tickets.systems]]
 system_type = "github"
 url = "https://api.github.com"
-project = "test-repo"
+api_key = "test-key"
 
 # --- Paper-Integration Research Flags (P1-P5) ---
 # All flags default to disabled. Enable to opt in to additional analysis phases.

@@ -144,7 +144,7 @@ model = "mistral-small"
 [tickets]
 # Add multiple ticket systems by adding multiple [[tickets.systems]] blocks
 [[tickets.systems]]
-# Ticket system type: github | gitlab | bugzilla | jira
+# Ticket system type: github | gitlab
 system_type = "github"
 # URL to the ticket system (must include protocol: https://...)
 url = "https://github.com/GNOME/libxml2"

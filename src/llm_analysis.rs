@@ -635,6 +635,42 @@ const MAX_CHUNKS_PER_FILE: usize = 24;
 /// Hard read cap for the chunked path so pathological inputs are skipped.
 const MAX_CHUNK_READ_BYTES: usize = 10 * 1024 * 1024;
 
+/// Why a file was left out of the analysis.
+///
+/// Carried as a value rather than only logged, so the reason reaches the log
+/// intact and a test can read the exact text an operator will see.
+#[derive(Debug)]
+pub enum SkipReason {
+    /// The file is larger than the hard read cap.
+    TooLarge(u64),
+    /// The file could not be read (missing, permissions, non-UTF-8).
+    Unreadable(std::io::Error),
+}
+
+impl std::fmt::Display for SkipReason {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SkipReason::TooLarge(bytes) => {
+                write!(f, "{bytes} bytes exceeds the hard read cap")
+            }
+            SkipReason::Unreadable(error) => write!(f, "unreadable: {error}"),
+        }
+    }
+}
+
+/// Read a file for analysis, or report why it was left out.
+///
+/// Returning an empty result with no record makes a file that could not be read
+/// indistinguishable from a file that holds nothing worth analysing.
+pub fn read_source_for_analysis(path: &Path) -> Result<String, SkipReason> {
+    if let Ok(meta) = fs::metadata(path) {
+        if meta.len() > MAX_CHUNK_READ_BYTES as u64 {
+            return Err(SkipReason::TooLarge(meta.len()));
+        }
+    }
+    fs::read_to_string(path).map_err(SkipReason::Unreadable)
+}
+
 /// A line-exact slice of a file: `text` is exactly `lines[start_line..=end_line]`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChunkRange {
@@ -850,20 +886,15 @@ impl LlmAnalyzer {
     /// Oversized files are split into line-exact tree-sitter chunks and
     /// analyzed per chunk instead of being silently skipped.
     pub async fn analyze_file(&self, path: &Path) -> Result<Vec<VulnerabilityFinding>, String> {
-        let metadata = fs::metadata(path).ok();
-        if let Some(meta) = &metadata {
-            if meta.len() > MAX_CHUNK_READ_BYTES as u64 {
-                tracing::warn!(
-                    "Skipping {}: {} bytes exceeds the hard read cap",
-                    path.display(),
-                    meta.len()
-                );
+        let content = match read_source_for_analysis(path) {
+            Ok(content) => content,
+            Err(reason) => {
+                // A file we cannot read is a skip, not an empty file. Returning
+                // nothing in silence made a permissions problem or a non-UTF-8
+                // file indistinguishable from a file that holds nothing.
+                tracing::warn!("Skipping {}: {}", path.display(), reason);
                 return Ok(Vec::new());
             }
-        }
-        let content = match fs::read_to_string(path) {
-            Ok(c) => c,
-            Err(_) => return Ok(Vec::new()), // unreadable (binary/permissions)
         };
 
         if content.len() <= self.max_file_size {

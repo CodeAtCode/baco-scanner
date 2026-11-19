@@ -55,20 +55,27 @@ impl ToolRegistry {
     }
 }
 
-pub fn default_tools() -> ToolRegistry {
+/// Build the registry of agent tools.
+///
+/// `allow_run` decides whether the code-executing `test_run` tool is offered at
+/// all. With it false the tool is neither registered nor advertised, so the
+/// model cannot ask for generated code to be run on the host — the capability
+/// is absent rather than refused, because a refusal still spends a turn.
+pub fn default_tools(allow_run: bool) -> ToolRegistry {
     let mut reg = ToolRegistry::new();
     reg.register(Box::new(super::tools::FileReadTool));
     reg.register(Box::new(super::tools::PatternSearchTool));
     reg.register(Box::new(super::tools::FileWriteTool));
     reg.register(Box::new(super::tools::TestCompileTool));
-    reg.register(Box::new(super::tools::TestRunTool));
-    // Also add the tool definitions
-    reg.definitions = tool_definitions();
+    if allow_run {
+        reg.register(Box::new(super::tools::TestRunTool));
+    }
+    reg.definitions = tool_definitions(allow_run);
     reg
 }
 
-pub fn tool_definitions() -> Vec<serde_json::Value> {
-    vec![
+pub fn tool_definitions(allow_run: bool) -> Vec<serde_json::Value> {
+    let mut definitions = vec![
         json!({"type": "function", "function": {
             "name": "file_read", "description": "Read file content from the project",
             "parameters": {"type": "object", "properties": {
@@ -86,7 +93,7 @@ pub fn tool_definitions() -> Vec<serde_json::Value> {
             }, "required": ["pattern", "path"]}
         }}),
         json!({"type": "function", "function": {
-            "name": "file_write", "description": "Write file to sandbox temp directory only",
+            "name": "file_write", "description": "Write a file inside the project root",
             "parameters": {"type": "object", "properties": {
                 "path": {"type": "string", "description": "Filename (placed in sandbox tempdir)"},
                 "content": {"type": "string", "description": "File content"}
@@ -99,12 +106,15 @@ pub fn tool_definitions() -> Vec<serde_json::Value> {
                 "language": {"type": "string", "enum": ["rust", "python", "c", "cpp"]}
             }, "required": ["source_path", "language"]}
         }}),
-        json!({"type": "function", "function": {
+    ];
+    if allow_run {
+        definitions.push(json!({"type": "function", "function": {
             "name": "test_run", "description": "Run a compiled test or script",
             "parameters": {"type": "object", "properties": {
                 "executable_path": {"type": "string", "description": "Path to executable or script"},
                 "timeout_secs": {"type": "integer", "description": "Timeout (default from config)"}
             }, "required": ["executable_path"]}
-        }}),
-    ]
+        }}));
+    }
+    definitions
 }

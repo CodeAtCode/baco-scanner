@@ -339,6 +339,7 @@ pub fn create_minimal_config() -> ScannerConfig {
             enabled: false,
             max_turns: 10,
             tool_timeout_secs: 30,
+            run_compiled_code: true,
         },
         tickets: TicketConfig::default(),
         router: Default::default(),

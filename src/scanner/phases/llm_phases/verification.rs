@@ -130,8 +130,8 @@ pub fn refute_with_primitive_check(
     if status != VerificationStatus::Confirmed {
         return (status, notes.to_string());
     }
-    match anchored_body_containing_primitive(finding, primitives) {
-        Some(Ok((_body, found))) => {
+    match probe_primitive(finding, primitives) {
+        PrimitiveProbe::Found(found) => {
             let reason = format!(
                 "not confirmed: {} found in the body of the function this finding names",
                 found
@@ -143,7 +143,7 @@ pub fn refute_with_primitive_check(
             };
             (VerificationStatus::FalsePositive, merged)
         }
-        Some(Err(read_error)) => {
+        PrimitiveProbe::Unreadable(read_error) => {
             let reason = format!("{read_error}: {path}", path = finding.file_path);
             let merged = if notes.trim().is_empty() {
                 reason
@@ -152,7 +152,9 @@ pub fn refute_with_primitive_check(
             };
             (VerificationStatus::NeedsReview, merged)
         }
-        None => (status, notes.to_string()),
+        // Neither outcome refutes anything: a body with no primitive, and a
+        // check that could not run, both leave a confirmed finding alone.
+        PrimitiveProbe::Absent | PrimitiveProbe::NotChecked => (status, notes.to_string()),
     }
 }
 
@@ -199,8 +201,8 @@ pub fn upgrade_for_absent_primitive(
     if !is_sensitive_state_mutation(finding) {
         return (status, notes.to_string());
     }
-    match anchored_body_containing_primitive(finding, primitives) {
-        Some(Ok((_body, found))) => {
+    match probe_primitive(finding, primitives) {
+        PrimitiveProbe::Found(found) => {
             let reason = if was_confirmed {
                 format!(
                     "downgraded from confirmed: {found} found in the body of the function this finding names — primitive may be a mitigation"
@@ -217,7 +219,7 @@ pub fn upgrade_for_absent_primitive(
             };
             (VerificationStatus::NeedsReview, merged)
         }
-        Some(Err(read_error)) => {
+        PrimitiveProbe::Unreadable(read_error) => {
             let reason = format!(
                 "not confirmed by absence: cannot read file to check for primitive ({read_error}: {path})",
                 path = finding.file_path
@@ -229,7 +231,7 @@ pub fn upgrade_for_absent_primitive(
             };
             (status, merged)
         }
-        None => {
+        PrimitiveProbe::Absent => {
             let reason = if was_confirmed {
                 "corroborated by absence: no security primitive found in the body of the function this finding names"
             } else {
@@ -241,6 +243,21 @@ pub fn upgrade_for_absent_primitive(
                 format!("{notes} ({reason})")
             };
             (VerificationStatus::Confirmed, merged)
+        }
+        // The check did not run, so nothing was learned about absence and the
+        // status must not move on the strength of it.
+        PrimitiveProbe::NotChecked => {
+            let reason = if was_confirmed {
+                "not checked: no security primitive is configured for this file's language, or the function this finding names has no body in this file"
+            } else {
+                "not checked: no security primitive is configured for this file's language, or the function this finding names has no body in this file — absence was not established"
+            };
+            let merged = if notes.trim().is_empty() {
+                reason.to_string()
+            } else {
+                format!("{notes} ({reason})")
+            };
+            (status, merged)
         }
     }
 }
@@ -274,37 +291,60 @@ fn is_sensitive_state_mutation(finding: &VulnerabilityFinding) -> bool {
     sensitive_keywords.iter().any(|kw| text.contains(*kw))
 }
 
-/// The body of the function the title names, if it contains a primitive.
+/// Outcome of looking for a security primitive in the body of the function a
+/// finding names.
 ///
-/// Returns:
-/// - `Some(Ok((body, primitive)))` if the file was read and a primitive was found
-/// - `Some(Err(String))` if the file could not be read (missing, permissions, etc.)
-/// - `None` if the file was read but no primitive was found, or if language/name could not be determined
-fn anchored_body_containing_primitive(
+/// `Absent` and `NotChecked` are deliberately distinct. Only a body that was
+/// read and searched can support "no primitive found"; when the language has no
+/// primitives configured, the title names no function, or that function has no
+/// body here, nothing was searched and nothing was learned.
+enum PrimitiveProbe {
+    /// The body was read and contains one of the configured primitives.
+    Found(String),
+    /// The body was read and contains none of them.
+    Absent,
+    /// The check could not run, so absence was not established.
+    NotChecked,
+    /// The file could not be read (missing, permissions, non-UTF-8).
+    Unreadable(String),
+}
+
+/// Look for a configured security primitive in the body of the named function.
+fn probe_primitive(
     finding: &VulnerabilityFinding,
     primitives: &std::collections::HashMap<String, Vec<String>>,
-) -> Option<Result<(String, String), String>> {
+) -> PrimitiveProbe {
     let language = extract_language_from_path(&finding.file_path);
-    let for_language = primitives.get(&language)?;
+    let Some(for_language) = primitives.get(&language) else {
+        return PrimitiveProbe::NotChecked;
+    };
     if for_language.is_empty() {
-        return None;
+        return PrimitiveProbe::NotChecked;
     }
-    let name = crate::llm_analysis::function_names_in_title(&finding.title)
+    let Some(name) = crate::llm_analysis::function_names_in_title(&finding.title)
         .into_iter()
-        .next()?;
+        .next()
+    else {
+        return PrimitiveProbe::NotChecked;
+    };
     let content = match std::fs::read_to_string(&finding.file_path) {
         Ok(c) => c,
-        Err(e) => return Some(Err(format!("cannot read file: {}", e))),
+        Err(e) => return PrimitiveProbe::Unreadable(format!("cannot read file: {}", e)),
     };
     let ranges = crate::llm_analysis::function_line_ranges(&content, &language);
-    let (start, end) = *ranges.get(&name)?;
-
-    let body = body_of(&content, start, end)?;
-    let found = for_language
+    let Some((start, end)) = ranges.get(&name).copied() else {
+        return PrimitiveProbe::NotChecked;
+    };
+    let Some(body) = body_of(&content, start, end) else {
+        return PrimitiveProbe::NotChecked;
+    };
+    match for_language
         .iter()
-        .find(|p| !p.is_empty() && body.contains(p.as_str()))?
-        .clone();
-    Some(Ok((body, found)))
+        .find(|p| !p.is_empty() && body.contains(p.as_str()))
+    {
+        Some(found) => PrimitiveProbe::Found(found.clone()),
+        None => PrimitiveProbe::Absent,
+    }
 }
 
 /// The function body, by its 1-indexed line range.

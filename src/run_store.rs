@@ -160,11 +160,15 @@ pub fn load_prior_runs(output_dir: &Path, max_runs: usize) -> Vec<VulnerabilityF
                     all_findings.extend(findings);
                 }
                 Err(e) => {
-                    tracing::debug!("Failed to parse findings.json in {:?}: {}", run_dir, e);
+                    tracing::warn!(
+                        "Failed to parse findings.json in {:?}: {} - prior run data will be lost",
+                        run_dir,
+                        e
+                    );
                 }
             },
             Err(e) => {
-                tracing::debug!("Failed to read {:?}: {}", findings_path, e);
+                tracing::warn!("Failed to read {:?}: {}", findings_path, e);
             }
         }
     }
@@ -197,15 +201,23 @@ pub fn build_prior_knowledge(prior: &[VulnerabilityFinding]) -> PriorKnowledge {
 
 /// Save the current run's findings to the output directory.
 ///
-/// Writes to `{output_dir}/runs/run-{unix_timestamp_secs}/findings.json`.
+/// Writes to `{output_dir}/runs/run-{unix_timestamp_secs}_{nanos}/findings.json`.
 /// Creates parent directories as needed. Logs on failure but does not panic.
 pub fn save_run(output_dir: &Path, findings: &[VulnerabilityFinding]) {
-    let timestamp = std::time::SystemTime::now()
+    let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
+        .unwrap_or_else(|_| std::time::Duration::from_secs(0));
 
-    let run_dir = output_dir.join("runs").join(format!("run-{}", timestamp));
+    // Use sub-second resolution to prevent same-second overwrites
+    let secs = now.as_secs();
+    let nanos = now.subsec_nanos();
+    let run_id = if nanos > 0 {
+        format!("run-{}_{}", secs, nanos)
+    } else {
+        format!("run-{}", secs)
+    };
+
+    let run_dir = output_dir.join("runs").join(run_id);
     let findings_path = run_dir.join("findings.json");
 
     // Create parent directories

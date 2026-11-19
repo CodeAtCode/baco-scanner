@@ -1,24 +1,51 @@
 //! Unit tests for evidence gate filtering in reports.
 
-use baco::evidence::{EvidenceDetail, VerificationTier, classify_finding};
+use baco::evidence::{classify_finding, Evidence, EvidenceSource, VerificationTier};
 use baco::findings::{Severity, VulnerabilityFinding};
 use baco::report::apply_evidence_gate;
 
-/// Create a finding with the given evidence tier.
+/// Create a finding whose evidence classifies to the given tier.
+///
+/// The tier comes from `classify_finding`, not from a field, so the evidence
+/// shape is what decides it: `Verified` needs two source kinds and a verifier,
+/// `Supported` needs two items, `Unverified` is a single item below the
+/// confidence threshold.
 fn make_finding(id: &str, severity: Severity, tier: VerificationTier) -> VulnerabilityFinding {
+    let now = chrono::Utc::now();
     let evidence = match tier {
-        VerificationTier::Verified => vec![EvidenceDetail::CodeMatch {
-            file: "test.rs".to_string(),
-            line: 42,
-            snippet: "unsafe code here".to_string(),
-        }],
-        VerificationTier::Supported => vec![EvidenceDetail::StaticAnalysis {
-            tool: "semgrep".to_string(),
-            rule_id: "test-rule".to_string(),
-        }],
-        VerificationTier::Unverified => vec![EvidenceDetail::Heuristic {
-            heuristic_name: "suspicious pattern".to_string(),
-            confidence: 0.5,
+        VerificationTier::Verified => vec![
+            Evidence {
+                source: EvidenceSource::Semgrep("test-rule".to_string()),
+                weight: 1.0,
+                detail: "static match".to_string(),
+                timestamp: now,
+            },
+            Evidence {
+                source: EvidenceSource::IndependentVerifier("verifier".to_string()),
+                weight: 1.5,
+                detail: "independent check".to_string(),
+                timestamp: now,
+            },
+        ],
+        VerificationTier::Supported => vec![
+            Evidence {
+                source: EvidenceSource::Semgrep("test-rule".to_string()),
+                weight: 1.0,
+                detail: "static match".to_string(),
+                timestamp: now,
+            },
+            Evidence {
+                source: EvidenceSource::LlmAnalysis("model".to_string()),
+                weight: 1.0,
+                detail: "model read the code".to_string(),
+                timestamp: now,
+            },
+        ],
+        VerificationTier::Unverified => vec![Evidence {
+            source: EvidenceSource::LlmAnalysis("model".to_string()),
+            weight: 1.0,
+            detail: "model read the code".to_string(),
+            timestamp: now,
         }],
     };
 
@@ -36,17 +63,12 @@ fn make_finding(id: &str, severity: Severity, tier: VerificationTier) -> Vulnera
         file_path: "src/test.rs".to_string(),
         line_number: Some(42),
         code_snippet: Some("test code".to_string()),
-        diff_hunk: None,
-        recommendation: "Fix this".to_string(),
+        recommendation: Some("Fix this".to_string()),
         cwe_id: None,
-        code_location: "src/test.rs:42".to_string(),
+        code_location: Some("src/test.rs:42".to_string()),
         sources: vec!["test".to_string()],
-        priority_score: 0.5,
-        verification_status: None,
-        agent_mode: false,
-        llm_model: None,
-        rejected: false,
-        rejection_reason: None,
+        priority_score: Some(0.5),
+        ..Default::default()
     }
 }
 

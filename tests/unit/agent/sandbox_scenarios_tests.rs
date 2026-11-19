@@ -317,7 +317,7 @@ fn test_tool_registry_overwrite_existing_tool() {
 
 #[test]
 fn test_default_tools_registry_has_all_tools() {
-    let registry = default_tools();
+    let registry = default_tools(true);
 
     assert!(registry.get("file_read").is_some());
     assert!(registry.get("pattern_search").is_some());
@@ -328,14 +328,14 @@ fn test_default_tools_registry_has_all_tools() {
 
 #[test]
 fn test_tool_definitions_returns_five_tools() {
-    let definitions = tool_definitions();
+    let definitions = tool_definitions(true);
 
     assert_eq!(definitions.len(), 5);
 }
 
 #[test]
 fn test_tool_definitions_structure() {
-    let definitions = tool_definitions();
+    let definitions = tool_definitions(true);
 
     for def in &definitions {
         assert_eq!(def["type"], "function");

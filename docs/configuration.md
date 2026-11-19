@@ -307,7 +307,14 @@ When enabled, the LLM Discovery phase reads source files directly before analyzi
 enabled = false
 max_turns = 10           # Max conversation turns with tools
 tool_timeout_secs = 60   # Timeout for tool execution
+run_compiled_code = false  # Allow the agent to run code it compiled (see below)
 ```
+
+`run_compiled_code` gates the `test_run` tool. While it is false (the default) the
+agent can still *compile* a test case, but the tool that would execute it is
+neither registered nor offered to the model, so generated code never runs on the
+host. Set it to true only where executing model-authored code on the scanning
+machine is an accepted risk.
 
 **Benefits:**
 - LLM reads actual source code before enriching findings

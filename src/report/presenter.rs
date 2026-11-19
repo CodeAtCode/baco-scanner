@@ -104,7 +104,7 @@ pub fn build_cwe_link_html(cwe_id: &Option<String>) -> String {
     if let Some(cwe) = cwe_id {
         format!(
             r#"<strong>CWE:</strong> <a href="https://cwe.mitre.org/data/definitions/{}.html" target="_blank">{}</a>"#,
-            html_escape::encode_text(cwe),
+            html_escape::encode_double_quoted_attribute(cwe),
             html_escape::encode_text(cwe)
         )
     } else {
@@ -153,7 +153,7 @@ pub fn build_metadata_rows(finding: &VulnerabilityFinding) -> MetadataRows {
     if let Some(cwe) = &finding.cwe_id {
         rows.push(format!(
             r#"<strong>CWE:</strong> <a href="https://cwe.mitre.org/data/definitions/{}.html" target="_blank">{}</a>"#,
-            html_escape::encode_text(cwe),
+            html_escape::encode_double_quoted_attribute(cwe),
             html_escape::encode_text(cwe)
         ));
     }

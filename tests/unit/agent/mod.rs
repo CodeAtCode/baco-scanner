@@ -4,6 +4,7 @@ mod agent_mod_tests;
 mod executor_scenarios_tests;
 mod executor_tests;
 mod mock_llm_tests;
+mod run_flag_tests;
 mod sandbox_containment_tests;
 mod sandbox_path_tests;
 mod sandbox_scenarios_tests;

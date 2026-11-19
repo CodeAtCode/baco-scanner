@@ -55,7 +55,7 @@ impl AgentSession {
     ) -> Self {
         Self {
             client: Box::new(client),
-            tool_registry: default_tools(),
+            tool_registry: default_tools(config.run_compiled_code),
             sandbox: ToolSandbox::new(project_root.to_path_buf(), config.tool_timeout_secs),
             max_turns: config.max_turns,
             progress_cb,

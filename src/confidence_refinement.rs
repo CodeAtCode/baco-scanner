@@ -12,6 +12,38 @@ use crate::analysis_context::AnalysisContext;
 use crate::findings::{VerificationStatus, VulnerabilityFinding};
 use std::collections::HashMap;
 
+/// Whether a path names test or mock code.
+///
+/// Matched per path component rather than as a substring: `contains("test")`
+/// also matches `latest_version.rs` and `contest.rs`, so real source was
+/// penalised as if it were a test fixture.
+fn is_test_or_mock_path(path: &str) -> bool {
+    const NAMES: [&str; 8] = [
+        "test",
+        "tests",
+        "testing",
+        "spec",
+        "specs",
+        "mock",
+        "mocks",
+        "__tests__",
+    ];
+    path.split(['/', '\\']).any(|component| {
+        let component = component.to_lowercase();
+        if NAMES.contains(&component.as_str()) {
+            return true;
+        }
+        let stem = component
+            .rsplit_once('.')
+            .map_or(component.as_str(), |(s, _)| s);
+        NAMES.contains(&stem)
+            || stem.starts_with("test_")
+            || stem.ends_with("_test")
+            || stem.starts_with("mock_")
+            || stem.ends_with("_mock")
+    })
+}
+
 /// Result of confidence refinement for a single finding.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct RefinedConfidence {
@@ -218,16 +250,13 @@ impl ConfidenceRefinementPhase {
         }
 
         // Factor 7: Check if in test/third-party code
-        let file_path_lower = finding.file_path.to_lowercase();
-        if file_path_lower.contains("test")
-            || file_path_lower.contains("mock")
-            || file_path_lower.contains("_test.")
-        {
+        if is_test_or_mock_path(&finding.file_path) {
             refined_score = (refined_score - 0.1).max(0.0);
             factors.push(ConfidenceFactor::TestCodeRelated);
             explanations.push("Finding is in test code - reduced confidence".to_string());
         }
 
+        let file_path_lower = finding.file_path.to_lowercase();
         if file_path_lower.contains("vendor")
             || file_path_lower.contains("node_modules")
             || file_path_lower.contains("third_party")

@@ -15,6 +15,7 @@ mod metrics_legacy_tests;
 mod metrics_tests;
 pub mod mod_config_tests;
 pub mod model_selector_tests;
+mod parse_tool_calls_string_args_tests;
 mod phase_gating_tests;
 mod request_count_tests;
 mod snippet_restatement_tests;

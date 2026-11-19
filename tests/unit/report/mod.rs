@@ -3,12 +3,13 @@
 mod ai_aggregation_enrichment_tests;
 mod ai_aggregation_silent_failure_tests;
 mod ai_aggregation_tests;
-// mod evidence_gate_tests;  // Disabled - pre-existing compilation errors
+mod evidence_gate_tests;
 mod finding_renderer_legacy_tests;
 mod html_dir_creation_tests;
 mod html_report_assets_tests;
-// mod markdown_tests;  // Disabled - pre-existing compilation errors (generate_markdown_report signature mismatch)
+mod markdown_tests;
 mod presenter_tests;
+mod render_injection_tests;
 mod report_html_finding_renderer_tests;
 mod report_html_renderer_tests;
 mod report_html_tests;

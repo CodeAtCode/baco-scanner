@@ -13,12 +13,12 @@ Search strategies:
 4. Search by affected function names
 
 Ticket systems to search:
-- %%TICKET_SYSTEMS%% (GitHub, GitLab, Jira, etc.)
+- %%TICKET_SYSTEMS%% (GitHub, GitLab)
 
 Return JSON array with matches:
 [
   {
-    "system": "github|gitlab|jira|custom",
+    "system": "github|gitlab",
     "ticket_id": "TICKET-123",
     "title": "related ticket title",
     "url": "https://example.com/issue/123",

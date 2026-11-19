@@ -25,6 +25,7 @@ fn create_session(
         enabled: false,
         max_turns,
         tool_timeout_secs,
+        run_compiled_code: true,
     };
     let tmpdir = tempfile::tempdir().unwrap();
     let progress_cb: ProgressCallback = Arc::new(|_| {});

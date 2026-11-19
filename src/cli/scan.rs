@@ -241,10 +241,18 @@ pub async fn run_resume(
     }
     let new_findings_count = findings.len().saturating_sub(prev_findings_count);
 
-    // Update checkpoint with new findings
-    let mut final_checkpoint = checkpoint;
-    final_checkpoint.findings_so_far = findings.clone();
+    // The scanner persists its own progress during run(), so the checkpoint on
+    // disk is ahead of the one loaded before the run. Reload it, or the phase
+    // state this run advanced is lost and the next resume redoes the tail.
     let checkpoint_path_str = checkpoint_path_to_str(checkpoint_path)?;
+    let mut final_checkpoint = match crate::checkpoint::Checkpoint::load(checkpoint_path_str) {
+        Ok(cp) => cp,
+        Err(e) => {
+            tracing::warn!("Failed to reload checkpoint after run: {e}. Using stale checkpoint.");
+            checkpoint
+        }
+    };
+    final_checkpoint.findings_so_far = findings.clone();
     final_checkpoint.save(checkpoint_path_str)?;
 
     if !quiet {

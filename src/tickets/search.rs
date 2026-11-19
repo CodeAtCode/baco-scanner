@@ -62,6 +62,18 @@ impl TicketSearcher {
         Ok(matches)
     }
 
+    /// Apply GitHub authentication headers to a request builder
+    pub fn apply_github_auth(
+        request: reqwest::RequestBuilder,
+        credentials: Option<&str>,
+    ) -> reqwest::RequestBuilder {
+        if let Some(token) = credentials {
+            request.header("Authorization", format!("Bearer {}", token))
+        } else {
+            request
+        }
+    }
+
     async fn search_github(
         &self,
         system: &TicketSystem,
@@ -146,7 +158,9 @@ impl TicketSearcher {
             urlencoding::encode(&query)
         );
 
-        match self.http_client.get(&url).send().await {
+        let request =
+            Self::apply_github_auth(self.http_client.get(&url), system.credentials.as_deref());
+        match request.send().await {
             Ok(response) => {
                 if !response.status().is_success() {
                     // 404 is expected when no results match the query

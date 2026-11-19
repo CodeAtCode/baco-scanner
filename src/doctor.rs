@@ -104,6 +104,7 @@ pub fn run_doctor_checks(config_path: Option<&Path>, output_dir: Option<&Path>) 
     // Check 7: Output directory writable
     let output_path = output_dir
         .map(PathBuf::from)
+        .or_else(|| configured_output_dir(config_path))
         .or_else(|| Some(PathBuf::from("baco-output")));
     results.add(check_output_dir_writable(output_path.as_deref()));
 
@@ -114,6 +115,22 @@ pub fn run_doctor_checks(config_path: Option<&Path>, output_dir: Option<&Path>) 
     results.add(check_llm_reachability(config_path));
 
     results
+}
+
+/// Resolve the output directory named by the config file.
+///
+/// `--output-dir` wins when it is given. Without it, the config's
+/// `[output].dir` is used, so a run does not probe and create a CWD-relative
+/// `baco-output` while the config names a different directory. An absent or
+/// empty setting returns `None` so the caller keeps its own default.
+fn configured_output_dir(config_path: Option<&Path>) -> Option<PathBuf> {
+    let path = config_path?;
+    let config = crate::config::ScannerConfig::from_file(path.to_str()?).ok()?;
+    let dir = config.output.dir.trim();
+    if dir.is_empty() {
+        return None;
+    }
+    Some(PathBuf::from(dir))
 }
 
 /// Check LLM endpoint reachability with a best-effort HTTP GET per unique

@@ -15,3 +15,4 @@ mod mutation_boundary_tests;
 mod mutation_verification_tests;
 mod pattern_edge_cases_tests;
 mod regex_defects_tests;
+mod test_path_boundary_tests;

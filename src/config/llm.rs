@@ -89,6 +89,13 @@ pub struct AgentConfig {
     pub max_turns: u32,
     #[serde(default = "crate::config::default_tool_timeout")]
     pub tool_timeout_secs: u64,
+    /// Whether the agent may execute code it compiled.
+    ///
+    /// Off by default: enabling the agent grants it a compiler, not a runner.
+    /// With this false the `test_run` tool is neither registered nor offered to
+    /// the model, so generated code is compiled but never executed on the host.
+    #[serde(default)]
+    pub run_compiled_code: bool,
 }
 
 impl Default for AgentConfig {
@@ -97,6 +104,7 @@ impl Default for AgentConfig {
             enabled: false,
             max_turns: crate::config::default_max_turns(),
             tool_timeout_secs: crate::config::default_tool_timeout(),
+            run_compiled_code: false,
         }
     }
 }

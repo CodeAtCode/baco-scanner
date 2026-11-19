@@ -1,5 +1,5 @@
 use crate::findings::VulnerabilityFinding;
-use html_escape::encode_text;
+use html_escape::{encode_double_quoted_attribute, encode_text};
 
 pub(super) use super::utilities::markdown_to_html;
 
@@ -51,10 +51,14 @@ pub fn render_finding_with_id(finding: &VulnerabilityFinding, finding_id: &str) 
         finding.confidence_score * 100.0
     );
 
+    // The id is derived from the scanned file's path, so it is untrusted: it is
+    // an attribute value, not text, and must be encoded for that context. The
+    // click handler is a constant string that interpolates nothing, so no data
+    // reaches a script context.
     let mut html = format!(
         r#"<div class="finding {6}" id="{0}">
     <div class="finding-header">
-        <h3 class="collapsible" style="cursor: pointer;" onclick="document.getElementById('{0}-details').style.display = document.getElementById('{0}-details').style.display === 'none' ? 'block' : 'none'">{1} {2} {3} {4} {5}</h3>
+        <h3 class="collapsible" style="cursor: pointer;" onclick="var d = this.closest('.finding').querySelector('.finding-details'); d.style.display = d.style.display === 'none' ? 'block' : 'none';">{1} {2} {3} {4} {5}</h3>
         <span class="severity {6}">{7}</span>
         </div>
     <div class="finding-details" id="{0}-details">
@@ -67,7 +71,7 @@ pub fn render_finding_with_id(finding: &VulnerabilityFinding, finding_id: &str) 
         </div>
         <p>{13}</p>
 "#,
-        finding_div_id.clone(),
+        encode_double_quoted_attribute(&finding_div_id),
         encode_text(&finding.title),
         triage_badge,
         location_span,

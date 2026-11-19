@@ -357,10 +357,16 @@ async fn test_llm_reachability_mock_server_ok() {
 
     let temp_dir = TempDir::new().unwrap();
     let config_path = temp_dir.path().join("baco.toml");
-    let config_content = format!("[llm]\nbase_url = \"{}\"\n", server.url());
+    let output_dir = temp_dir.path().join("out");
+    let config_content = format!(
+        "[llm]\nbase_url = \"{}\"\n[output]\ndir = \"{}\"\n",
+        server.url(),
+        output_dir.display()
+    );
     std::fs::write(&config_path, config_content).unwrap();
 
-    let results = baco::doctor::run_doctor_checks(Some(config_path.as_path()), None);
+    let results =
+        baco::doctor::run_doctor_checks(Some(config_path.as_path()), Some(output_dir.as_path()));
     let check = results
         .checks
         .iter()
@@ -373,10 +379,15 @@ async fn test_llm_reachability_mock_server_ok() {
 async fn test_llm_reachability_refused_warns() {
     let temp_dir = TempDir::new().unwrap();
     let config_path = temp_dir.path().join("baco.toml");
-    let config_content = "[llm]\nbase_url = \"http://127.0.0.1:1\"\n";
+    let output_dir = temp_dir.path().join("out");
+    let config_content = format!(
+        "[llm]\nbase_url = \"http://127.0.0.1:1\"\n[output]\ndir = \"{}\"\n",
+        output_dir.display()
+    );
     std::fs::write(&config_path, config_content).unwrap();
 
-    let results = baco::doctor::run_doctor_checks(Some(config_path.as_path()), None);
+    let results =
+        baco::doctor::run_doctor_checks(Some(config_path.as_path()), Some(output_dir.as_path()));
     let check = results
         .checks
         .iter()
@@ -387,7 +398,9 @@ async fn test_llm_reachability_refused_warns() {
 #[test]
 fn preset_resolve_unreadable_path_warns() {
     let temp_dir = TempDir::new().unwrap();
-    let results = baco::doctor::run_doctor_checks(Some(temp_dir.path()), None);
+    let output_dir = temp_dir.path().join("out");
+    let results =
+        baco::doctor::run_doctor_checks(Some(temp_dir.path()), Some(output_dir.as_path()));
     let check = results
         .checks
         .iter()
@@ -405,7 +418,9 @@ fn preset_resolve_unknown_preset_fails() {
         "[scanner]\nprofile = \"core\"\npreset = \"nonexistent-preset-xyz-123\"\n",
     )
     .unwrap();
-    let results = baco::doctor::run_doctor_checks(Some(config_path.as_path()), None);
+    let output_dir = temp_dir.path().join("out");
+    let results =
+        baco::doctor::run_doctor_checks(Some(config_path.as_path()), Some(output_dir.as_path()));
     let check = results
         .checks
         .iter()
@@ -416,7 +431,9 @@ fn preset_resolve_unknown_preset_fails() {
 }
 #[test]
 fn doctor_checks_without_config_path_skip_ok() {
-    let results = baco::doctor::run_doctor_checks(None, None);
+    let temp_dir = TempDir::new().unwrap();
+    let output_dir = temp_dir.path().join("out");
+    let results = baco::doctor::run_doctor_checks(None, Some(output_dir.as_path()));
     assert!(!results.checks.is_empty());
     for check in &results.checks {
         if check.name == "preset_resolve"
@@ -516,11 +533,17 @@ fn test_check_output_dir_writable_path_is_file() {
 #[test]
 fn test_check_output_dir_writable_none_uses_default() {
     // Call with None - should use "baco-output" in CWD
+    let pre_existing = std::path::Path::new("baco-output").exists();
+
     let result = check_output_dir_writable(None);
     assert_eq!(result.status, CheckStatus::Ok);
 
-    // Clean up the created directory
-    let _ = std::fs::remove_dir_all("baco-output");
+    // Remove only the directory this test created. Removing "baco-output"
+    // unconditionally deletes the real scan output of anyone who runs the suite
+    // from the project root, because that is the default output directory.
+    if !pre_existing {
+        let _ = std::fs::remove_dir_all("baco-output");
+    }
 }
 
 // ============================================================================
@@ -598,7 +621,9 @@ path = "."
 
     std::fs::write(&config_path, config_content).unwrap();
 
-    let results = baco::doctor::run_doctor_checks(Some(config_path.as_path()), None);
+    let output_dir = temp_dir.path().join("out");
+    let results =
+        baco::doctor::run_doctor_checks(Some(config_path.as_path()), Some(output_dir.as_path()));
 
     let preset_check = results
         .checks
@@ -656,7 +681,9 @@ api_key = "x"
 
     std::fs::write(&config_path, config_content).unwrap();
 
-    let results = baco::doctor::run_doctor_checks(Some(config_path.as_path()), None);
+    let output_dir = temp_dir.path().join("out");
+    let results =
+        baco::doctor::run_doctor_checks(Some(config_path.as_path()), Some(output_dir.as_path()));
 
     let llm_check = results
         .checks
@@ -714,7 +741,9 @@ base_url = "http://x"
 
     std::fs::write(&config_path, config_content).unwrap();
 
-    let results = baco::doctor::run_doctor_checks(Some(config_path.as_path()), None);
+    let output_dir = temp_dir.path().join("out");
+    let results =
+        baco::doctor::run_doctor_checks(Some(config_path.as_path()), Some(output_dir.as_path()));
 
     let llm_check = results
         .checks
@@ -728,8 +757,11 @@ base_url = "http://x"
 
 #[test]
 fn doctor_checks_missing_config_file_skip_ok() {
+    let temp_dir = TempDir::new().unwrap();
+    let output_dir = temp_dir.path().join("out");
     let missing = std::path::PathBuf::from("/nonexistent-baco-probe-xyz.toml");
-    let results = baco::doctor::run_doctor_checks(Some(missing.as_path()), None);
+    let results =
+        baco::doctor::run_doctor_checks(Some(missing.as_path()), Some(output_dir.as_path()));
     let names: Vec<&str> = results.checks.iter().map(|c| c.name.as_str()).collect();
     assert!(names.contains(&"config_parse"));
     assert!(names.contains(&"preset_resolve"));
@@ -792,7 +824,9 @@ model = "test-model"
 
     std::fs::write(&config_path, config_content).unwrap();
 
-    let results = baco::doctor::run_doctor_checks(Some(config_path.as_path()), None);
+    let output_dir = temp_dir.path().join("out");
+    let results =
+        baco::doctor::run_doctor_checks(Some(config_path.as_path()), Some(output_dir.as_path()));
 
     // config_parse should succeed (TOML parses fine)
     let config_parse_check = results
@@ -831,7 +865,9 @@ profile = "core"  # Missing closing bracket - invalid TOML
 
     std::fs::write(&config_path, config_content).unwrap();
 
-    let results = baco::doctor::run_doctor_checks(Some(config_path.as_path()), None);
+    let output_dir = temp_dir.path().join("out");
+    let results =
+        baco::doctor::run_doctor_checks(Some(config_path.as_path()), Some(output_dir.as_path()));
 
     // LLM reachability should FAIL with config parse error
     let llm_check = results
@@ -857,7 +893,9 @@ profile = "core"  # Missing closing bracket - invalid TOML
 
     std::fs::write(&config_path, config_content).unwrap();
 
-    let results = baco::doctor::run_doctor_checks(Some(config_path.as_path()), None);
+    let output_dir = temp_dir.path().join("out");
+    let results =
+        baco::doctor::run_doctor_checks(Some(config_path.as_path()), Some(output_dir.as_path()));
 
     // LLM phases should FAIL with config parse error
     let llm_check = results

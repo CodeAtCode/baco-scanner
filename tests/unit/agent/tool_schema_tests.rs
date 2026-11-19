@@ -34,7 +34,7 @@ fn test_tool_registry_registration() {
 
 #[test]
 fn test_tool_registry_get_definitions() {
-    let definitions = tool_definitions();
+    let definitions = tool_definitions(true);
     assert_eq!(definitions.len(), 5);
 
     for def in &definitions {
@@ -47,7 +47,7 @@ fn test_tool_registry_get_definitions() {
 
 #[test]
 fn test_tool_definitions_contains_all_tools() {
-    let definitions = tool_definitions();
+    let definitions = tool_definitions(true);
     let names: Vec<&str> = definitions
         .iter()
         .flat_map(|d| d["function"].as_object().unwrap().get("name"))
@@ -63,7 +63,7 @@ fn test_tool_definitions_contains_all_tools() {
 
 #[test]
 fn test_file_read_schema_has_required_path() {
-    let defs = tool_definitions();
+    let defs = tool_definitions(true);
     let file_read = defs
         .iter()
         .find(|d| d["function"]["name"].as_str() == Some("file_read"))
@@ -99,7 +99,7 @@ fn test_tool_registry_overwrite_existing_tool() {
 
 #[test]
 fn test_default_tools_registry() {
-    let registry = default_tools();
+    let registry = default_tools(true);
     let defs = registry.get_definitions();
 
     assert_eq!(defs.len(), 5);
@@ -114,7 +114,7 @@ fn test_default_tools_registry() {
 
 #[test]
 fn test_tool_definitions_schema_structure() {
-    let definitions = tool_definitions();
+    let definitions = tool_definitions(true);
 
     for def in &definitions {
         // Check top-level structure
@@ -137,7 +137,7 @@ fn test_tool_definitions_schema_structure() {
 
 #[test]
 fn test_tool_definitions_required_fields() {
-    let definitions = tool_definitions();
+    let definitions = tool_definitions(true);
 
     // Check that each tool has required fields defined
     let file_read = definitions
@@ -217,7 +217,7 @@ fn test_tool_registry_empty() {
 
 #[test]
 fn test_tool_definitions_schema_has_type_function() {
-    let definitions = tool_definitions();
+    let definitions = tool_definitions(true);
 
     for def in &definitions {
         assert_eq!(def["type"], "function");
@@ -227,7 +227,7 @@ fn test_tool_definitions_schema_has_type_function() {
 
 #[test]
 fn test_tool_definitions_parameter_types() {
-    let definitions = tool_definitions();
+    let definitions = tool_definitions(true);
 
     for def in &definitions {
         let params = def["function"]["parameters"]["properties"]
@@ -252,7 +252,7 @@ fn test_tool_definitions_parameter_types() {
 
 #[test]
 fn test_default_tools_registry_get_definitions() {
-    let registry = default_tools();
+    let registry = default_tools(true);
     let defs = registry.get_definitions();
 
     assert_eq!(defs.len(), 5);

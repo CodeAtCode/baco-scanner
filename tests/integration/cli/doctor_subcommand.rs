@@ -8,16 +8,22 @@ fn project_root() -> std::path::PathBuf {
 }
 
 /// Create a minimal valid config file
+///
+/// The output directory is placed inside `temp_dir`. A relative path would be
+/// resolved against the process CWD, which is the project root, so the doctor
+/// run would create a real `baco-output` directory next to the sources.
 fn create_minimal_config(temp_dir: &TempDir) -> std::path::PathBuf {
     let config_path = temp_dir.path().join("config.toml");
-    let content = r#"
+    let output_dir = temp_dir.path().join("out");
+    let content = format!(
+        r#"
 [project]
 name = "test-project"
 path = "."
 languages = ["rust"]
 
 [output]
-dir = "baco-output"
+dir = "{}"
 
 [llm]
 timeout_secs = 60
@@ -30,7 +36,9 @@ model = "mistral-small"
 
 [scanner]
 max_file_size_kb = 1024
-"#;
+"#,
+        output_dir.display()
+    );
     std::fs::write(&config_path, content).unwrap();
     config_path
 }
@@ -38,19 +46,23 @@ max_file_size_kb = 1024
 /// Create a config with missing LLM keys
 fn create_config_missing_llm_keys(temp_dir: &TempDir) -> std::path::PathBuf {
     let config_path = temp_dir.path().join("config.toml");
-    let content = r#"
+    let output_dir = temp_dir.path().join("out");
+    let content = format!(
+        r#"
 [project]
 name = "test-project"
 path = "."
 languages = ["rust"]
 
 [output]
-dir = "baco-output"
+dir = "{}"
 
 [llm.phases.discovery]
 base_url = "https://api.mistral.ai/v1"
 # Missing api_key and model
-"#;
+"#,
+        output_dir.display()
+    );
     std::fs::write(&config_path, content).unwrap();
     config_path
 }
@@ -144,6 +156,7 @@ fn test_doctor_missing_key_lists_phase_by_name() {
 fn test_doctor_hard_failure_exits_nonzero() {
     let temp_dir = TempDir::new().unwrap();
     let config_path = create_invalid_toml_config(&temp_dir);
+    let output_dir = temp_dir.path().join("out");
 
     let output = Command::new("cargo")
         .args([
@@ -154,6 +167,10 @@ fn test_doctor_hard_failure_exits_nonzero() {
             "doctor",
             "--config",
             config_path.to_str().unwrap(),
+            // Doctor cannot read the invalid config, so it would otherwise fall
+            // back to the CWD-relative default output directory.
+            "--output-dir",
+            output_dir.to_str().unwrap(),
         ])
         .current_dir(project_root())
         .output()

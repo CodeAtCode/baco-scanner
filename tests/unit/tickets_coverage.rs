@@ -99,7 +99,7 @@ fn test_ticket_reference_with_all_states() {
 
 #[test]
 fn test_ticket_system_with_various_types() {
-    let types = vec!["github", "gitlab", "jira", "bugzilla", "custom"];
+    let types = vec!["github", "gitlab", "custom"];
     for system_type in types {
         let system = TicketSystem {
             name: format!("{} System", system_type),
