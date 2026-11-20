@@ -802,57 +802,57 @@ fn test_dedup_multiple_kev_entries() {
 
 #[test]
 fn test_map_kev_severity() {
-    use baco::cve_client::CveSeverity;
-    assert_eq!(CveSeverity::Critical, CveSeverity::Critical);
-    assert_eq!(CveSeverity::High, CveSeverity::High);
-    assert_eq!(CveSeverity::Medium, CveSeverity::Medium);
-    assert_eq!(CveSeverity::Low, CveSeverity::Low);
-    assert_eq!(CveSeverity::Medium, CveSeverity::Medium);
+    use baco::cve_client::{CveSeverity, map_kev_severity};
+    assert_eq!(map_kev_severity("CRITICAL"), CveSeverity::Critical);
+    assert_eq!(map_kev_severity("high"), CveSeverity::High);
+    assert_eq!(map_kev_severity("Medium"), CveSeverity::Medium);
+    assert_eq!(map_kev_severity("low"), CveSeverity::Low);
 }
 
 #[test]
 fn test_map_nvd_severity() {
-    use baco::cve_client::CveSeverity;
-    assert_eq!(CveSeverity::Critical, CveSeverity::Critical);
-    assert_eq!(CveSeverity::High, CveSeverity::High);
-    assert_eq!(CveSeverity::Medium, CveSeverity::Medium);
-    assert_eq!(CveSeverity::Low, CveSeverity::Low);
+    use baco::cve_client::{CveSeverity, map_nvd_severity};
+    assert_eq!(map_nvd_severity("CRITICAL"), CveSeverity::Critical);
+    assert_eq!(map_nvd_severity("high"), CveSeverity::High);
+    assert_eq!(map_nvd_severity("Medium"), CveSeverity::Medium);
+    assert_eq!(map_nvd_severity("low"), CveSeverity::Low);
 }
 
 #[test]
 fn test_map_cve_severity() {
-    assert_eq!(V3Severity::Critical, V3Severity::Critical);
-    assert_eq!(V3Severity::High, V3Severity::High);
-    assert_eq!(V3Severity::Medium, V3Severity::Medium);
-    assert_eq!(V3Severity::Low, V3Severity::Low);
+    use baco::cve_client::{CveSeverity, map_cve_severity};
+    assert_eq!(
+        map_cve_severity(CveSeverity::Critical),
+        V3Severity::Critical
+    );
+    assert_eq!(map_cve_severity(CveSeverity::High), V3Severity::High);
+    assert_eq!(map_cve_severity(CveSeverity::Medium), V3Severity::Medium);
+    assert_eq!(map_cve_severity(CveSeverity::Low), V3Severity::Low);
 }
 
 #[test]
 fn test_map_kev_severity_case_insensitive() {
-    use baco::cve_client::CveSeverity;
-    assert_eq!(CveSeverity::Critical, CveSeverity::Critical);
-    assert_eq!(CveSeverity::Critical, CveSeverity::Critical);
-    assert_eq!(CveSeverity::Critical, CveSeverity::Critical);
-    assert_eq!(CveSeverity::High, CveSeverity::High);
-    assert_eq!(CveSeverity::High, CveSeverity::High);
-    assert_eq!(CveSeverity::High, CveSeverity::High);
+    use baco::cve_client::{CveSeverity, map_kev_severity};
+    assert_eq!(map_kev_severity("Critical"), CveSeverity::Critical);
+    assert_eq!(map_kev_severity("cRiTiCaL"), CveSeverity::Critical);
+    assert_eq!(map_kev_severity("HIGH"), CveSeverity::High);
+    assert_eq!(map_kev_severity("hiGh"), CveSeverity::High);
 }
 
 #[test]
 fn test_map_kev_severity_unknown_defaults_to_medium() {
-    use baco::cve_client::CveSeverity;
-    assert_eq!(CveSeverity::Medium, CveSeverity::Medium);
-    assert_eq!(CveSeverity::Medium, CveSeverity::Medium);
-    assert_eq!(CveSeverity::Medium, CveSeverity::Medium);
-    assert_eq!(CveSeverity::Medium, CveSeverity::Medium);
+    use baco::cve_client::{CveSeverity, map_kev_severity};
+    assert_eq!(map_kev_severity(""), CveSeverity::Medium);
+    assert_eq!(map_kev_severity("not-a-severity"), CveSeverity::Medium);
+    assert_eq!(map_kev_severity("UNKNOWN"), CveSeverity::Medium);
 }
 
 #[test]
 fn test_map_nvd_severity_unknown_defaults_to_medium() {
-    use baco::cve_client::CveSeverity;
-    assert_eq!(CveSeverity::Medium, CveSeverity::Medium);
-    assert_eq!(CveSeverity::Medium, CveSeverity::Medium);
-    assert_eq!(CveSeverity::Medium, CveSeverity::Medium);
+    use baco::cve_client::{CveSeverity, map_nvd_severity};
+    assert_eq!(map_nvd_severity(""), CveSeverity::Medium);
+    assert_eq!(map_nvd_severity("not-a-severity"), CveSeverity::Medium);
+    assert_eq!(map_nvd_severity("UNKNOWN"), CveSeverity::Medium);
 }
 
 #[test]

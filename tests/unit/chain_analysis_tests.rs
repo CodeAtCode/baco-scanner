@@ -146,20 +146,6 @@ fn test_apply_chain_verdicts_marks_related_findings() {
 }
 
 #[test]
-fn test_chain_type_variants() {
-    assert_eq!(
-        ChainType::InjectionToExecution,
-        ChainType::InjectionToExecution
-    );
-    assert_eq!(
-        ChainType::AuthBypassToPrivilegeEscal,
-        ChainType::AuthBypassToPrivilegeEscal
-    );
-    assert_eq!(ChainType::FileAccessToRCE, ChainType::FileAccessToRCE);
-    assert_eq!(ChainType::DataExfilChain, ChainType::DataExfilChain);
-}
-
-#[test]
 fn test_chain_result_creation() {
     let result = ChainResult {
         primary_finding_id: "primary-1".to_string(),

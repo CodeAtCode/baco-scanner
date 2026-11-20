@@ -2,7 +2,7 @@ use crate::error::ScanResult;
 use crate::findings::VulnerabilityFinding;
 use crate::scanner::phases::PhaseConfig;
 
-/// Run CVE bootstrap phase (phase 20 of 23).
+/// Run CVE bootstrap phase.
 pub async fn run_cve_bootstrap(
     _scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,

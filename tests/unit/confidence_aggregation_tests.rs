@@ -878,3 +878,29 @@ fn test_never_submit_pattern_no_match_unchanged() {
             .any(|f| matches!(f, ConfidenceFactor::NeverSubmitMatch { .. }))
     );
 }
+
+/// Only a triage kill is a false positive for the baseline.
+///
+/// The baseline's false-positive rate feeds `ProjectRelative` confidence
+/// scaling, so counting every finding as a true positive pinned the rate at zero
+/// and inflated the confidence of everything.
+#[test]
+fn only_a_killed_finding_counts_as_a_false_positive() {
+    use baco::findings::TriageVerdict;
+    use baco::scanner::phases::other_phases::counts_as_true_positive;
+
+    assert!(!counts_as_true_positive(Some(&TriageVerdict::Kill)));
+    assert!(counts_as_true_positive(Some(&TriageVerdict::Pass)));
+    assert!(counts_as_true_positive(Some(&TriageVerdict::Downgrade {
+        adjusted_severity: baco::findings::Severity::Medium,
+    })));
+    assert!(counts_as_true_positive(Some(
+        &TriageVerdict::ChainRequired {
+            chain_partner_ids: vec!["f2".to_string()],
+        }
+    )));
+    assert!(
+        counts_as_true_positive(None),
+        "an un-triaged finding is not a known false positive"
+    );
+}

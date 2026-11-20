@@ -10,6 +10,7 @@ use baco::analysis_context::AnalysisContext;
 use baco::findings::{Severity, VerificationStatus, VulnerabilityFinding};
 use baco::llm::LlmConfig;
 use baco::report::ai_aggregation::conflict_resolver::ConflictResolver;
+use baco::report::ai_aggregation::enrichment::BatchEnrichmentItem;
 use baco::report::ai_aggregation::{
     AiAggregation, AiAggregationPhase, AiAggregationResult, AiAggregationStatistics,
     ConsensusRecommendation, ConsensusResult, FindingSource, UnifiedFindingReport,
@@ -1388,6 +1389,297 @@ fn test_extract_json_field_empty_string() {
 }
 
 // ============================================================================
+// ============================================================================
+// G-1: LLM Deduplication Tests with mockito
+// ============================================================================
+
+#[tokio::test]
+async fn test_deduplicate_with_llm_same_issue_true() {
+    use mockito;
+
+    // Start mock server
+    let mut server = mockito::Server::new_async().await;
+
+    // Mock the chat completion endpoint to return same_issue: true
+    let mock = server
+        .mock("POST", "/v1/chat/completions")
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(
+            r#"{
+                "choices": [{
+                    "message": {
+                        "content": "{\"same_issue\": true, \"reason\": \"Same vulnerability at nearby lines\"}"
+                    }
+                }]
+            }"#,
+        )
+        .create();
+
+    // Create config pointing to mock server
+    let config = LlmConfig {
+        base_url: server.url(),
+        api_key: "test-key".to_string(),
+        model: "test-model".to_string(),
+        models: vec!["test-model".to_string()],
+        timeout: 30,
+        max_retries: 3,
+        retry_backoff_ms: 1000,
+        temperature: 0.5,
+        max_reasoning_tokens: None,
+        enable_llm_cache: false,
+        cache_dir: None,
+        max_concurrent: 3,
+    };
+
+    let service = DeduplicationService::new(&config);
+
+    // Create two findings at the same location (within ±3 lines)
+    let findings = vec![
+        make_aggregation_finding(
+            "f1",
+            Severity::High,
+            0.8,
+            "src/main.rs",
+            Some(42),
+            Some("CWE-79"),
+            None,
+        ),
+        make_aggregation_finding(
+            "f2",
+            Severity::Low,
+            0.6,
+            "src/main.rs",
+            Some(43), // Within ±3 lines of f1
+            Some("CWE-79"),
+            None,
+        ),
+    ];
+
+    let result = service.deduplicate(&findings).await;
+
+    // Should collapse to 1 finding (duplicate removed)
+    assert_eq!(
+        result.len(),
+        1,
+        "Expected 1 finding after deduplication, got {}",
+        result.len()
+    );
+
+    // The higher severity finding (f1 - High) should be preserved
+    assert_eq!(result[0].id, "f1");
+    assert_eq!(result[0].severity, Severity::High);
+
+    mock.assert();
+}
+
+#[tokio::test]
+async fn test_deduplicate_with_llm_same_issue_yes_string() {
+    use mockito;
+
+    let mut server = mockito::Server::new_async().await;
+
+    // Mock with "yes" string instead of boolean true
+    let mock = server
+        .mock("POST", "/v1/chat/completions")
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(
+            r#"{
+                "choices": [{
+                    "message": {
+                        "content": "{\"same_issue\": \"yes\", \"reason\": \"Same issue\"}"
+                    }
+                }]
+            }"#,
+        )
+        .create();
+
+    let config = LlmConfig {
+        base_url: server.url(),
+        api_key: "test-key".to_string(),
+        model: "test-model".to_string(),
+        models: vec!["test-model".to_string()],
+        timeout: 30,
+        max_retries: 3,
+        retry_backoff_ms: 1000,
+        temperature: 0.5,
+        max_reasoning_tokens: None,
+        enable_llm_cache: false,
+        cache_dir: None,
+        max_concurrent: 3,
+    };
+
+    let service = DeduplicationService::new(&config);
+
+    let findings = vec![
+        make_aggregation_finding(
+            "f1",
+            Severity::High,
+            0.8,
+            "src/main.rs",
+            Some(42),
+            Some("CWE-79"),
+            None,
+        ),
+        make_aggregation_finding(
+            "f2",
+            Severity::Medium,
+            0.6,
+            "src/main.rs",
+            Some(44),
+            Some("CWE-79"),
+            None,
+        ),
+    ];
+
+    let result = service.deduplicate(&findings).await;
+
+    assert_eq!(result.len(), 1);
+    assert_eq!(result[0].id, "f1");
+
+    mock.assert();
+}
+
+#[tokio::test]
+async fn test_deduplicate_with_llm_same_issue_one_string() {
+    use mockito;
+
+    let mut server = mockito::Server::new_async().await;
+
+    // Mock with "1" string
+    let mock = server
+        .mock("POST", "/v1/chat/completions")
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(
+            r#"{
+                "choices": [{
+                    "message": {
+                        "content": "{\"same_issue\": \"1\", \"reason\": \"Duplicate\"}"
+                    }
+                }]
+            }"#,
+        )
+        .create();
+
+    let config = LlmConfig {
+        base_url: server.url(),
+        api_key: "test-key".to_string(),
+        model: "test-model".to_string(),
+        models: vec!["test-model".to_string()],
+        timeout: 30,
+        max_retries: 3,
+        retry_backoff_ms: 1000,
+        temperature: 0.5,
+        max_reasoning_tokens: None,
+        enable_llm_cache: false,
+        cache_dir: None,
+        max_concurrent: 3,
+    };
+
+    let service = DeduplicationService::new(&config);
+
+    let findings = vec![
+        make_aggregation_finding(
+            "f1",
+            Severity::Critical,
+            0.9,
+            "src/main.rs",
+            Some(100),
+            Some("CWE-89"),
+            None,
+        ),
+        make_aggregation_finding(
+            "f2",
+            Severity::High,
+            0.8,
+            "src/main.rs",
+            Some(101),
+            Some("CWE-89"),
+            None,
+        ),
+    ];
+
+    let result = service.deduplicate(&findings).await;
+
+    assert_eq!(result.len(), 1);
+    assert_eq!(result[0].id, "f1");
+
+    mock.assert();
+}
+
+#[tokio::test]
+async fn test_deduplicate_with_llm_keeps_higher_severity() {
+    use mockito;
+
+    let mut server = mockito::Server::new_async().await;
+
+    // Mock returning same_issue: true
+    let mock = server
+        .mock("POST", "/v1/chat/completions")
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(
+            r#"{
+                "choices": [{
+                    "message": {
+                        "content": "{\"same_issue\": true, \"reason\": \"Same vulnerability\"}"
+                    }
+                }]
+            }"#,
+        )
+        .create();
+
+    let config = LlmConfig {
+        base_url: server.url(),
+        api_key: "test-key".to_string(),
+        model: "test-model".to_string(),
+        models: vec!["test-model".to_string()],
+        timeout: 30,
+        max_retries: 3,
+        retry_backoff_ms: 1000,
+        temperature: 0.5,
+        max_reasoning_tokens: None,
+        enable_llm_cache: false,
+        cache_dir: None,
+        max_concurrent: 3,
+    };
+
+    let service = DeduplicationService::new(&config);
+
+    // f2 has higher severity (Critical) than f1 (Low)
+    let findings = vec![
+        make_aggregation_finding(
+            "f1",
+            Severity::Low,
+            0.9,
+            "src/main.rs",
+            Some(50),
+            Some("CWE-22"),
+            None,
+        ),
+        make_aggregation_finding(
+            "f2",
+            Severity::Critical,
+            0.5,
+            "src/main.rs",
+            Some(51),
+            Some("CWE-22"),
+            None,
+        ),
+    ];
+
+    let result = service.deduplicate(&findings).await;
+
+    // Should keep the higher severity finding (f2)
+    assert_eq!(result.len(), 1);
+    assert_eq!(result[0].id, "f2");
+    assert_eq!(result[0].severity, Severity::Critical);
+
+    mock.assert();
+}
+
 // DeduplicationService Tests
 // ============================================================================
 
@@ -1727,4 +2019,90 @@ fn detect_conflicts_finds_cwe_mismatch_in_group() {
         conflicts[0].conflict_type,
         baco::report::ai_aggregation::models::ConflictType::CweMismatch
     );
+}
+
+// ============================================================================
+// G-6: Out-of-range index handling tests
+// ============================================================================
+
+#[test]
+fn test_parse_batch_enrichment_verdict_out_of_range_index() {
+    use baco::report::ai_aggregation::enrichment::BatchEnrichmentItem;
+
+    // Test that out-of-range indices are ignored without panic
+    let json_with_bad_index = r#"[
+        {"index": 0, "description": "Valid item 0", "recommendation": "Fix 0"},
+        {"index": 5, "description": "Out of range", "recommendation": "Ignored"},
+        {"index": 1, "description": "Valid item 1", "recommendation": "Fix 1"},
+        {"index": 100, "description": "Also out of range", "recommendation": "Ignored"}
+    ]"#;
+
+    let results = parse_batch_enrichment_verdict_safe(json_with_bad_index, 2);
+
+    // Should have 2 results (matching expected_count)
+    assert_eq!(results.len(), 2);
+
+    // Index 0 should be populated
+    assert!(results[0].0.is_some());
+    assert_eq!(results[0].0.as_ref().unwrap(), "Valid item 0");
+    assert!(results[0].1.is_some());
+    assert_eq!(results[0].1.as_ref().unwrap(), "Fix 0");
+
+    // Index 1 should be populated
+    assert!(results[1].0.is_some());
+    assert_eq!(results[1].0.as_ref().unwrap(), "Valid item 1");
+    assert!(results[1].1.is_some());
+    assert_eq!(results[1].1.as_ref().unwrap(), "Fix 1");
+}
+
+#[test]
+fn test_parse_batch_enrichment_verdict_all_out_of_range() {
+    // All indices out of range - should return all None
+    let json_all_bad = r#"[
+        {"index": 10, "description": "Ignored", "recommendation": "Ignored"},
+        {"index": 20, "description": "Also ignored", "recommendation": "Also ignored"}
+    ]"#;
+
+    let results = parse_batch_enrichment_verdict_safe(json_all_bad, 2);
+
+    assert_eq!(results.len(), 2);
+    assert!(results[0].0.is_none());
+    assert!(results[0].1.is_none());
+    assert!(results[1].0.is_none());
+    assert!(results[1].1.is_none());
+}
+
+#[test]
+fn test_parse_batch_enrichment_verdict_empty_batch() {
+    // Empty batch should return empty results
+    let json_empty = "[]";
+    let results = parse_batch_enrichment_verdict_safe(json_empty, 0);
+    assert_eq!(results.len(), 0);
+}
+
+// Helper to expose private function for testing
+fn parse_batch_enrichment_verdict_safe(
+    content: &str,
+    expected_count: usize,
+) -> Vec<(Option<String>, Option<String>)> {
+    let cleaned = content
+        .trim_start_matches("```")
+        .trim_end_matches("```")
+        .trim_start_matches("json")
+        .trim();
+
+    match serde_json::from_str::<Vec<BatchEnrichmentItem>>(cleaned) {
+        Ok(items) => {
+            let mut results = vec![(None, None); expected_count];
+
+            for item in items {
+                if item.index < expected_count {
+                    results[item.index] = (item.description, item.recommendation);
+                }
+            }
+
+            results
+        }
+        Err(_) => vec![(None, None); expected_count],
+    }
 }

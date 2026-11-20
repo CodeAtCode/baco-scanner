@@ -510,20 +510,6 @@ fn test_blast_radius_default_is_high() {
     assert_eq!(radius, BlastRadius::High);
 }
 
-fn assert_enum_variants_distinct<T: PartialEq + std::fmt::Debug>(variants: &[T], name: &str) {
-    for (i, v1) in variants.iter().enumerate() {
-        for (j, v2) in variants.iter().enumerate() {
-            if i != j {
-                assert_ne!(
-                    v1, v2,
-                    "{} variants at indices {} and {} should be distinct",
-                    name, i, j
-                );
-            }
-        }
-    }
-}
-
 #[test]
 fn test_blast_radius_all_variants() {
     // Test that all BlastRadius variants map to their expected weights via SeverityRubric
@@ -564,18 +550,6 @@ fn test_blast_radius_serialization() {
 fn test_v3_severity_default_is_low() {
     let severity = V3Severity::default();
     assert_eq!(severity, V3Severity::Low);
-}
-
-#[test]
-fn test_v3_severity_all_variants() {
-    // Test that all V3Severity variants are distinct and can be created
-    let variants = vec![
-        V3Severity::Low,
-        V3Severity::Medium,
-        V3Severity::High,
-        V3Severity::Critical,
-    ];
-    assert_enum_variants_distinct(&variants, "V3Severity");
 }
 
 #[test]

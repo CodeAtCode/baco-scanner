@@ -292,7 +292,7 @@ pub enum CveSeverity {
     Critical,
 }
 
-fn map_kev_severity(severity: &str) -> CveSeverity {
+pub fn map_kev_severity(severity: &str) -> CveSeverity {
     match severity.to_lowercase().as_str() {
         "critical" => CveSeverity::Critical,
         "high" => CveSeverity::High,
@@ -302,7 +302,7 @@ fn map_kev_severity(severity: &str) -> CveSeverity {
     }
 }
 
-fn map_nvd_severity(severity: &str) -> CveSeverity {
+pub fn map_nvd_severity(severity: &str) -> CveSeverity {
     match severity.to_lowercase().as_str() {
         "critical" => CveSeverity::Critical,
         "high" => CveSeverity::High,
@@ -312,7 +312,7 @@ fn map_nvd_severity(severity: &str) -> CveSeverity {
     }
 }
 
-fn map_cve_severity(severity: CveSeverity) -> V3Severity {
+pub fn map_cve_severity(severity: CveSeverity) -> V3Severity {
     match severity {
         CveSeverity::Critical => V3Severity::Critical,
         CveSeverity::High => V3Severity::High,

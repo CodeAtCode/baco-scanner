@@ -149,17 +149,33 @@ fn test_cpe_hint_does_not_break_non_matching_cves() {
 
 #[test]
 fn test_cpe_hint_parsing() {
-    // Test CPE parsing logic
     let cpe = "cpe:2.3:a:microsoft:internet_explorer:11.0:*:*:*:*:*:*:*";
-    let parts: Vec<&str> = cpe.split(':').collect();
+    let (vendor, product) = baco::cve_bootstrap::cpe_vendor_product(cpe)
+        .expect("a full CPE carries both a vendor and a product");
 
-    assert_eq!(parts.len(), 13); // Full CPE has 13 parts
-    assert_eq!(parts[0], "cpe");
-    assert_eq!(parts[1], "2.3");
-    assert_eq!(parts[2], "a"); // Part type (application)
-    assert_eq!(parts[3], "microsoft"); // Vendor
-    assert_eq!(parts[4], "internet_explorer"); // Product
-    assert_eq!(parts[5], "11.0"); // Version
+    assert_eq!(vendor, "microsoft");
+    assert_eq!(product, "internet_explorer");
+
+    // Too short to carry both fields.
+    assert_eq!(baco::cve_bootstrap::cpe_vendor_product("cpe:2.3:a:x"), None);
+}
+
+#[test]
+fn test_dependency_vendor_product_splits_scoped_and_bare_names() {
+    use baco::cve_bootstrap::dependency_vendor_product;
+
+    assert_eq!(
+        dependency_vendor_product("@scope/pkg"),
+        ("@scope".to_string(), "pkg".to_string())
+    );
+    assert_eq!(
+        dependency_vendor_product("org/repo"),
+        ("org".to_string(), "repo".to_string())
+    );
+    assert_eq!(
+        dependency_vendor_product("serde"),
+        ("serde".to_string(), "serde".to_string())
+    );
 }
 
 #[test]

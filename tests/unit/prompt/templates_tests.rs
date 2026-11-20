@@ -85,12 +85,6 @@ fn test_baco_phase_ordering_lexicographic() {
     assert_eq!(phases, sorted);
 }
 
-#[test]
-fn test_baco_phase_eq() {
-    assert_eq!(BacoPhase::Indexing, BacoPhase::Indexing);
-    assert_ne!(BacoPhase::Indexing, BacoPhase::Semgrep);
-}
-
 // ============================================================================
 // ProjectType Tests
 // ============================================================================
@@ -130,12 +124,6 @@ fn test_project_type_ordering_lexicographic() {
     sorted.sort();
 
     assert_eq!(types, sorted);
-}
-
-#[test]
-fn test_project_type_eq() {
-    assert_eq!(ProjectType::CLI, ProjectType::CLI);
-    assert_ne!(ProjectType::CLI, ProjectType::Web);
 }
 
 // ============================================================================
@@ -489,4 +477,51 @@ fn test_get_template_variables_percent() {
 fn test_get_template_variables_no_vars() {
     let vars = get_template_variables("No variables here");
     assert!(vars.is_empty());
+}
+
+/// The bundled default for each phase must be exactly the prompt file it stands
+/// in for.
+///
+/// `prompts/phases/*.md` is read from disk at run time; the embedded copy is only
+/// the fallback when that read fails. Two of those copies had silently become
+/// stubs a fraction of the real size, and one carried a typo the file does not.
+/// Embedding the same file fixes that; this test keeps it fixed — reintroduce a
+/// hand-written copy and it fails.
+#[test]
+fn every_bundled_default_matches_the_prompt_file_it_stands_in_for() {
+    let defaults = get_all_defaults();
+    let phases = [
+        ("indexing", &defaults.indexing),
+        ("semgrep", &defaults.semgrep),
+        ("llm_static_analysis", &defaults.llm_static_analysis),
+        ("llm_discovery", &defaults.llm_discovery),
+        ("llm_verification", &defaults.llm_verification),
+        ("ticket_crossref", &defaults.ticket_crossref),
+        ("git_analysis", &defaults.git_analysis),
+        ("cross_file_analysis", &defaults.cross_file_analysis),
+        ("confidence_scoring", &defaults.confidence_scoring),
+        ("ai_aggregation", &defaults.ai_aggregation),
+        ("reporting", &defaults.reporting),
+    ];
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("prompts/phases");
+
+    for (name, bundled) in phases {
+        let path = dir.join(format!("{name}.md"));
+        let on_disk = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()))
+            .trim()
+            .to_string();
+
+        assert_eq!(
+            bundled,
+            &on_disk,
+            "{name}: the bundled default has drifted from {}",
+            path.display()
+        );
+        assert!(
+            bundled.len() > 100,
+            "{name}: the bundled default is a stub ({} bytes)",
+            bundled.len()
+        );
+    }
 }

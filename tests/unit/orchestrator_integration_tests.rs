@@ -11,6 +11,8 @@ use baco::config::{
 use baco::findings::{Severity, VulnerabilityFinding};
 use baco::scanner::Scanner;
 use baco::scanner::checkpoint::{Checkpoint, EarlyTerminationInfo, ScanPhase};
+use baco::scanner::helpers::{PhaseResult, log_and_aggregate_llm_results};
+use baco::scanner::orchestrator::should_terminate_early;
 use std::fs;
 use std::path::PathBuf;
 
@@ -711,9 +713,11 @@ fn test_early_termination_counts_only_medium_and_above() {
     assert_eq!(medium_plus_count, 100);
     assert_eq!(findings.len(), 1050);
 
-    // Threshold is 1000, medium+ count is 100, so no termination
-    let threshold: f32 = 1000.0;
-    assert!(medium_plus_count as f32 <= threshold);
+    // Threshold is 1000; 100 medium+ findings must not terminate.
+    assert!(
+        !should_terminate_early(medium_plus_count, 1000.0),
+        "100 findings against a 1000 threshold must keep scanning"
+    );
 }
 
 #[test]
@@ -746,8 +750,7 @@ fn test_early_termination_triggers_on_medium_plus_threshold() {
     assert_eq!(medium_plus_count, 1001);
     assert_eq!(findings.len(), 1051);
 
-    let threshold: f32 = 1000.0;
-    assert!(medium_plus_count as f32 > threshold);
+    assert!(should_terminate_early(medium_plus_count, 1000.0));
 }
 
 #[test]
@@ -770,9 +773,11 @@ fn test_early_termination_boundary_exact_threshold() {
 
     assert_eq!(medium_plus_count, 1000);
 
-    let threshold: f32 = 1000.0;
-    // Exact threshold should NOT trigger (uses > not >=)
-    assert!(medium_plus_count as f32 <= threshold);
+    // Exact threshold must NOT trigger: the comparison is strict.
+    assert!(
+        !should_terminate_early(medium_plus_count, 1000.0),
+        "a count equal to the threshold must not terminate"
+    );
 }
 
 #[test]
@@ -795,9 +800,8 @@ fn test_early_termination_boundary_one_over_threshold() {
 
     assert_eq!(medium_plus_count, 1001);
 
-    let threshold: f32 = 1000.0;
-    // One over threshold SHOULD trigger
-    assert!(medium_plus_count as f32 > threshold);
+    // One over the threshold must trigger.
+    assert!(should_terminate_early(medium_plus_count, 1000.0));
 }
 
 #[test]
@@ -820,4 +824,61 @@ fn test_early_termination_info_default() {
     assert!(!info.triggered);
     assert_eq!(info.finding_count, 0);
     assert!(info.phases_skipped.is_empty());
+}
+
+#[test]
+fn test_a_zero_threshold_disables_early_termination() {
+    // A threshold of zero turns the check off, however many findings there are.
+    assert!(!should_terminate_early(0, 0.0));
+    assert!(!should_terminate_early(10_000, 0.0));
+    // Negative thresholds are nonsense and must not terminate either.
+    assert!(!should_terminate_early(10_000, -1.0));
+}
+
+// ============================================================================
+// G-2: a dead parallel phase must return its reason, not just log it
+// ============================================================================
+
+#[test]
+fn a_failed_llm_phase_returns_its_reason() {
+    // The orchestrator pushes this onto `parallel_failures`, which is what marks
+    // the phase failed in the scan health. Returning None here is how a dead
+    // phase came to read as a clean one.
+    let failed: Option<PhaseResult> = Some(Err("llm phase exploded".to_string()));
+    let mut findings = Vec::new();
+    let mut analyzed_files = Vec::new();
+
+    assert_eq!(
+        log_and_aggregate_llm_results(&failed, &mut findings, &mut analyzed_files).as_deref(),
+        Some("llm phase exploded")
+    );
+}
+
+#[test]
+fn a_successful_llm_phase_returns_no_failure() {
+    let ok: Option<PhaseResult> = Some(Ok((
+        Vec::new(),
+        vec!["src/handler.rs".to_string()],
+        Vec::new(),
+    )));
+    let mut findings = Vec::new();
+    let mut analyzed_files = Vec::new();
+
+    assert_eq!(
+        log_and_aggregate_llm_results(&ok, &mut findings, &mut analyzed_files),
+        None
+    );
+    assert_eq!(analyzed_files, vec!["src/handler.rs".to_string()]);
+}
+
+#[test]
+fn an_absent_llm_phase_returns_no_failure() {
+    let absent: Option<PhaseResult> = None;
+    let mut findings = Vec::new();
+    let mut analyzed_files = Vec::new();
+
+    assert_eq!(
+        log_and_aggregate_llm_results(&absent, &mut findings, &mut analyzed_files),
+        None
+    );
 }

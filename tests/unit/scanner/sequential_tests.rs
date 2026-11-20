@@ -75,34 +75,9 @@ fn test_scan_phase_cve_bootstrap() {
     assert_eq!(format!("{:?}", ScanPhase::CveBootstrap), "CveBootstrap");
 }
 
-#[test]
-fn test_scan_phase_equality() {
-    assert_eq!(ScanPhase::LlmDiscovery, ScanPhase::LlmDiscovery);
-    assert_ne!(ScanPhase::LlmDiscovery, ScanPhase::Reporting);
-}
-
-#[test]
-fn test_scan_phase_clone() {
-    let phase = ScanPhase::LlmDiscovery;
-    let cloned = phase.clone();
-    assert_eq!(phase, cloned);
-}
-
 // ============================================================================
 // Severity variant tests
 // ============================================================================
-
-#[test]
-fn test_severity_all_variants() {
-    let variants = [
-        Severity::Low,
-        Severity::Medium,
-        Severity::High,
-        Severity::Critical,
-    ];
-
-    assert_eq!(variants.len(), 4);
-}
 
 #[test]
 fn test_severity_debug_format_low() {
@@ -122,12 +97,6 @@ fn test_severity_debug_format_high() {
 #[test]
 fn test_severity_debug_format_critical() {
     assert_eq!(format!("{:?}", Severity::Critical), "Critical");
-}
-
-#[test]
-fn test_severity_equality() {
-    assert_eq!(Severity::High, Severity::High);
-    assert_ne!(Severity::High, Severity::Medium);
 }
 
 // ============================================================================

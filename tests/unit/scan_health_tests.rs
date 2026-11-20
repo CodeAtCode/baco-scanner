@@ -558,3 +558,72 @@ fn test_blind_marker_empty_health() {
     let health = ScanHealth::new();
     assert!(health.blind_marker().is_none());
 }
+
+/// A phase that a flag turns off must be reported as skipped, not as run.
+///
+/// The recording pass marks every planned phase as run and only the LLM-config
+/// skips were corrected, so a phase the operator disabled read as executed.
+#[test]
+fn a_config_disabled_phase_is_reported_as_skipped() {
+    use baco::scan_health::{detect_config_skips, phase_name};
+    use baco::scanner::checkpoint::ScanPhase;
+
+    let mut config = baco::config::ScannerConfig::default();
+    config.router.enabled = false;
+    config.scanner.performance.enable_confidence_refinement = false;
+    config.scanner.performance.enable_cve_bootstrap = false;
+    config.scanner.performance.enable_root_cause_dedup = false;
+
+    let skips = detect_config_skips(&config);
+    let phases: Vec<String> = skips.iter().map(|(p, _)| phase_name(p)).collect();
+
+    assert_eq!(
+        phases,
+        vec![
+            phase_name(&ScanPhase::CweRouting),
+            phase_name(&ScanPhase::ConfidenceScoring),
+            phase_name(&ScanPhase::CveBootstrap),
+            phase_name(&ScanPhase::RootCauseDedup),
+        ]
+    );
+    assert!(
+        skips.iter().all(|(_, reason)| reason.contains("= false")),
+        "each skip must name the key, got {:?}",
+        skips
+    );
+}
+
+#[test]
+fn enabling_every_flag_produces_no_config_skips() {
+    use baco::scan_health::detect_config_skips;
+
+    let mut config = baco::config::ScannerConfig::default();
+    config.router.enabled = true;
+    config.scanner.performance.enable_confidence_refinement = true;
+    config.scanner.performance.enable_cve_bootstrap = true;
+    config.scanner.performance.enable_root_cause_dedup = true;
+
+    assert!(detect_config_skips(&config).is_empty());
+}
+
+#[test]
+fn applying_a_skip_overwrites_the_run_entry() {
+    use baco::scan_health::{PhaseStatusKind, ScanHealth};
+    use baco::scanner::checkpoint::ScanPhase;
+
+    let mut health = ScanHealth::new();
+    health.record_phase_run(&ScanPhase::CweRouting);
+    assert_eq!(health.phase_status.len(), 1);
+
+    health.apply_skips(&[(
+        ScanPhase::CweRouting,
+        "disabled by `router.enabled = false`".to_string(),
+    )]);
+
+    assert_eq!(
+        health.phase_status.len(),
+        1,
+        "a skip overwrites, it does not append"
+    );
+    assert_eq!(health.phase_status[0].status, PhaseStatusKind::Skipped);
+}

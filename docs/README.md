@@ -1,6 +1,6 @@
 # BACO Documentation
 
-Documentation for baco — a 23-phase LLM-assisted code scanner.
+Documentation for baco — a 15-phase LLM-assisted code scanner.
 
 **For setup, usage, and reading order, see the root [README.md](../README.md).**
 
@@ -18,7 +18,7 @@ Documentation for baco — a 23-phase LLM-assisted code scanner.
 
 | File | Description |
 |------|-------------|
-| [architecture.md](architecture.md) | The 23-phase pipeline, PhaseGraph, data flow |
+| [architecture.md](architecture.md) | The 15-phase pipeline, PhaseGraph, data flow |
 | [research-integration.md](research-integration.md) | Research-backed design and paper integrations |
 | [llm-vuln-detection-papers-survey.md](llm-vuln-detection-papers-survey.md) | Full survey of 36 papers |
 

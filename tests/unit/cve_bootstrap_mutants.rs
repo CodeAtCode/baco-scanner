@@ -207,40 +207,12 @@ fn test_has_source_file_respects_max_depth() {
     // With max_depth = 3, we should find the file
     // (root=0, sub1=1, sub2=2, file at depth 2)
     let root = temp_dir.path();
-    let result = has_source_file_at_depth(root, &["php"], 3);
+    let result = baco::cve_bootstrap::has_source_file(root, &["php"], 3);
     assert!(result, "should find file at depth 2 with max_depth 3");
 
     // With max_depth = 1, we should NOT find the file
-    let result = has_source_file_at_depth(root, &["php"], 1);
+    let result = baco::cve_bootstrap::has_source_file(root, &["php"], 1);
     assert!(!result, "should not find file at depth 2 with max_depth 1");
-}
-
-// Helper function to expose has_source_file with custom depth
-fn has_source_file_at_depth(root: &std::path::Path, extensions: &[&str], max_depth: usize) -> bool {
-    use std::fs;
-    let mut dirs = vec![(root.to_path_buf(), 0usize)];
-    while let Some((dir, depth)) = dirs.pop() {
-        let Ok(entries) = fs::read_dir(&dir) else {
-            continue;
-        };
-        for entry in entries.flatten() {
-            let path = entry.path();
-            let name = entry.file_name().to_string_lossy().to_lowercase();
-            if path.is_dir() {
-                if depth < max_depth && !matches!(name.as_str(), "node_modules" | "vendor" | ".git")
-                {
-                    dirs.push((path, depth + 1));
-                }
-                continue;
-            }
-            if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                if extensions.contains(&ext.to_lowercase().as_str()) {
-                    return true;
-                }
-            }
-        }
-    }
-    false
 }
 
 // ============================================================================

@@ -3,7 +3,7 @@ use crate::findings::VulnerabilityFinding;
 use crate::git_analysis::GitAnalyzer;
 use crate::scanner::phases::PhaseConfig;
 
-/// Run ticket cross-reference phase (phase 11 of 23).
+/// Run ticket cross-reference phase.
 pub async fn run_ticket_cross_ref(
     _scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,
@@ -65,7 +65,7 @@ pub fn looks_like_a_repository(path: &std::path::Path) -> bool {
         .any(|dir| dir.join(".git").exists())
 }
 
-/// Run Git analysis phase (phase 12 of 23).
+/// Run Git analysis phase.
 pub async fn run_git_analysis(
     _scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,
@@ -139,7 +139,7 @@ pub async fn run_git_analysis(
     Ok((findings, analyzed_files.to_vec()))
 }
 
-/// Run cross-file analysis phase (phase 13 of 23).
+/// Run cross-file analysis phase.
 pub async fn run_cross_file_analysis(
     _scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,

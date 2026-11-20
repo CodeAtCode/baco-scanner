@@ -96,14 +96,165 @@ fn test_phase_error_round_trips_phase_name() {
 
 #[test]
 fn test_from_reqwest_error_maps_to_retryable_network() {
-    // Test that the helper method exists and creates retryable errors
-    // Note: reqwest::Error construction is complex, so we test the classification logic
-    // by creating a server error variant directly
-    let err = ScanError::Server {
-        message: "HTTP 500".to_string(),
-        source: None,
-    };
-    assert!(err.is_retryable());
+    // Test 429 RateLimit - retryable
+    // Note: HTTP error status codes return Ok(Response), not Err.
+    // We use error_for_status() to convert them to reqwest::Error
+    let mut server = mockito::Server::new();
+    let mock = server
+        .mock("GET", "/rate-limit")
+        .with_status(429)
+        .with_body("Too Many Requests")
+        .create();
+
+    let client = reqwest::Client::new();
+    let url = server.url() + "/rate-limit";
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let result = runtime.block_on(async {
+        let resp = client.get(&url).send().await?;
+        resp.error_for_status()
+    });
+
+    match result {
+        Ok(_) => panic!("Expected error for 429 response"),
+        Err(reqwest_err) => {
+            let scan_err = ScanError::from_reqwest(reqwest_err);
+            assert!(
+                matches!(scan_err, ScanError::RateLimit { .. }),
+                "Expected RateLimit variant for 429, got {:?}",
+                scan_err
+            );
+            assert!(scan_err.is_retryable(), "429 should be retryable");
+        }
+    }
+    mock.assert();
+}
+
+#[test]
+fn test_from_reqwest_401_maps_to_auth_non_retryable() {
+    let mut server = mockito::Server::new();
+    let mock = server
+        .mock("GET", "/unauthorized")
+        .with_status(401)
+        .with_body("Unauthorized")
+        .create();
+
+    let client = reqwest::Client::new();
+    let url = server.url() + "/unauthorized";
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let result = runtime.block_on(async {
+        let resp = client.get(&url).send().await?;
+        resp.error_for_status()
+    });
+
+    match result {
+        Ok(_) => panic!("Expected error for 401 response"),
+        Err(reqwest_err) => {
+            let scan_err = ScanError::from_reqwest(reqwest_err);
+            assert!(
+                matches!(scan_err, ScanError::Auth { .. }),
+                "Expected Auth variant for 401, got {:?}",
+                scan_err
+            );
+            assert!(!scan_err.is_retryable(), "401 should be non-retryable");
+        }
+    }
+    mock.assert();
+}
+
+#[test]
+fn test_from_reqwest_403_maps_to_auth_non_retryable() {
+    let mut server = mockito::Server::new();
+    let mock = server
+        .mock("GET", "/forbidden")
+        .with_status(403)
+        .with_body("Forbidden")
+        .create();
+
+    let client = reqwest::Client::new();
+    let url = server.url() + "/forbidden";
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let result = runtime.block_on(async {
+        let resp = client.get(&url).send().await?;
+        resp.error_for_status()
+    });
+
+    match result {
+        Ok(_) => panic!("Expected error for 403 response"),
+        Err(reqwest_err) => {
+            let scan_err = ScanError::from_reqwest(reqwest_err);
+            assert!(
+                matches!(scan_err, ScanError::Auth { .. }),
+                "Expected Auth variant for 403, got {:?}",
+                scan_err
+            );
+            assert!(!scan_err.is_retryable(), "403 should be non-retryable");
+        }
+    }
+    mock.assert();
+}
+
+#[test]
+fn test_from_reqwest_500_maps_to_server_retryable() {
+    let mut server = mockito::Server::new();
+    let mock = server
+        .mock("GET", "/server-error")
+        .with_status(500)
+        .with_body("Internal Server Error")
+        .create();
+
+    let client = reqwest::Client::new();
+    let url = server.url() + "/server-error";
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let result = runtime.block_on(async {
+        let resp = client.get(&url).send().await?;
+        resp.error_for_status()
+    });
+
+    match result {
+        Ok(_) => panic!("Expected error for 500 response"),
+        Err(reqwest_err) => {
+            let scan_err = ScanError::from_reqwest(reqwest_err);
+            assert!(
+                matches!(scan_err, ScanError::Server { .. }),
+                "Expected Server variant for 500, got {:?}",
+                scan_err
+            );
+            assert!(scan_err.is_retryable(), "500 should be retryable");
+        }
+    }
+    mock.assert();
+}
+
+#[test]
+fn test_from_reqwest_503_maps_to_server_retryable() {
+    let mut server = mockito::Server::new();
+    let mock = server
+        .mock("GET", "/service-unavailable")
+        .with_status(503)
+        .with_body("Service Unavailable")
+        .create();
+
+    let client = reqwest::Client::new();
+    let url = server.url() + "/service-unavailable";
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let result = runtime.block_on(async {
+        let resp = client.get(&url).send().await?;
+        resp.error_for_status()
+    });
+
+    match result {
+        Ok(_) => panic!("Expected error for 503 response"),
+        Err(reqwest_err) => {
+            let scan_err = ScanError::from_reqwest(reqwest_err);
+            assert!(
+                matches!(scan_err, ScanError::Server { .. }),
+                "Expected Server variant for 503, got {:?}",
+                scan_err
+            );
+            assert!(scan_err.is_retryable(), "503 should be retryable");
+        }
+    }
+    mock.assert();
 }
 
 #[test]

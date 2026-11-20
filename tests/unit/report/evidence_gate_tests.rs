@@ -1,6 +1,6 @@
 //! Unit tests for evidence gate filtering in reports.
 
-use baco::evidence::{classify_finding, Evidence, EvidenceSource, VerificationTier};
+use baco::evidence::{Evidence, EvidenceSource, VerificationTier, classify_finding};
 use baco::findings::{Severity, VulnerabilityFinding};
 use baco::report::apply_evidence_gate;
 

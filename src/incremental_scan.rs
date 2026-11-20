@@ -1,7 +1,15 @@
-//! Incremental scanning support using file hash comparison
+//! File-hash bookkeeping for incremental scanning.
 //!
-//! This module provides functionality to detect file changes between scans
-//! using SHA256 hash comparison, enabling skipping of unchanged files.
+//! The indexer records a SHA256 per file, and this store is what a future
+//! incremental scan would compare against. **No skipping is implemented**: the
+//! indexer hashes every file on every run, the store it builds is discarded at
+//! the call site, and `save`/`load` have no caller.
+//!
+//! Wiring it is not a one-liner. Skipping an unchanged file also skips the phases
+//! that would analyse it, so the scan would have to carry that file's previous
+//! findings forward — otherwise a scan of an unchanged repository reports fewer
+//! findings than the run before it. A false negative is the worst failure this
+//! scanner can have, so the feature stays off until that is designed.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

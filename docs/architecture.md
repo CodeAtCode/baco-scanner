@@ -13,7 +13,8 @@ BACO uses a **data-driven PhaseGraph** (`src/scanner/pipeline/orchestrator.rs`) 
 
 **Core Pipeline (15 phases total: 3 parallel + 12 sequential):**
 
-> **Note:** Phase order is defined in `PhaseGraph::new()` (src/scanner/pipeline/orchestrator.rs:28-53). This table is manually maintained and should be updated when that code changes.
+> **Note:** Phase order is defined by `PhaseSpec` (src/scanner/phase_spec.rs).
+> `documented_phase_count_matches_the_pipeline` fails when this table's count drifts.
 
 | Phase # | Name | Config gate (default) | Description |
 |---------|------|----------------------|-------------|
@@ -29,8 +30,8 @@ BACO uses a **data-driven PhaseGraph** (`src/scanner/pipeline/orchestrator.rs`) 
 | 10 | Cross-File Analysis | Always-on | Analyze cross-file dependencies |
 | 11 | Confidence Scoring | `scanner.performance.enable_confidence_refinement=false` | Refine confidence scores |
 | 12 | AI Aggregation | `llm.phases.aggregation` (API key present) | Aggregate findings with AI |
-| 13 | Threat Modeling | Always-on | Generate threat model (STRIDE) |
-| 14 | Root Cause Deduplication | `scanner.performance.enable_root_cause_dedup=true` | Deduplicate by root cause |
+| 13 | Root Cause Deduplication | `scanner.performance.enable_root_cause_dedup=false` | Deduplicate by root cause |
+| 14 | CVE Bootstrap | `scanner.performance.enable_cve_bootstrap=false` | Bootstrap CVE knowledge from dependencies |
 | 15 | Reporting | Always-on | Generate reports (JSON/HTML/SARIF) |
 
 ## Data Flow
@@ -52,14 +53,14 @@ flowchart LR
         C1[Validate] --> C2[Ticket Cross-Ref] --> C3[Git Analysis] --> C4[Cross-File]
     end
 
-    subgraph Aggregation["Aggregation (11-13)"]
+    subgraph Aggregation["Aggregation (11-12)"]
         direction TB
-        D1[Confidence] --> D2[AI Aggregation] --> D3[Threat Modeling]
+        D1[Confidence] --> D2[AI Aggregation]
     end
 
-    subgraph PostProcessing["Post-Processing (14)"]
+    subgraph PostProcessing["Post-Processing (13-14)"]
         direction TB
-        E1[Root Cause Dedup]
+        E1[Root Cause Dedup] --> E2[CVE Bootstrap]
     end
 
     subgraph Output["Output (15)"]

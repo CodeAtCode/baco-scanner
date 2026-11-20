@@ -7,7 +7,6 @@ pub mod helpers;
 pub mod orchestrator;
 
 pub use orchestrator::{skipped_sequential_phase_names, structural_dedup};
-pub mod parallel;
 pub mod phase_spec;
 pub mod phases;
 mod pipeline;
@@ -24,8 +23,6 @@ pub use pipeline::orchestrator::PhaseGraph;
 
 // Re-export utility functions from env
 pub use env::{extract_owner_repo_from_url, get_git_remote_url};
-// Re-export parallel module types for testing
-pub use parallel::{ParallelPhaseResult, ParallelSlot, combine_parallel_results};
 
 // Use the checkpoint module for save/load
 use crate::checkpoint::ScanPhase;

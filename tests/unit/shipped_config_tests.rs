@@ -7,55 +7,54 @@
 use std::fs;
 use std::path::PathBuf;
 
-/// Test that all shipped config files parse through the production loader.
+/// Test that every shipped config file parses through the production loader.
+///
+/// "Shipped" means part of the repository: `config.example.toml` and the
+/// fixtures the suite reads. A local scratch config belongs to one machine, is
+/// not in the repository, and is validated only when present — requiring it made
+/// the suite fail on a clean checkout.
 #[test]
 fn test_shipped_configs_deserialize() {
-    let manifest_dir = env!("CARGO_MANIFEST_DIR");
-    let mut checked_files: Vec<PathBuf> = Vec::new();
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 
-    // Canonical root files that MUST exist
-    let root_files = vec![
-        PathBuf::from(manifest_dir).join("config.example.toml"),
-        PathBuf::from(manifest_dir).join("config_test.toml"),
+    // Ships with the repository, so a clean checkout must have it.
+    let mut required: Vec<PathBuf> = vec![root.join("config.example.toml")];
+
+    // Local scratch configs: validated when present, never required.
+    let optional: Vec<PathBuf> = vec![
+        root.join("config_test.toml"),
+        root.join("config_libyaml.toml"),
     ];
 
-    for path in &root_files {
-        assert!(
-            path.exists(),
-            "Canonical shipped config missing: {}",
-            path.display()
-        );
-        checked_files.push(path.clone());
-    }
-
-    // Optional root file (untracked scratch)
-    let libyaml_path = PathBuf::from(manifest_dir).join("config_libyaml.toml");
-    if libyaml_path.exists() {
-        checked_files.push(libyaml_path);
-    }
-
-    // All TOMLs under tests/fixtures/
-    let fixtures_dir = PathBuf::from(manifest_dir).join("tests/fixtures");
-    if fixtures_dir.exists() {
-        let entries = fs::read_dir(&fixtures_dir).expect("Cannot read fixtures dir");
-        for entry in entries {
-            let entry = entry.expect("Cannot read fixture entry");
-            let path = entry.path();
-            if path.extension().is_some_and(|ext| ext == "toml") {
-                checked_files.push(path);
-            }
+    // Every config the test suite reads ships with the suite.
+    let fixtures_dir = root.join("tests/fixtures");
+    let entries = fs::read_dir(&fixtures_dir).expect("Cannot read tests/fixtures");
+    for entry in entries {
+        let path = entry.expect("Cannot read fixture entry").path();
+        if path.extension().is_some_and(|ext| ext == "toml") {
+            required.push(path);
         }
     }
 
-    // Assert we have at least the canonical files
+    for path in &required {
+        assert!(path.exists(), "Shipped config missing: {}", path.display());
+    }
+
+    // The walk must actually have found the fixtures, or this test proves nothing.
+    let fixture_count = required
+        .iter()
+        .filter(|path| path.starts_with(&fixtures_dir))
+        .count();
     assert!(
-        checked_files.len() >= 3,
-        "Expected at least 3 shipped configs (2 canonical + optional), found {}",
-        checked_files.len()
+        fixture_count >= 1,
+        "No fixture TOMLs found under {}",
+        fixtures_dir.display()
     );
 
-    // Verify each file through the production loader
-    for config_path in &checked_files {
+    let mut checked = required;
+    checked.extend(optional.into_iter().filter(|path| path.exists()));
+
+    for config_path in &checked {
         let result = baco::config::ScannerConfig::from_file(
             config_path.to_str().expect("Config path not valid UTF-8"),
         );
@@ -68,13 +67,10 @@ fn test_shipped_configs_deserialize() {
         );
     }
 
-    println!("Checked {} shipped config file(s)", checked_files.len());
+    println!("Checked {} config file(s)", checked.len());
 }
 
 /// Teeth test: prove the loader actually rejects phantom keys.
-///
-/// Note: config_test.toml itself failed this check before it was fixed
-/// (it had six phantom keys plus enable_hunt_prompts in the wrong section).
 #[test]
 fn test_phantom_key_rejection() {
     use std::io::Write;

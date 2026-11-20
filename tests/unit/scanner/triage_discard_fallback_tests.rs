@@ -85,3 +85,31 @@ fn test_nothing_skipped_is_never_distrusted() {
     // 10 classified out of 10 submitted = 0% unclassified
     assert!(!should_distrust_triage(10, 10));
 }
+
+#[test]
+fn test_classified_equals_submitted_boundary() {
+    // Boundary: classified == submitted means 0% unclassified
+    assert!(!should_distrust_triage(5, 5));
+    assert!(!should_distrust_triage(1, 1));
+}
+
+#[test]
+fn test_classified_greater_than_submitted_no_panic() {
+    // The core defect: LLM names more files than were sent.
+    // With saturating_sub, this returns 0 unclassified, not a panic or wrap.
+    // 11 classified out of 10 submitted -> unclassified = 0 -> 0% > 0.5 = false
+    assert!(!should_distrust_triage(11, 10));
+    assert!(!should_distrust_triage(100, 10));
+}
+
+#[test]
+fn test_above_discard_ratio_boundary() {
+    // Just above the 50% threshold: 4/10 = 60% unclassified -> true
+    assert!(should_distrust_triage(4, 10));
+    // Just below: 5/10 = 50% unclassified -> false (not strictly greater)
+    assert!(!should_distrust_triage(5, 10));
+    // Edge case: 3/5 = 40% unclassified -> false
+    assert!(!should_distrust_triage(3, 5));
+    // Edge case: 2/5 = 60% unclassified -> true
+    assert!(should_distrust_triage(2, 5));
+}

@@ -32,12 +32,27 @@ pub fn compute_cache_key(
     hex::encode(hash)
 }
 
+/// The directory used when caching is enabled but no directory is configured.
+const DEFAULT_CACHE_DIR: &str = "baco-output/llm-cache";
+
 /// Get the effective cache directory.
-/// If cache_dir is None and caching is enabled, returns "baco-output/llm-cache" relative to CWD.
+///
+/// `Some` is the configured directory. `None` is the last resort and resolves
+/// against the process CWD, which is why it warns: `phase_llm_config` roots the
+/// directory under `[output].dir` before this is reached, so taking this arm
+/// means a caller built an `LlmConfig` by hand. Writing cache files to whatever
+/// directory the scanner happened to run in is how the cache once landed in the
+/// repository root.
 pub fn get_effective_cache_dir(cache_dir: Option<&String>) -> PathBuf {
     match cache_dir {
         Some(dir) => PathBuf::from(dir),
-        None => PathBuf::from("baco-output/llm-cache"),
+        None => {
+            tracing::warn!(
+                "LLM cache is enabled but no cache directory is configured; writing to ./{}",
+                DEFAULT_CACHE_DIR
+            );
+            PathBuf::from(DEFAULT_CACHE_DIR)
+        }
     }
 }
 

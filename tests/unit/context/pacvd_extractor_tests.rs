@@ -17,31 +17,11 @@ fn test_abstraction_level_ordering() {
 }
 
 #[test]
-fn test_abstraction_level_equality() {
-    assert_eq!(AbstractionLevel::Primitive, AbstractionLevel::Primitive);
-    assert_ne!(AbstractionLevel::Primitive, AbstractionLevel::Typed);
-}
-
-#[test]
 fn test_abstraction_level_debug() {
     assert_eq!(format!("{:?}", AbstractionLevel::Primitive), "Primitive");
     assert_eq!(format!("{:?}", AbstractionLevel::Typed), "Typed");
     assert_eq!(format!("{:?}", AbstractionLevel::Grouped), "Grouped");
     assert_eq!(format!("{:?}", AbstractionLevel::Semantic), "Semantic");
-}
-
-#[test]
-fn test_abstraction_level_clone() {
-    let level = AbstractionLevel::Grouped;
-    let level_clone = level;
-    assert_eq!(level, level_clone);
-}
-
-#[test]
-fn test_abstraction_level_copy() {
-    let level = AbstractionLevel::Semantic;
-    let level_copy = level; // Copy, not move
-    assert_eq!(level, level_copy);
 }
 
 // ============================================================================

@@ -1,4 +1,4 @@
-/// Run LLM static analysis phase (phase 4 of 23).
+/// Run LLM static analysis phase.
 use crate::checkpoint::ScanPhase;
 use crate::context::callee_walker::extract_call_sites;
 use crate::context::pacvd_extractor::{self, AbstractionLevel};
@@ -169,7 +169,12 @@ pub async fn run_llm_static_analysis(
 
         // Initialize vuln_spec index if enabled
         if config.vuln_spec.enabled {
-            crate::vuln_spec::initialize_spec_index(&config.vuln_spec);
+            let mut spec_config = config.vuln_spec.clone();
+            spec_config.db_path = crate::config::specifications::resolve_spec_db_path(
+                &spec_config.db_path,
+                &config.output.dir,
+            );
+            crate::vuln_spec::initialize_spec_index(&spec_config);
         }
 
         // Load CWE knowledge base for triple-path context
@@ -225,7 +230,7 @@ pub async fn run_llm_static_analysis(
         // skipped_files is non-empty: an empty LLM response is still a response
         // that must be validated.
         if submitted > 0 {
-            let unclassified = submitted - classified;
+            let unclassified = submitted.saturating_sub(classified);
             tracing::info!(
                 "[Triage] Submitted {} files, classified {} ({} unclassified)",
                 submitted,
@@ -595,7 +600,7 @@ pub fn should_distrust_triage(classified: usize, submitted: usize) -> bool {
     if submitted == 0 {
         return false;
     }
-    let unclassified = submitted - classified;
+    let unclassified = submitted.saturating_sub(classified);
     unclassified as f64 / submitted as f64 > TRIAGE_MAX_DISCARD_RATIO
 }
 

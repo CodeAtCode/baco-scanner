@@ -2,7 +2,7 @@ use crate::error::ScanResult;
 use crate::findings::VulnerabilityFinding;
 use crate::scanner::phases::PhaseConfig;
 
-/// Run root cause deduplication phase (phase 17 of 23).
+/// Run root cause deduplication phase.
 pub async fn run_root_cause_dedup(
     _scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,

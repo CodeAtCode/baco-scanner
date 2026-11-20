@@ -75,3 +75,26 @@ any security primitive, the finding is likely a true positive.
 action. If NONE of the primitives for the language appear in the function body,
 treat the ABSENCE as confirmation evidence and upgrade the finding to confirmed.
 
+
+## B4: Buffer-Size Bound Check
+
+Before confirming any buffer-copy finding (CWE-120, CWE-787 out-of-bounds write,
+CWE-119 out-of-bounds read), answer this one question:
+
+**Was the destination buffer's size derived from, or bounded by, the number of
+bytes being copied?**
+
+- If the destination was allocated with a size taken from the same expression as
+  the copy length (`malloc(n)` / `calloc(n, sz)` / `realloc(_, n)` / `alloca(n)`
+  followed by a copy of `k` bytes where `k <= n`), the copy cannot overflow the
+  destination. Verdict: false positive.
+- If an assert or an explicit guard clamps the length before the copy, and the
+  copy uses the clamped value, same: false positive.
+- If the destination is a fixed-size buffer, or its size is independent of the
+  copy length, the finding stands.
+- If you cannot see how the destination was allocated, say so and leave the
+  finding as needs_review — do not confirm it and do not kill it.
+
+This check applies only when the allocation size and the copy size are the same
+expression or are provably ordered. A destination that merely *happens* to be
+large enough is not bounded by the copy.

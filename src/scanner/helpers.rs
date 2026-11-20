@@ -3,7 +3,7 @@
 use crate::findings::VulnerabilityFinding;
 
 /// Type alias for phase result
-pub(crate) type PhaseResult = Result<
+pub type PhaseResult = Result<
     (
         Vec<VulnerabilityFinding>,
         Vec<String>,
@@ -13,23 +13,33 @@ pub(crate) type PhaseResult = Result<
 >;
 
 /// Log and aggregate LLM static analysis results.
-/// This helper consolidates the common pattern for handling LLM phase results.
+///
+/// Returns the failure reason when the phase died so the caller can record it
+/// against the phase. Logging alone is not enough: the scan health is built from
+/// the phase plan, so an error that is only logged leaves a dead phase reading
+/// as a clean one.
 pub fn log_and_aggregate_llm_results(
     llm_static_result: &Option<PhaseResult>,
     findings: &mut Vec<VulnerabilityFinding>,
     analyzed_files: &mut Vec<String>,
-) {
-    if let Some(Ok((llm_findings, new_files, _))) = llm_static_result {
-        tracing::info!("[SCANNER] Added {} LLM findings", llm_findings.len());
-        if !llm_findings.is_empty() {
-            tracing::debug!(
-                "[SCANNER] First finding description length: {}",
-                llm_findings[0].description.len()
-            );
+) -> Option<String> {
+    match llm_static_result {
+        Some(Ok((llm_findings, new_files, _))) => {
+            tracing::info!("[SCANNER] Added {} LLM findings", llm_findings.len());
+            if !llm_findings.is_empty() {
+                tracing::debug!(
+                    "[SCANNER] First finding description length: {}",
+                    llm_findings[0].description.len()
+                );
+            }
+            findings.extend(llm_findings.clone());
+            *analyzed_files = new_files.to_vec();
+            None
         }
-        findings.extend(llm_findings.clone());
-        *analyzed_files = new_files.to_vec();
-    } else if let Some(Err(e)) = llm_static_result {
-        tracing::warn!("[SCANNER] LLM static analysis failed: {}", e);
+        Some(Err(e)) => {
+            tracing::warn!("[SCANNER] LLM static analysis failed: {}", e);
+            Some(e.to_string())
+        }
+        None => None,
     }
 }

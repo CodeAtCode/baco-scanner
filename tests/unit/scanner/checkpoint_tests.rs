@@ -52,28 +52,6 @@ async fn test_save_checkpoint_records_scan_target_and_config() {
 // Note: create_test_finding() kept local due to custom modifications specific to checkpoint tests
 
 // Shared test data for phase transition tests (mirrors src/scanner/checkpoint.rs)
-const PHASE_TRANSITION_TEST_CASES: &[(ScanPhase, ScanPhase)] = &[
-    // Parallel phases (Indexing, Semgrep, LlmStaticAnalysis run concurrently)
-    (ScanPhase::Indexing, ScanPhase::Semgrep),
-    (ScanPhase::Semgrep, ScanPhase::LlmStaticAnalysis),
-    (ScanPhase::LlmStaticAnalysis, ScanPhase::CweRouting),
-    // Sequential phases
-    (ScanPhase::CweRouting, ScanPhase::LlmDiscovery),
-    (ScanPhase::LlmDiscovery, ScanPhase::LlmVerification),
-    (ScanPhase::LlmVerification, ScanPhase::Validate),
-    (ScanPhase::Validate, ScanPhase::TicketCrossRef),
-    (ScanPhase::TicketCrossRef, ScanPhase::GitAnalysis),
-    (ScanPhase::GitAnalysis, ScanPhase::CrossFileAnalysis),
-    (ScanPhase::CrossFileAnalysis, ScanPhase::ConfidenceScoring),
-    (ScanPhase::ConfidenceScoring, ScanPhase::AiAggregation),
-    (ScanPhase::AiAggregation, ScanPhase::RootCauseDedup),
-    (ScanPhase::RootCauseDedup, ScanPhase::CveBootstrap),
-    (ScanPhase::CveBootstrap, ScanPhase::Reporting),
-    (ScanPhase::Reporting, ScanPhase::Complete),
-    // Terminal states
-    (ScanPhase::Complete, ScanPhase::Indexing),
-    (ScanPhase::Error, ScanPhase::Indexing),
-];
 
 // ============================================================================
 // Test Fixtures
@@ -404,20 +382,46 @@ fn test_checkpoint_resume_from_error() {
 
 #[test]
 fn test_checkpoint_resume_from_all_phases() {
-    for (current_phase, expected_next) in PHASE_TRANSITION_TEST_CASES {
-        let mut checkpoint = create_test_checkpoint();
-        checkpoint.current_phase = current_phase.clone();
+    use baco::scanner::phase_spec::PhaseSpec;
 
-        let temp_path = get_temp_path(&format!("resume_{:?}", current_phase));
+    // The expected successor is the pipeline's own order, so a phase added to
+    // `PhaseSpec` cannot leave a hole here.
+    let chain: Vec<ScanPhase> = PhaseSpec::parallel()
+        .iter()
+        .chain(PhaseSpec::sequential().iter())
+        .cloned()
+        .collect();
+
+    for (index, phase) in chain.iter().enumerate() {
+        let expected_next = chain.get(index + 1).cloned().unwrap_or(ScanPhase::Complete);
+
+        let mut checkpoint = create_test_checkpoint();
+        checkpoint.current_phase = phase.clone();
+
+        let temp_path = get_temp_path(&format!("resume_{:?}", phase));
         checkpoint.save(&temp_path).unwrap();
 
-        let next_phase = Checkpoint::resume_from(&temp_path).unwrap();
         assert_eq!(
-            next_phase,
-            expected_next.clone(),
-            "Resume from {:?} should return {:?}",
-            current_phase,
-            expected_next
+            Checkpoint::resume_from(&temp_path).unwrap(),
+            expected_next,
+            "Resume from {phase:?} should return {expected_next:?}"
+        );
+
+        let _ = fs::remove_file(&temp_path);
+    }
+
+    // A terminal phase restarts the scan from the first phase.
+    for terminal in [ScanPhase::Complete, ScanPhase::Error] {
+        let mut checkpoint = create_test_checkpoint();
+        checkpoint.current_phase = terminal.clone();
+
+        let temp_path = get_temp_path(&format!("resume_terminal_{terminal:?}"));
+        checkpoint.save(&temp_path).unwrap();
+
+        assert_eq!(
+            Checkpoint::resume_from(&temp_path).unwrap(),
+            ScanPhase::Indexing,
+            "a terminal phase restarts the scan"
         );
 
         let _ = fs::remove_file(&temp_path);
@@ -499,13 +503,6 @@ fn test_checkpoint_serialization_with_all_phases() {
 // ============================================================================
 // ScanPhase Tests
 // ============================================================================
-
-#[test]
-fn test_scan_phase_equality() {
-    assert_eq!(ScanPhase::Indexing, ScanPhase::Indexing);
-    assert_ne!(ScanPhase::Indexing, ScanPhase::Semgrep);
-    assert_eq!(ScanPhase::Complete, ScanPhase::Complete);
-}
 
 #[test]
 fn test_scan_phase_debug() {

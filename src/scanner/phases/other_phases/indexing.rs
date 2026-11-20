@@ -121,7 +121,7 @@ fn unprotected_hook_finding(
     }
 }
 
-/// Run indexing phase (phase 1 of 23).
+/// Run indexing phase.
 pub async fn run_indexing(
     scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,

@@ -10,7 +10,6 @@ use baco::llm_verification::{
     RationaleVerdict, TriageResult, TriageVerdict, VerificationReport, VerificationResult,
     render_template,
 };
-use baco::project_type::ProjectType;
 use std::collections::HashMap;
 
 // ============================================================================
@@ -325,23 +324,6 @@ fn test_verification_result_with_finding() {
 
     assert_eq!(result.finding_id, finding.id);
     assert_eq!(result.status, VerificationStatus::Confirmed);
-}
-
-#[test]
-fn test_project_type_enum_variants() {
-    // Verify all ProjectType variants exist and can be used
-    let _web = ProjectType::Web;
-    let _cli = ProjectType::CLI;
-    let _library = ProjectType::Library;
-    let _embedded = ProjectType::Embedded;
-    let _firmware = ProjectType::Firmware;
-    let _desktop = ProjectType::Desktop;
-    let _game = ProjectType::Game;
-    let _unknown = ProjectType::Unknown;
-
-    // Verify they can be compared (they implement PartialEq)
-    assert_eq!(ProjectType::Web, ProjectType::Web);
-    assert_ne!(ProjectType::Web, ProjectType::CLI);
 }
 
 #[test]

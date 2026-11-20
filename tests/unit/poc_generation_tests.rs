@@ -874,21 +874,35 @@ fn test_poc_id_uniqueness() {
 
 #[test]
 fn test_template_key_format() {
-    // Test that template keys follow expected CWE:Format format
+    // The exact key set. A property check on the keys the engine happens to hold
+    // would not notice a template that is added, dropped or renamed.
     let engine = PoCGenerationEngine::new();
 
-    for key in engine.templates.keys() {
-        // Keys should contain a colon separating CWE and format
-        assert!(
-            key.contains(':'),
-            "Template key should contain colon: {}",
-            key
-        );
+    let mut keys: Vec<String> = engine.templates.keys().cloned().collect();
+    keys.sort();
 
-        let parts: Vec<&str> = key.split(':').collect();
-        assert_eq!(parts.len(), 2, "Template key should have exactly 2 parts");
-        assert!(parts[0].starts_with("CWE-"), "First part should be CWE ID");
-    }
+    let expected: Vec<String> = [
+        "CWE-119:Rust",
+        "CWE-121:Rust",
+        "CWE-22:Go",
+        "CWE-22:Python",
+        "CWE-327:Python",
+        "CWE-338:Python",
+        "CWE-502:Python",
+        "CWE-611:Python",
+        "CWE-78:Python",
+        "CWE-78:Shell",
+        "CWE-798:Python",
+        "CWE-79:Python",
+        "CWE-89:Go",
+        "CWE-89:Python",
+        "CWE-95:Python",
+    ]
+    .iter()
+    .map(|k| k.to_string())
+    .collect();
+
+    assert_eq!(keys, expected);
 }
 
 #[test]

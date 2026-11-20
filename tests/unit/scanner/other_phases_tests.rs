@@ -1904,3 +1904,56 @@ async fn test_llm_static_analysis_skips_when_no_api_key() {
     })
     .await;
 }
+
+// ============================================================================
+// Indexing Failure Behavior Test
+// ============================================================================
+
+/// PINS the current behavior: when indexing fails, the phase returns Ok
+/// with the original analyzed_files list (empty for the first phase).
+///
+/// This is a regression guard: any future change to this behavior (e.g.,
+/// aborting the scan on index failure) must be deliberate and documented.
+#[tokio::test]
+async fn test_indexing_failure_returns_ok_with_zero_files() {
+    use baco::scanner::phases::other_phases::indexing::run_indexing;
+
+    let scanner = create_test_scanner();
+    let config = create_test_config();
+    let pb = ProgressBar::hidden();
+    let metrics_tracker = LlmMetricsTracker::new();
+    let analyzed_files: Vec<String> = vec![];
+    // Use a non-existent directory to force indexing failure
+    let target_path = PathBuf::from("/non-existent-directory-for-testing");
+    let project_stack: Option<baco::scanner_types::project::ProjectStack> = None;
+    let phase = ScanPhase::Indexing;
+    let phase_config = PhaseConfig {
+        phase: &phase,
+        findings: vec![],
+        pb: &pb,
+        analyzed_files: &analyzed_files,
+        metrics_tracker: &metrics_tracker,
+        target_path: &target_path,
+        config: &config,
+        project_stack: &project_stack,
+    };
+
+    // Indexing should fail because the directory doesn't exist
+    let result = run_indexing(&scanner, phase_config).await;
+
+    // The current behavior: returns Ok with the original analyzed_files list
+    assert!(
+        result.is_ok(),
+        "indexing failure currently returns Ok, not Err"
+    );
+    let (findings, files) = result.unwrap();
+    assert!(
+        findings.is_empty(),
+        "no findings should be produced on index failure"
+    );
+    assert_eq!(
+        files.len(),
+        0,
+        "indexing failure returns the original analyzed_files list (empty for first phase)"
+    );
+}

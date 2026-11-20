@@ -82,10 +82,10 @@ fn test_root_cause_dedup_keeps_distinct_findings_separate() {
 }
 
 #[test]
-fn test_root_cause_dedup_preserves_one_finding_per_group() {
-    // Mirror the phase logic: create dedup, call deduplicate, then for each group
-    // pick group.findings.first() and find the matching finding in the original list.
-    // Assert the result has exactly 1 finding after dedup.
+fn root_cause_dedup_groups_findings_sharing_a_root_cause() {
+    // The "keep one per group" rule lives in the dedup phase. What the
+    // deduplicator owns is the grouping, so assert that exactly instead of
+    // replaying the phase's keep-one loop here.
     let mut dedup = RootCauseDeduplicator::new();
 
     let findings = vec![
@@ -112,27 +112,13 @@ fn test_root_cause_dedup_preserves_one_finding_per_group() {
         ),
     ];
 
-    let deduped_groups = dedup.deduplicate(findings.clone());
+    let groups = dedup.deduplicate(findings);
 
-    // Keep one finding per group (the first one encountered) - mirroring phases.rs:1084-1092
-    let mut kept_findings = Vec::new();
-    for group in deduped_groups {
-        if let Some(finding_id) = group.findings.first() {
-            // Find the original finding by ID
-            if let Some(finding) = findings.iter().find(|f| f.id == *finding_id) {
-                kept_findings.push(finding.clone());
-            }
-        }
-    }
-
+    assert_eq!(groups.len(), 1, "one root cause, so one group");
     assert_eq!(
-        kept_findings.len(),
-        1,
-        "Should preserve exactly 1 finding after dedup"
-    );
-    assert_eq!(
-        kept_findings[0].id, "f1",
-        "Should keep the first finding encountered"
+        groups[0].findings,
+        vec!["f1".to_string(), "f2".to_string(), "f3".to_string()],
+        "every finding with that root cause belongs to the group"
     );
 }
 

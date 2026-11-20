@@ -303,7 +303,11 @@ async fn run_parallel_phases(
             Err(e) => parallel_failures.push((ScanPhase::Semgrep, e.to_string())),
         }
     }
-    log_and_aggregate_llm_results(&llm_static_result, &mut findings, &mut analyzed_files);
+    if let Some(reason) =
+        log_and_aggregate_llm_results(&llm_static_result, &mut findings, &mut analyzed_files)
+    {
+        parallel_failures.push((ScanPhase::LlmStaticAnalysis, reason));
+    }
 
     tracing::info!("After parallel phases: {} findings total", findings.len());
 
@@ -326,7 +330,7 @@ async fn run_parallel_phases(
         .scanner
         .performance
         .early_termination_threshold;
-    if threshold > 0.0 && medium_plus_count as f32 > threshold {
+    if should_terminate_early(medium_plus_count, threshold) {
         let skipped_phases = skipped_sequential_phase_names();
         tracing::warn!(
             "Early termination triggered after parallel phases: {} medium+ findings > threshold {} (total findings: {}), skipping phases: {:?}",
@@ -390,6 +394,14 @@ fn sequential_phases() -> &'static [ScanPhase; 12] {
 ///
 /// Derived from `PhaseSpec::sequential()` and `ScanPhase`'s `Display`, so it
 /// cannot go stale when the pipeline changes.
+/// Whether the medium-and-above finding count should stop the pipeline early.
+///
+/// A threshold of zero disables termination entirely, and the comparison is
+/// strict: a count equal to the threshold keeps scanning.
+pub fn should_terminate_early(medium_plus_count: usize, threshold: f32) -> bool {
+    threshold > 0.0 && medium_plus_count as f32 > threshold
+}
+
 pub fn skipped_sequential_phase_names() -> Vec<String> {
     sequential_phases().iter().map(|p| p.to_string()).collect()
 }
@@ -524,7 +536,7 @@ async fn run_sequential_phases(
             .scanner
             .performance
             .early_termination_threshold;
-        if threshold > 0.0 && medium_plus_count as f32 > threshold {
+        if should_terminate_early(medium_plus_count, threshold) {
             let remaining_phases: Vec<&str> = all_sequential_phases
                 .iter()
                 .skip_while(|p| *p != phase)
@@ -722,19 +734,10 @@ pub(super) async fn run_scanner(
     );
 
     // Record LLM-config skips (override previous "run" status if needed)
-    for (phase, reason) in llm_config_skips {
-        // Find and update the phase status if it was recorded as run
-        if let Some(entry) = health
-            .phase_status
-            .iter_mut()
-            .find(|ps| ps.phase == crate::scan_health::phase_name(&phase))
-        {
-            entry.status = crate::scan_health::PhaseStatusKind::Skipped;
-            entry.reason = Some(reason.clone());
-        } else {
-            health.record_phase_skipped(&phase, &reason);
-        }
-    }
+    health.apply_skips(&llm_config_skips);
+
+    // Phases a config flag turns off: the recording pass above marks them as run.
+    health.apply_skips(&crate::scan_health::detect_config_skips(&scanner.config));
     // The indexing phase records how many files the indexer matched.
     health.set_indexed(scanner.state.borrow().files_scanned as u64);
 

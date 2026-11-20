@@ -87,5 +87,5 @@ fn default_false() -> bool {
 }
 
 fn default_db_path() -> String {
-    "baco-output/vuln_spec_db.json".to_string()
+    crate::config::specifications::DEFAULT_SPEC_DB_PATH.to_string()
 }

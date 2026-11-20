@@ -19,7 +19,7 @@ baco init /path/to/project
 
 ### `doctor` — Pre-flight system checks
 
-Validates the entire scan environment before running. Checks config parsing, preset resolution, LLM phase availability, semgrep installation, Python3, Joern (if CPG enabled), output directory writability, and disk space.
+Validates the entire scan environment before running. Checks config parsing, preset resolution, LLM phase availability, semgrep installation, Python3, output directory writability, and disk space.
 
 ```bash
 baco doctor              # Human-readable report
@@ -30,7 +30,7 @@ baco doctor --json       # JSON output for CI/CD
 
 ### `scan` — Run the vulnerability scan
 
-Executes the full 23-phase pipeline on a target project.
+Executes the full 15-phase pipeline on a target project.
 
 ```bash
 baco scan --config /path/to/baco.toml

@@ -83,3 +83,34 @@ fn test_cache_read_missing() {
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), None);
 }
+
+/// The `None` arm resolves against the process CWD, so it must not be taken
+/// quietly: that is how the cache once ended up inside the repository.
+#[test]
+fn an_unset_cache_dir_warns_before_falling_back_to_the_cwd() {
+    let logs = crate::log_capture::capture_logs(|| {
+        let dir = get_effective_cache_dir(None);
+        assert_eq!(dir, PathBuf::from("baco-output/llm-cache"));
+    });
+
+    assert!(
+        logs.contains("no cache directory is configured"),
+        "expected a warning, got {:?}",
+        logs.messages()
+    );
+}
+
+#[test]
+fn a_configured_cache_dir_needs_no_warning() {
+    let custom = "/custom/cache".to_string();
+    let logs = crate::log_capture::capture_logs(|| {
+        let dir = get_effective_cache_dir(Some(&custom));
+        assert_eq!(dir, PathBuf::from("/custom/cache"));
+    });
+
+    assert!(
+        !logs.contains("no cache directory"),
+        "a configured directory must stay silent, got {:?}",
+        logs.messages()
+    );
+}

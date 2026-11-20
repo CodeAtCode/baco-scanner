@@ -22,7 +22,6 @@ Common issues and solutions for the Baco SAST scanner.
 |---------|-------|-----|
 | Scan fails mid-way, can't resume | No checkpoint created | Re-run the scan from scratch. To enable checkpointing for future runs, ensure the output directory is writable. |
 | checkpoint.json not found | Output directory cleared | Re-run full scan; checkpoint is written to output dir |
-| Report missing threat modeling section | Feature disabled | Remove this row - threat modeling is a core phase that always runs |
 
 ## External Tool Dependencies
 
@@ -69,14 +68,13 @@ Resume with: baco resume --checkpoint <path>
 
 2. **Parallelize:** For large codebases, split into smaller modules and scan separately.
 
-3. **Use incremental scans:** After initial full scan, subsequent runs only process changed files.
+3. **Narrow the scope:** exclude vendored and generated trees in `[scanner] exclude_paths`. Note that incremental skipping is not implemented — every run re-reads every file.
 
 4. **Disable unused phases:** Keep `enable_confidence_refinement = false` to reduce LLM calls.
 
 ## Getting Help
 
 - Check config.toml for syntax errors
-- Verify Joern is installed and in PATH
 - Ensure per-phase LLM API keys are set (`[llm.phases.discovery.api_key]` or env vars like `LLM_DISCOVERY_KEY`)
 - Review checkpoint.json for scan state
 - Clear output directory for fresh start — this removes checkpoints, incremental scan hashes, and the prior-runs store. Findings are regenerated from scratch.
@@ -108,7 +106,7 @@ export LLM_VERIFICATION_KEY=your_api_key_here
 export LLM_AGGREGATION_KEY=your_api_key_here
 ```
 
-**Verify Joern installation:**
+**Check the tools the scan actually uses:**
 ```bash
-joern-cli --version
+baco doctor --config config.toml
 ```

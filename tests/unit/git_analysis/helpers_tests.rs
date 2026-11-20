@@ -372,65 +372,6 @@ fn test_get_commit_stats() {
     assert_eq!(stats.get("total_deletions"), Some(&7));
 }
 // ============================================================================
-// Diff Hunk Parsing Tests
-// ============================================================================
-
-#[test]
-fn test_hunk_header_parsing_simple() {
-    // @@ -10,5 +10,7 @@ function main()
-    let header = "@@ -10,5 +10,7 @@ function main()";
-
-    // Extract old start line
-    let parts: Vec<&str> = header.split(" @@").next().unwrap().split(' ').collect();
-    assert_eq!(parts.len(), 3);
-
-    let old_range = parts[1].trim_start_matches('-');
-    let old_start: i32 = old_range.split(',').next().unwrap().parse().unwrap();
-    assert_eq!(old_start, 10);
-}
-
-#[test]
-fn test_hunk_header_parsing_no_count() {
-    // @@ -10 +10,7 @@ (old count omitted means 1)
-    let header = "@@ -10 +10,7 @@";
-
-    let parts: Vec<&str> = header.split(" @@").next().unwrap().split(' ').collect();
-    let old_range = parts[1].trim_start_matches('-');
-    let old_start: i32 = old_range.split(',').next().unwrap().parse().unwrap();
-    assert_eq!(old_start, 10);
-}
-
-#[test]
-fn test_path_extraction_from_diff() {
-    // diff --git a/src/main.c b/src/main.c
-    let diff_line = "diff --git a/src/main.c b/src/main.c";
-
-    // Extract path after "b/"
-    if let Some(start) = diff_line.find("b/") {
-        let path = &diff_line[start + 2..];
-        // Path should be "src/main.c"
-        assert_eq!(path, "src/main.c");
-    }
-}
-
-#[test]
-fn test_rename_detection_in_diff() {
-    // rename from a/old/path.c
-    // rename to b/new/path.c
-    let rename_from = "rename from a/old/path.c";
-    let rename_to = "rename to b/new/path.c";
-
-    assert!(rename_from.contains("rename from"));
-    assert!(rename_to.contains("rename to"));
-
-    let old_path = rename_from.trim_start_matches("rename from a/");
-    let new_path = rename_to.trim_start_matches("rename to b/");
-
-    assert_eq!(old_path, "old/path.c");
-    assert_eq!(new_path, "new/path.c");
-}
-
-// ============================================================================
 // Commit Reference Field Tests
 // ============================================================================
 

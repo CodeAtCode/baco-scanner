@@ -386,3 +386,60 @@ pub fn phase_name(phase: &ScanPhase) -> String {
 pub fn from_llm_metrics(metrics: &LlmMetrics) -> (u64, u64) {
     (metrics.total_success, metrics.total_failed)
 }
+
+/// Phases that a configuration flag turns off.
+///
+/// The recording pass marks every planned phase as run, so without this the
+/// operator sees a phase listed as executed when they had disabled it.
+pub fn detect_config_skips(config: &crate::config::ScannerConfig) -> Vec<(ScanPhase, String)> {
+    let checks: [(ScanPhase, bool, &str); 4] = [
+        (
+            ScanPhase::CweRouting,
+            config.router.enabled,
+            "router.enabled",
+        ),
+        (
+            ScanPhase::ConfidenceScoring,
+            config.scanner.performance.enable_confidence_refinement,
+            "scanner.performance.enable_confidence_refinement",
+        ),
+        (
+            ScanPhase::CveBootstrap,
+            config.scanner.performance.enable_cve_bootstrap,
+            "scanner.performance.enable_cve_bootstrap",
+        ),
+        (
+            ScanPhase::RootCauseDedup,
+            config.scanner.performance.enable_root_cause_dedup,
+            "scanner.performance.enable_root_cause_dedup",
+        ),
+    ];
+
+    checks
+        .into_iter()
+        .filter(|(_, enabled, _)| !enabled)
+        .map(|(phase, _, key)| (phase, format!("disabled by `{key} = false`")))
+        .collect()
+}
+
+impl ScanHealth {
+    /// Apply a list of skips over the recorded phase statuses.
+    ///
+    /// The initial pass records every planned phase as run, so a skip has to
+    /// overwrite that entry rather than add a second one.
+    pub fn apply_skips(&mut self, skips: &[(ScanPhase, String)]) {
+        for (phase, reason) in skips {
+            match self
+                .phase_status
+                .iter_mut()
+                .find(|ps| ps.phase == phase_name(phase))
+            {
+                Some(entry) => {
+                    entry.status = PhaseStatusKind::Skipped;
+                    entry.reason = Some(reason.clone());
+                }
+                None => self.record_phase_skipped(phase, reason),
+            }
+        }
+    }
+}

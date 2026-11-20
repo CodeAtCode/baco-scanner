@@ -14,10 +14,10 @@ BACO supports analysis of multiple programming languages through a combination o
 | Language      | Static analysis          | LLM analysis |
 | ------------- | ------------------------ | ------------ |
 | C / C++       | tree-sitter + semgrep    | ✅           |
-| Rust          | tree-sitter + semgrep    | ✅           |
+| Rust          | tree-sitter              | ✅           |
 | Python        | tree-sitter + semgrep    | ✅           |
 | JavaScript    | tree-sitter + semgrep    | ✅           |
-| TypeScript    | tree-sitter + semgrep    | ✅           |
+| TypeScript    | tree-sitter + JS rules   | ✅           |
 | PHP           | tree-sitter + semgrep    | ✅           |
 | Go            | tree-sitter + semgrep    | ✅           |
 | Java          | tree-sitter + semgrep    | ✅           |
@@ -26,6 +26,6 @@ BACO supports analysis of multiple programming languages through a combination o
 
 ## Notes
 
-- All supported languages receive both static analysis (semgrep rules) and LLM verification
-- CPG-based analysis (Joern) is available for C/C++, Java, and Python when enabled
+- All supported languages receive tree-sitter parsing and LLM verification
+- The bundled semgrep taint rules cover C/C++, Python, JavaScript/TypeScript, PHP, Go, Java, C# and Ruby. Rust is parsed by tree-sitter but has no bundled taint rule file, so only the rulesets you configure apply
 - Tree-sitter grammars must be available for each language (handled automatically by BACO)

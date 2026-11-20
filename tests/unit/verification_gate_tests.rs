@@ -64,10 +64,9 @@ fn test_not_reachable_kills_the_finding() {
     );
     let out = parse_batch_verification_verdict(&body, 1);
     assert_eq!(out[0].0, VerificationStatus::NeedsReview);
-    assert!(
-        out[0].1.contains("not reachable"),
-        "the reason must say which gate answer killed it, got {:?}",
-        out[0].1
+    assert_eq!(
+        out[0].1,
+        "looks real (gate: not reachable from user input (needs human review))"
     );
 }
 
@@ -80,7 +79,10 @@ fn test_uncontrollable_input_kills_the_finding() {
     );
     let out = parse_batch_verification_verdict(&body, 1);
     assert_eq!(out[0].0, VerificationStatus::NeedsReview);
-    assert!(out[0].1.contains("does not control"));
+    assert_eq!(
+        out[0].1,
+        "looks real (gate: attacker does not control the input (needs human review))"
+    );
 }
 
 #[test]
@@ -94,7 +96,10 @@ fn test_an_existing_guard_kills_the_finding() {
     );
     let out = parse_batch_verification_verdict(&body, 1);
     assert_eq!(out[0].0, VerificationStatus::FalsePositive);
-    assert!(out[0].1.contains("validation"));
+    assert_eq!(
+        out[0].1,
+        "looks real (gate: blocked by existing validation)"
+    );
 }
 
 #[test]
@@ -106,7 +111,10 @@ fn test_no_code_evidence_demotes_to_needs_review() {
     );
     let out = parse_batch_verification_verdict(&body, 1);
     assert_eq!(out[0].0, VerificationStatus::NeedsReview);
-    assert!(out[0].1.contains("no code evidence"));
+    assert_eq!(
+        out[0].1,
+        "looks real (gate: no code evidence for the claim)"
+    );
 }
 
 #[test]
@@ -119,7 +127,10 @@ fn test_a_theoretical_impact_demotes_to_needs_review() {
     );
     let out = parse_batch_verification_verdict(&body, 1);
     assert_eq!(out[0].0, VerificationStatus::NeedsReview);
-    assert!(out[0].1.contains("theoretical"));
+    assert_eq!(
+        out[0].1,
+        "looks real (gate: impact is theoretical or unstated)"
+    );
 }
 
 #[test]
@@ -173,10 +184,9 @@ fn test_a_confirmed_verdict_without_a_gate_downgrades_to_needs_review() {
         VerificationStatus::NeedsReview,
         "a confirmed verdict without a gate must downgrade"
     );
-    assert!(
-        out[0].1.contains("missing seven_question_gate"),
-        "the reason must name the missing gate, got {:?}",
-        out[0].1
+    assert_eq!(
+        out[0].1,
+        "legacy shape (gate: missing seven_question_gate for confirmed verdict)"
     );
 }
 
@@ -221,8 +231,9 @@ fn test_a_non_confirmed_verdict_is_never_overridden() {
     let out = parse_batch_verification_verdict(body, 1);
     assert_eq!(out[0].0, VerificationStatus::FalsePositive);
     assert!(
-        out[0].1.contains("check_admin_referer"),
-        "the model's reason survives"
+        out[0].1.starts_with("protected by check_admin_referer"),
+        "the model's reason must survive, got {:?}",
+        out[0].1
     );
 }
 
@@ -310,18 +321,10 @@ fn test_verification_prompt_loaded_from_file_not_hardcoded() {
         loaded_prompt.contains("Concrete Impact Proof"),
         "prompt must contain the Concrete Impact Proof section"
     );
-
-    // Empirical proof: if we add a unique marker to the file, it must appear in the loaded prompt
-    // This proves the prompt is loaded dynamically, not from a hardcoded string
-    if loaded_prompt.contains("EMPIRICAL TEST MARKER") {
-        // The marker is present - this proves dynamic loading
-        // (This assertion will pass when the marker is in the file)
-    } else {
-        // The marker is not present - this is expected in normal operation
-        // If this assertion fails, it means the file was changed but the code is not reloading it
-        // which would indicate a hardcoded string
-        // For now, we just note this - the test passes either way
-    }
+    assert!(
+        loaded_prompt.contains("Buffer-Size Bound Check"),
+        "prompt must contain the buffer-size bound check"
+    );
 }
 
 // ============================================================================
@@ -361,10 +364,9 @@ fn test_reachability_no_downgrades_to_needs_review_not_false_positive() {
         "reachability=NO should downgrade to NeedsReview, not FalsePositive"
     );
     let reason_str = reason.unwrap();
-    assert!(
-        reason_str.contains("not reachable"),
-        "reason must explain why: {:?}",
-        reason_str
+    assert_eq!(
+        reason_str,
+        "gate: not reachable from user input (needs human review)"
     );
 }
 
@@ -399,10 +401,9 @@ fn test_controllability_no_downgrades_to_needs_review_not_false_positive() {
         "controllability=NO should downgrade to NeedsReview, not FalsePositive"
     );
     let reason_str = reason.unwrap();
-    assert!(
-        reason_str.contains("does not control"),
-        "reason must explain why: {:?}",
-        reason_str
+    assert_eq!(
+        reason_str,
+        "gate: attacker does not control the input (needs human review)"
     );
 }
 
@@ -437,11 +438,7 @@ fn test_preconditions_yes_still_downgrades_to_false_positive() {
         "preconditions=YES should still downgrade to FalsePositive (explicit sanitization)"
     );
     let reason_str = reason.unwrap();
-    assert!(
-        reason_str.contains("validation"),
-        "reason must mention validation: {:?}",
-        reason_str
-    );
+    assert_eq!(reason_str, "gate: blocked by existing validation");
 }
 
 #[test]
@@ -475,10 +472,9 @@ fn test_context_no_still_downgrades_to_false_positive() {
         "context=NO should still downgrade to FalsePositive (test code)"
     );
     let reason_str = reason.unwrap();
-    assert!(
-        reason_str.contains("test"),
-        "reason must mention test code: {:?}",
-        reason_str
+    assert_eq!(
+        reason_str,
+        "gate: test or example code, not a production path"
     );
 }
 
@@ -514,9 +510,8 @@ fn test_impact_no_downgrades_to_needs_review_not_false_positive() {
         "impact=NO should downgrade to NeedsReview, not FalsePositive"
     );
     let reason_str = reason.unwrap();
-    assert!(
-        reason_str.contains("no concrete security impact"),
-        "reason must explain why: {:?}",
-        reason_str
+    assert_eq!(
+        reason_str,
+        "gate: no concrete security impact (needs human review)"
     );
 }

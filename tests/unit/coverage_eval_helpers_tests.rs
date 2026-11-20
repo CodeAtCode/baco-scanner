@@ -545,7 +545,13 @@ fn write_findings(dir: &std::path::Path, stem: &str, body: &str) {
 fn run_suite_missing_oracles_dir_errors() {
     let temp = TempDir::new().unwrap();
     let err = baco::eval::run_suite(temp.path()).unwrap_err();
-    assert!(err.contains("not found"), "unexpected: {err}");
+    assert_eq!(
+        err,
+        format!(
+            "Eval oracles directory not found: {}",
+            temp.path().join("oracles").display()
+        )
+    );
 }
 
 #[test]
@@ -553,7 +559,13 @@ fn run_suite_empty_oracles_dir_errors() {
     let temp = TempDir::new().unwrap();
     std::fs::create_dir_all(temp.path().join("oracles")).unwrap();
     let err = baco::eval::run_suite(temp.path()).unwrap_err();
-    assert!(err.contains("No oracle files"), "unexpected: {err}");
+    assert_eq!(
+        err,
+        format!(
+            "No oracle files found in {}",
+            temp.path().join("oracles").display()
+        )
+    );
 }
 
 #[test]
@@ -561,7 +573,14 @@ fn run_suite_bad_oracle_json_errors() {
     let temp = TempDir::new().unwrap();
     write_oracle(temp.path(), "probe", "{not json");
     let err = baco::eval::run_suite(temp.path()).unwrap_err();
-    assert!(err.contains("probe.json"), "unexpected: {err}");
+    // The tail is the parser's own message, so pin the prefix and the path.
+    assert!(
+        err.starts_with(&format!(
+            "{}: ",
+            temp.path().join("oracles").join("probe.json").display()
+        )),
+        "unexpected: {err}"
+    );
 }
 
 #[test]
@@ -573,7 +592,13 @@ fn run_suite_stem_mismatch_errors() {
         r#"{"target": "other", "description": "d", "expected_findings": [], "expected_suppressed": []}"#,
     );
     let err = baco::eval::run_suite(temp.path()).unwrap_err();
-    assert!(err.contains("declares target"), "unexpected: {err}");
+    assert_eq!(
+        err,
+        format!(
+            "Oracle {} declares target 'other' but the file stem is 'probe'",
+            temp.path().join("oracles").join("probe.json").display()
+        )
+    );
 }
 
 #[test]
@@ -585,7 +610,8 @@ fn run_suite_missing_findings_file_errors() {
         r#"{"target": "probe", "description": "d", "expected_findings": [], "expected_suppressed": []}"#,
     );
     let err = baco::eval::run_suite(temp.path()).unwrap_err();
-    assert!(!err.is_empty());
+    // The tail is the validator's own message; the target prefix is ours.
+    assert!(err.starts_with("Target probe: "), "unexpected: {err}");
 }
 
 #[test]

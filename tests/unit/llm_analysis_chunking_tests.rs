@@ -382,22 +382,15 @@ fn test_chunk_from_span_no_trailing_newline() {
 
     let chunks = LlmAnalyzer::chunk_file_with_ranges(content, "rust", 1000);
 
-    assert!(!chunks.is_empty(), "Should produce at least one chunk");
-
-    // Check that line numbers are calculated correctly without trailing newline
-    for chunk in &chunks {
-        // Verify the chunk text matches the expected lines
-        let lines: Vec<&str> = content.lines().collect();
-        let expected_text = lines[chunk.start_line - 1..chunk.end_line].join("\n");
-
-        assert_eq!(
-            chunk.text.trim_end_matches('\n'),
-            expected_text,
-            "Chunk {}-{} should be exact slice (no trailing newline case)",
-            chunk.start_line,
-            chunk.end_line
-        );
-    }
+    // The expectation is a literal, not a slice derived from the chunk's own line
+    // numbers: that version moves with the bug it is meant to catch.
+    assert_eq!(chunks.len(), 1, "the file fits in one chunk");
+    assert_eq!(
+        chunks[0].text.trim_end_matches('\n'),
+        "fn a() {}\nfn b() {}"
+    );
+    assert_eq!(chunks[0].start_line, 1);
+    assert_eq!(chunks[0].end_line, 2);
 }
 
 // ============================================================================

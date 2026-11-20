@@ -31,15 +31,12 @@
   - [VulnLLM-R Policy Sampling (P2.2)](#vulnllm-r-policy-sampling-p22)
   - [VulnLLM-R Agent Scaffold (P2.5)](#vulnllm-r-agent-scaffold-p25)
   - [Truncated Generation (P2.1)](#truncated-generation-p21)
-  - [MoCQ Neuro-Symbolic Rule Synthesis (P3)](#mocq-neuro-symbolic-rule-synthesis-p3)
-  - [CPG-Guided Slicing (T3.1)](#cpg-guided-slicing-t31)
   - [PacVD Primitive-API Abstraction (P4)](#pacvd-primitive-api-abstraction-p4)
   - [Citation Verification Gate](#citation-verification-gate)
   - [Prior-Runs Store](#prior-runs-store)
   - [Org-Context Profile](#org-context-profile)
   - [Domain-Routed Hunt Prompts](#domain-routed-hunt-prompts)
   - [Taint Rules](#taint-rules)
-  - [Exploit Synthesis (T3.2)](#exploit-synthesis-t32)
   - [Confidence Normalization](#confidence-normalization)
 - [Triage Configuration](#triage-configuration)
 - [Priority Configuration](#priority-configuration)
@@ -796,13 +793,13 @@ The `[vuln_spec]` section configures the VulInSpec security specification extrac
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `enabled` | bool | `false` | Enable VulInSpec |
-| `db_path` | str | `"baco-output/vuln_spec_db.json"` | Path to the specification database (JSON file) |
+| `db_path` | str | `"vuln_spec_db.json"` | Path to the specification database (JSON file) |
 | `auto_extract_from_patches` | bool | `false` | Automatically extract specs from incoming patches |
 
 ```toml
 [vuln_spec]
 enabled = false
-db_path = "baco-output/vuln_spec_db.json"
+db_path = "vuln_spec_db.json"
 auto_extract_from_patches = false
 ```
 

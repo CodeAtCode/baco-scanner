@@ -16,8 +16,8 @@ This document covers the papers already integrated into baco's architecture — 
 | Context-Enhanced Vulnerability Detection | Multi-level context injection | Integrated | Always on |
 | VulIn (BM25 RAG) | Specification RAG with BM25 retrieval | Integrated | Always on |
 | VulTriage | Triple-path context augmentation | Integrated | `vultriage.enabled=true` |
-| LLMxCPG (Usenix 2025) | CPG-guided code slicing | Integrated | `cpg.enabled=true` |
-| MoCQ | LLM-generated semgrep rules | Integrated | `rulesynth.enabled=true` |
+| LLMxCPG (Usenix 2025) | CPG-guided code slicing | Surveyed | not integrated |
+| MoCQ | LLM-generated semgrep rules | Surveyed | not integrated |
 | QRS | LLM-to-CodeQL with adversarial validation | Integrated | Always on |
 | MoEVD (FSE 2025) | Per-CWE model routing | Integrated | `router.enabled=true` |
 | R2Vul + VULPO | Reasoning distillation + RL | Surveyed | N/A |
@@ -105,7 +105,7 @@ For the broader survey of 36 surveyed papers and the selection criteria for the 
 
 **Key Result:** CPG-guided slicing achieved the highest quality gain among context techniques, reducing code volume dramatically while maintaining analysis accuracy.
 
-**Baco Integration:** Baco integrates CPG-guided slicing using Joern CPG to reduce code volume for LLM analysis while preserving critical vulnerability paths. Enabled via `cpg.enabled=true`.
+**Baco Integration:** Surveyed, **not integrated**. The Joern CPG slice phase was removed from the pipeline.
 
 ## Rule Synthesis & Exploit Generation
 
@@ -117,7 +117,7 @@ For the broader survey of 36 surveyed papers and the selection criteria for the 
 
 **Key Result:** LLM-driven rule synthesis achieved rapid F-score improvement through automated pattern generation and validation, demonstrating the viability of synthetic rule creation.
 
-**Baco Integration:** Baco implements LLM-driven semgrep rule synthesis with validation, using the cargo-based build system for rapid rule iteration. Enabled via `rulesynth.enabled=true`.
+**Baco Integration:** Surveyed, **not integrated**. The rule-synthesis phase was removed from the pipeline.
 
 ### QRS (2602.09774)
 
@@ -127,7 +127,7 @@ For the broader survey of 36 surveyed papers and the selection criteria for the 
 
 **Key Result:** The LLM-to-rule compiler with adversarial validation produced high-quality CodeQL queries that matched or exceeded manually created rules.
 
-**Baco Integration:** Baco implements adversarial exploit synthesis to validate generated rules, using the QRS pattern for dynamic rule verification.
+**Baco Integration:** Surveyed, **not integrated**. The exploit-synthesis phase was removed from the pipeline.
 
 ## Model Specialization & Routing
 

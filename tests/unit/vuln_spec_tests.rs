@@ -46,7 +46,7 @@ fn test_vuln_spec_config_defaults() {
     let config = VulnSpecConfig::default();
 
     assert!(!config.enabled, "Should be disabled by default");
-    assert_eq!(config.db_path, "baco-output/vuln_spec_db.json");
+    assert_eq!(config.db_path, "vuln_spec_db.json");
     assert!(!config.auto_extract_from_patches);
 }
 

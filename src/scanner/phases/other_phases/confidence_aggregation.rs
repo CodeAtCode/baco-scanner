@@ -7,7 +7,16 @@ use crate::scanner::phases::PhaseConfig;
 /// Project baseline file name.
 const PROJECT_BASELINE_FILE: &str = "project-baseline.json";
 
-/// Run confidence scoring phase (phase 14 of 23).
+/// Whether a finding's triage outcome counts as a true positive for the baseline.
+///
+/// Only an explicit kill is a false positive. A downgrade still reports a real
+/// issue, and an un-triaged finding counts as a positive because the baseline's
+/// rate feeds confidence scaling and must not be guessed downward.
+pub fn counts_as_true_positive(verdict: Option<&crate::findings::TriageVerdict>) -> bool {
+    !matches!(verdict, Some(crate::findings::TriageVerdict::Kill))
+}
+
+/// Run confidence scoring phase.
 pub async fn run_confidence_scoring(
     _scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,
@@ -87,11 +96,15 @@ pub async fn run_confidence_scoring(
         }
     }
 
-    // Update baseline with this run's findings (simplified: treat all as potential TP)
-    // In a full implementation, this would use triage outcomes
+    // The baseline's false-positive rate is what `ProjectRelative` normalization
+    // scales confidence by, so a finding the triage phase killed has to count as a
+    // false positive here. Recording every finding as a positive pinned the rate
+    // at zero and inflated every confidence by the full scale factor.
     for finding in &updated_findings {
-        // For now, just count findings - real FP tracking requires triage feedback
-        baseline.update(finding.confidence_score, true);
+        baseline.update(
+            finding.confidence_score,
+            counts_as_true_positive(finding.triage_verdict.as_ref()),
+        );
     }
 
     // Save updated baseline
@@ -136,7 +149,7 @@ pub async fn run_confidence_scoring(
     Ok((updated_findings, analyzed_files.to_vec()))
 }
 
-/// Run AI aggregation phase (phase 15 of 23).
+/// Run AI aggregation phase.
 pub async fn run_ai_aggregation(
     _scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,
@@ -171,7 +184,7 @@ pub async fn run_ai_aggregation(
     Ok((enriched_findings, analyzed_files.to_vec()))
 }
 
-/// Run reporting phase (phase 24 of 23).
+/// Run reporting phase.
 pub async fn run_reporting(
     scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,

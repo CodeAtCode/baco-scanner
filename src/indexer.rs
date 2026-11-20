@@ -132,6 +132,12 @@ impl FileIndex {
         })
     }
 
+    /// Index a project, recording a content hash for every file.
+    ///
+    /// Despite the name, nothing incremental happens: every file is hashed on
+    /// every run, no comparison against a previous store is made, and the caller
+    /// discards the store this returns. See the `incremental_scan` module doc for
+    /// why skipping is not wired.
     pub fn index_project_incremental(
         project_path: &str,
         languages: &[String],

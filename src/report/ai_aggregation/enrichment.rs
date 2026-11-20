@@ -12,10 +12,10 @@ pub struct EnrichmentService {
 
 /// Batch enrichment item (index + description + recommendation)
 #[derive(Deserialize, Debug)]
-struct BatchEnrichmentItem {
-    index: usize,
-    description: Option<String>,
-    recommendation: Option<String>,
+pub struct BatchEnrichmentItem {
+    pub index: usize,
+    pub description: Option<String>,
+    pub recommendation: Option<String>,
 }
 
 /// Build stable prefix for enrichment prompt (byte-stable across findings)
@@ -423,12 +423,22 @@ impl EnrichmentService {
 
     /// Extract a field value from JSON response (public for deduplication module)
     pub fn extract_json_field(json: &str, field: &str) -> Option<String> {
-        let pattern = format!("\"{}\":\\s*\"([^\"]+)\"", field);
-        if let Some(caps) = regex::Regex::new(&pattern).ok()?.captures(json) {
+        // A verdict may arrive as a JSON string or as a bare true/false/1/0, so
+        // match the string shape first and then the unquoted one.
+        let string_pattern = format!("\"{}\":\\s*\"([^\"]+)\"", field);
+        if let Some(caps) = regex::Regex::new(&string_pattern).ok()?.captures(json) {
             if let Some(m) = caps.get(1) {
                 return Some(m.as_str().to_string());
             }
         }
+
+        let bare_pattern = format!("\"{}\":\\s*(true|false|\\d+)", field);
+        if let Some(caps) = regex::Regex::new(&bare_pattern).ok()?.captures(json) {
+            if let Some(m) = caps.get(1) {
+                return Some(m.as_str().to_string());
+            }
+        }
+
         None
     }
 }

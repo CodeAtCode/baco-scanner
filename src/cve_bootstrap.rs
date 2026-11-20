@@ -54,7 +54,35 @@ pub struct CveBootstrapper {
 /// "is there PHP here", not to inventory the tree. Indexing does the full job.
 const MAX_STACK_SCAN_DEPTH: usize = 3;
 
-fn has_source_file(root: &Path, extensions: &[&str], max_depth: usize) -> bool {
+/// Split a CPE 2.3 string into its vendor and product fields.
+///
+/// `cpe:2.3:a:vendor:product:version:...` — `None` when the string is too short
+/// to carry both. The vendor is the fourth field and the product the fifth.
+pub fn cpe_vendor_product(cpe: &str) -> Option<(&str, &str)> {
+    let parts: Vec<&str> = cpe.split(':').collect();
+    if parts.len() >= 5 {
+        Some((parts[3], parts[4]))
+    } else {
+        None
+    }
+}
+
+/// The vendor and product to query NVD with, derived from a dependency name.
+///
+/// A scoped or namespaced name (`@scope/pkg`, `org/repo`) splits on the slash; a
+/// bare name uses its first hyphen-delimited segment as the vendor and the whole
+/// name as the product.
+pub fn dependency_vendor_product(name: &str) -> (String, String) {
+    let parts: Vec<&str> = name.split('/').collect();
+    if parts.len() >= 2 {
+        (parts[0].to_string(), parts[1].to_string())
+    } else {
+        let vendor = name.split('-').next().unwrap_or(name).to_string();
+        (vendor, name.to_string())
+    }
+}
+
+pub fn has_source_file(root: &Path, extensions: &[&str], max_depth: usize) -> bool {
     let mut dirs = vec![(root.to_path_buf(), 0usize)];
     while let Some((dir, depth)) = dirs.pop() {
         let Ok(entries) = fs::read_dir(&dir) else {
@@ -385,11 +413,7 @@ impl CveBootstrapper {
         // If CPE hint is set, use it for CVE matching
         if let Some(cpe) = &self.cpe_hint {
             // Parse CPE format: cpe:2.3:a:vendor:product:version:*:*:*:*:*:*:*
-            let parts: Vec<&str> = cpe.split(':').collect();
-            if parts.len() >= 5 {
-                let vendor = parts[3];
-                let product = parts[4];
-
+            if let Some((vendor, product)) = cpe_vendor_product(cpe) {
                 match self.client.fetch_nvd_cves(vendor, product).await {
                     Ok(cves) => all_cves.extend(cves),
                     Err(e) => {
@@ -401,13 +425,7 @@ impl CveBootstrapper {
 
         // Also fetch CVEs based on dependency name matching
         for dep in &stack.dependencies {
-            let parts: Vec<&str> = dep.name.split('/').collect();
-            let (vendor, product) = if parts.len() >= 2 {
-                (parts[0].to_string(), parts[1].to_string())
-            } else {
-                let name = dep.name.split('-').next().unwrap_or(&dep.name).to_string();
-                (name, dep.name.clone())
-            };
+            let (vendor, product) = dependency_vendor_product(&dep.name);
 
             match self.client.fetch_nvd_cves(&vendor, &product).await {
                 Ok(cves) => all_cves.extend(cves),

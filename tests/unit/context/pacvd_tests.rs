@@ -23,14 +23,6 @@ fn test_abstraction_level_ordering() {
 }
 
 #[test]
-fn test_abstraction_level_equality() {
-    assert_eq!(AbstractionLevel::Primitive, AbstractionLevel::Primitive);
-    assert_eq!(AbstractionLevel::Typed, AbstractionLevel::Typed);
-    assert_eq!(AbstractionLevel::Grouped, AbstractionLevel::Grouped);
-    assert_eq!(AbstractionLevel::Semantic, AbstractionLevel::Semantic);
-}
-
-#[test]
 fn test_abstraction_level_ord_values() {
     assert_eq!(AbstractionLevel::Primitive as u8, 0);
     assert_eq!(AbstractionLevel::Typed as u8, 1);

@@ -13,8 +13,6 @@ mod helpers_tests;
 mod mod_tests;
 mod orchestrator_inline_tests;
 mod other_phases_tests;
-mod parallel_error_tests;
-mod parallel_tests;
 mod phases;
 mod sequential_tests;
 mod static_analysis_tests;
