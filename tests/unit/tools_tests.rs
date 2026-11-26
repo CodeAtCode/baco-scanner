@@ -22,12 +22,12 @@ mod tests {
         let input = DiffAnalysisInput {
             file_path: "README.md".to_string(),
             repo_path: None,
-            base_commit: Some("v1.0.0".to_string()),
-            head_commit: Some("v1.0.1".to_string()),
+            base_commit: Some("baco-nonexistent-ref-000".to_string()),
+            head_commit: Some("baco-nonexistent-ref-001".to_string()),
         };
 
         let result = analyze_diff(input);
-        // These revspecs do not resolve in this repository (no tags, single commit), so
+        // These revspecs do not resolve anywhere (fabricated names), so
         // analyze_diff must reject them rather than report an empty diff as success.
         assert!(result.is_err(), "unresolvable revspec should be rejected");
     }
@@ -38,12 +38,12 @@ mod tests {
         let input = DiffAnalysisInput {
             file_path: "README.md".to_string(),
             repo_path: None,
-            base_commit: Some("v1.0.0".to_string()),
+            base_commit: Some("baco-nonexistent-ref-000".to_string()),
             head_commit: None,
         };
 
         let result = analyze_diff(input);
-        // These revspecs do not resolve in this repository (no tags, single commit), so
+        // These revspecs do not resolve anywhere (fabricated names), so
         // analyze_diff must reject them rather than report an empty diff as success.
         assert!(result.is_err(), "unresolvable revspec should be rejected");
     }
@@ -55,11 +55,11 @@ mod tests {
             file_path: "README.md".to_string(),
             repo_path: None,
             base_commit: None,
-            head_commit: Some("v1.0.1".to_string()),
+            head_commit: Some("baco-nonexistent-ref-001".to_string()),
         };
 
         let result = analyze_diff(input);
-        // These revspecs do not resolve in this repository (no tags, single commit), so
+        // These revspecs do not resolve anywhere (fabricated names), so
         // analyze_diff must reject them rather than report an empty diff as success.
         assert!(result.is_err(), "unresolvable revspec should be rejected");
     }

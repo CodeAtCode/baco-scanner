@@ -142,12 +142,12 @@ fn test_diff_analysis_both_commits_inline_migrated() {
     let input = DiffAnalysisInput {
         file_path: "README.md".to_string(),
         repo_path: None,
-        base_commit: Some("v1.0.0".to_string()),
-        head_commit: Some("v1.0.1".to_string()),
+        base_commit: Some("baco-nonexistent-ref-000".to_string()),
+        head_commit: Some("baco-nonexistent-ref-001".to_string()),
     };
 
     let result = analyze_diff(input);
-    // Tags v1.0.0/v1.0.1 do not exist here, so the revspec cannot resolve.
+    // Fabricated revspecs can never resolve, so the revspec must be rejected.
     assert!(
         result.is_err(),
         "an unresolvable revspec should be rejected"
@@ -159,12 +159,12 @@ fn test_diff_analysis_only_base_inline_migrated() {
     let input = DiffAnalysisInput {
         file_path: "README.md".to_string(),
         repo_path: None,
-        base_commit: Some("v1.0.0".to_string()),
+        base_commit: Some("baco-nonexistent-ref-000".to_string()),
         head_commit: None,
     };
 
     let result = analyze_diff(input);
-    // Tags v1.0.0/v1.0.1 do not exist here, so the revspec cannot resolve.
+    // Fabricated revspecs can never resolve, so the revspec must be rejected.
     assert!(
         result.is_err(),
         "an unresolvable revspec should be rejected"
@@ -177,11 +177,11 @@ fn test_diff_analysis_only_head_inline_migrated() {
         file_path: "README.md".to_string(),
         repo_path: None,
         base_commit: None,
-        head_commit: Some("v1.0.1".to_string()),
+        head_commit: Some("baco-nonexistent-ref-001".to_string()),
     };
 
     let result = analyze_diff(input);
-    // Tags v1.0.0/v1.0.1 do not exist here, so the revspec cannot resolve.
+    // Fabricated revspecs can never resolve, so the revspec must be rejected.
     assert!(
         result.is_err(),
         "an unresolvable revspec should be rejected"
