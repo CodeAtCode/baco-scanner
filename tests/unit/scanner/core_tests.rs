@@ -6,7 +6,7 @@
 use baco::checkpoint::ScanPhase;
 use baco::config::{
     LlmConfig, LlmPhaseConfig, LlmPhasesConfig, OutputConfig, PerformanceSettings, ProjectConfig,
-    ScannerConfig, ScannerSettings, SemgrepSettings,
+    ScannerConfig, ScannerSettings,
 };
 use baco::findings::{Severity, VulnerabilityFinding};
 use baco::scanner::Scanner;
@@ -769,52 +769,43 @@ fn create_config_without_llm_keys() -> baco::config::ScannerConfig {
     baco::config::ScannerConfig {
         output: OutputConfig {
             dir: "/tmp/baco_run_test_output".to_string(),
-            evidence_gate: false,
-            include_rejected: false,
+            ..Default::default()
         },
         scanner: ScannerSettings {
             performance: PerformanceSettings {
                 early_termination_threshold: 100.0,
                 ..Default::default()
             },
-            ..Default::default()
+            ..baco::config::ScannerSettings::default()
         },
         llm: LlmConfig {
             phases: LlmPhasesConfig {
                 // All phases have no API key, so LLM calls will be skipped
                 discovery: LlmPhaseConfig {
                     base_url: "http://localhost:11434".to_string(),
-                    api_key: None,
                     model: "llama3.1".to_string(),
-                    models: vec![],
-                    temperature: None,
                     timeout_secs: Some(30),
+                    ..Default::default()
                 },
                 verification: LlmPhaseConfig {
                     base_url: "http://localhost:11434".to_string(),
-                    api_key: None,
                     model: "llama3.1".to_string(),
-                    models: vec![],
-                    temperature: None,
                     timeout_secs: Some(30),
+                    ..Default::default()
                 },
                 aggregation: LlmPhaseConfig {
                     base_url: "http://localhost:11434".to_string(),
-                    api_key: None,
                     model: "llama3.1".to_string(),
-                    models: vec![],
-                    temperature: None,
                     timeout_secs: Some(30),
+                    ..Default::default()
                 },
                 static_analysis: LlmPhaseConfig {
                     base_url: "http://localhost:11434".to_string(),
-                    api_key: None,
                     model: "llama3.1".to_string(),
-                    models: vec![],
-                    temperature: None,
                     timeout_secs: Some(30),
+                    ..Default::default()
                 },
-                prompt_overrides: Default::default(),
+                ..Default::default()
             },
             ..Default::default()
         },
@@ -1013,52 +1004,28 @@ async fn test_scanner_run_nonexistent_target() {
 
 fn create_test_config_core_migrated() -> ScannerConfig {
     ScannerConfig {
-        eval: Default::default(),
         project: ProjectConfig {
             name: "test-project".to_string(),
             path: "/tmp/test-project".to_string(),
-            languages: vec![],
+            ..Default::default()
         },
         output: OutputConfig {
             dir: "/tmp/test-output".to_string(),
-            evidence_gate: false,
-            include_rejected: false,
+            ..Default::default()
         },
         scanner: ScannerSettings {
             max_file_size_kb: 1024,
-            exclude_paths: vec![],
-            semgrep: SemgrepSettings::default(),
-            performance: PerformanceSettings::default(),
+            ..ScannerSettings::default()
         },
         llm: LlmConfig {
-            base_url: String::new(),
             timeout_secs: 30,
             max_retries: 3,
             retry_backoff_ms: 1000,
             max_concurrent: 3,
-            phases: LlmPhasesConfig::default(),
             temperature: 0.5,
-            max_reasoning_tokens: None,
-            enable_llm_cache: false,
-            cache_dir: None,
+            ..Default::default()
         },
-        tickets: Default::default(),
-        agent: Default::default(),
-        router: Default::default(),
-        aggregation: Default::default(),
-        normalization: Default::default(),
-        validate: Default::default(),
-        vultriage: Default::default(),
-        policy_sampling: Default::default(),
-        pacvd: Default::default(),
-        vuln_spec: Default::default(),
-        citation_verification: Default::default(),
-        triage: Default::default(),
-        priority: Default::default(),
-        budget: Default::default(),
-        prior_runs: Default::default(),
-        org_context: Default::default(),
-        knowledge: Default::default(),
+        ..Default::default()
     }
 }
 

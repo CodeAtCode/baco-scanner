@@ -141,7 +141,7 @@ pub async fn run_indexing(
     tracing::info!("Running indexing phase on {:?}", target_path);
 
     // Run incremental indexing
-    let (index, _hash_store) = match crate::indexer::FileIndex::index_project_incremental(
+    let (index, hash_store) = match crate::indexer::FileIndex::index_project_incremental(
         target_path.to_str().unwrap_or("."),
         &config.project.languages,
         config.scanner.max_file_size_kb * 1024,
@@ -154,6 +154,13 @@ pub async fn run_indexing(
             return Ok((findings, analyzed_files.to_vec()));
         }
     };
+
+    // Hand the built store to the orchestrator: when incremental scanning is
+    // on and the scan fully completes, it is persisted as next run's
+    // "already analyzed under these rules" baseline.
+    scanner
+        .state
+        .send_modify(|s| s.last_hash_store = Some(hash_store));
 
     // Extract framework hooks from language-matched files and save hook map
     // Skip entirely if no hook_registry config is provided

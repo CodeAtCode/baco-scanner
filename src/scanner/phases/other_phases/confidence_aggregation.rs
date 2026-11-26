@@ -206,6 +206,40 @@ pub async fn run_reporting(
 
     tracing::info!("Running reporting phase to {:?}", config.output.dir);
 
+    // Incremental carry: the previous run's findings for files the pipeline
+    // skipped come back here — after every whole-project phase, so
+    // aggregation never mixed stale with fresh, and before every write, so
+    // findings.json, the saved run and report.html all include them. They
+    // keep the metadata their run gave them. The same predicate decided
+    // which fresh findings were dropped at the chokepoint, so the union is
+    // disjoint by file: no loss, no duplicates.
+    {
+        let (previous_store, previous_findings) = {
+            let state = scanner.state.borrow();
+            (
+                state.previous_hash_store.clone(),
+                state.previous_findings.clone(),
+            )
+        };
+        if let Some(previous_store) = previous_store.filter(|s| !s.is_empty()) {
+            if !previous_findings.is_empty() {
+                let mut hasher = crate::file_hash::FileHasher::new();
+                let carried = crate::incremental_scan::carry_previous(
+                    &previous_findings,
+                    &previous_store,
+                    &mut hasher,
+                );
+                if !carried.is_empty() {
+                    tracing::info!(
+                        "Incremental: carrying {} finding(s) from the previous run",
+                        carried.len()
+                    );
+                }
+                findings.extend(carried);
+            }
+        }
+    }
+
     // Finalize metrics and get summary
     let llm_metrics = metrics_tracker.finalize().await;
 

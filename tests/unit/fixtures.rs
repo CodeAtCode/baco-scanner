@@ -35,7 +35,14 @@
 #[path = "../fixtures/mod.rs"]
 mod centralized_fixtures;
 
-pub use centralized_fixtures::create_test_config as create_test_config_central;
+pub use centralized_fixtures::{
+    create_test_config as create_test_config_central, scanner_settings_default,
+};
+
+/// Alias for create_test_config (used by report_json_tests.rs)
+pub fn create_minimal_config() -> baco::config::ScannerConfig {
+    create_test_config_central()
+}
 pub use centralized_fixtures::create_test_finding;
 pub use centralized_fixtures::create_test_finding as create_test_finding_central;
 pub use centralized_fixtures::make_finding_confidence;
@@ -226,6 +233,7 @@ pub fn create_test_config() -> ScannerConfig {
         scanner: ScannerSettings {
             max_file_size_kb: 1024,
             exclude_paths: vec![],
+            incremental_scan: false,
             semgrep: SemgrepSettings {
                 ..Default::default()
             },
@@ -287,7 +295,6 @@ pub fn create_test_config() -> ScannerConfig {
             ..Default::default()
         },
         router: Default::default(),
-        aggregation: Default::default(),
         normalization: Default::default(),
         validate: Default::default(),
         vultriage: Default::default(),
@@ -302,79 +309,6 @@ pub fn create_test_config() -> ScannerConfig {
         org_context: Default::default(),
         knowledge: Default::default(),
     }
-}
-
-/// Create a test config with minimal settings.
-///
-/// Simpler version for tests that only need basic config structure.
-pub fn create_minimal_config() -> ScannerConfig {
-    ScannerConfig {
-        eval: Default::default(),
-        project: ProjectConfig {
-            name: "test".to_string(),
-            path: ".".to_string(),
-            languages: vec!["rust".to_string()],
-        },
-        output: OutputConfig {
-            dir: temp_fixture_path("baco_test_output")
-                .to_string_lossy()
-                .to_string(),
-            evidence_gate: false,
-            include_rejected: false,
-        },
-        scanner: ScannerSettings {
-            max_file_size_kb: 1024,
-            exclude_paths: vec![],
-            semgrep: SemgrepSettings::default(),
-            performance: PerformanceSettings::default(),
-        },
-        llm: LlmConfig {
-            phases: baco::config::LlmPhasesConfig::default(),
-            timeout_secs: 60,
-            max_retries: 3,
-            retry_backoff_ms: 1000,
-            ..Default::default()
-        },
-        agent: AgentConfig {
-            enabled: false,
-            max_turns: 10,
-            tool_timeout_secs: 30,
-            run_compiled_code: true,
-        },
-        tickets: TicketConfig::default(),
-        router: Default::default(),
-        aggregation: Default::default(),
-        normalization: Default::default(),
-        validate: Default::default(),
-        vultriage: Default::default(),
-        policy_sampling: Default::default(),
-        pacvd: Default::default(),
-        vuln_spec: Default::default(),
-        citation_verification: Default::default(),
-        triage: Default::default(),
-        priority: Default::default(),
-        budget: Default::default(),
-        prior_runs: Default::default(),
-        org_context: Default::default(),
-        knowledge: Default::default(),
-    }
-}
-
-/// Create test config with LLM discovery API key.
-pub fn create_test_config_with_discovery_key() -> ScannerConfig {
-    let mut config = create_minimal_config();
-    config.llm.phases.discovery.api_key = Some("test-key".to_string());
-    config.llm.phases.discovery.base_url = "http://localhost:11434".to_string();
-    config
-}
-
-/// Create test config with all features enabled.
-pub fn create_test_config_all_features() -> ScannerConfig {
-    let mut config = create_minimal_config();
-    config.scanner.performance.enable_confidence_refinement = true;
-    config.scanner.performance.enable_root_cause_dedup = true;
-    config.scanner.performance.enable_cve_bootstrap = true;
-    config
 }
 
 // ============================================================================

@@ -69,15 +69,21 @@ BACO runs a phased pipeline that progressively refines findings:
 4. **Score** — confidence calibration with citation verification
 5. **Report** — JSON, HTML, SARIF, Markdown outputs
 
-Optional phases add CWE-aware MoE routing, rule synthesis, exploit
-synthesis, threat modeling, auto-patching, and PoC compilation.
-See [Architecture](docs/architecture.md) for the full phase graph and
-[Configuration](docs/configuration.md) for enabling flags.
+The pipeline is a fixed 15-phase core (3 parallel + 12 sequential): indexing,
+semgrep, LLM static analysis, then CWE routing, LLM discovery, LLM verification,
+validate, ticket cross-reference, git analysis, cross-file analysis, confidence
+scoring, AI aggregation, root-cause dedup, CVE bootstrap and reporting.
+See [Architecture](docs/architecture.md) for the phase graph and
+[Configuration](docs/configuration.md) for the enabling flags.
 
 ## Supported Languages
 
-C/C++, Rust, Python, JavaScript, TypeScript, PHP, Go, Java, C#, Ruby —
-all with static analysis (tree-sitter + semgrep) and LLM verification.
+C/C++, Rust, Python, JavaScript, TypeScript, PHP, Go, Java, C#, Ruby.
+
+All ten get tree-sitter parsing plus LLM verification. The bundled semgrep taint
+rules cover eight of them (C/C++, Python, JavaScript/TypeScript, PHP, Go, Java,
+C#, Ruby); **Rust has no bundled taint rule file**, so on Rust the semgrep layer
+only sees whatever rulesets you configure.
 See [Supported Languages](docs/languages.md) for the full matrix.
 
 ## Outputs

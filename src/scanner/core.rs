@@ -20,6 +20,19 @@ pub struct ScannerState {
     pub cve_entries: Vec<CveEntry>,
     pub project_stack: Option<ProjectStack>,
     pub rejected_findings: Vec<crate::scanner::phases::llm_phases::RejectedFinding>,
+    /// Previous run's hash store, loaded before any phase runs when
+    /// incremental scanning is active. `None` = analyze everything.
+    pub previous_hash_store: Option<crate::incremental_scan::FileHashStore>,
+    /// Previous complete run's findings, from the run store's newest run.
+    /// The carry at reporting re-attaches the subset for unchanged files.
+    pub previous_findings: Vec<VulnerabilityFinding>,
+    /// Files the LLM phases skipped this run because their bytes and rules
+    /// match the previous run. Keeps the "analysed nothing" health warning
+    /// quiet on a legitimately all-unchanged project.
+    pub incremental_unchanged: usize,
+    /// The hash store this run's indexing phase built; saved only when the
+    /// scan fully completes.
+    pub last_hash_store: Option<crate::incremental_scan::FileHashStore>,
 }
 
 pub struct Scanner {
@@ -127,6 +140,10 @@ impl Scanner {
             cve_entries: Vec::new(),
             project_stack: None,
             rejected_findings: Vec::new(),
+            previous_hash_store: None,
+            previous_findings: Vec::new(),
+            incremental_unchanged: 0,
+            last_hash_store: None,
         });
 
         let output_dir = PathBuf::from(&config.output.dir);

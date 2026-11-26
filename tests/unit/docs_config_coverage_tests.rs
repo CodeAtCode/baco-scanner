@@ -230,7 +230,9 @@ fn removed_phases_are_not_advertised_in_the_docs() {
     let mut targets = docs.clone();
     targets.push(readme.clone());
     for path in &targets {
-        let text = fs::read_to_string(path).expect("docs file is readable").to_lowercase();
+        let text = fs::read_to_string(path)
+            .expect("docs file is readable")
+            .to_lowercase();
         for key in removed_config_keys {
             assert!(
                 !text.contains(key),
@@ -249,7 +251,9 @@ fn removed_phases_are_not_advertised_in_the_docs() {
             && !p.ends_with("llm-vuln-detection-papers-survey.md")
     }));
     for path in &operational {
-        let text = fs::read_to_string(path).expect("docs file is readable").to_lowercase();
+        let text = fs::read_to_string(path)
+            .expect("docs file is readable")
+            .to_lowercase();
         for phrase in removed_subsystems {
             assert!(
                 !text.contains(phrase),

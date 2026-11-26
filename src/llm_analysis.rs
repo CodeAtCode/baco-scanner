@@ -736,18 +736,6 @@ pub const STATIC_ANALYSIS_FIELDS: &[(&str, &str, bool)] = &[
     ("diff_hunk", "string", true),
 ];
 
-/// Field specification for verification batch JSON output (prompt↔parser contract).
-///
-/// This defines the BatchVerdictItem structure used in verification.rs.
-/// The index field is OPTIONAL (positional fallback supported).
-pub const VERIFICATION_BATCH_FIELDS: &[(&str, &str, bool)] = &[
-    ("index", "integer", false), // Optional - positional fallback
-    ("verification_status", "string", true),
-    ("verification_notes", "string", false), // Optional but expected
-    ("seven_question_gate", "object", false), // Optional - the 7-question gate
-    ("concrete_impact_proof", "object", false), // Optional - impact proof requirement
-];
-
 /// Map a language name to its bundled tree-sitter parser, if any.
 fn tree_sitter_language(language: &str) -> Option<tree_sitter::Language> {
     match language.to_lowercase().as_str() {
@@ -778,6 +766,129 @@ pub struct LlmAnalyzer {
     enable_structured_output: bool,
     /// Enable merge-order detection (CWE-915)
     enable_merge_order_detection: bool,
+}
+
+/// Strip markdown code fences from LLM response text.
+///
+/// Accepts the superset of fence styles used across all parsers:
+/// - ```json, ```yaml, ``` (plain)
+/// - ~~~ (alternative markdown fence)
+/// - Leading/trailing whitespace
+fn strip_llm_response_fences(text: &str) -> String {
+    text.trim()
+        .trim_start_matches("```json")
+        .trim_start_matches("```yaml")
+        .trim_start_matches("```")
+        .trim_start_matches("~~~")
+        .trim_start_matches(|c: char| c.is_whitespace())
+        .trim_end_matches("```")
+        .trim_end_matches("~~~")
+        .trim_end_matches(|c: char| c.is_whitespace())
+        .trim()
+        .to_string()
+}
+
+/// Map severity string to Severity enum.
+///
+/// Two variants exist:
+/// - `strict`: unknown → Low (used by parse_structured_llm_response)
+/// - `lenient`: "low" explicit, unknown → Medium (used by parse_llm_response)
+fn parse_severity(severity_str: &str, strict: bool) -> Severity {
+    match severity_str.to_lowercase().as_str() {
+        "critical" => Severity::Critical,
+        "high" => Severity::High,
+        "medium" => Severity::Medium,
+        "low" if !strict => Severity::Low,
+        _ if strict => Severity::Low,
+        _ => Severity::Medium,
+    }
+}
+
+/// Build a VulnerabilityFinding from a JSON item, sharing the common field
+/// construction between the two twin parsers.
+///
+/// The caller passes the genuinely different fields inline:
+/// - `code_snippet`: None for structured, Some(...) for unstructured
+/// - `diff_hunk`: None for structured, Option<String> for unstructured
+/// - `recommendation`, `poc_code`, `mitigation_code`, `statement_range`:
+///   computed differently per parser
+/// - `evidence.detail`: different text per parser
+/// - `cwe_id`: extracted by caller (may include description fallback)
+#[allow(clippy::too_many_arguments)]
+fn finding_from_json_item(
+    item: &serde_json::Value,
+    file_path: &str,
+    line: u32,
+    severity: Severity,
+    code_snippet: Option<String>,
+    diff_hunk: Option<String>,
+    recommendation: String,
+    poc_code: Option<String>,
+    mitigation_code: Option<String>,
+    statement_range: Option<(u32, u32)>,
+    model_name: &str,
+    evidence_detail: &str,
+    cwe_id: Option<String>,
+) -> VulnerabilityFinding {
+    let title = item.get("title").and_then(|v| v.as_str()).unwrap_or("");
+    let description = item
+        .get("description")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .unwrap_or_default();
+
+    let cwe_id_for_hash = cwe_id.as_deref().unwrap_or("CWE-000");
+
+    VulnerabilityFinding {
+        id: VulnerabilityFinding::generate_id(
+            file_path,
+            Some(line),
+            cwe_id_for_hash,
+            title,
+            code_snippet.as_deref(),
+        ),
+        title: title.to_string(),
+        description,
+        severity,
+        confidence_score: 0.7,
+        cwe_id,
+        file_path: file_path.to_string(),
+        line_number: Some(line),
+        code_snippet,
+        diff_hunk,
+        recommendation: Some(recommendation),
+        code_location: Some(format!("{}:{}", file_path, line)),
+        sources: vec!["llm_analysis".to_string()],
+        commit_reference: None,
+        ticket_reference: None,
+        priority_score: None,
+        cross_file_references: None,
+        related_finding_ids: None,
+        verification_status: None,
+        verification_notes: None,
+        verification_error: None,
+        agent_evidence_path: None,
+        security_issue: None,
+        poc_code,
+        mitigation_code,
+        poc_format: None,
+        llm_model: if model_name == "fallback" || model_name.is_empty() {
+            None
+        } else {
+            Some(model_name.to_string())
+        },
+        agent_mode: false,
+        statement_range,
+        triage_verdict: None,
+        evidence: vec![crate::evidence::Evidence {
+            source: crate::evidence::EvidenceSource::LlmAnalysis(model_name.to_string()),
+            weight: 0.6,
+            detail: evidence_detail.to_string(),
+            timestamp: chrono::Utc::now(),
+        }],
+        verification_tier: None,
+        verification_gate_answers: None,
+    }
 }
 
 impl LlmAnalyzer {
@@ -1591,7 +1702,7 @@ impl LlmAnalyzer {
         file_path: &str,
         model_name: &str,
     ) -> Result<Vec<VulnerabilityFinding>, String> {
-        // Remove markdown code fences
+        // Remove markdown code fences (structured parser: minimal fence set)
         let cleaned = text
             .trim()
             .trim_start_matches("```json")
@@ -1620,19 +1731,10 @@ impl LlmAnalyzer {
         for item in findings_array.iter() {
             let severity_str = item.get("severity").and_then(|v| v.as_str());
             let title = item.get("title").and_then(|v| v.as_str());
-            let description = item.get("description").and_then(|v| v.as_str());
             let line = item.get("line").and_then(|v| v.as_i64());
 
-            if let (Some(severity_str), Some(title), Some(line)) = (severity_str, title, line) {
-                let description = description.map(|s| s.to_string()).unwrap_or_default();
-
-                let severity = match severity_str.to_lowercase().as_str() {
-                    "critical" => Severity::Critical,
-                    "high" => Severity::High,
-                    "medium" => Severity::Medium,
-                    _ => Severity::Low,
-                };
-
+            if let (Some(severity_str), Some(_title), Some(line)) = (severity_str, title, line) {
+                let severity = parse_severity(severity_str, true /* strict */);
                 let recommendation = item
                     .get("recommendation")
                     .and_then(|v| v.as_str())
@@ -1644,60 +1746,21 @@ impl LlmAnalyzer {
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string());
 
-                let cwe_id_for_hash = cwe_id.as_deref().unwrap_or("CWE-000");
-
-                findings.push(VulnerabilityFinding {
-                    id: VulnerabilityFinding::generate_id(
-                        file_path,
-                        Some(line as u32),
-                        cwe_id_for_hash,
-                        title, // Use title as rule_id (LLM discovery doesn't have semgrep rule IDs)
-                        None,  // No code snippet at this stage
-                    ),
-                    title: title.to_string(),
-                    description,
+                findings.push(finding_from_json_item(
+                    item,
+                    file_path,
+                    line as u32,
                     severity,
-                    confidence_score: 0.7,
+                    None, // code_snippet: structured parser doesn't capture snippets
+                    None, // diff_hunk: structured parser doesn't capture diff hunks
+                    recommendation,
+                    None, // poc_code
+                    None, // mitigation_code
+                    None, // statement_range
+                    model_name,
+                    "LLM static analysis finding (structured output)",
                     cwe_id,
-                    file_path: file_path.to_string(),
-                    line_number: Some(line as u32),
-                    code_snippet: None,
-                    diff_hunk: None,
-                    recommendation: Some(recommendation),
-                    code_location: Some(format!("{}:{}", file_path, line)),
-                    sources: vec!["llm_analysis".to_string()],
-                    commit_reference: None,
-                    ticket_reference: None,
-                    priority_score: None,
-                    cross_file_references: None,
-                    related_finding_ids: None,
-                    verification_status: None,
-                    verification_notes: None,
-                    verification_error: None,
-                    agent_evidence_path: None,
-                    security_issue: None,
-                    poc_code: None,
-                    mitigation_code: None,
-                    poc_format: None,
-                    llm_model: if model_name == "fallback" || model_name.is_empty() {
-                        None
-                    } else {
-                        Some(model_name.to_string())
-                    },
-                    agent_mode: false,
-                    statement_range: None,
-                    triage_verdict: None,
-                    evidence: vec![crate::evidence::Evidence {
-                        source: crate::evidence::EvidenceSource::LlmAnalysis(
-                            model_name.to_string(),
-                        ),
-                        weight: 0.6,
-                        detail: "LLM static analysis finding (structured output)".to_string(),
-                        timestamp: chrono::Utc::now(),
-                    }],
-                    verification_tier: None,
-                    verification_gate_answers: None,
-                });
+                ));
             }
         }
 
@@ -1711,24 +1774,14 @@ impl LlmAnalyzer {
         file_path: &str,
         model_name: &str,
     ) -> Result<Vec<VulnerabilityFinding>, String> {
-        // Remove markdown code fences (including language specifiers like ```json)
-        let cleaned = text
-            .trim()
-            .trim_start_matches("```json")
-            .trim_start_matches("```")
-            .trim_start_matches("```yaml")
-            .trim_start_matches("~~~")
-            .trim_start_matches(|c: char| c.is_whitespace())
-            .trim_end_matches("```")
-            .trim_end_matches("~~~")
-            .trim_end_matches(|c: char| c.is_whitespace())
-            .trim();
+        // Remove markdown code fences (unstructured parser: superset of fence styles)
+        let cleaned = strip_llm_response_fences(text);
 
         // LLM response parsing
         let mut findings = Vec::new();
 
         // Try to parse as JSON array
-        if let Ok(parsed) = serde_json::from_str::<Vec<serde_json::Value>>(cleaned) {
+        if let Ok(parsed) = serde_json::from_str::<Vec<serde_json::Value>>(&cleaned) {
             tracing::debug!("Parsed {} items from JSON", parsed.len());
             for (i, item) in parsed.iter().enumerate() {
                 let desc_val = item.get("description");
@@ -1755,16 +1808,7 @@ impl LlmAnalyzer {
                     });
 
                 if let (Some(severity_str), Some(title)) = (severity_str, title) {
-                    // Use description from LLM response (may be empty if LLM didn't provide one)
-                    let description = description.map(|s| s.to_string()).unwrap_or_default();
-
-                    let severity = match severity_str.to_lowercase().as_str() {
-                        "critical" => Severity::Critical,
-                        "high" => Severity::High,
-                        "medium" => Severity::Medium,
-                        "low" => Severity::Low,
-                        _ => Severity::Medium,
-                    };
+                    let severity = parse_severity(severity_str, false /* lenient */);
 
                     // Parse code_snippet - now an object with before/code/after
                     let code_snippet_obj = item.get("code_snippet");
@@ -1839,11 +1883,11 @@ impl LlmAnalyzer {
                             }
                         });
 
+                    // Use description from LLM response (may be empty if LLM didn't provide one)
+                    let description = description.map(|s| s.to_string()).unwrap_or_default();
+
                     // Generate recommendation based on vulnerability type
                     let recommendation = generate_recommendation(title, &description);
-
-                    // Set code location
-                    let code_location = format!("{}:{}", file_path, line);
 
                     // Generate PoC and mitigation code if applicable
                     let poc_code = generate_poc_code(title, file_path, line as u32);
@@ -1859,61 +1903,21 @@ impl LlmAnalyzer {
                         .map(|s| s.to_string())
                         .or_else(|| extract_cwe_id(&description));
 
-                    // Use default CWE if none found
-                    let cwe_id_for_hash = cwe_id.as_deref().unwrap_or("CWE-000");
-
-                    findings.push(VulnerabilityFinding {
-                        id: VulnerabilityFinding::generate_id(
-                            file_path,
-                            Some(line as u32),
-                            cwe_id_for_hash,
-                            title, // Use title as rule_id (LLM discovery doesn't have semgrep rule IDs)
-                            Some(&code_snippet),
-                        ),
-                        title: title.to_string(),
-                        description: description.clone(), // Use the description (possibly fallback)
+                    findings.push(finding_from_json_item(
+                        &item,
+                        file_path,
+                        line as u32,
                         severity,
-                        confidence_score: 0.7,
-                        cwe_id,
-                        file_path: file_path.to_string(),
-                        line_number: Some(line as u32),
-                        code_snippet: Some(code_snippet),
+                        Some(code_snippet),
                         diff_hunk,
-                        recommendation: Some(recommendation),
-                        code_location: Some(code_location),
-                        sources: vec!["llm_analysis".to_string()],
-                        commit_reference: None,
-                        ticket_reference: None,
-                        priority_score: None,
-                        cross_file_references: None,
-                        related_finding_ids: None,
-                        verification_status: None,
-                        verification_notes: None,
-                        verification_error: None,
-                        agent_evidence_path: None,
-                        security_issue: None,
-                        poc_code: poc_code.clone(),
-                        mitigation_code: mitigation_code.clone(),
-                        poc_format: None,
-                        llm_model: if model_name == "fallback" || model_name.is_empty() {
-                            None
-                        } else {
-                            Some(model_name.to_string())
-                        },
-                        agent_mode: false,
+                        recommendation,
+                        poc_code,
+                        mitigation_code,
                         statement_range,
-                        triage_verdict: None,
-                        evidence: vec![crate::evidence::Evidence {
-                            source: crate::evidence::EvidenceSource::LlmAnalysis(
-                                model_name.to_string(),
-                            ),
-                            weight: 0.6,
-                            detail: "LLM static analysis finding".to_string(),
-                            timestamp: chrono::Utc::now(),
-                        }],
-                        verification_tier: None,
-                        verification_gate_answers: None,
-                    });
+                        model_name,
+                        "LLM static analysis finding",
+                        cwe_id,
+                    ));
                 }
             }
         }

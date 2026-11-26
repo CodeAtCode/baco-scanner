@@ -107,6 +107,7 @@ mod confidence_normalization_update_tests;
 mod confidence_refinement;
 mod config;
 mod coverage_eval_helpers_tests;
+mod coverage_gate_script_tests;
 mod coverage_llm_phase_pure_tests;
 
 mod coverage_small_modules_tests;

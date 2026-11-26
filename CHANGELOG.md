@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Taint-mode semgrep presets for JavaScript (`presets/javascript.toml`) and Go (`presets/go.toml`), with taint-source/sink rules for SQLi, command injection, and path traversal
 - Taint-mode rules added to existing PHP and Python presets
 - `max_target_bytes` config field under `[scanner.semgrep]` to cap file size passed to semgrep via `--max-target-bytes`
+- Incremental scanning: `[scanner] incremental_scan = true` (requires `prior_runs.enabled = true`) skips LLM analysis for files unchanged since the last completed run and carries their previous findings forward; the changed/unchanged decision hashes every file, comparison uses one predicate for both the restriction and the carry, and `<output>/file-hashes.json` is written only after a scan completes fully
 - Graduated verification gate: individual check results (reachability, controllability, preconditions, context, impact) are recorded separately instead of a single binary kill
 
 ### Changed

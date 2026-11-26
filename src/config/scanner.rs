@@ -13,6 +13,12 @@ pub struct ScannerSettings {
     pub semgrep: SemgrepSettings,
     #[serde(default)]
     pub performance: PerformanceSettings,
+    /// Incremental scanning: files whose content hash and rule fingerprint
+    /// match the previous run keep their previous findings instead of being
+    /// re-analyzed. Requires `prior_runs.enabled = true`, because the
+    /// carried findings are read from the run store. Default: false.
+    #[serde(default)]
+    pub incremental_scan: bool,
 }
 
 impl Default for ScannerSettings {
@@ -22,6 +28,7 @@ impl Default for ScannerSettings {
             exclude_paths: Vec::new(),
             semgrep: SemgrepSettings::default(),
             performance: PerformanceSettings::default(),
+            incremental_scan: false,
         }
     }
 }

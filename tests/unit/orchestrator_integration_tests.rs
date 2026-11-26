@@ -4,10 +4,7 @@
 //! functionality including force flag behavior, checkpoint resume, finding
 //! propagation, and early termination.
 
-use baco::config::{
-    AgentConfig, LlmConfig, LlmPhasesConfig, OutputConfig, PerformanceSettings, ProjectConfig,
-    ScannerConfig, ScannerSettings,
-};
+use baco::config::{LlmConfig, OutputConfig, ProjectConfig, ScannerConfig, ScannerSettings};
 use baco::findings::{Severity, VulnerabilityFinding};
 use baco::scanner::Scanner;
 use baco::scanner::checkpoint::{Checkpoint, EarlyTerminationInfo, ScanPhase};
@@ -34,47 +31,26 @@ fn temp_orchestrator_path(prefix: &str) -> PathBuf {
 
 fn create_test_scanner_config() -> ScannerConfig {
     ScannerConfig {
-        eval: Default::default(),
         project: ProjectConfig {
             name: "test-project".to_string(),
-            path: "/tmp".to_string(),
             languages: vec!["rust".to_string()],
+            ..Default::default()
         },
         scanner: ScannerSettings {
             max_file_size_kb: 1024,
-            exclude_paths: vec![],
-            semgrep: Default::default(),
-            performance: PerformanceSettings::default(),
+            ..baco::config::ScannerSettings::default()
+        },
+        output: OutputConfig {
+            dir: "/tmp/test_output".to_string(),
+            ..Default::default()
         },
         llm: LlmConfig {
-            phases: LlmPhasesConfig::default(),
             timeout_secs: 30,
             max_retries: 3,
             retry_backoff_ms: 1000,
             ..Default::default()
         },
-        output: OutputConfig {
-            dir: "/tmp/test_output".to_string(),
-            evidence_gate: false,
-            include_rejected: false,
-        },
-        agent: AgentConfig::default(),
-        tickets: Default::default(),
-        router: Default::default(),
-        aggregation: Default::default(),
-        normalization: Default::default(),
-        validate: Default::default(),
-        vultriage: Default::default(),
-        policy_sampling: Default::default(),
-        pacvd: Default::default(),
-        vuln_spec: Default::default(),
-        citation_verification: Default::default(),
-        prior_runs: Default::default(),
-        triage: Default::default(),
-        priority: Default::default(),
-        budget: Default::default(),
-        org_context: Default::default(),
-        knowledge: Default::default(),
+        ..Default::default()
     }
 }
 

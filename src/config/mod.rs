@@ -60,8 +60,6 @@ pub struct ScannerConfig {
     #[serde(default)]
     pub router: RouterConfig,
     #[serde(default)]
-    pub aggregation: AggregationConfig,
-    #[serde(default)]
     pub normalization: NormalizationConfig,
     #[serde(default)]
     pub validate: ValidateConfig,
@@ -326,6 +324,16 @@ impl ScannerConfig {
             return Err(ConfigError::Validation {
                 field: "scanner.max_file_size_kb".to_string(),
                 message: format!("must be > 0, got {}", self.scanner.max_file_size_kb),
+            });
+        }
+        // Incremental scanning carries findings from the run store's newest
+        // complete run; with prior_runs disabled nothing is ever saved, so
+        // the chokepoint would drop unchanged-file findings with nothing to
+        // carry. Fail loudly at config load rather than lose findings.
+        if self.scanner.incremental_scan && !self.prior_runs.enabled {
+            return Err(ConfigError::Validation {
+                field: "scanner.incremental_scan".to_string(),
+                message: "requires prior_runs.enabled = true: carried findings are read from the run store".to_string(),
             });
         }
         let max_allowed = u64::MAX / 1024;

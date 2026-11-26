@@ -35,6 +35,12 @@ include_rejected = false
 max_file_size_kb = 512
 # Paths to exclude from scanning (use glob patterns like "tests/" or "docs/*")
 exclude_paths = ["tests/", "docs/", "target/"]
+# When true, files unchanged since the last completed run are not analyzed
+# again; their findings are carried from that run into this one. Requires
+# prior_runs.enabled = true (validated at startup). The comparison store is
+# written only after a scan completes fully, so an interrupted scan never
+# marks files as already analyzed.
+incremental_scan = false
 
 [scanner.semgrep]
 # Rulesets can be a single string or an array of strings
@@ -88,6 +94,18 @@ enable_cve_bootstrap = true
 # prompts/hunt/ based on the target's languages during LLM discovery
 # Default: true
 enable_hunt_prompts = true
+
+# Agent mode: lets the LLM read source and use tools before analysing findings
+[agent]
+# Disabled by default
+enabled = false
+# Maximum conversation turns with tools
+max_turns = 10
+# Timeout in seconds for a single tool execution
+tool_timeout_secs = 60
+# Whether the agent may run code it compiled. While false the test_run tool is
+# not offered to the model, so generated code is compiled but never executed.
+run_compiled_code = false
 
 # LLM configuration with per-phase settings
 [llm]

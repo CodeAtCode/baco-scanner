@@ -146,19 +146,9 @@ impl ScanHealth {
         *self.llm_outcomes.entry(key).or_default() += 1;
     }
 
-    /// Increment indexed file counter
-    pub fn increment_indexed(&mut self) {
-        self.files.indexed += 1;
-    }
-
     /// Set indexed file count (bulk set)
     pub fn set_indexed(&mut self, count: u64) {
         self.files.indexed = count;
-    }
-
-    /// Increment analyzed file counter
-    pub fn increment_analyzed(&mut self) {
-        self.files.analyzed += 1;
     }
 
     /// Set analyzed file count (bulk set)
@@ -166,29 +156,14 @@ impl ScanHealth {
         self.files.analyzed = count;
     }
 
-    /// Increment dropped-by-size counter
-    pub fn increment_dropped_by_size(&mut self) {
-        self.files.dropped_by_size += 1;
-    }
-
     /// Set dropped-by-size count (bulk set)
     pub fn set_dropped_by_size(&mut self, count: u64) {
         self.files.dropped_by_size = count;
     }
 
-    /// Increment chunked counter
-    pub fn increment_chunked(&mut self) {
-        self.files.chunked += 1;
-    }
-
     /// Set chunked count (bulk set)
     pub fn set_chunked(&mut self, count: u64) {
         self.files.chunked = count;
-    }
-
-    /// Increment truncated counter
-    pub fn increment_truncated(&mut self) {
-        self.files.truncated += 1;
     }
 
     /// Set truncated count (bulk set)

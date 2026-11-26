@@ -49,6 +49,7 @@ pub fn create_test_config() -> ScannerConfig {
         scanner: ScannerSettings {
             max_file_size_kb: 1024,
             exclude_paths: vec![],
+            incremental_scan: false,
 
             semgrep: SemgrepSettings {
                 ..Default::default()
@@ -108,7 +109,6 @@ pub fn create_test_config() -> ScannerConfig {
         agent: Default::default(),
         tickets: Default::default(),
         router: Default::default(),
-        aggregation: Default::default(),
         normalization: Default::default(),
         validate: Default::default(),
         vultriage: Default::default(),
@@ -148,6 +148,13 @@ pub fn create_test_config_all_features() -> ScannerConfig {
     config.llm.phases.discovery.api_key = Some("test-key".to_string());
     config.llm.phases.verification.api_key = Some("test-key".to_string());
     config
+}
+
+/// Default ScannerSettings for tests.
+///
+/// Use with spread syntax: `ScannerSettings { max_file_size_kb: 100, ..scanner_settings_default() }`
+pub fn scanner_settings_default() -> ScannerSettings {
+    ScannerSettings::default()
 }
 
 // ============================================================================

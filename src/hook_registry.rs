@@ -327,31 +327,7 @@ pub fn hook_map_path(output_dir: &Path) -> PathBuf {
     output_dir.join("hook_map.json")
 }
 
-/// Write bytes to a file atomically.
-///
-/// Creates the parent directory if needed, writes to a `.tmp` sibling in the
-/// same directory, flushes/syncs, then renames into place. A plain `fs::write`
-/// truncates first, so a crash mid-write leaves a corrupt file that deserialises
-/// on the next run. This pattern guarantees the target is either the old content
-/// or the new content, never a truncation.
-pub fn atomic_write(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-
-    let tmp = path.with_extension("tmp");
-    std::fs::write(&tmp, bytes)?;
-    // Sync the file to disk
-    let file = std::fs::File::open(&tmp)?;
-    file.sync_all()?;
-    match std::fs::rename(&tmp, path) {
-        Ok(()) => Ok(()),
-        Err(e) => {
-            let _ = std::fs::remove_file(&tmp);
-            Err(e)
-        }
-    }
-}
+pub use crate::fs_util::{atomic_write, write_json_atomic};
 
 /// Save hook map to JSON file using atomic write.
 ///
@@ -362,12 +338,7 @@ pub fn save_hook_map(
     path: &Path,
     map: &HashMap<String, Vec<HookRegistration>>,
 ) -> std::io::Result<()> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    let json = serde_json::to_string_pretty(map).map_err(std::io::Error::other)?;
-
-    atomic_write(path, json.as_bytes())
+    write_json_atomic(path, map)
 }
 
 /// Load hook map from JSON file

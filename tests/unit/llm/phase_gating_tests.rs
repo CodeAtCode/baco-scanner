@@ -10,7 +10,7 @@
 //! and not accessible from tests. They are tested indirectly through phase execution.
 
 use baco::checkpoint::ScanPhase;
-use baco::config::{AgentConfig, LlmPhaseConfig, LlmPhasesConfig, ScannerSettings};
+use baco::config::{LlmPhaseConfig, LlmPhasesConfig, ScannerSettings};
 use baco::findings::{Severity, VerificationStatus};
 use baco::llm::metrics::LlmMetricsTracker;
 use baco::scanner::Scanner;
@@ -26,25 +26,20 @@ use crate::fixtures::make_finding_report_agg;
 
 fn create_test_config_with_static_analysis() -> baco::config::ScannerConfig {
     baco::config::ScannerConfig {
-        eval: Default::default(),
         project: baco::config::ProjectConfig {
             name: "test-project".to_string(),
-            path: ".".to_string(),
             languages: vec!["python".to_string()],
+            ..Default::default()
         },
         output: baco::config::OutputConfig {
             dir: "/tmp/test_output".to_string(),
-            evidence_gate: false,
-            include_rejected: false,
+            ..Default::default()
         },
         scanner: ScannerSettings {
             max_file_size_kb: 1024,
-            exclude_paths: vec![],
-            semgrep: baco::config::SemgrepSettings::default(),
-            performance: baco::config::PerformanceSettings::default(),
+            ..baco::config::ScannerSettings::default()
         },
         llm: baco::config::LlmConfig {
-            base_url: String::new(),
             timeout_secs: 30,
             max_retries: 3,
             retry_backoff_ms: 1000,
@@ -55,33 +50,15 @@ fn create_test_config_with_static_analysis() -> baco::config::ScannerConfig {
                     base_url: "http://localhost:8080".to_string(),
                     api_key: Some("test-key".to_string()),
                     model: "test-model".to_string(),
-                    models: vec![],
                     timeout_secs: Some(30),
-                    temperature: None,
+                    ..Default::default()
                 },
                 ..Default::default()
             },
             max_reasoning_tokens: Some(32768),
-            enable_llm_cache: false,
-            cache_dir: None,
+            ..Default::default()
         },
-        tickets: baco::config::TicketConfig { systems: vec![] },
-        agent: AgentConfig::default(),
-        router: baco::config::RouterConfig::default(),
-        aggregation: baco::config::AggregationConfig::default(),
-        normalization: baco::config::NormalizationConfig::default(),
-        validate: Default::default(),
-        vultriage: Default::default(),
-        policy_sampling: Default::default(),
-        pacvd: Default::default(),
-        vuln_spec: Default::default(),
-        citation_verification: Default::default(),
-        prior_runs: Default::default(),
-        triage: Default::default(),
-        priority: Default::default(),
-        budget: Default::default(),
-        org_context: Default::default(),
-        knowledge: Default::default(),
+        ..Default::default()
     }
 }
 

@@ -70,6 +70,7 @@ fn test_default_config() {
 
     assert_eq!(config.scanner.max_file_size_kb, 512);
     assert!(config.scanner.exclude_paths.is_empty());
+    assert!(!config.scanner.incremental_scan);
 }
 
 #[test]
@@ -2401,4 +2402,72 @@ fn test_vuln_spec_config_rejects_unknown_keys() {
         "error must name the unknown key, got: {}",
         err_msg
     );
+}
+
+// ============================================================================
+// Incremental scanning: config surface
+// ============================================================================
+
+#[test]
+fn incremental_scan_requires_prior_runs() {
+    let toml_str = r#"
+        [project]
+        name = "t"
+        path = "/tmp/t"
+        [output]
+        dir = "./out"
+        [scanner]
+        incremental_scan = true
+    "#;
+    let config: ScannerConfig = toml::from_str(toml_str).unwrap();
+
+    // Without prior_runs.enabled the carry has no source: carried findings
+    // are read from the run store, which is only written when prior runs
+    // are enabled. The config must be rejected at load, not fail mid-scan.
+    let err = config.validate().unwrap_err().to_string();
+    assert!(
+        err.contains("scanner.incremental_scan"),
+        "error must name the field, got: {}",
+        err
+    );
+}
+
+#[test]
+fn incremental_scan_is_accepted_when_prior_runs_enabled() {
+    let project = tempfile::TempDir::new().unwrap();
+    let toml_str = format!(
+        r#"
+        [project]
+        name = "t"
+        path = {:?}
+        [output]
+        dir = "./out"
+        [scanner]
+        incremental_scan = true
+        [prior_runs]
+        enabled = true
+    "#,
+        project.path()
+    );
+    let config: ScannerConfig = toml::from_str(&toml_str).unwrap();
+
+    if let Err(e) = config.validate() {
+        panic!(
+            "config with incremental_scan and prior_runs.enabled should validate, got: {}",
+            e
+        );
+    }
+}
+
+#[test]
+fn incremental_scan_defaults_to_false() {
+    let toml_str = r#"
+        [project]
+        name = "t"
+        path = "/tmp/t"
+        [output]
+        dir = "./out"
+    "#;
+    let config: ScannerConfig = toml::from_str(toml_str).unwrap();
+    assert!(!config.scanner.incremental_scan);
 }

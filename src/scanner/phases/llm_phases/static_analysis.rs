@@ -87,7 +87,7 @@ async fn run_policy_sampling(
 }
 
 pub async fn run_llm_static_analysis(
-    _scanner: &crate::scanner::Scanner,
+    scanner: &crate::scanner::Scanner,
     cfg: PhaseConfig<'_>,
 ) -> ScanResult<(Vec<VulnerabilityFinding>, Vec<String>)> {
     let PhaseConfig {
@@ -125,7 +125,38 @@ pub async fn run_llm_static_analysis(
         hash_store: None,
     });
 
-    let files = index.get_files();
+    // Incremental restriction: drop files whose content hash matches the
+    // previous run before any LLM call — including triage, which is itself
+    // an LLM cascade. This phase runs in parallel with indexing, so the
+    // decision cannot come from a shared index: each file is resolved and
+    // hashed against the store the orchestrator loaded before the parallel
+    // block. Unchanged files keep their previous findings through the
+    // reporting-phase carry, which uses the same predicate — a file is
+    // never both skipped here and not carried there.
+    let previous_store = scanner.state.borrow().previous_hash_store.clone();
+    let has_previous_findings = !scanner.state.borrow().previous_findings.is_empty();
+    let (incremental_files, skipped_count) =
+        crate::incremental_scan::analysis_files_for_incremental(
+            index.get_files(),
+            previous_store.as_ref(),
+            has_previous_findings,
+        );
+    if skipped_count > 0 {
+        tracing::info!(
+            "Incremental: LLM static analysis skips {} unchanged file(s), {} file(s) to analyze",
+            skipped_count,
+            incremental_files.len()
+        );
+    }
+    // Count the skip so the "analysed nothing" health warning can
+    // tell it apart from a phase silently dropping every file.
+    scanner
+        .state
+        .send_modify(|s| s.incremental_unchanged += skipped_count);
+    let files = incremental_files.as_slice();
+    let _files = files; // Keep for downstream usage
+
+    let files = incremental_files.as_slice();
     let file_count = files.len();
 
     // Check for LLM discovery API key (used by LlmStaticAnalysis)

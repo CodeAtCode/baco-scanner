@@ -176,6 +176,71 @@ pub fn load_prior_runs(output_dir: &Path, max_runs: usize) -> Vec<VulnerabilityF
     all_findings
 }
 
+/// Load the findings of the newest complete prior run, or `Ok(None)` when no
+/// run has ever been saved.
+///
+/// This is the incremental-carry source, so it is strict where
+/// `load_prior_runs` is tolerant: the newest run directory that has a
+/// `findings.json` must parse, or the scan falls back to a full analysis.
+/// Silently carrying an older run's findings would resurrect findings the
+/// newest run may have resolved, and carrying nothing while the pipeline
+/// skips unchanged files would lose them.
+pub fn load_last_run_findings(
+    output_dir: &Path,
+) -> Result<Option<Vec<VulnerabilityFinding>>, String> {
+    let runs_dir = output_dir.join("runs");
+    if !runs_dir.exists() {
+        return Ok(None);
+    }
+
+    let mut run_dirs: Vec<PathBuf> = match fs::read_dir(&runs_dir) {
+        Ok(entries) => entries
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().is_dir())
+            .map(|e| e.path())
+            .collect(),
+        Err(e) => {
+            return Err(format!(
+                "Failed to read runs directory {:?}: {}",
+                runs_dir, e
+            ));
+        }
+    };
+
+    // Directory names are timestamps, so lexicographic order is chronological.
+    run_dirs.sort_by(|a, b| b.cmp(a));
+
+    let mut newest_with_findings: Option<PathBuf> = None;
+    for run_dir in run_dirs {
+        let findings_path = run_dir.join("findings.json");
+        if findings_path.exists() {
+            newest_with_findings = Some(findings_path);
+            break;
+        }
+    }
+
+    let Some(findings_path) = newest_with_findings else {
+        return Ok(None);
+    };
+
+    let content = fs::read_to_string(&findings_path)
+        .map_err(|e| format!("Failed to read {:?}: {}", findings_path, e))?;
+
+    let findings = serde_json::from_str::<Vec<VulnerabilityFinding>>(&content).map_err(|e| {
+        format!(
+            "Failed to parse findings.json in {:?}: {}",
+            findings_path, e
+        )
+    })?;
+
+    tracing::debug!(
+        "Loaded {} findings from the newest prior run: {:?}",
+        findings.len(),
+        findings_path
+    );
+    Ok(Some(findings))
+}
+
 /// Build prior knowledge from a list of prior findings.
 ///
 /// Extracts stable keys from findings with `verification_status` of

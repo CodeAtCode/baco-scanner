@@ -37,17 +37,6 @@ fn validate_test_source_content(path: &str, content: &str) -> Result<(), String>
     Ok(())
 }
 
-/// Error type for sandbox operations
-#[derive(Debug, thiserror::Error)]
-pub enum SandboxError {
-    #[error("Docker unavailable: {0}")]
-    DockerUnavailable(String),
-    #[error("Runtime error: {0}")]
-    RuntimeError(String),
-    #[error("Timeout after {0}s")]
-    Timeout(u64),
-}
-
 /// Validate that a resolved path is contained within the sandbox root.
 ///
 /// Checks:

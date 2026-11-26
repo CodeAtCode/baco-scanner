@@ -552,3 +552,92 @@ fn test_stable_key_includes_taxonomy_domain() {
         "Different CWEs should produce different keys due to taxonomy domain"
     );
 }
+
+// ============================================================================
+// load_last_run_findings: the incremental-carry source
+// ============================================================================
+
+fn write_prior_run(output_dir: &std::path::Path, run_name: &str, findings_json: &str) {
+    let run_dir = output_dir.join("runs").join(run_name);
+    std::fs::create_dir_all(&run_dir).unwrap();
+    std::fs::write(run_dir.join("findings.json"), findings_json).unwrap();
+}
+
+#[test]
+fn load_last_run_findings_returns_none_without_a_runs_dir() {
+    let dir = tempfile::TempDir::new().unwrap();
+
+    let result = run_store::load_last_run_findings(dir.path()).unwrap();
+
+    assert!(result.is_none());
+}
+
+#[test]
+fn load_last_run_findings_parses_the_newest_run() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let old = serde_json::to_string(&vec![make_finding(
+        "old-run",
+        "src/a.rs",
+        Some(1),
+        Some("let x = 1;"),
+        None,
+    )])
+    .unwrap();
+    let new = serde_json::to_string(&vec![make_finding(
+        "new-run",
+        "src/a.rs",
+        Some(1),
+        Some("let x = 1;"),
+        None,
+    )])
+    .unwrap();
+    // Directory names are timestamps, so lexicographic order finds the
+    // newest; "run-0002_b" sorts after "run-0001_a".
+    write_prior_run(dir.path(), "run-0001_a", &old);
+    write_prior_run(dir.path(), "run-0002_b", &new);
+
+    let findings = run_store::load_last_run_findings(dir.path())
+        .unwrap()
+        .expect("the newest run must be found");
+
+    assert_eq!(findings.len(), 1);
+    assert_eq!(findings[0].id, "new-run");
+}
+
+#[test]
+fn load_last_run_findings_skips_a_run_without_findings() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let old = serde_json::to_string(&vec![make_finding(
+        "old-run",
+        "src/a.rs",
+        Some(1),
+        Some("let x = 1;"),
+        None,
+    )])
+    .unwrap();
+    write_prior_run(dir.path(), "run-0001_a", &old);
+    // The newest run directory exists but its findings.json was never
+    // written: the scan cannot treat that run as completed.
+    std::fs::create_dir_all(dir.path().join("runs").join("run-0002_b")).unwrap();
+
+    let findings = run_store::load_last_run_findings(dir.path())
+        .unwrap()
+        .expect("the older completed run must be found");
+
+    assert_eq!(findings.len(), 1);
+    assert_eq!(findings[0].id, "old-run");
+}
+
+#[test]
+fn load_last_run_findings_is_strict_about_an_unparsable_newest_run() {
+    let dir = tempfile::TempDir::new().unwrap();
+    write_prior_run(dir.path(), "run-0002_b", "this is not findings json {{{");
+
+    let err = run_store::load_last_run_findings(dir.path()).unwrap_err();
+
+    assert!(
+        err.contains("Failed to parse"),
+        "error must name the parse failure, got: {}",
+        err
+    );
+}

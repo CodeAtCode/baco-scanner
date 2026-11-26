@@ -2,16 +2,10 @@
 //!
 //! Note: For new tests in the `tests/` directory, use the fixtures module instead:
 //! ```text
-//! use tests::fixtures::{create_test_finding, create_finding_with_params, create_test_scanner};
+//! use tests::fixtures::{create_test_finding, create_finding_with_params, create_test_finding_simple};
 //! ```
-//!
-//! The functions here are kept for backward compatibility with existing tests in `src/`.
 
-use crate::config::ScannerConfig;
 use crate::findings::{Severity, VerificationStatus, VulnerabilityFinding};
-use crate::phase::PhaseContext;
-use crate::scanner::Scanner;
-use tempfile::TempDir;
 
 /// Create a test vulnerability finding with default values.
 ///
@@ -109,99 +103,4 @@ pub fn create_finding_with_params(
         verification_tier: None,
         verification_gate_answers: None,
     }
-}
-
-/// Create a test scanner with default configuration.
-pub fn create_test_scanner() -> (Scanner, TempDir) {
-    let temp_dir = TempDir::new().unwrap();
-    let config = ScannerConfig::default();
-    let scanner = Scanner::new(config, temp_dir.path().to_path_buf(), false);
-    (scanner, temp_dir)
-}
-
-/// Create a test scanner with a temporary directory.
-pub fn create_test_scanner_with_options(
-    temp_dir: Option<TempDir>,
-    config: Option<ScannerConfig>,
-) -> (Scanner, Option<TempDir>) {
-    let temp_dir = temp_dir.unwrap_or_else(|| TempDir::new().unwrap());
-    let config = config.unwrap_or_default();
-
-    let scanner = Scanner::new(config, temp_dir.path().to_path_buf(), false);
-    (scanner, Some(temp_dir))
-}
-
-/// Create a test scanner with default settings.
-pub fn create_default_test_scanner() -> (Scanner, TempDir) {
-    let temp_dir = TempDir::new().unwrap();
-    let config = ScannerConfig::default();
-    let scanner = Scanner::new(config, temp_dir.path().to_path_buf(), false);
-    (scanner, temp_dir)
-}
-
-/// Internal helper to create a test PhaseContext with empty analyzed_files.
-/// Both create_test_phase_context and setup_test_phase_context use this.
-fn create_test_phase_context_impl() -> (TempDir, PhaseContext<'static>) {
-    let temp_dir = TempDir::new().unwrap();
-    let config = ScannerConfig::default();
-    let scanner = Scanner::new(config, temp_dir.path().to_path_buf(), false);
-    let analyzed_files: Vec<String> = Vec::new();
-
-    // Safety: We leak these boxes to make them 'static for the test context.
-    // This is acceptable in test code where the lifetime is bounded by the test execution.
-    let scanner_ref: &'static mut Scanner = Box::leak(Box::new(scanner));
-    let analyzed_files_ref: &'static mut Vec<String> = Box::leak(Box::new(analyzed_files));
-
-    let ctx = PhaseContext {
-        scanner: scanner_ref,
-        analyzed_files: analyzed_files_ref,
-    };
-
-    (temp_dir, ctx)
-}
-
-/// Create a test context for phase tests with empty analyzed_files.
-/// Used to eliminate duplication in phase test `is_enabled` tests.
-/// Returns (temp_dir, ctx) where ctx contains a leaked scanner and analyzed_files vec.
-pub fn create_test_phase_context() -> (TempDir, PhaseContext<'static>) {
-    create_test_phase_context_impl()
-}
-
-/// Macro to create a test context with scanner and empty analyzed_files.
-#[macro_export]
-macro_rules! create_ctx {
-    () => {{
-        let (scanner, temp_dir) = $crate::phase::helpers::create_test_scanner();
-        let analyzed_files = Vec::<String>::new();
-        let ctx = $crate::phase::PhaseContext {
-            scanner: Box::leak(Box::new(scanner)),
-            analyzed_files: Box::leak(Box::new(analyzed_files)),
-        };
-        (temp_dir, ctx)
-    }};
-}
-
-/// Macro to create a test context with a finding already added.
-#[macro_export]
-macro_rules! create_ctx_with_finding {
-    ($title:expr, $file:expr, $line:expr, $severity:expr) => {{
-        let (scanner, temp_dir) = $crate::phase::helpers::create_test_scanner();
-        let finding = $crate::phase::helpers::create_test_finding($title, $file, $line, $severity);
-        let scanner_ref = Box::leak(Box::new(scanner));
-        scanner_ref.state.send_modify(|s| {
-            s.findings.push(finding);
-        });
-        let analyzed_files = Vec::<String>::new();
-        let ctx = $crate::phase::PhaseContext {
-            scanner: scanner_ref,
-            analyzed_files: Box::leak(Box::new(analyzed_files)),
-        };
-        (temp_dir, ctx)
-    }};
-}
-
-/// Create test phase context with empty analyzed_files for is_enabled tests.
-/// This eliminates duplication between confidence_scoring and indexing tests.
-pub fn setup_test_phase_context() -> (TempDir, PhaseContext<'static>) {
-    create_test_phase_context_impl()
 }

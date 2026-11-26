@@ -58,11 +58,6 @@ impl PhaseSpec {
         15
     }
 
-    /// Look up the slot for a given phase.
-    pub fn from_phase(phase: &ScanPhase) -> Option<&'static PhaseSlot> {
-        SLOTS.iter().find(|s| &s.phase == phase)
-    }
-
     /// Compute the next phase to resume from, given a completed phase.
     ///
     /// Byte-identical semantics to checkpoint::Checkpoint::resume_from.

@@ -24,12 +24,6 @@ pub fn resolve_spec_db_path(db_path: &str, output_dir: &str) -> String {
     format!("{output_dir}/{db_path}")
 }
 
-/// Default top-k results for RAG retrieval
-pub const DEFAULT_RAG_TOP_K: usize = 5;
-
-/// Default similarity threshold for specification matching
-pub const DEFAULT_SIMILARITY_THRESHOLD: f64 = 0.6;
-
 /// Create default VulnSpecConfig
 pub fn default_vuln_spec_config() -> VulnSpecConfig {
     VulnSpecConfig {

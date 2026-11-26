@@ -607,6 +607,130 @@ async fn run_sequential_phases(
     Ok((findings, analyzed_files))
 }
 
+/// Execution-time context for incremental scanning, resolved once from the
+/// scanner's config: whether the feature runs at all, where the previous
+/// store is expected, and the rules fingerprint that store must match.
+pub struct IncrementalContext {
+    pub active: bool,
+    pub store_path: std::path::PathBuf,
+    pub fingerprint: String,
+}
+
+/// Resolve the incremental context for this run. `force` disables the
+/// feature for the run that asked to re-analyze everything.
+pub fn prepare_incremental_context(scanner: &crate::scanner::Scanner) -> IncrementalContext {
+    let output_dir = std::path::PathBuf::from(&scanner.config.output.dir);
+    IncrementalContext {
+        active: scanner.config.scanner.incremental_scan && !scanner.force,
+        store_path: output_dir.join("file-hashes.json"),
+        fingerprint: crate::incremental_scan::rules_fingerprint(
+            &scanner.config.project.languages,
+            &scanner.config.scanner.semgrep.rulesets,
+            &scanner.config.scanner.semgrep.exclude_rules,
+            &scanner.config.scanner.semgrep.custom_rules,
+        ),
+    }
+}
+
+/// Snapshot the previous run's hashes and findings into the scanner state
+/// before any phase runs. The per-phase checkpoint rewrites findings.json
+/// during this scan, so "previous" cannot be read from there; it comes from
+/// the run store, which only scans that completed reporting ever write to.
+/// Returns the number of warnings raised while loading.
+pub fn ingest_incremental_snapshot(
+    scanner: &crate::scanner::Scanner,
+    ctx: &IncrementalContext,
+) -> usize {
+    if !ctx.active {
+        return 0;
+    }
+    let output_dir = std::path::PathBuf::from(&scanner.config.output.dir);
+    let (previous_store, previous_findings, warnings) =
+        crate::incremental_scan::load_previous_run_context(
+            &output_dir,
+            &ctx.fingerprint,
+            &ctx.store_path,
+        );
+    for w in &warnings {
+        tracing::warn!("{}", w);
+    }
+    scanner.state.send_modify(|s| {
+        s.previous_hash_store = previous_store;
+        s.previous_findings = previous_findings;
+    });
+    warnings.len()
+}
+
+/// Incremental chokepoint: fresh findings on unchanged files are dropped
+/// before any sequential phase sees them, so whole-project phases never
+/// mix stale with fresh. The reporting phase carries the previous run's
+/// findings for those files back in; restriction and carry share one
+/// predicate, so no file can be both dropped and not carried.
+pub fn apply_incremental_chokepoint(
+    scanner: &crate::scanner::Scanner,
+    ctx: &IncrementalContext,
+    findings: Vec<VulnerabilityFinding>,
+) -> Vec<VulnerabilityFinding> {
+    if !ctx.active {
+        return findings;
+    }
+    let (previous_store, previous_findings_len) = {
+        let state = scanner.state.borrow();
+        (
+            state.previous_hash_store.clone(),
+            state.previous_findings.len(),
+        )
+    };
+    let (filtered, dropped) = crate::incremental_scan::drop_findings_for_unchanged_files(
+        findings,
+        previous_store.as_ref(),
+        previous_findings_len,
+    );
+    if dropped > 0 {
+        tracing::info!(
+            "Incremental: dropped {} fresh finding(s) on unchanged files; the previous run's findings for them come back at reporting",
+            dropped
+        );
+    }
+    filtered
+}
+
+/// Save the incremental hash store only for a fully completed scan: an
+/// early termination or a dead parallel phase means some files were never
+/// analyzed, and a store poisoned with them would make the next run skip
+/// them and carry forward nothing.
+pub fn maybe_persist_incremental_store(
+    scanner: &crate::scanner::Scanner,
+    ctx: &IncrementalContext,
+    parallel_failures_empty: bool,
+    scan_completed_fully: bool,
+) {
+    if !crate::incremental_scan::should_persist(
+        ctx.active,
+        parallel_failures_empty,
+        scan_completed_fully,
+    ) {
+        return;
+    }
+    match scanner.state.borrow().last_hash_store.clone() {
+        Some(store) => {
+            let output_dir = std::path::PathBuf::from(&scanner.config.output.dir);
+            if let Err(e) = crate::incremental_scan::persist_store_after_full_scan(
+                &output_dir,
+                &store,
+                &ctx.fingerprint,
+            ) {
+                tracing::warn!("Failed to save the incremental hash store: {}", e);
+            } else {
+                tracing::info!("Incremental: recorded hashes for {} file(s)", store.len());
+            }
+        }
+        None => {
+            tracing::warn!("Incremental enabled but the indexing phase built no hash store");
+        }
+    }
+}
+
 /// Main scanner orchestration - coordinates parallel and sequential phase execution
 pub(super) async fn run_scanner(
     scanner: &super::Scanner,
@@ -658,6 +782,12 @@ pub(super) async fn run_scanner(
         (Vec::new(), Vec::new(), Vec::new())
     };
 
+    // Incremental scanning: the wiring lives behind the context helpers —
+    // snapshot before any phase runs, chokepoint after the parallel block,
+    // persistence after a fully completed scan.
+    let incremental_ctx = prepare_incremental_context(scanner);
+    ingest_incremental_snapshot(scanner, &incremental_ctx);
+
     let enable_parallel = true;
     let total_phases = PhaseSpec::total();
 
@@ -694,6 +824,10 @@ pub(super) async fn run_scanner(
     } else {
         0
     };
+
+    // Incremental chokepoint (see `apply_incremental_chokepoint`).
+    findings = apply_incremental_chokepoint(scanner, &incremental_ctx, findings);
+
     let (findings, analyzed_files) = run_sequential_phases(
         scanner,
         &pb,
@@ -742,6 +876,7 @@ pub(super) async fn run_scanner(
     health.set_indexed(scanner.state.borrow().files_scanned as u64);
 
     // Phases that errored are not runs and not skips: say so in the report.
+    let parallel_failures_empty = parallel_failures.is_empty();
     for (phase, reason) in parallel_failures {
         tracing::warn!(
             "Phase {} failed: {}",
@@ -763,7 +898,16 @@ pub(super) async fn run_scanner(
     // The condition above is satisfied by a single triage call, so it stays
     // silent through the failure it should catch: files the indexer found, and
     // nothing analysed them. That reads as a clean scan of nothing.
-    if crate::scan_health::scan_analysed_nothing(health.files.indexed, health.files.analyzed) {
+    // Files the incremental filter legitimately skipped were analysed in a
+    // previous run; they must not count as "dropped" for this warning.
+    let incremental_unchanged_files = scanner.state.borrow().incremental_unchanged as u64;
+    if crate::scan_health::scan_analysed_nothing(
+        health
+            .files
+            .indexed
+            .saturating_sub(incremental_unchanged_files),
+        health.files.analyzed,
+    ) {
         eprintln!(
             "\u{1B}[33m[SCAN HEALTH] WARNING: {} file(s) indexed but 0 analysed — \
              a phase silently dropped every file; the report below reflects nothing being scanned\u{1B}[0m",
@@ -776,6 +920,7 @@ pub(super) async fn run_scanner(
     let et_info = crate::checkpoint::Checkpoint::load(&scanner.checkpoint_path.to_string_lossy())
         .ok()
         .and_then(|mut cp| cp.early_termination.take());
+    let scan_completed_fully = et_info.is_none();
     let json_path = format!("{}/findings.json", scanner.config.output.dir);
     if let Err(e) = crate::report::json::write_findings_json(
         &findings,
@@ -788,6 +933,15 @@ pub(super) async fn run_scanner(
     ) {
         tracing::warn!("Failed to write final report with scan health: {}", e);
     }
+
+    // Save the incremental hash store only for a fully completed scan (see
+    // `maybe_persist_incremental_store`).
+    maybe_persist_incremental_store(
+        scanner,
+        &incremental_ctx,
+        parallel_failures_empty,
+        scan_completed_fully,
+    );
 
     scanner.state.send_modify(|s| {
         s.current_phase = ScanPhase::Reporting;

@@ -43,16 +43,16 @@ impl FileIndex {
         let lang_extensions = get_language_extensions(languages);
 
         // Canonicalize the scan root once for symlink containment check
-        let canonical_root = match std::fs::canonicalize(project_path) {
-            Ok(path) => path,
-            Err(e) => {
-                warn!(
-                    "Failed to canonicalize path {:?}: {}. Using path as-is.",
-                    project_path, e
-                );
-                PathBuf::from(project_path)
-            }
-        };
+        let canonical_root = crate::fs_util::canonical_or_as_is(Path::new(project_path));
+        if canonical_root.as_os_str() != Path::new(project_path).as_os_str() {
+            // Path was canonicalized successfully
+        } else {
+            // Fallback used - path could not be canonicalized
+            warn!(
+                "Failed to canonicalize path {:?}: using path as-is.",
+                project_path
+            );
+        }
 
         // Build the exclusion matcher
         let exclude_matcher = ExcludeMatcher::new_or_empty(excludes);
@@ -159,16 +159,16 @@ impl FileIndex {
         let lang_extensions = get_language_extensions(languages);
 
         // Canonicalize the scan root once for symlink containment check
-        let canonical_root = match std::fs::canonicalize(project_path) {
-            Ok(path) => path,
-            Err(e) => {
-                warn!(
-                    "Failed to canonicalize path {:?}: {}. Using path as-is.",
-                    project_path, e
-                );
-                PathBuf::from(project_path)
-            }
-        };
+        let canonical_root = crate::fs_util::canonical_or_as_is(Path::new(project_path));
+        if canonical_root.as_os_str() != Path::new(project_path).as_os_str() {
+            // Path was canonicalized successfully
+        } else {
+            // Fallback used - path could not be canonicalized
+            warn!(
+                "Failed to canonicalize path {:?}: using path as-is.",
+                project_path
+            );
+        }
 
         // Build the exclusion matcher
         let exclude_matcher = ExcludeMatcher::new_or_empty(excludes);
@@ -259,7 +259,12 @@ impl FileIndex {
         for (i, file_info) in all_files.iter_mut().enumerate() {
             if let Ok(hash) = hasher.hash_file(&file_info.path) {
                 file_info.hash = Some(hash.clone());
-                hash_store.insert_hash(&file_info.path, hash);
+                // Canonical key: the incremental comparison joins on canonical
+                // paths, so the store must not depend on how the scan target
+                // was spelled (relative vs absolute, trailing components).
+                let key = std::fs::canonicalize(&file_info.path)
+                    .unwrap_or_else(|_| file_info.path.to_path_buf());
+                hash_store.insert_hash(&key, hash);
             }
             if let Some(pb) = pb {
                 pb.set_position((i + 1) as u64);

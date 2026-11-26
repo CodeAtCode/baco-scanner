@@ -1,14 +1,5 @@
 use thiserror::Error;
 
-/// Retryability classification for pipeline errors
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Retryable {
-    /// Retryable error (Network/Timeout/RateLimit)
-    Yes,
-    /// Non-retryable error (Auth/Config/Parse)
-    No,
-}
-
 /// Top-level error type for BACO scanner operations
 ///
 /// Provides typed error taxonomy with retryability classification and phase context.

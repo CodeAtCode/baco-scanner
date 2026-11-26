@@ -1,10 +1,4 @@
-use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-
-/// Aggregation configuration including false positive store settings
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields)]
-pub struct AggregationConfig {}
 
 pub const DEFAULT_ENABLE_ROOT_CAUSE_DEDUP: bool = true;
 pub fn default_enable_root_cause_dedup() -> bool {

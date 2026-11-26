@@ -18,6 +18,7 @@ pub mod eval;
 pub mod evidence;
 pub mod file_hash;
 pub mod findings;
+pub mod fs_util;
 pub mod git_analysis;
 pub mod historical_patterns;
 pub mod hook_registry;

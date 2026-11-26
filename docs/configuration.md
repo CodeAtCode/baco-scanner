@@ -946,7 +946,7 @@ check against.
 | Section      | Key fields                                                                 |
 |--------------|---------------------------------------------------------------------------|
 | `project`    | `name`, `path`, `languages`                                               |
-| `scanner`    | `max_file_size_kb`, `exclude_paths`, `semgrep.rulesets`, `semgrep.custom_rules`, `performance.*`  |
+| `scanner`    | `max_file_size_kb`, `exclude_paths`, `incremental_scan`, `semgrep.rulesets`, `semgrep.custom_rules`, `performance.*`  |
 | `llm`        | `timeout_secs`, `max_concurrent`, `temperature`, `phases.*`               |
 | `triage`     | `enabled`, `model`, `batch_size`, `suspicion_threshold`                   |
 | `priority`   | `enabled`, `git_recent_boost`, `entry_point_boost`, `small_file_boost`, `entry_point_patterns`, `sink_patterns` |
