@@ -44,11 +44,13 @@ pub fn load_hunt_prompts(base_path: Option<&str>) -> HashMap<String, String> {
     let hunt_domains = [
         ("injection", "injection.md"),
         ("auth", "auth.md"),
+        ("authz_absence", "authz_absence.md"),
         ("xss", "xss.md"),
         ("path_traversal", "path_traversal.md"),
         ("crypto", "crypto.md"),
         ("resource", "resource.md"),
         ("deserialization", "deserialization.md"),
+        ("memory_safety", "memory_safety.md"),
     ];
 
     for (domain_name, filename) in hunt_domains {

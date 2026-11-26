@@ -190,3 +190,26 @@ fn test_engine_get_hunt_prompt_injection() {
     let prompt = result.unwrap();
     assert!(!prompt.is_empty());
 }
+#[test]
+fn test_engine_get_hunt_prompt_memory_safety() {
+    let engine = PromptEngine::new();
+
+    // memory_safety.md exists in prompts/hunt/ and select_hunt_domains maps
+    // C/C++ to it, so the engine must actually load the file.
+    let result = engine.get_hunt_prompt("memory_safety");
+    assert!(result.is_some(), "memory_safety hunt prompt must load");
+    let prompt = result.unwrap();
+    assert!(!prompt.is_empty());
+}
+
+#[test]
+fn test_engine_get_hunt_prompt_authz_absence() {
+    let engine = PromptEngine::new();
+
+    // authz_absence.md exists in prompts/hunt/ and CWE-284/862/863/639 route
+    // to it, so the engine must actually load the file.
+    let result = engine.get_hunt_prompt("authz_absence");
+    assert!(result.is_some(), "authz_absence hunt prompt must load");
+    let prompt = result.unwrap();
+    assert!(!prompt.is_empty());
+}
